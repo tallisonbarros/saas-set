@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Painel Inicial</title>
+    <style>
+      body { font-family: Arial, sans-serif; background: #f2f2f2; }
+      .container { max-width: 720px; margin: 10vh auto; background: #fff; padding: 24px; border-radius: 10px; }
+      .links { display: grid; gap: 12px; margin-top: 16px; }
+      .card { display: block; padding: 16px; border: 1px solid #eee; border-radius: 8px; text-decoration: none; color: #111; }
+      .card:hover { background: #fafafa; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Painel Inicial</h1>
+      <div class="links">
+        <a class="card" href="{% url 'propostas' %}">Cliente</a>
+        <a class="card" href="/admin/">Set</a>
+        <a class="card" href="{% url 'usuarios' %}">Gerenciar usuarios</a>
+      </div>
+      <p><a href="{% url 'login' %}">Login</a></p>
+    </div>
+  </body>
+</html>

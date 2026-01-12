@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gerenciar Usuarios</title>
+    <style>
+      body { font-family: Arial, sans-serif; background: #f6f6f6; }
+      .container { max-width: 900px; margin: 24px auto; background: #fff; padding: 24px; border-radius: 8px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+      th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; }
+      form { margin-top: 16px; }
+      label { display: block; margin-top: 10px; }
+      input { width: 100%; padding: 8px; margin-top: 6px; }
+      .checkbox { width: auto; }
+      button { margin-top: 16px; padding: 10px 16px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Gerenciar Usuarios</h1>
+      <a href="{% url 'home' %}">Voltar ao painel</a>
+
+      <h2>Criar usuario</h2>
+      <form method="post">
+        {% csrf_token %}
+        <label for="id_username">Email</label>
+        {{ form.username }}
+        <label for="id_password">Senha</label>
+        {{ form.password }}
+        <label for="id_is_staff">Administrador</label>
+        {{ form.is_staff }}
+        <button type="submit">Criar</button>
+      </form>
+
+      <h2>Usuarios</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Admin</th>
+            <th>Ativo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.is_staff|yesno:"Sim,Nao" }}</td>
+              <td>{{ user.is_active|yesno:"Sim,Nao" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3">Sem usuarios cadastrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>
