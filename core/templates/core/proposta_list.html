@@ -15,6 +15,7 @@
   </head>
   <body>
     <div class="container">
+      <p>Usuario: {{ request.user.username }}</p>
       <div>
         <strong>{{ cliente.nome }}</strong>
         {% if cliente.logo %}

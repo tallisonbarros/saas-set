@@ -15,12 +15,21 @@
   <body>
     <div class="container">
       <h1>Painel Inicial</h1>
+      {% if request.user.is_authenticated %}
+        <p>Usuario: {{ request.user.username }}</p>
+      {% else %}
+        <p>Usuario: visitante</p>
+      {% endif %}
       <div class="links">
         <a class="card" href="{% url 'propostas' %}">Cliente</a>
         <a class="card" href="/admin/">Set</a>
         <a class="card" href="{% url 'usuarios' %}">Gerenciar usuarios</a>
       </div>
-      <p><a href="{% url 'login' %}">Login</a></p>
+      {% if request.user.is_authenticated %}
+        <p><a href="{% url 'logout' %}">Sair</a></p>
+      {% else %}
+        <p><a href="{% url 'login' %}">Login</a></p>
+      {% endif %}
     </div>
   </body>
 </html>

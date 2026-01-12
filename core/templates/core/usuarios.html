@@ -19,6 +19,7 @@
   <body>
     <div class="container">
       <h1>Gerenciar Usuarios</h1>
+      <p>Usuario: {{ request.user.username }}</p>
       <a href="{% url 'home' %}">Voltar ao painel</a>
 
       <h2>Criar usuario</h2>
