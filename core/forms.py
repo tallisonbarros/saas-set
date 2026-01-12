@@ -39,9 +39,9 @@ class ClienteAdminForm(forms.ModelForm):
             usuario.set_password(senha_inicial)
         elif not usuario.pk:
             usuario.set_unusable_password()
+        usuario.save()
+        cliente.usuario = usuario
         if commit:
-            usuario.save()
-            cliente.usuario = usuario
             cliente.save()
             self.save_m2m()
         return cliente
