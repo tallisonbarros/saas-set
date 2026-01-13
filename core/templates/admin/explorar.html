@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+  <div class="module">
+    <h2>Explorar clientes</h2>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Empresa</th>
+          <th>Email</th>
+          <th>Propostas</th>
+          <th>Abrir</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+          <tr>
+            <td>{{ c.nome }}</td>
+            <td>{{ c.empresa }}</td>
+            <td>{{ c.email }}</td>
+            <td>{{ c.propostas.count }}</td>
+            <td><a class="button" href="/admin/explorar/?cliente_id={{ c.id }}">Ver propostas</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5">Sem clientes cadastrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if cliente %}
+    <div class="module">
+      <h2>Propostas de {{ cliente.nome }}</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Codigo</th>
+            <th>Status</th>
+            <th>Prioridade</th>
+            <th>Valor</th>
+            <th>Abrir</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in propostas %}
+            <tr>
+              <td>{{ p.nome }}</td>
+              <td>{{ p.codigo }}</td>
+              <td>{{ p.get_status_display }}</td>
+              <td>{{ p.prioridade }}</td>
+              <td>R$ {{ p.valor }}</td>
+              <td><a class="button" href="/admin/core/proposta/{{ p.id }}/change/">Abrir</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6">Sem propostas para este cliente.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

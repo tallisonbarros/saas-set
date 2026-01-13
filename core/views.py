@@ -118,3 +118,20 @@ def user_management(request):
         form = UserCreateForm()
     users = User.objects.order_by("username")
     return render(request, "core/usuarios.html", {"form": form, "users": users})
+
+
+def admin_explorar(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    cliente_id = request.GET.get("cliente_id")
+    clientes = Cliente.objects.order_by("nome")
+    cliente = None
+    propostas = Proposta.objects.none()
+    if cliente_id:
+        cliente = get_object_or_404(Cliente, pk=cliente_id)
+        propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
+    return render(
+        request,
+        "admin/explorar.html",
+        {"clientes": clientes, "cliente": cliente, "propostas": propostas},
+    )
