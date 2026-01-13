@@ -8,6 +8,10 @@
 {% block content %}
   <section class="card hero">
     <img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo">
+    <div>
+      <h1 class="hero-title">Aprove propostas em minutos</h1>
+      <p class="hero-subtitle">Centralize propostas e aprovacoes com um fluxo simples.</p>
+    </div>
     <div class="actions">
       <a class="btn btn-primary" href="{% url 'login' %}">Entrar</a>
       <div class="icon-row">
@@ -28,12 +32,23 @@
           </a>
         {% endif %}
       </div>
-      {% if request.user.is_authenticated %}
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button class="btn btn-ghost" type="submit">Sair</button>
-        </form>
-      {% endif %}
+    </div>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-title">1. Faça seu login</div>
+        <p class="muted">Utilize o Email e senha encaminhado.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">2. Monitore as propostas</div>
+        <p class="muted">Verifique o status das propostas em andamento.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">3. Aprove propostas</div>
+        <p class="muted">Aprove ou reprove com observacao.</p>
+      </div>
+    </div>
+    <div class="hero-links">
+      <a class="btn btn-ghost" href="https://www.setbrasil.com" target="_blank" rel="noreferrer">Fale com a SET</a>
     </div>
   </section>
 {% endblock %}

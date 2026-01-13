@@ -155,6 +155,17 @@ body {
   margin: 0 auto;
 }
 
+.hero-title {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: -0.5px;
+}
+
+.hero-subtitle {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
 .hero .actions {
   display: grid;
   gap: 12px;
@@ -310,6 +321,31 @@ select {
   margin-top: 18px;
 }
 
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.step-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.step-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.hero-links {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .detail-actions form {
   display: grid;
   gap: 8px;
@@ -336,5 +372,13 @@ select {
   .client-meta {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-title {
+    font-size: 26px;
   }
 }
