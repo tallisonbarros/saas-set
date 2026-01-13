@@ -1,53 +1,41 @@
+{% extends "core/base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="pt-br">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Gerenciar Usuarios</title>
-    <style>
-      body { font-family: Arial, sans-serif; background: #f6f6f6; }
-      .container { max-width: 900px; margin: 24px auto; background: #fff; padding: 24px; border-radius: 8px; }
-      .header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-      .logo { height: 40px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-      th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; }
-      form { margin-top: 16px; }
-      label { display: block; margin-top: 10px; }
-      input { width: 100%; padding: 8px; margin-top: 6px; }
-      .checkbox { width: auto; }
-      button { margin-top: 16px; padding: 10px 16px; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="{% url 'home' %}"><img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo"></a>
-        <div>
-          <div>Usuario: {{ request.user.username }}</div>
-          <div>Gerenciar Usuarios</div>
+
+{% block title %}Usuarios{% endblock %}
+
+{% block content %}
+  <section class="card stack">
+    <div>
+      <h1 style="margin: 0;">Gerenciar Usuarios</h1>
+      <p class="muted">Usuario atual: {{ request.user.username }}</p>
+    </div>
+
+    <div class="card" style="box-shadow: none;">
+      <h2 style="margin-top: 0;">Criar usuario</h2>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <div class="field">
+          <label for="id_username">Email</label>
+          {{ form.username }}
         </div>
-      </div>
-      <a href="{% url 'home' %}">Voltar ao painel</a>
-      <form method="post" action="{% url 'logout' %}">
-        {% csrf_token %}
-        <button type="submit">Sair</button>
+        <div class="field">
+          <label for="id_password">Senha</label>
+          {{ form.password }}
+        </div>
+        <div class="field">
+          <label for="id_is_staff">Administrador</label>
+          {{ form.is_staff }}
+        </div>
+        <button class="btn btn-primary" type="submit">Criar</button>
+        {% if form.errors %}
+          <p class="muted">Erro ao criar usuario. Verifique os dados.</p>
+        {% endif %}
       </form>
+    </div>
 
-      <h2>Criar usuario</h2>
-      <form method="post">
-        {% csrf_token %}
-        <label for="id_username">Email</label>
-        {{ form.username }}
-        <label for="id_password">Senha</label>
-        {{ form.password }}
-        <label for="id_is_staff">Administrador</label>
-        {{ form.is_staff }}
-        <button type="submit">Criar</button>
-      </form>
-
-      <h2>Usuarios</h2>
-      <table>
+    <div class="card" style="box-shadow: none;">
+      <h2 style="margin-top: 0;">Usuarios</h2>
+      <table class="table">
         <thead>
           <tr>
             <th>Email</th>
@@ -68,5 +56,5 @@
         </tbody>
       </table>
     </div>
-  </body>
-</html>
+  </section>
+{% endblock %}

@@ -1,78 +1,75 @@
+{% extends "core/base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="pt-br">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Minhas Propostas</title>
-    <style>
-      body { font-family: Arial, sans-serif; background: #f6f6f6; }
-      .container { max-width: 900px; margin: 24px auto; background: #fff; padding: 24px; border-radius: 8px; }
-      .header { display: flex; justify-content: center; margin-bottom: 24px; }
-      .logo { height: 48px; }
-      .content { margin-top: 24px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-      th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; }
-      .status { font-weight: bold; }
-      .actions form { display: inline; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="{% url 'home' %}"><img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo"></a>
+
+{% block title %}Propostas{% endblock %}
+
+{% block content %}
+  <section class="card stack">
+    <div class="client-meta">
+      {% if cliente.logo %}
+        <img src="{{ cliente.logo.url }}" alt="Logo">
+      {% endif %}
+      <div>
+        <div><strong>{{ cliente.nome }}</strong></div>
+        <div class="muted">{{ cliente.email }}</div>
       </div>
-      <div class="content">
-        <div>
-          <strong>{{ cliente.nome }}</strong>
-          {% if cliente.logo %}
-            <div><img src="{{ cliente.logo.url }}" alt="Logo" width="120"></div>
-          {% endif %}
-        </div>
-        {% if not cliente %}
-          <p>Usuario sem cliente associado. Fale com o administrador.</p>
-        {% elif propostas %}
-          <table>
-            <thead>
+    </div>
+    {% if not cliente %}
+      <p>Usuario sem cliente associado. Fale com o administrador.</p>
+    {% else %}
+      <div class="filters">
+        <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
+        <a href="{% url 'propostas' %}?status=PENDENTE" class="filter-pill {% if status_filter == 'PENDENTE' %}active{% endif %}">Pendentes</a>
+        <a href="{% url 'propostas' %}?status=APROVADA" class="filter-pill {% if status_filter == 'APROVADA' %}active{% endif %}">Aprovadas</a>
+        <a href="{% url 'propostas' %}?status=REPROVADA" class="filter-pill {% if status_filter == 'REPROVADA' %}active{% endif %}">Reprovadas</a>
+      </div>
+      {% if propostas %}
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Codigo</th>
+              <th>Descricao</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Acoes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for proposta in propostas %}
               <tr>
-                <th>Nome</th>
-                <th>Codigo</th>
-                <th>Descricao</th>
-                <th>Valor</th>
-                <th>Status</th>
-                <th>Acoes</th>
+                <td><a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a></td>
+                <td>{{ proposta.codigo }}</td>
+                <td>{{ proposta.descricao|truncatewords:12 }}</td>
+                <td>R$ {{ proposta.valor }}</td>
+                <td>
+                  <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
+                </td>
+                <td>
+                  {% if proposta.status == "PENDENTE" %}
+                    <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}" style="display: inline;">
+                      {% csrf_token %}
+                      <button class="btn btn-primary" type="submit">Aprovar</button>
+                    </form>
+                    <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}" style="display: inline;">
+                      {% csrf_token %}
+                      <button class="btn btn-outline" type="submit">Reprovar</button>
+                    </form>
+                  {% else %}
+                    <a class="nav-link" href="{% url 'proposta_detail' proposta.pk %}">Ver detalhes</a>
+                  {% endif %}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {% for proposta in propostas %}
-                <tr>
-                  <td>{{ proposta.nome }}</td>
-                  <td>{{ proposta.codigo }}</td>
-                  <td>{{ proposta.descricao }}</td>
-                  <td>R$ {{ proposta.valor }}</td>
-                  <td class="status">{{ proposta.get_status_display }}</td>
-                  <td class="actions">
-                    {% if proposta.status == "PENDENTE" %}
-                      <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-                        {% csrf_token %}
-                        <button type="submit">Aprovar</button>
-                      </form>
-                    {% else %}
-                      -
-                    {% endif %}
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        {% if status_filter %}
+          <p>Sem propostas para o filtro selecionado.</p>
         {% else %}
           <p>Sem propostas no momento.</p>
         {% endif %}
-      </div>
-      <form method="post" action="{% url 'logout' %}">
-        {% csrf_token %}
-        <button type="submit">Sair</button>
-      </form>
-    </div>
-  </body>
-</html>
+      {% endif %}
+    {% endif %}
+  </section>
+{% endblock %}

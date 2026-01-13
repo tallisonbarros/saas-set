@@ -26,6 +26,10 @@ class Proposta(models.Model):
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDENTE)
     criado_em = models.DateTimeField(auto_now_add=True)
     decidido_em = models.DateTimeField(null=True, blank=True)
+    aprovado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="propostas_aprovadas"
+    )
+    observacao_cliente = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.cliente.nome} - {self.valor} ({self.status})"

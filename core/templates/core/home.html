@@ -1,39 +1,24 @@
+{% extends "core/base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="pt-br">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Painel Inicial</title>
-    <style>
-      body { font-family: Arial, sans-serif; background: #f2f2f2; }
-      .container { max-width: 720px; margin: 10vh auto; background: #fff; padding: 24px; border-radius: 10px; }
-      .header { display: flex; justify-content: center; margin-bottom: 24px; }
-      .logo { height: 48px; }
-      .links { display: grid; gap: 12px; margin-top: 16px; }
-      .primary { display: block; padding: 18px; border-radius: 10px; text-decoration: none; color: #111; background: #f2f7ff; border: 1px solid #d7e5ff; font-weight: bold; text-align: center; }
-      .primary:hover { background: #e8f1ff; }
-      .mini-links { display: flex; gap: 10px; margin-top: 8px; }
-      .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; border: 1px solid #eee; background: #fff; text-decoration: none; color: #111; }
-      .icon-btn:hover { background: #fafafa; }
-      .icon { width: 18px; height: 18px; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="{% url 'home' %}"><img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo"></a>
-      </div>
-      <div class="links">
-        <a class="primary" href="{% url 'login' %}">Entrar</a>
-        <div class="mini-links">
-          <a class="icon-btn" href="/admin/" title="Set" aria-label="Set">
+
+{% block title %}Inicio{% endblock %}
+
+{% block header %}{% endblock %}
+
+{% block content %}
+  <section class="card hero">
+    <img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo">
+    <div class="actions">
+      <a class="btn btn-primary" href="{% url 'login' %}">Entrar</a>
+      <div class="icon-row">
+        {% if request.user.is_staff %}
+          <a class="icon-btn" href="/admin/" title="Admin" aria-label="Admin">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
               <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
             </svg>
           </a>
-          <a class="icon-btn" href="{% url 'usuarios' %}" title="Gerenciar usuarios" aria-label="Gerenciar usuarios">
+          <a class="icon-btn" href="{% url 'usuarios' %}" title="Usuarios" aria-label="Usuarios">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="8" cy="9" r="3" fill="currentColor"></circle>
               <circle cx="16" cy="10" r="2.5" fill="currentColor"></circle>
@@ -41,16 +26,14 @@
               <path d="M12 19c.3-1.6 1.7-2.8 3.4-2.8 1.8 0 3.3 1.2 3.6 2.8" fill="none" stroke="currentColor" stroke-width="2"></path>
             </svg>
           </a>
-        </div>
+        {% endif %}
       </div>
       {% if request.user.is_authenticated %}
         <form method="post" action="{% url 'logout' %}">
           {% csrf_token %}
-          <button type="submit">Sair</button>
+          <button class="btn btn-ghost" type="submit">Sair</button>
         </form>
-      {% else %}
-        <p><a href="{% url 'login' %}">Login</a></p>
       {% endif %}
     </div>
-  </body>
-</html>
+  </section>
+{% endblock %}

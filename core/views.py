@@ -27,7 +27,21 @@ def proposta_list(request):
     propostas = Proposta.objects.none()
     if cliente:
         propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
-    return render(request, "core/proposta_list.html", {"cliente": cliente, "propostas": propostas})
+    status = request.GET.get("status")
+    if status in Proposta.Status.values:
+        propostas = propostas.filter(status=status)
+    return render(
+        request,
+        "core/proposta_list.html",
+        {"cliente": cliente, "propostas": propostas, "status_filter": status},
+    )
+
+
+@login_required
+def proposta_detail(request, pk):
+    cliente = _get_cliente(request.user)
+    proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    return render(request, "core/proposta_detail.html", {"cliente": cliente, "proposta": proposta})
 
 
 @login_required
@@ -38,7 +52,23 @@ def aprovar_proposta(request, pk):
     if proposta.status == Proposta.Status.PENDENTE:
         proposta.status = Proposta.Status.APROVADA
         proposta.decidido_em = timezone.now()
-        proposta.save(update_fields=["status", "decidido_em"])
+        proposta.aprovado_por = request.user
+        proposta.save(update_fields=["status", "decidido_em", "aprovado_por"])
+    return redirect("propostas")
+
+
+@login_required
+@require_POST
+def reprovar_proposta(request, pk):
+    cliente = _get_cliente(request.user)
+    proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    if proposta.status == Proposta.Status.PENDENTE:
+        observacao = request.POST.get("observacao", "").strip()
+        proposta.status = Proposta.Status.REPROVADA
+        proposta.decidido_em = timezone.now()
+        proposta.observacao_cliente = observacao
+        proposta.aprovado_por = request.user
+        proposta.save(update_fields=["status", "decidido_em", "observacao_cliente", "aprovado_por"])
     return redirect("propostas")
 
 

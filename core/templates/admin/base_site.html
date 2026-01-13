@@ -1,0 +1,14 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}SET Admin{% endblock %}
+
+{% block branding %}
+  <div id="site-name">
+    <a href="{% url 'admin:index' %}">
+      <img src="{% static 'core/logoset.png' %}" alt="SET" style="height: 40px;">
+    </a>
+  </div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
