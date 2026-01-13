@@ -11,6 +11,9 @@
       {% endif %}
       <div>
         <div><strong>{{ cliente.nome }}</strong></div>
+        {% if cliente.empresa %}
+          <div class="muted">{{ cliente.empresa }}</div>
+        {% endif %}
         <div class="muted">{{ cliente.email }}</div>
       </div>
     </div>
@@ -29,22 +32,24 @@
       {% if propostas %}
         <table class="table">
           <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Codigo</th>
-              <th>Descricao</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th>Acoes</th>
-            </tr>
+          <tr>
+            <th>Nome</th>
+            <th>Codigo</th>
+            <th>Descricao</th>
+            <th>Prioridade</th>
+            <th>Valor</th>
+            <th>Status</th>
+            <th>Acoes</th>
+          </tr>
           </thead>
           <tbody>
             {% for proposta in propostas %}
               <tr>
-                <td><a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a></td>
-                <td>{{ proposta.codigo }}</td>
-                <td>{{ proposta.descricao|truncatewords:12 }}</td>
-                <td>R$ {{ proposta.valor }}</td>
+              <td><a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a></td>
+              <td>{{ proposta.codigo }}</td>
+              <td>{{ proposta.descricao|truncatewords:12 }}</td>
+              <td>{{ proposta.prioridade }}</td>
+              <td>R$ {{ proposta.valor }}</td>
               <td>
                 <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
               </td>

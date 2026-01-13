@@ -30,6 +30,8 @@ def proposta_list(request):
     status = request.GET.get("status")
     if status in Proposta.Status.values:
         propostas = propostas.filter(status=status)
+        if status == Proposta.Status.APROVADA:
+            propostas = propostas.order_by("prioridade", "-criado_em")
     else:
         propostas = propostas.exclude(status=Proposta.Status.FINALIZADO)
     return render(

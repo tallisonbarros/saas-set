@@ -13,7 +13,7 @@ class ClienteAdminForm(forms.ModelForm):
 
     class Meta:
         model = Cliente
-        fields = ["nome", "email", "logo", "ativo"]
+        fields = ["nome", "empresa", "email", "logo", "ativo"]
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()

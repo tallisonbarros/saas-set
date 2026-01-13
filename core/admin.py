@@ -13,6 +13,6 @@ class ClienteAdmin(admin.ModelAdmin):
 
 @admin.register(Proposta)
 class PropostaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "codigo", "cliente", "status", "valor", "criado_em", "decidido_em")
+    list_display = ("nome", "codigo", "cliente", "status", "prioridade", "valor", "criado_em", "decidido_em")
     list_filter = ("status",)
     search_fields = ("nome", "codigo", "cliente__nome")
