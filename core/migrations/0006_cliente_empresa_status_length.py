@@ -15,6 +15,11 @@ class Migration(migrations.Migration):
             name="empresa",
             field=models.CharField(blank=True, max_length=120),
         ),
+        migrations.AddField(
+            model_name="cliente",
+            name="sigla_cidade",
+            field=models.CharField(blank=True, max_length=3),
+        ),
         migrations.AlterField(
             model_name="proposta",
             name="status",

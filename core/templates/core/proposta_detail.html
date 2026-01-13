@@ -25,9 +25,11 @@
     <div class="detail-actions">
       <form method="post" action="{% url 'salvar_observacao' proposta.pk %}">
         {% csrf_token %}
+        <label for="id_prioridade">Prioridade (1 a 99)</label>
+        <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ proposta.prioridade }}">
         <label for="id_observacao">Observacao</label>
         <textarea id="id_observacao" name="observacao">{{ proposta.observacao_cliente }}</textarea>
-        <button class="btn btn-ghost" type="submit">Salvar observacao</button>
+        <button class="btn btn-ghost" type="submit">Salvar</button>
       </form>
       {% if proposta.status == "PENDENTE" %}
         <div style="display: flex; gap: 12px;">

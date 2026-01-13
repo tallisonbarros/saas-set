@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from django.contrib.auth.models import User
+from django.db.models import Case, IntegerField, Value, When
 
 from .forms import UserCreateForm
 from .models import Cliente, Proposta
@@ -33,7 +34,17 @@ def proposta_list(request):
         if status == Proposta.Status.APROVADA:
             propostas = propostas.order_by("prioridade", "-criado_em")
     else:
-        propostas = propostas.exclude(status=Proposta.Status.FINALIZADO)
+        propostas = propostas.exclude(status__in=[Proposta.Status.REPROVADA, Proposta.Status.FINALIZADO])
+        propostas = propostas.annotate(
+            status_order=Case(
+                When(status=Proposta.Status.PENDENTE, then=Value(1)),
+                When(status=Proposta.Status.EXECUTANDO, then=Value(2)),
+                When(status=Proposta.Status.APROVADA, then=Value(3)),
+                When(status=Proposta.Status.LEVANTAMENTO, then=Value(4)),
+                default=Value(5),
+                output_field=IntegerField(),
+            )
+        ).order_by("status_order", "-criado_em")
     return render(
         request,
         "core/proposta_list.html",
@@ -80,8 +91,17 @@ def salvar_observacao(request, pk):
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     observacao = request.POST.get("observacao", "").strip()
+    prioridade_raw = request.POST.get("prioridade", "").strip()
     proposta.observacao_cliente = observacao
-    proposta.save(update_fields=["observacao_cliente"])
+    if prioridade_raw:
+        try:
+            prioridade = int(prioridade_raw)
+        except ValueError:
+            prioridade = None
+        if prioridade is not None:
+            prioridade = max(1, min(99, prioridade))
+            proposta.prioridade = prioridade
+    proposta.save(update_fields=["observacao_cliente", "prioridade"])
     return redirect("proposta_detail", pk=proposta.pk)
 
 
