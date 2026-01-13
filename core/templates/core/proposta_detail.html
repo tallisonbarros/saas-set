@@ -21,24 +21,26 @@
         <div><strong>Decidido por:</strong> {{ proposta.aprovado_por.username }}</div>
       {% endif %}
     </div>
-    {% if proposta.status == "PENDENTE" %}
-      <div class="detail-actions">
-        <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-          {% csrf_token %}
-          <button class="btn btn-primary" type="submit">Aprovar</button>
-        </form>
-        <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
-          {% csrf_token %}
-          <label for="id_observacao">Observacao</label>
-          <textarea id="id_observacao" name="observacao"></textarea>
-          <button class="btn btn-outline" type="submit">Reprovar</button>
-        </form>
-      </div>
-    {% else %}
-      {% if proposta.observacao_cliente %}
-        <p><strong>Observacao do cliente:</strong> {{ proposta.observacao_cliente }}</p>
+    <div class="detail-actions">
+      <form method="post" action="{% url 'salvar_observacao' proposta.pk %}">
+        {% csrf_token %}
+        <label for="id_observacao">Observacao</label>
+        <textarea id="id_observacao" name="observacao">{{ proposta.observacao_cliente }}</textarea>
+        <button class="btn btn-ghost" type="submit">Salvar observacao</button>
+      </form>
+      {% if proposta.status == "PENDENTE" %}
+        <div style="display: flex; gap: 12px;">
+          <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-primary" type="submit">Aprovar</button>
+          </form>
+          <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-outline" type="submit">Reprovar</button>
+          </form>
+        </div>
       {% endif %}
-    {% endif %}
+    </div>
     <a class="nav-link" href="{% url 'propostas' %}">Voltar</a>
   </section>
 {% endblock %}

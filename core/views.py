@@ -63,13 +63,22 @@ def reprovar_proposta(request, pk):
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.status == Proposta.Status.PENDENTE:
-        observacao = request.POST.get("observacao", "").strip()
         proposta.status = Proposta.Status.REPROVADA
         proposta.decidido_em = timezone.now()
-        proposta.observacao_cliente = observacao
         proposta.aprovado_por = request.user
-        proposta.save(update_fields=["status", "decidido_em", "observacao_cliente", "aprovado_por"])
+        proposta.save(update_fields=["status", "decidido_em", "aprovado_por"])
     return redirect("propostas")
+
+
+@login_required
+@require_POST
+def salvar_observacao(request, pk):
+    cliente = _get_cliente(request.user)
+    proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    observacao = request.POST.get("observacao", "").strip()
+    proposta.observacao_cliente = observacao
+    proposta.save(update_fields=["observacao_cliente"])
+    return redirect("proposta_detail", pk=proposta.pk)
 
 
 @login_required

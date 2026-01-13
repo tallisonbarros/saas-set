@@ -31,6 +31,7 @@ urlpatterns = [
     path('propostas/<int:pk>/', views.proposta_detail, name="proposta_detail"),
     path('propostas/<int:pk>/aprovar/', views.aprovar_proposta, name="aprovar_proposta"),
     path('propostas/<int:pk>/reprovar/', views.reprovar_proposta, name="reprovar_proposta"),
+    path('propostas/<int:pk>/observacao/', views.salvar_observacao, name="salvar_observacao"),
     path('usuarios/', views.user_management, name="usuarios"),
 ]
 
