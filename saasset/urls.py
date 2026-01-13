@@ -26,6 +26,7 @@ urlpatterns = [
     path('admin/explorar/', admin.site.admin_view(views.admin_explorar), name="admin_explorar"),
     path('admin/', admin.site.urls),
     path('', views.home, name="home"),
+    path('painel/', views.painel, name="painel"),
     path('login/', auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
     path('logout/', auth_views.LogoutView.as_view(), name="logout"),
     path('propostas/', views.proposta_list, name="propostas"),

@@ -23,6 +23,11 @@ def home(request):
 
 
 @login_required
+def painel(request):
+    return render(request, "core/painel.html")
+
+
+@login_required
 def proposta_list(request):
     cliente = _get_cliente(request.user)
     propostas = Proposta.objects.none()

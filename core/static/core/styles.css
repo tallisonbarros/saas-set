@@ -377,6 +377,34 @@ select {
   flex-wrap: wrap;
 }
 
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.panel-card {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.panel-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.panel-title {
+  font-weight: 600;
+}
+
 .detail-actions form {
   display: grid;
   gap: 8px;
@@ -415,5 +443,9 @@ select {
 
   .hero-title {
     font-size: 26px;
+  }
+
+  .panel-grid {
+    grid-template-columns: 1fr;
   }
 }

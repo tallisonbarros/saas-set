@@ -137,5 +137,5 @@ MEDIA_ROOT = Path(os.environ.get(
 ))
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "propostas"
+LOGIN_REDIRECT_URL = "painel"
 LOGOUT_REDIRECT_URL = "login"

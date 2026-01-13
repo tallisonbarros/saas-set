@@ -1,0 +1,38 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Painel{% endblock %}
+
+{% block content %}
+  <section class="card hero">
+    <img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo">
+    <div>
+      <h1 class="hero-title">Painel</h1>
+      <p class="hero-subtitle">Escolha para onde deseja ir.</p>
+    </div>
+    <div class="panel-grid">
+      <a class="panel-card" href="{% url 'propostas' %}">
+        <div class="panel-title">Propostas</div>
+        <div class="muted">Visualizar e aprovar propostas.</div>
+      </a>
+      {% if request.user.is_staff %}
+        <a class="panel-card" href="/admin/">
+          <div class="panel-title">Admin</div>
+          <div class="muted">Gerenciar dados do sistema.</div>
+        </a>
+        <a class="panel-card" href="/admin/explorar/">
+          <div class="panel-title">Explorar</div>
+          <div class="muted">Clientes e propostas por cliente.</div>
+        </a>
+        <a class="panel-card" href="{% url 'usuarios' %}">
+          <div class="panel-title">Usuarios</div>
+          <div class="muted">Criar e listar usuarios.</div>
+        </a>
+      {% endif %}
+    </div>
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button class="btn btn-ghost" type="submit">Sair</button>
+    </form>
+  </section>
+{% endblock %}
