@@ -8,8 +8,10 @@
 {% block content %}
   <div class="page-center">
     <div class="card" style="max-width: 380px; width: 100%;">
-      <div class="stack" style="text-align: center; align-items: center;">
-        <img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo">
+      <div class="stack centered" style="text-align: center;">
+        <div class="logo-wrap">
+          <img class="logo login-logo" src="{% static 'core/logoset.png' %}" alt="Logo">
+        </div>
         <h1 style="margin: 0; font-size: 18px;">Login do Cliente</h1>
       </div>
       {% if form.errors %}

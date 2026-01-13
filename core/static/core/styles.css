@@ -48,6 +48,16 @@ body {
   display: block;
 }
 
+.login-logo {
+  margin: 0 auto;
+}
+
+.logo-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
 .nav {
   display: flex;
   gap: 16px;
@@ -264,6 +274,10 @@ select {
 .stack {
   display: grid;
   gap: 16px;
+}
+
+.stack.centered {
+  justify-items: center;
 }
 
 .muted {
