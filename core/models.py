@@ -17,6 +17,9 @@ class Proposta(models.Model):
         PENDENTE = "PENDENTE", "Pendente"
         APROVADA = "APROVADA", "Aprovada"
         REPROVADA = "REPROVADA", "Reprovada"
+        LEVANTAMENTO = "LEVANTAMENTO", "Levantamento"
+        EXECUTANDO = "EXECUTANDO", "Executando"
+        FINALIZADO = "FINALIZADO", "Finalizado"
 
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="propostas")
     nome = models.CharField(max_length=120)

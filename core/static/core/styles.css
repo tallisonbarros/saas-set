@@ -245,6 +245,21 @@ body {
   color: #9a2f00;
 }
 
+.badge-levantamento {
+  background: #ffe9d6;
+  color: #b34b00;
+}
+
+.badge-executando {
+  background: #ffd9bf;
+  color: #a84200;
+}
+
+.badge-finalizado {
+  background: #ffe1cc;
+  color: #9b3a00;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;

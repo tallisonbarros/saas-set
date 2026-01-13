@@ -20,8 +20,11 @@
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
         <a href="{% url 'propostas' %}?status=PENDENTE" class="filter-pill {% if status_filter == 'PENDENTE' %}active{% endif %}">Pendentes</a>
+        <a href="{% url 'propostas' %}?status=LEVANTAMENTO" class="filter-pill {% if status_filter == 'LEVANTAMENTO' %}active{% endif %}">Levantamento</a>
+        <a href="{% url 'propostas' %}?status=EXECUTANDO" class="filter-pill {% if status_filter == 'EXECUTANDO' %}active{% endif %}">Executando</a>
         <a href="{% url 'propostas' %}?status=APROVADA" class="filter-pill {% if status_filter == 'APROVADA' %}active{% endif %}">Aprovadas</a>
         <a href="{% url 'propostas' %}?status=REPROVADA" class="filter-pill {% if status_filter == 'REPROVADA' %}active{% endif %}">Reprovadas</a>
+        <a href="{% url 'propostas' %}?status=FINALIZADO" class="filter-pill {% if status_filter == 'FINALIZADO' %}active{% endif %}">Finalizadas</a>
       </div>
       {% if propostas %}
         <table class="table">
@@ -42,9 +45,9 @@
                 <td>{{ proposta.codigo }}</td>
                 <td>{{ proposta.descricao|truncatewords:12 }}</td>
                 <td>R$ {{ proposta.valor }}</td>
-                <td>
-                  <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
-                </td>
+              <td>
+                <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
+              </td>
                 <td>
                   {% if proposta.status == "PENDENTE" %}
                     <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}" style="display: inline;">
