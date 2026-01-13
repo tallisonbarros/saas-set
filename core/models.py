@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 class Cliente(models.Model):
     nome = models.CharField(max_length=120)
     email = models.EmailField()
-    logo = models.ImageField(upload_to="logos/", blank=True, null=True)
+    logo = models.ImageField(upload_to="clientes/logos/", blank=True, null=True)
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)  # login do cliente
     ativo = models.BooleanField(default=True)
 
