@@ -35,7 +35,6 @@
           <tr>
             <th>Nome</th>
             <th>Codigo</th>
-            <th>Descricao</th>
             <th>Prioridade</th>
             <th>Valor</th>
             <th>Status</th>
@@ -47,28 +46,26 @@
               <tr>
               <td><a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a></td>
               <td>{{ proposta.codigo }}</td>
-              <td>{{ proposta.descricao|truncatewords:12 }}</td>
               <td>{{ proposta.prioridade }}</td>
               <td>R$ {{ proposta.valor }}</td>
               <td>
                 <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
               </td>
-                <td>
-                  {% if proposta.status == "PENDENTE" %}
-                    <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}" style="display: inline;">
-                      {% csrf_token %}
-                      <button class="btn btn-primary" type="submit">Aprovar</button>
-                    </form>
-                    <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}" style="display: inline;">
-                      {% csrf_token %}
-                      <button class="btn btn-outline" type="submit">Reprovar</button>
-                    </form>
-                  {% else %}
-                    <a class="nav-link" href="{% url 'proposta_detail' proposta.pk %}">Ver detalhes</a>
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
+              <td>
+                {% if proposta.status == "PENDENTE" %}
+                  <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button class="btn btn-primary" type="submit">Aprovar</button>
+                  </form>
+                  <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button class="btn btn-outline" type="submit">Reprovar</button>
+                  </form>
+                {% endif %}
+                <a class="btn btn-ghost" href="{% url 'proposta_detail' proposta.pk %}">Abrir detalhes</a>
+              </td>
+            </tr>
+          {% endfor %}
           </tbody>
         </table>
       {% else %}

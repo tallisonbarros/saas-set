@@ -1,0 +1,43 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var codigo = document.getElementById("id_codigo");
+      if (!codigo) return;
+      var cliente = document.getElementById("id_cliente");
+      if (!cliente) return;
+
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "button";
+      button.style.marginLeft = "8px";
+      button.textContent = "Gerar codigo";
+
+      codigo.parentNode.appendChild(button);
+
+      button.addEventListener("click", function () {
+        var clienteId = cliente.value;
+        if (!clienteId) {
+          alert("Selecione um cliente primeiro.");
+          return;
+        }
+        var url = "{% url 'admin:core_proposta_gerar_codigo' %}?cliente_id=" + clienteId;
+        fetch(url)
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (data.codigo) {
+              codigo.value = data.codigo;
+            } else if (data.error) {
+              alert(data.error);
+            }
+          })
+          .catch(function () {
+            alert("Nao foi possivel gerar o codigo.");
+          });
+      });
+    });
+  </script>
+{% endblock %}

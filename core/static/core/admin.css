@@ -1,0 +1,27 @@
+#header {
+  background: #ff6600;
+}
+
+#header #site-name a {
+  color: #fff;
+}
+
+.module h2, .module caption, .inline-group h2 {
+  background: #ffe2d1;
+  color: #3b2a20;
+}
+
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  background: #ff6600;
+  border-color: #e65c00;
+  color: #fff;
+}
+
+.button:hover, input[type=submit]:hover, input[type=button]:hover, .submit-row input:hover, a.button:hover {
+  background: #e65c00;
+  color: #fff;
+}
+
+.breadcrumbs {
+  background: #fff4ed;
+}

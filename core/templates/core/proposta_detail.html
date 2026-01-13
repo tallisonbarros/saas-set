@@ -5,10 +5,10 @@
 
 {% block content %}
   <section class="card stack">
-    <div>
-      <h1 style="margin: 0 0 8px 0;">{{ proposta.nome }}</h1>
-      <div class="muted">{{ proposta.descricao }}</div>
-    </div>
+      <div>
+        <h1 style="margin: 0 0 8px 0;">{{ proposta.nome }}</h1>
+        <div class="muted">{{ proposta.descricao|linebreaksbr }}</div>
+      </div>
     <div class="stack">
       <div><strong>Codigo:</strong> {{ proposta.codigo }}</div>
       <div><strong>Prioridade:</strong> {{ proposta.prioridade }}</div>
