@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="pt-br">
   <head>
@@ -7,6 +8,9 @@
     <style>
       body { font-family: Arial, sans-serif; background: #f6f6f6; }
       .container { max-width: 900px; margin: 24px auto; background: #fff; padding: 24px; border-radius: 8px; }
+      .header { display: flex; justify-content: center; margin-bottom: 24px; }
+      .logo { height: 48px; }
+      .content { margin-top: 24px; }
       table { width: 100%; border-collapse: collapse; margin-top: 16px; }
       th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; }
       .status { font-weight: bold; }
@@ -15,54 +19,60 @@
   </head>
   <body>
     <div class="container">
-      <p>Usuario: {{ request.user.username }}</p>
-      <div>
-        <strong>{{ cliente.nome }}</strong>
-        {% if cliente.logo %}
-          <div><img src="{{ cliente.logo.url }}" alt="Logo" width="120"></div>
+      <div class="header">
+        <a href="{% url 'home' %}"><img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo"></a>
+      </div>
+      <div class="content">
+        <div>
+          <strong>{{ cliente.nome }}</strong>
+          {% if cliente.logo %}
+            <div><img src="{{ cliente.logo.url }}" alt="Logo" width="120"></div>
+          {% endif %}
+        </div>
+        {% if not cliente %}
+          <p>Usuario sem cliente associado. Fale com o administrador.</p>
+        {% elif propostas %}
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Codigo</th>
+                <th>Descricao</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for proposta in propostas %}
+                <tr>
+                  <td>{{ proposta.nome }}</td>
+                  <td>{{ proposta.codigo }}</td>
+                  <td>{{ proposta.descricao }}</td>
+                  <td>R$ {{ proposta.valor }}</td>
+                  <td class="status">{{ proposta.get_status_display }}</td>
+                  <td class="actions">
+                    {% if proposta.status == "PENDENTE" %}
+                      <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
+                        {% csrf_token %}
+                        <button type="submit">Aprovar</button>
+                      </form>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p>Sem propostas no momento.</p>
         {% endif %}
       </div>
-      <h1>Minhas Propostas</h1>
-      {% if not cliente %}
-        <p>Usuario sem cliente associado. Fale com o administrador.</p>
-      {% elif propostas %}
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Codigo</th>
-              <th>Descricao</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th>Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for proposta in propostas %}
-              <tr>
-                <td>{{ proposta.nome }}</td>
-                <td>{{ proposta.codigo }}</td>
-                <td>{{ proposta.descricao }}</td>
-                <td>R$ {{ proposta.valor }}</td>
-                <td class="status">{{ proposta.get_status_display }}</td>
-                <td class="actions">
-                  {% if proposta.status == "PENDENTE" %}
-                    <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-                      {% csrf_token %}
-                      <button type="submit">Aprovar</button>
-                    </form>
-                  {% else %}
-                    -
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <p>Sem propostas no momento.</p>
-      {% endif %}
-      <p><a href="{% url 'logout' %}">Sair</a></p>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit">Sair</button>
+      </form>
     </div>
   </body>
 </html>
