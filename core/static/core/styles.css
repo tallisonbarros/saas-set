@@ -206,11 +206,22 @@ body {
   margin-top: 16px;
 }
 
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .table th,
 .table td {
   text-align: left;
   padding: 12px 10px;
   border-bottom: 1px solid var(--border);
+}
+
+.table .actions-cell {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .table thead th {
@@ -387,6 +398,10 @@ select {
   .client-meta {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .table {
+    min-width: 620px;
   }
 
   .steps {
