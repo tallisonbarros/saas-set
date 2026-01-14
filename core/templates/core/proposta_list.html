@@ -30,49 +30,41 @@
         <a href="{% url 'propostas' %}?status=FINALIZADO" class="filter-pill {% if status_filter == 'FINALIZADO' %}active{% endif %}">Finalizadas</a>
       </div>
       {% if propostas %}
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th class="col-valor">Valor</th>
-              <th>Status</th>
-              <th>Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for proposta in propostas %}
-              <tr>
-                <td><a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a></td>
-                <td class="col-valor">R$ {{ proposta.valor }}</td>
-                <td>
-                  <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
-                </td>
-                <td class="actions-cell">
-                  {% if proposta.status == "PENDENTE" %}
-                    <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-                      {% csrf_token %}
-                      <button class="btn btn-primary" type="submit">Aprovar</button>
-                    </form>
-                    <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
-                      {% csrf_token %}
-                      <button class="btn btn-outline icon-only" type="submit" title="Reprovar" aria-label="Reprovar">
-                        ✕
-                      </button>
-                    </form>
-                  {% endif %}
-                  <a class="btn btn-ghost icon-only" href="{% url 'proposta_detail' proposta.pk %}" title="Abrir detalhes" aria-label="Abrir detalhes">
-                    ⓘ
-                  </a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      {% if status_filter %}
-        <p>Sem propostas para o filtro selecionado.</p>
+        <div class="proposal-grid">
+          {% for proposta in propostas %}
+            <div class="proposal-card">
+              <div class="proposal-head">
+                <div>
+                  <div class="proposal-title">
+                    <a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a>
+                  </div>
+                  <div class="proposal-meta">R$ {{ proposta.valor }}</div>
+                </div>
+                <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
+              </div>
+              <div class="proposal-actions">
+                {% if proposta.status == "PENDENTE" %}
+                  <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-primary" type="submit">Aprovar</button>
+                  </form>
+                  <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-outline icon-only" type="submit" title="Reprovar" aria-label="Reprovar">
+                      ✕
+                    </button>
+                  </form>
+                {% endif %}
+                <a class="btn btn-ghost icon-only" href="{% url 'proposta_detail' proposta.pk %}" title="Abrir detalhes" aria-label="Abrir detalhes">
+                  ⓘ
+                </a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        {% if status_filter %}
+          <p>Sem propostas para o filtro selecionado.</p>
         {% else %}
           <p>Sem propostas no momento.</p>
         {% endif %}
