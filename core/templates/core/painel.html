@@ -11,15 +11,17 @@
       <p class="hero-subtitle">Escolha para onde deseja ir.</p>
     </div>
     <div class="panel-grid">
-      <a class="panel-card" href="{% url 'propostas' %}">
-        <div class="panel-title">Propostas</div>
-        <div class="muted">Visualizar e aprovar propostas.</div>
-      </a>
+      {% if role != "FINANCEIRO" %}
+        <a class="panel-card" href="{% url 'propostas' %}">
+          <div class="panel-title">Propostas</div>
+          <div class="muted">Visualizar e aprovar propostas.</div>
+        </a>
+      {% endif %}
       <div class="panel-card panel-disabled">
         <div class="panel-title">Planta conectada</div>
         <div class="muted">Visualizar sua automacao online.</div>
       </div>
-      {% if request.user.is_staff %}
+      {% if role == "ADMIN" %}
         <a class="panel-card" href="/admin/">
           <div class="panel-title">Admin</div>
           <div class="muted">Gerenciar dados do sistema.</div>

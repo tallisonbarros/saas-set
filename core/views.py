@@ -4,10 +4,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.db.models import Case, IntegerField, Value, When
 
-from .forms import UserCreateForm
+from .forms import GroupCreateForm, UserCreateForm
 from .models import Cliente, Proposta
 
 
@@ -18,17 +18,33 @@ def _get_cliente(user):
         return None
 
 
+def _has_group(user, name):
+    return user.groups.filter(name=name).exists()
+
+
+def _user_role(user):
+    if user.is_superuser or user.is_staff:
+        return "ADMIN"
+    if _has_group(user, "Financeiro"):
+        return "FINANCEIRO"
+    if _has_group(user, "Cliente"):
+        return "CLIENTE"
+    return "CLIENTE"
+
+
 def home(request):
     return render(request, "core/home.html")
 
 
 @login_required
 def painel(request):
-    return render(request, "core/painel.html")
+    return render(request, "core/painel.html", {"role": _user_role(request.user)})
 
 
 @login_required
 def proposta_list(request):
+    if _user_role(request.user) == "FINANCEIRO":
+        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     propostas = Proposta.objects.none()
     if cliente:
@@ -59,6 +75,8 @@ def proposta_list(request):
 
 @login_required
 def proposta_detail(request, pk):
+    if _user_role(request.user) == "FINANCEIRO":
+        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     return render(request, "core/proposta_detail.html", {"cliente": cliente, "proposta": proposta})
@@ -67,6 +85,8 @@ def proposta_detail(request, pk):
 @login_required
 @require_POST
 def aprovar_proposta(request, pk):
+    if _user_role(request.user) == "FINANCEIRO":
+        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.status == Proposta.Status.PENDENTE:
@@ -80,6 +100,8 @@ def aprovar_proposta(request, pk):
 @login_required
 @require_POST
 def reprovar_proposta(request, pk):
+    if _user_role(request.user) == "FINANCEIRO":
+        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.status == Proposta.Status.PENDENTE:
@@ -93,6 +115,8 @@ def reprovar_proposta(request, pk):
 @login_required
 @require_POST
 def salvar_observacao(request, pk):
+    if _user_role(request.user) == "FINANCEIRO":
+        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     observacao = request.POST.get("observacao", "").strip()
@@ -114,15 +138,56 @@ def salvar_observacao(request, pk):
 def user_management(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
+    message = None
+    form = UserCreateForm()
+    group_form = GroupCreateForm()
     if request.method == "POST":
-        form = UserCreateForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("usuarios")
+        if request.POST.get("create_group") == "1":
+            group_form = GroupCreateForm(request.POST)
+            if group_form.is_valid():
+                group_form.save()
+                return redirect("usuarios")
+        elif request.POST.get("create_user") == "1":
+            form = UserCreateForm(request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect("usuarios")
+        else:
+            user_id = request.POST.get("user_id")
+            action = request.POST.get("action")
+            user = get_object_or_404(User, pk=user_id)
+            if action == "toggle_active":
+                user.is_active = not user.is_active
+                user.save(update_fields=["is_active"])
+                return redirect("usuarios")
+            if action == "set_groups":
+                group_ids = request.POST.getlist("groups")
+                groups = Group.objects.filter(id__in=group_ids)
+                user.groups.set(groups)
+                return redirect("usuarios")
+            if action == "set_password":
+                new_password = request.POST.get("new_password", "").strip()
+                if new_password:
+                    user.set_password(new_password)
+                    user.save(update_fields=["password"])
+                    message = "Senha atualizada."
+                else:
+                    message = "Informe uma senha valida."
     else:
         form = UserCreateForm()
     users = User.objects.order_by("username")
-    return render(request, "core/usuarios.html", {"form": form, "users": users})
+    groups = Group.objects.order_by("name")
+    return render(
+        request,
+        "core/usuarios.html",
+        {
+            "form": form,
+            "group_form": group_form,
+            "users": users,
+            "groups": groups,
+            "message": message,
+        },
+    )
 
 
 def admin_explorar(request):

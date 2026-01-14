@@ -515,6 +515,33 @@ select {
   background: #fff6ef;
 }
 
+.user-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.user-card {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.user-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.user-actions {
+  display: grid;
+  gap: 12px;
+}
+
 .detail-actions form {
   display: grid;
   gap: 8px;

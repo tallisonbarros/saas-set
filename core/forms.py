@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 
 from .models import Cliente
 
@@ -51,6 +51,12 @@ class UserCreateForm(forms.Form):
     username = forms.EmailField(label="Email")
     password = forms.CharField(label="Senha", widget=forms.PasswordInput)
     is_staff = forms.BooleanField(label="Administrador", required=False)
+    groups = forms.ModelMultipleChoiceField(
+        label="Grupos",
+        queryset=Group.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple,
+    )
 
     def clean_username(self):
         username = self.cleaned_data["username"].strip().lower()
@@ -62,6 +68,7 @@ class UserCreateForm(forms.Form):
         username = self.cleaned_data["username"]
         password = self.cleaned_data["password"]
         is_staff = self.cleaned_data["is_staff"]
+        groups = self.cleaned_data.get("groups")
         user = User.objects.create_user(
             username=username,
             email=username,
@@ -69,4 +76,20 @@ class UserCreateForm(forms.Form):
         )
         user.is_staff = is_staff
         user.save(update_fields=["is_staff"])
+        if groups:
+            user.groups.set(groups)
         return user
+
+
+class GroupCreateForm(forms.Form):
+    name = forms.CharField(label="Nome do grupo", max_length=150)
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if Group.objects.filter(name=name).exists():
+            raise forms.ValidationError("Grupo ja existe.")
+        return name
+
+    def save(self):
+        name = self.cleaned_data["name"]
+        return Group.objects.create(name=name)
