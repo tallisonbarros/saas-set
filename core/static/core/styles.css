@@ -269,7 +269,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: #fff;
-  text-decoration: none;
+  position: relative;
   color: inherit;
 }
 
@@ -287,6 +287,26 @@ body {
 }
 
 .proposal-title {
+  font-weight: 600;
+}
+
+.proposal-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  text-decoration: none;
+}
+
+.proposal-actions {
+  position: relative;
+  z-index: 2;
+}
+
+.proposal-more {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  color: var(--muted);
   font-weight: 600;
 }
 

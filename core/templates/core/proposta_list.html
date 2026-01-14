@@ -38,7 +38,8 @@
       {% if propostas %}
         <div class="proposal-grid">
           {% for proposta in propostas %}
-            <a class="proposal-card" href="{% url 'proposta_detail' proposta.pk %}">
+            <div class="proposal-card">
+              <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
               <div class="proposal-head">
                 <div>
                   <div class="proposal-title">{{ proposta.nome }}</div>
@@ -46,7 +47,7 @@
                 </div>
                 <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
               </div>
-              <div class="proposal-actions" onclick="event.preventDefault(); event.stopPropagation();">
+              <div class="proposal-actions">
                 {% if proposta.status == "PENDENTE" %}
                   <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
                     {% csrf_token %}
@@ -59,11 +60,9 @@
                     </button>
                   </form>
                 {% endif %}
-                <span class="btn btn-ghost icon-only" title="Abrir detalhes" aria-label="Abrir detalhes">
-                  ⓘ
-                </span>
               </div>
-            </a>
+              <div class="proposal-more" aria-hidden="true">...</div>
+            </div>
           {% endfor %}
         </div>
       {% else %}
