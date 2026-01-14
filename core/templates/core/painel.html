@@ -34,6 +34,10 @@
           <div class="panel-title">Usuarios</div>
           <div class="muted">Criar e listar usuarios.</div>
         </a>
+        <a class="panel-card" href="{% url 'grupos' %}">
+          <div class="panel-title">Grupos</div>
+          <div class="muted">Criar e remover grupos.</div>
+        </a>
       {% endif %}
     </div>
     <form method="post" action="{% url 'logout' %}">

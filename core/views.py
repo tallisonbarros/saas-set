@@ -140,14 +140,8 @@ def user_management(request):
         return HttpResponseForbidden("Sem permissao.")
     message = None
     form = UserCreateForm()
-    group_form = GroupCreateForm()
     if request.method == "POST":
-        if request.POST.get("create_group") == "1":
-            group_form = GroupCreateForm(request.POST)
-            if group_form.is_valid():
-                group_form.save()
-                return redirect("usuarios")
-        elif request.POST.get("create_user") == "1":
+        if request.POST.get("create_user") == "1":
             form = UserCreateForm(request.POST)
             if form.is_valid():
                 form.save()
@@ -176,17 +170,45 @@ def user_management(request):
     else:
         form = UserCreateForm()
     users = User.objects.order_by("username")
+    selected_user_id = request.GET.get("user_id")
+    selected_user = None
+    if selected_user_id:
+        selected_user = get_object_or_404(User, pk=selected_user_id)
     groups = Group.objects.order_by("name")
     return render(
         request,
         "core/usuarios.html",
         {
             "form": form,
-            "group_form": group_form,
             "users": users,
+            "selected_user": selected_user,
             "groups": groups,
             "message": message,
         },
+    )
+
+
+@login_required
+def group_management(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    group_form = GroupCreateForm()
+    if request.method == "POST":
+        if request.POST.get("create_group") == "1":
+            group_form = GroupCreateForm(request.POST)
+            if group_form.is_valid():
+                group_form.save()
+                return redirect("grupos")
+        elif request.POST.get("delete_group") == "1":
+            group_id = request.POST.get("group_id")
+            group = get_object_or_404(Group, pk=group_id)
+            group.delete()
+            return redirect("grupos")
+    groups = Group.objects.order_by("name")
+    return render(
+        request,
+        "core/grupos.html",
+        {"group_form": group_form, "groups": groups},
     )
 
 
