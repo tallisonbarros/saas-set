@@ -4,6 +4,9 @@
 {% block title %}Propostas{% endblock %}
 
 {% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
   <section class="card stack">
     <div class="client-meta">
       {% if cliente.logo %}

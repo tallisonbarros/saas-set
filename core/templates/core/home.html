@@ -8,11 +8,11 @@
 {% block content %}
   <section class="card hero">
     <img class="logo" src="{% static 'core/logoset.png' %}" alt="Logo">
+    <div class="slogan">Indústria e tecnologia.</div>
     <div>
       <h1 class="hero-title">Aprove propostas em minutos</h1>
       <p class="hero-subtitle">Centralize propostas e aprovacoes com um fluxo simples.</p>
     </div>
-    <div class="slogan">Indústria e tecnologia.</div>
     <div class="actions">
       <a class="btn btn-primary" href="{% url 'login' %}">Entrar</a>
       <div class="icon-row">
@@ -51,5 +51,8 @@
     <div class="hero-links">
       <a class="btn btn-ghost" href="https://www.setbrasil.com" target="_blank" rel="noreferrer">Fale com a SET</a>
     </div>
+    <a class="site-link" href="https://www.setbrasil.com" target="_blank" rel="noreferrer">www.setbrasil.com</a>
   </section>
 {% endblock %}
+
+{% block footer %}{% endblock %}

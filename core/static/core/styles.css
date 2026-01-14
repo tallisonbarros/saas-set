@@ -106,6 +106,12 @@ body {
   color: var(--accent);
 }
 
+.site-link {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -390,6 +396,12 @@ select {
   min-height: calc(100vh - 180px);
   display: grid;
   place-items: center;
+}
+
+.page-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
 }
 
 .client-meta {
