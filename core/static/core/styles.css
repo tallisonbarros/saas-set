@@ -48,6 +48,10 @@ body {
   display: block;
 }
 
+.logo-small {
+  height: 40px;
+}
+
 .login-logo {
   margin: 0 auto;
 }

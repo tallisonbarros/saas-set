@@ -129,14 +129,44 @@ def admin_explorar(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
     cliente_id = request.GET.get("cliente_id")
-    clientes = Cliente.objects.order_by("nome")
+    cliente_q = request.GET.get("cliente_q", "").strip()
+    cliente_sort = request.GET.get("cliente_sort", "nome")
+    proposta_status = request.GET.get("proposta_status", "").strip()
+    proposta_sort = request.GET.get("proposta_sort", "-criado_em")
+
+    clientes = Cliente.objects.all()
+    if cliente_q:
+        clientes = clientes.filter(nome__icontains=cliente_q)
+    if cliente_sort == "empresa":
+        clientes = clientes.order_by("empresa", "nome")
+    elif cliente_sort == "email":
+        clientes = clientes.order_by("email", "nome")
+    else:
+        clientes = clientes.order_by("nome")
+
     cliente = None
     propostas = Proposta.objects.none()
     if cliente_id:
         cliente = get_object_or_404(Cliente, pk=cliente_id)
-        propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
+        propostas = Proposta.objects.filter(cliente=cliente)
+        if proposta_status in Proposta.Status.values:
+            propostas = propostas.filter(status=proposta_status)
+        if proposta_sort == "prioridade":
+            propostas = propostas.order_by("prioridade", "-criado_em")
+        elif proposta_sort == "valor":
+            propostas = propostas.order_by("-valor", "-criado_em")
+        else:
+            propostas = propostas.order_by("-criado_em")
     return render(
         request,
         "admin/explorar.html",
-        {"clientes": clientes, "cliente": cliente, "propostas": propostas},
+        {
+            "clientes": clientes,
+            "cliente": cliente,
+            "propostas": propostas,
+            "cliente_q": cliente_q,
+            "cliente_sort": cliente_sort,
+            "proposta_status": proposta_status,
+            "proposta_sort": proposta_sort,
+        },
     )

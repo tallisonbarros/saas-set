@@ -4,6 +4,15 @@
 {% block content %}
   <div class="module">
     <h2>Explorar clientes</h2>
+    <form method="get" style="margin: 12px 0;">
+      <input type="text" name="cliente_q" placeholder="Buscar cliente" value="{{ cliente_q }}">
+      <select name="cliente_sort">
+        <option value="nome" {% if cliente_sort == "nome" %}selected{% endif %}>Ordenar por nome</option>
+        <option value="empresa" {% if cliente_sort == "empresa" %}selected{% endif %}>Ordenar por empresa</option>
+        <option value="email" {% if cliente_sort == "email" %}selected{% endif %}>Ordenar por email</option>
+      </select>
+      <button class="button" type="submit">Filtrar</button>
+    </form>
     <table class="table">
       <thead>
         <tr>
@@ -21,7 +30,7 @@
             <td>{{ c.empresa }}</td>
             <td>{{ c.email }}</td>
             <td>{{ c.propostas.count }}</td>
-            <td><a class="button" href="/admin/explorar/?cliente_id={{ c.id }}">Ver propostas</a></td>
+            <td><a class="button" href="/admin/explorar/?cliente_id={{ c.id }}&cliente_q={{ cliente_q }}&cliente_sort={{ cliente_sort }}">Ver propostas</a></td>
           </tr>
         {% empty %}
           <tr><td colspan="5">Sem clientes cadastrados.</td></tr>
@@ -33,6 +42,26 @@
   {% if cliente %}
     <div class="module">
       <h2>Propostas de {{ cliente.nome }}</h2>
+      <form method="get" style="margin: 12px 0;">
+        <input type="hidden" name="cliente_id" value="{{ cliente.id }}">
+        <input type="hidden" name="cliente_q" value="{{ cliente_q }}">
+        <input type="hidden" name="cliente_sort" value="{{ cliente_sort }}">
+        <select name="proposta_status">
+          <option value="" {% if not proposta_status %}selected{% endif %}>Todos os status</option>
+          <option value="PENDENTE" {% if proposta_status == "PENDENTE" %}selected{% endif %}>Pendente</option>
+          <option value="LEVANTAMENTO" {% if proposta_status == "LEVANTAMENTO" %}selected{% endif %}>Levantamento</option>
+          <option value="EXECUTANDO" {% if proposta_status == "EXECUTANDO" %}selected{% endif %}>Executando</option>
+          <option value="APROVADA" {% if proposta_status == "APROVADA" %}selected{% endif %}>Aprovada</option>
+          <option value="REPROVADA" {% if proposta_status == "REPROVADA" %}selected{% endif %}>Reprovada</option>
+          <option value="FINALIZADO" {% if proposta_status == "FINALIZADO" %}selected{% endif %}>Finalizado</option>
+        </select>
+        <select name="proposta_sort">
+          <option value="-criado_em" {% if proposta_sort == "-criado_em" %}selected{% endif %}>Mais recentes</option>
+          <option value="prioridade" {% if proposta_sort == "prioridade" %}selected{% endif %}>Prioridade</option>
+          <option value="valor" {% if proposta_sort == "valor" %}selected{% endif %}>Maior valor</option>
+        </select>
+        <button class="button" type="submit">Filtrar</button>
+      </form>
       <table class="table">
         <thead>
           <tr>
