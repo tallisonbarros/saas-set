@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;500;600&display=swap");
 
 :root {
   --bg: #fff4ed;
@@ -97,6 +97,13 @@ body {
 .site-footer a {
   color: inherit;
   text-decoration: none;
+}
+
+.slogan {
+  font-family: "Audiowide", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  color: var(--accent);
 }
 
 .btn {
@@ -456,6 +463,12 @@ select {
 
 .panel-title {
   font-weight: 600;
+}
+
+.panel-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  background: #fff6ef;
 }
 
 .detail-actions form {

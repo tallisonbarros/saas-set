@@ -11,17 +11,14 @@
   <body class="{% block body_class %}page{% endblock %}">
     <div class="bg"></div>
     {% block header %}
-      <header class="site-header">
-        <a class="brand" href="{% url 'home' %}">
-          <img class="logo" src="{% static 'core/logoset.png' %}" alt="SET">
-        </a>
-      </header>
+      <header class="site-header"></header>
     {% endblock %}
     <main class="main">
       {% block content %}{% endblock %}
     </main>
     {% block footer %}
       <footer class="site-footer">
+        <div class="slogan">Indústria e tecnologia.</div>
         <a href="https://www.setbrasil.com" target="_blank" rel="noreferrer">www.setbrasil.com</a>
       </footer>
     {% endblock %}

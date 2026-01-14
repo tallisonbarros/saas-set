@@ -10,11 +10,16 @@
       <h1 class="hero-title">Painel</h1>
       <p class="hero-subtitle">Escolha para onde deseja ir.</p>
     </div>
+    <div class="slogan">Indústria e tecnologia.</div>
     <div class="panel-grid">
       <a class="panel-card" href="{% url 'propostas' %}">
         <div class="panel-title">Propostas</div>
         <div class="muted">Visualizar e aprovar propostas.</div>
       </a>
+      <div class="panel-card panel-disabled">
+        <div class="panel-title">Planta conectada</div>
+        <div class="muted">Visualizar dados da sua automacao online.</div>
+      </div>
       {% if request.user.is_staff %}
         <a class="panel-card" href="/admin/">
           <div class="panel-title">Admin</div>
