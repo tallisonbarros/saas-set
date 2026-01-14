@@ -7,6 +7,9 @@
   <div class="page-logo">
     <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
   </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="{% url 'painel' %}">Painel</a>
+  </div>
   <section class="card stack">
     <div class="client-meta">
       {% if cliente.logo %}
@@ -35,17 +38,15 @@
       {% if propostas %}
         <div class="proposal-grid">
           {% for proposta in propostas %}
-            <div class="proposal-card">
+            <a class="proposal-card" href="{% url 'proposta_detail' proposta.pk %}">
               <div class="proposal-head">
                 <div>
-                  <div class="proposal-title">
-                    <a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a>
-                  </div>
+                  <div class="proposal-title">{{ proposta.nome }}</div>
                   <div class="proposal-meta">R$ {{ proposta.valor }}</div>
                 </div>
                 <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
               </div>
-              <div class="proposal-actions">
+              <div class="proposal-actions" onclick="event.preventDefault(); event.stopPropagation();">
                 {% if proposta.status == "PENDENTE" %}
                   <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
                     {% csrf_token %}
@@ -58,11 +59,11 @@
                     </button>
                   </form>
                 {% endif %}
-                <a class="btn btn-ghost icon-only" href="{% url 'proposta_detail' proposta.pk %}" title="Abrir detalhes" aria-label="Abrir detalhes">
+                <span class="btn btn-ghost icon-only" title="Abrir detalhes" aria-label="Abrir detalhes">
                   ⓘ
-                </a>
+                </span>
               </div>
-            </div>
+            </a>
           {% endfor %}
         </div>
       {% else %}
