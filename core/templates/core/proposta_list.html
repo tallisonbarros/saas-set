@@ -58,10 +58,14 @@
                     </form>
                     <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
                       {% csrf_token %}
-                      <button class="btn btn-outline" type="submit">Reprovar</button>
+                      <button class="btn btn-outline icon-only" type="submit" title="Reprovar" aria-label="Reprovar">
+                        ✕
+                      </button>
                     </form>
                   {% endif %}
-                  <a class="btn btn-ghost" href="{% url 'proposta_detail' proposta.pk %}">Abrir detalhes</a>
+                  <a class="btn btn-ghost icon-only" href="{% url 'proposta_detail' proposta.pk %}" title="Abrir detalhes" aria-label="Abrir detalhes">
+                    ⓘ
+                  </a>
                 </td>
               </tr>
             {% endfor %}
