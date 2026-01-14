@@ -212,6 +212,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   margin-top: 16px;
+  font-size: 13px;
 }
 
 .table-wrap {

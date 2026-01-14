@@ -35,7 +35,6 @@
           <thead>
             <tr>
               <th>Nome</th>
-              <th>Prioridade</th>
               <th class="col-valor">Valor</th>
               <th>Status</th>
               <th>Acoes</th>
@@ -45,7 +44,6 @@
             {% for proposta in propostas %}
               <tr>
                 <td><a href="{% url 'proposta_detail' proposta.pk %}">{{ proposta.nome }}</a></td>
-                <td>{{ proposta.prioridade }}</td>
                 <td class="col-valor">R$ {{ proposta.valor }}</td>
                 <td>
                   <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
