@@ -38,7 +38,9 @@ def _user_role(user):
     cliente = _get_cliente(user)
     if not cliente:
         return "CLIENTE"
-    has_cliente = cliente.tipos.filter(nome__iexact="Cliente").exists()
+    has_cliente = cliente.tipos.filter(nome__iexact="Contratante").exists() or cliente.tipos.filter(
+        nome__iexact="Cliente"
+    ).exists()
     has_financeiro = cliente.tipos.filter(nome__iexact="Financeiro").exists()
     if has_cliente:
         return "CLIENTE"
@@ -52,6 +54,13 @@ def _has_tipo(user, nome):
     if not cliente:
         return False
     return cliente.tipos.filter(nome__iexact=nome).exists()
+
+
+def _has_tipo_any(user, nomes):
+    cliente = _get_cliente(user)
+    if not cliente:
+        return False
+    return cliente.tipos.filter(nome__in=nomes).exists()
 
 
 def home(request):
@@ -68,7 +77,7 @@ def painel(request):
         {
             "role": _user_role(request.user),
             "is_financeiro": _has_tipo(request.user, "Financeiro") or request.user.is_staff,
-            "is_cliente": _has_tipo(request.user, "Cliente"),
+            "is_cliente": _has_tipo_any(request.user, ["Contratante", "Cliente"]),
         },
     )
 
