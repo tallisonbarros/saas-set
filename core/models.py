@@ -26,7 +26,7 @@ class TipoPerfil(models.Model):
 
 class Caderno(models.Model):
     nome = models.CharField(max_length=80)
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cadernos")
+    clientes = models.ManyToManyField(Cliente, related_name="cadernos", blank=True)
     ativo = models.BooleanField(default=True)
 
     def __str__(self):

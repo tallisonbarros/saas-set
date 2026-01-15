@@ -275,15 +275,15 @@ def financeiro_overview(request):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    cadernos = Caderno.objects.filter(cliente=cliente) if cliente else Caderno.objects.none()
+    cadernos = Caderno.objects.filter(clientes=cliente) if cliente else Caderno.objects.none()
     cadernos = cadernos.annotate(total=Sum("compras__valor")).order_by("nome")
-    total_geral = Compra.objects.filter(caderno__cliente=cliente).aggregate(total=Sum("valor")).get("total")
-    ultimas_compras = Compra.objects.filter(caderno__cliente=cliente).order_by("-data")[:6]
+    total_geral = Compra.objects.filter(caderno__clientes=cliente).aggregate(total=Sum("valor")).get("total")
+    ultimas_compras = Compra.objects.filter(caderno__clientes=cliente).order_by("-data")[:6]
 
     caderno_id = request.GET.get("caderno_id")
     compras = Compra.objects.none()
     if cliente and caderno_id:
-        compras = Compra.objects.filter(caderno_id=caderno_id, caderno__cliente=cliente).order_by("-data")
+        compras = Compra.objects.filter(caderno_id=caderno_id, caderno__clientes=cliente).order_by("-data")
 
     return render(
         request,
@@ -346,7 +346,7 @@ def financeiro_nova(request):
                 )
             return redirect("financeiro")
 
-    cadernos = Caderno.objects.filter(cliente=cliente) if cliente else Caderno.objects.none()
+    cadernos = Caderno.objects.filter(clientes=cliente) if cliente else Caderno.objects.none()
     categorias = CategoriaCompra.objects.order_by("nome")
     tipos = TipoCompra.objects.order_by("nome")
     centros = CentroCusto.objects.order_by("nome")
@@ -379,16 +379,17 @@ def financeiro_cadernos(request):
         if action == "create_caderno":
             nome = request.POST.get("nome", "").strip()
             if nome and cliente:
-                Caderno.objects.create(nome=nome, cliente=cliente, ativo=True)
+                caderno = Caderno.objects.create(nome=nome, ativo=True)
+                caderno.clientes.add(cliente)
             return redirect("financeiro_cadernos")
         if action == "toggle_caderno":
             caderno_id = request.POST.get("caderno_id")
-            caderno = get_object_or_404(Caderno, pk=caderno_id, cliente=cliente)
+            caderno = get_object_or_404(Caderno, pk=caderno_id, clientes=cliente)
             caderno.ativo = not caderno.ativo
             caderno.save(update_fields=["ativo"])
             return redirect("financeiro_cadernos")
 
-    cadernos = Caderno.objects.filter(cliente=cliente).annotate(total=Sum("compras__valor")).order_by("nome")
+    cadernos = Caderno.objects.filter(clientes=cliente).annotate(total=Sum("compras__valor")).order_by("nome")
     return render(
         request,
         "core/financeiro_cadernos.html",
@@ -403,7 +404,7 @@ def financeiro_caderno_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    caderno = get_object_or_404(Caderno, pk=pk, cliente=cliente)
+    caderno = get_object_or_404(Caderno, pk=pk, clientes=cliente)
     compras = Compra.objects.filter(caderno=caderno).order_by("-data")
     return render(
         request,
@@ -419,7 +420,7 @@ def financeiro_compra_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    compra = get_object_or_404(Compra, pk=pk, caderno__cliente=cliente)
+    compra = get_object_or_404(Compra, pk=pk, caderno__clientes=cliente)
     return render(
         request,
         "core/financeiro_compra_detail.html",
