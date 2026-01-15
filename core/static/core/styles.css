@@ -520,6 +520,10 @@ select {
   gap: 16px;
 }
 
+.user-grid.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .user-card {
   display: grid;
   gap: 16px;
@@ -540,6 +544,22 @@ select {
 .user-actions {
   display: grid;
   gap: 12px;
+}
+
+.user-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .user-grid.two-col {
+    grid-template-columns: 1fr;
+  }
 }
 
 .detail-actions form {

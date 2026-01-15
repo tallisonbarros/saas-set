@@ -43,6 +43,9 @@
 
     <div class="card" style="box-shadow: none;">
       <h2 style="margin-top: 0;">Usuarios</h2>
+      <div style="margin-bottom: 12px;">
+        <a class="btn btn-ghost" href="{% url 'grupos' %}">Gerenciar grupos</a>
+      </div>
       <form method="get" class="stack">
         <label for="id_user_filter">Buscar usuario</label>
         <input id="id_user_filter" type="text" placeholder="Digite parte do email">
@@ -59,16 +62,25 @@
       </form>
 
       {% if selected_user %}
-        <div class="user-grid">
+        <div class="user-grid two-col">
           <div class="user-card">
-            <div class="user-head">
+            <div class="panel-title">Resumo</div>
+            <div class="user-summary">
               <div>
-                <div class="panel-title">{{ selected_user.username }}</div>
-                <div class="muted">
-                  Admin: {{ selected_user.is_staff|yesno:"Sim,Nao" }} | Ativo: {{ selected_user.is_active|yesno:"Sim,Nao" }}
-                </div>
-                <div class="muted">
-                  Grupos:
+                <div class="summary-label">Email</div>
+                <div>{{ selected_user.username }}</div>
+              </div>
+              <div>
+                <div class="summary-label">Admin</div>
+                <div>{{ selected_user.is_staff|yesno:"Sim,Nao" }}</div>
+              </div>
+              <div>
+                <div class="summary-label">Ativo</div>
+                <div>{{ selected_user.is_active|yesno:"Sim,Nao" }}</div>
+              </div>
+              <div>
+                <div class="summary-label">Grupos</div>
+                <div>
                   {% if selected_user.groups.all %}
                     {% for g in selected_user.groups.all %}
                       {{ g.name }}{% if not forloop.last %}, {% endif %}
@@ -78,39 +90,43 @@
                   {% endif %}
                 </div>
               </div>
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="user_id" value="{{ selected_user.id }}">
-                <input type="hidden" name="action" value="toggle_active">
-                <button class="btn btn-outline" type="submit">
-                  {% if selected_user.is_active %}Desativar{% else %}Ativar{% endif %}
-                </button>
-              </form>
             </div>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="user_id" value="{{ selected_user.id }}">
+              <input type="hidden" name="action" value="toggle_active">
+              <button class="btn btn-outline" type="submit">
+                {% if selected_user.is_active %}Desativar usuario{% else %}Ativar usuario{% endif %}
+              </button>
+            </form>
+          </div>
 
-            <div class="user-actions">
-              <form method="post" class="stack">
-                {% csrf_token %}
-                <input type="hidden" name="user_id" value="{{ selected_user.id }}">
-                <input type="hidden" name="action" value="set_groups">
-                <label>Grupos</label>
-                <select name="groups" multiple>
-                  {% for group in groups %}
-                    <option value="{{ group.id }}" {% if group in selected_user.groups.all %}selected{% endif %}>{{ group.name }}</option>
-                  {% endfor %}
-                </select>
-                <button class="btn btn-ghost" type="submit">Salvar grupos</button>
-              </form>
+          <div class="user-card">
+            <div class="panel-title">Editar grupos</div>
+            <form method="post" class="stack">
+              {% csrf_token %}
+              <input type="hidden" name="user_id" value="{{ selected_user.id }}">
+              <input type="hidden" name="action" value="set_groups">
+              <label>Grupos</label>
+              <select name="groups" multiple>
+                {% for group in groups %}
+                  <option value="{{ group.id }}" {% if group in selected_user.groups.all %}selected{% endif %}>{{ group.name }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn btn-ghost" type="submit">Salvar grupos</button>
+            </form>
+          </div>
 
-              <form method="post" class="stack">
-                {% csrf_token %}
-                <input type="hidden" name="user_id" value="{{ selected_user.id }}">
-                <input type="hidden" name="action" value="set_password">
-                <label>Nova senha</label>
-                <input type="password" name="new_password" placeholder="Digite a nova senha">
-                <button class="btn btn-ghost" type="submit">Atualizar senha</button>
-              </form>
-            </div>
+          <div class="user-card">
+            <div class="panel-title">Atualizar senha</div>
+            <form method="post" class="stack">
+              {% csrf_token %}
+              <input type="hidden" name="user_id" value="{{ selected_user.id }}">
+              <input type="hidden" name="action" value="set_password">
+              <label>Nova senha</label>
+              <input type="password" name="new_password" placeholder="Digite a nova senha">
+              <button class="btn btn-ghost" type="submit">Atualizar senha</button>
+            </form>
           </div>
         </div>
       {% endif %}
