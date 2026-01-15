@@ -1,0 +1,106 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Nova Compra{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <section class="card stack">
+    <div class="finance-header">
+      <div>
+        <h1 style="margin: 0;">Nova Compra</h1>
+        <p class="muted">Registre compras e crie status.</p>
+      </div>
+      <div class="finance-actions">
+        <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="finance-grid">
+      <div class="finance-card">
+        <div class="panel-title">Registrar compra</div>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_compra">
+          <div class="field">
+            <label>Caderno</label>
+            <select name="caderno" required>
+              <option value="">Selecione</option>
+              {% for c in cadernos %}
+                <option value="{{ c.id }}">{{ c.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Descricao</label>
+            <textarea name="descricao" rows="3" required></textarea>
+          </div>
+          <div class="finance-form-grid">
+            <div class="field">
+              <label>Valor</label>
+              <input type="text" name="valor" placeholder="0,00" required>
+            </div>
+            <div class="field">
+              <label>Data</label>
+              <input type="date" name="data" required>
+            </div>
+          </div>
+          <div class="finance-form-grid">
+            <div class="field">
+              <label>Categoria</label>
+              <select name="categoria" required>
+                <option value="">Selecione</option>
+                {% for c in categorias %}
+                  <option value="{{ c.id }}">{{ c.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Tipo</label>
+              <select name="tipo" required>
+                <option value="">Selecione</option>
+                {% for t in tipos %}
+                  <option value="{{ t.id }}">{{ t.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="finance-form-grid">
+            <div class="field">
+              <label>Centro de custo</label>
+              <select name="centro_custo" required>
+                <option value="">Selecione</option>
+                {% for c in centros %}
+                  <option value="{{ c.id }}">{{ c.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Status</label>
+              <select name="status" required>
+                <option value="">Selecione</option>
+                {% for s in status_list %}
+                  <option value="{{ s.id }}">{{ s.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" type="submit">Registrar</button>
+        </form>
+      </div>
+
+      <div class="finance-card">
+        <div class="panel-title">Status de compra</div>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_status">
+          <label>Novo status</label>
+          <input type="text" name="nome" placeholder="Pendente/Pago/Cotando" required>
+          <button class="btn btn-ghost" type="submit">Criar status</button>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}

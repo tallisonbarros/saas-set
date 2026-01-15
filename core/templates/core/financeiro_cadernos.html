@@ -1,0 +1,61 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Cadernos{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <section class="card stack">
+    <div class="finance-header">
+      <div>
+        <h1 style="margin: 0;">Cadernos</h1>
+        <p class="muted">Crie e gerencie cadernos de compras.</p>
+      </div>
+      <div class="finance-actions">
+        <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="finance-card">
+      <div class="panel-title">Novo caderno</div>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_caderno">
+        <label>Nome</label>
+        <input type="text" name="nome" placeholder="Nome do caderno" required>
+        <button class="btn btn-primary" type="submit">Criar caderno</button>
+      </form>
+    </div>
+
+    <div class="finance-card">
+      <div class="panel-title">Seus cadernos</div>
+      {% if cadernos %}
+        <div class="proposal-grid">
+          {% for c in cadernos %}
+            <div class="proposal-card">
+              <div class="proposal-head">
+                <div>
+                  <div class="proposal-title">{{ c.nome }}</div>
+                  <div class="proposal-meta">Total: R$ {{ c.total|default:0 }}</div>
+                </div>
+                <span class="badge">{{ c.ativo|yesno:"Ativo,Inativo" }}</span>
+              </div>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_caderno">
+                <input type="hidden" name="caderno_id" value="{{ c.id }}">
+                <button class="btn btn-outline" type="submit">
+                  {% if c.ativo %}Desativar{% else %}Ativar{% endif %}
+                </button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Nenhum caderno cadastrado.</p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

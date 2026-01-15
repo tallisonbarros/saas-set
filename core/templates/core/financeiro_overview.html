@@ -1,0 +1,71 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Compras{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <section class="card stack">
+    <div class="finance-header">
+      <div>
+        <h1 style="margin: 0;">Compras</h1>
+        <p class="muted">Resumo por caderno e ultimas compras.</p>
+      </div>
+      <div class="finance-actions">
+        <a class="btn btn-primary" href="{% url 'financeiro_nova' %}">Nova compra</a>
+        <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
+      </div>
+    </div>
+
+    <div class="finance-summary">
+      <div class="summary-card">
+        <div class="summary-label">Total geral</div>
+        <div class="summary-value">R$ {{ total_geral }}</div>
+      </div>
+      {% for c in cadernos %}
+        <div class="summary-card">
+          <div class="summary-label">{{ c.nome }}</div>
+          <div class="summary-value">R$ {{ c.total|default:0 }}</div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <form method="get" class="finance-filter">
+      <label for="id_caderno">Filtrar por caderno</label>
+      <select id="id_caderno" name="caderno_id">
+        <option value="">Selecione</option>
+        {% for c in cadernos %}
+          <option value="{{ c.id }}" {% if caderno_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-ghost" type="submit">Filtrar</button>
+    </form>
+
+    <div class="finance-card">
+      <div class="panel-title">Compras</div>
+      {% if compras %}
+        <div class="proposal-grid">
+          {% for compra in compras %}
+            <div class="proposal-card">
+              <div class="proposal-head">
+                <div>
+                  <div class="proposal-title">{{ compra.descricao }}</div>
+                  <div class="proposal-meta">{{ compra.data }} • R$ {{ compra.valor }}</div>
+                </div>
+                <span class="badge">{{ compra.status.nome }}</span>
+              </div>
+              <div class="proposal-meta">Caderno: {{ compra.caderno.nome }}</div>
+              <div class="proposal-meta">
+                {{ compra.categoria.nome }} • {{ compra.tipo.nome }} • {{ compra.centro_custo.nome }}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Selecione um caderno para listar compras.</p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

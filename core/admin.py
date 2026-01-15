@@ -4,7 +4,17 @@ from django.urls import path
 from django.utils.translation import gettext_lazy as _
 
 from .forms import ClienteAdminForm
-from .models import Cliente, Proposta
+from .models import (
+    CategoriaCompra,
+    Caderno,
+    CentroCusto,
+    Cliente,
+    Compra,
+    Proposta,
+    StatusCompra,
+    TipoCompra,
+    TipoPerfil,
+)
 
 admin.site.site_header = "SET Admin"
 admin.site.site_title = "SET Admin"
@@ -50,3 +60,48 @@ class PropostaAdmin(admin.ModelAdmin):
             return JsonResponse({"error": _("Cliente invalido.")}, status=400)
         proposta = Proposta(cliente=cliente)
         return JsonResponse({"codigo": proposta._proximo_codigo()})
+
+
+@admin.register(TipoPerfil)
+class TipoPerfilAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+
+@admin.register(Caderno)
+class CadernoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "cliente", "ativo")
+    search_fields = ("nome", "cliente__nome")
+    list_filter = ("ativo",)
+
+
+@admin.register(CategoriaCompra)
+class CategoriaCompraAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+
+@admin.register(TipoCompra)
+class TipoCompraAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+
+@admin.register(CentroCusto)
+class CentroCustoAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+
+@admin.register(StatusCompra)
+class StatusCompraAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ativo")
+    search_fields = ("nome",)
+    list_filter = ("ativo",)
+
+
+@admin.register(Compra)
+class CompraAdmin(admin.ModelAdmin):
+    list_display = ("descricao", "caderno", "valor", "data", "status")
+    list_filter = ("status", "tipo", "categoria")
+    search_fields = ("descricao", "caderno__nome")

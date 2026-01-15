@@ -35,6 +35,9 @@ urlpatterns = [
     path('propostas/<int:pk>/reprovar/', views.reprovar_proposta, name="reprovar_proposta"),
     path('propostas/<int:pk>/observacao/', views.salvar_observacao, name="salvar_observacao"),
     path('usuarios/', views.user_management, name="usuarios"),
+    path('financeiro/', views.financeiro_overview, name="financeiro"),
+    path('financeiro/nova/', views.financeiro_nova, name="financeiro_nova"),
+    path('financeiro/cadernos/', views.financeiro_cadernos, name="financeiro_cadernos"),
 ]
 
 if settings.DEBUG:

@@ -1,3 +1,6 @@
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
@@ -6,10 +9,20 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from django.contrib.auth.models import User
-from django.db.models import Case, IntegerField, Value, When
+from django.db.models import Case, IntegerField, Sum, Value, When
 
 from .forms import TipoPerfilCreateForm, UserCreateForm
-from .models import Cliente, Proposta, TipoPerfil
+from .models import (
+    CategoriaCompra,
+    Caderno,
+    CentroCusto,
+    Cliente,
+    Compra,
+    Proposta,
+    StatusCompra,
+    TipoCompra,
+    TipoPerfil,
+)
 
 
 def _get_cliente(user):
@@ -34,6 +47,13 @@ def _user_role(user):
     return "CLIENTE"
 
 
+def _has_tipo(user, nome):
+    cliente = _get_cliente(user)
+    if not cliente:
+        return False
+    return cliente.tipos.filter(nome__iexact=nome).exists()
+
+
 def home(request):
     if request.user.is_authenticated:
         logout(request)
@@ -42,7 +62,15 @@ def home(request):
 
 @login_required
 def painel(request):
-    return render(request, "core/painel.html", {"role": _user_role(request.user)})
+    return render(
+        request,
+        "core/painel.html",
+        {
+            "role": _user_role(request.user),
+            "is_financeiro": _has_tipo(request.user, "Financeiro") or request.user.is_staff,
+            "is_cliente": _has_tipo(request.user, "Cliente"),
+        },
+    )
 
 
 @login_required
@@ -228,6 +256,132 @@ def user_management(request):
             "tipo_form": tipo_form,
             "message": message,
         },
+    )
+
+
+@login_required
+def financeiro_overview(request):
+    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
+        return HttpResponseForbidden("Sem permissao.")
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    cadernos = Caderno.objects.filter(cliente=cliente) if cliente else Caderno.objects.none()
+    cadernos = cadernos.annotate(total=Sum("compras__valor")).order_by("nome")
+    total_geral = Compra.objects.filter(caderno__cliente=cliente).aggregate(total=Sum("valor")).get("total")
+
+    caderno_id = request.GET.get("caderno_id")
+    compras = Compra.objects.none()
+    if cliente and caderno_id:
+        compras = Compra.objects.filter(caderno_id=caderno_id, caderno__cliente=cliente).order_by("-data")
+
+    return render(
+        request,
+        "core/financeiro_overview.html",
+        {
+            "cliente": cliente,
+            "cadernos": cadernos,
+            "total_geral": total_geral or 0,
+            "compras": compras,
+            "caderno_id": caderno_id,
+        },
+    )
+
+
+@login_required
+def financeiro_nova(request):
+    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
+        return HttpResponseForbidden("Sem permissao.")
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_status":
+            nome = request.POST.get("nome", "").strip()
+            if nome:
+                StatusCompra.objects.get_or_create(nome=nome, defaults={"ativo": True})
+            return redirect("financeiro_nova")
+        if action == "create_compra":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            caderno_id = request.POST.get("caderno")
+            descricao = request.POST.get("descricao", "").strip()
+            valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
+            data_raw = request.POST.get("data", "").strip()
+            categoria_id = request.POST.get("categoria")
+            tipo_id = request.POST.get("tipo")
+            centro_id = request.POST.get("centro_custo")
+            status_id = request.POST.get("status")
+            try:
+                valor = Decimal(valor_raw)
+            except (InvalidOperation, ValueError):
+                valor = None
+            try:
+                data = datetime.strptime(data_raw, "%Y-%m-%d").date()
+            except ValueError:
+                data = None
+            if all([caderno_id, descricao, valor, data, categoria_id, tipo_id, centro_id, status_id]):
+                Compra.objects.create(
+                    caderno_id=caderno_id,
+                    descricao=descricao,
+                    valor=valor,
+                    data=data,
+                    categoria_id=categoria_id,
+                    tipo_id=tipo_id,
+                    centro_custo_id=centro_id,
+                    status_id=status_id,
+                )
+            return redirect("financeiro")
+
+    cadernos = Caderno.objects.filter(cliente=cliente) if cliente else Caderno.objects.none()
+    categorias = CategoriaCompra.objects.order_by("nome")
+    tipos = TipoCompra.objects.order_by("nome")
+    centros = CentroCusto.objects.order_by("nome")
+    status_list = StatusCompra.objects.filter(ativo=True).order_by("nome")
+
+    return render(
+        request,
+        "core/financeiro_nova.html",
+        {
+            "cliente": cliente,
+            "cadernos": cadernos,
+            "categorias": categorias,
+            "tipos": tipos,
+            "centros": centros,
+            "status_list": status_list,
+        },
+    )
+
+
+@login_required
+def financeiro_cadernos(request):
+    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
+        return HttpResponseForbidden("Sem permissao.")
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_caderno":
+            nome = request.POST.get("nome", "").strip()
+            if nome and cliente:
+                Caderno.objects.create(nome=nome, cliente=cliente, ativo=True)
+            return redirect("financeiro_cadernos")
+        if action == "toggle_caderno":
+            caderno_id = request.POST.get("caderno_id")
+            caderno = get_object_or_404(Caderno, pk=caderno_id, cliente=cliente)
+            caderno.ativo = not caderno.ativo
+            caderno.save(update_fields=["ativo"])
+            return redirect("financeiro_cadernos")
+
+    cadernos = Caderno.objects.filter(cliente=cliente).annotate(total=Sum("compras__valor")).order_by("nome")
+    return render(
+        request,
+        "core/financeiro_cadernos.html",
+        {"cadernos": cadernos},
     )
 
 

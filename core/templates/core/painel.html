@@ -11,10 +11,16 @@
       <p class="hero-subtitle">Escolha para onde deseja ir.</p>
     </div>
     <div class="panel-grid">
-      {% if role != "FINANCEIRO" %}
+      {% if is_cliente or role == "ADMIN" %}
         <a class="panel-card" href="{% url 'propostas' %}">
           <div class="panel-title">Propostas</div>
           <div class="muted">Visualizar e aprovar propostas.</div>
+        </a>
+      {% endif %}
+      {% if is_financeiro %}
+        <a class="panel-card" href="{% url 'financeiro' %}">
+          <div class="panel-title">Financeiro</div>
+          <div class="muted">Registrar compras e gastos.</div>
         </a>
       {% endif %}
       <div class="panel-card panel-disabled">

@@ -24,6 +24,59 @@ class TipoPerfil(models.Model):
         return self.nome
 
 
+class Caderno(models.Model):
+    nome = models.CharField(max_length=80)
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cadernos")
+    ativo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nome
+
+
+class CategoriaCompra(models.Model):
+    nome = models.CharField(max_length=80, unique=True)
+
+    def __str__(self):
+        return self.nome
+
+
+class TipoCompra(models.Model):
+    nome = models.CharField(max_length=80, unique=True)
+
+    def __str__(self):
+        return self.nome
+
+
+class CentroCusto(models.Model):
+    nome = models.CharField(max_length=80, unique=True)
+
+    def __str__(self):
+        return self.nome
+
+
+class StatusCompra(models.Model):
+    nome = models.CharField(max_length=40, unique=True)
+    ativo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nome
+
+
+class Compra(models.Model):
+    caderno = models.ForeignKey(Caderno, on_delete=models.CASCADE, related_name="compras")
+    descricao = models.TextField()
+    valor = models.DecimalField(max_digits=12, decimal_places=2)
+    data = models.DateField()
+    categoria = models.ForeignKey(CategoriaCompra, on_delete=models.PROTECT)
+    tipo = models.ForeignKey(TipoCompra, on_delete=models.PROTECT)
+    centro_custo = models.ForeignKey(CentroCusto, on_delete=models.PROTECT)
+    status = models.ForeignKey(StatusCompra, on_delete=models.PROTECT)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.descricao} - {self.valor}"
+
+
 class Proposta(models.Model):
     class Status(models.TextChoices):
         PENDENTE = "PENDENTE", "Pendente"
