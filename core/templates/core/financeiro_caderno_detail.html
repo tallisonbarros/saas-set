@@ -1,0 +1,46 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Caderno{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">???</a>
+  </div>
+  <section class="card stack">
+    <div class="finance-header">
+      <div>
+        <h1 style="margin: 0;">{{ caderno.nome }}</h1>
+        <p class="muted">Compras do caderno selecionado.</p>
+      </div>
+      <div class="finance-actions">
+        <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Voltar</a>
+      </div>
+    </div>
+
+    {% if compras %}
+      <div class="proposal-grid">
+        {% for compra in compras %}
+          <div class="proposal-card">
+            <a class="proposal-link" href="{% url 'financeiro_compra_detail' compra.pk %}" aria-label="Abrir compra"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ compra.descricao }}</div>
+                <div class="proposal-meta">{{ compra.data }} ??? R$ {{ compra.valor }}</div>
+              </div>
+              <span class="badge">{{ compra.status.nome }}</span>
+            </div>
+            <div class="proposal-meta">
+              {{ compra.categoria.nome }} ??? {{ compra.tipo.nome }} ??? {{ compra.centro_custo.nome }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Sem compras neste caderno.</p>
+    {% endif %}
+  </section>
+{% endblock %}

@@ -269,6 +269,7 @@ def financeiro_overview(request):
     cadernos = Caderno.objects.filter(cliente=cliente) if cliente else Caderno.objects.none()
     cadernos = cadernos.annotate(total=Sum("compras__valor")).order_by("nome")
     total_geral = Compra.objects.filter(caderno__cliente=cliente).aggregate(total=Sum("valor")).get("total")
+    ultimas_compras = Compra.objects.filter(caderno__cliente=cliente).order_by("-data")[:6]
 
     caderno_id = request.GET.get("caderno_id")
     compras = Compra.objects.none()
@@ -284,6 +285,7 @@ def financeiro_overview(request):
             "total_geral": total_geral or 0,
             "compras": compras,
             "caderno_id": caderno_id,
+            "ultimas_compras": ultimas_compras,
         },
     )
 
@@ -382,6 +384,37 @@ def financeiro_cadernos(request):
         request,
         "core/financeiro_cadernos.html",
         {"cadernos": cadernos},
+    )
+
+
+@login_required
+def financeiro_caderno_detail(request, pk):
+    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
+        return HttpResponseForbidden("Sem permissao.")
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    caderno = get_object_or_404(Caderno, pk=pk, cliente=cliente)
+    compras = Compra.objects.filter(caderno=caderno).order_by("-data")
+    return render(
+        request,
+        "core/financeiro_caderno_detail.html",
+        {"caderno": caderno, "compras": compras},
+    )
+
+
+@login_required
+def financeiro_compra_detail(request, pk):
+    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
+        return HttpResponseForbidden("Sem permissao.")
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    compra = get_object_or_404(Compra, pk=pk, caderno__cliente=cliente)
+    return render(
+        request,
+        "core/financeiro_compra_detail.html",
+        {"compra": compra},
     )
 
 

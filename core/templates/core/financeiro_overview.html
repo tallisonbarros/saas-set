@@ -7,6 +7,9 @@
   <div class="page-logo">
     <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
   </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">P</a>
+  </div>
   <section class="card stack">
     <div class="finance-header">
       <div>
@@ -52,19 +55,45 @@
               <div class="proposal-head">
                 <div>
                   <div class="proposal-title">{{ compra.descricao }}</div>
-                  <div class="proposal-meta">{{ compra.data }} • R$ {{ compra.valor }}</div>
+                  <div class="proposal-meta">{{ compra.data }} - R$ {{ compra.valor }}</div>
                 </div>
                 <span class="badge">{{ compra.status.nome }}</span>
               </div>
               <div class="proposal-meta">Caderno: {{ compra.caderno.nome }}</div>
               <div class="proposal-meta">
-                {{ compra.categoria.nome }} • {{ compra.tipo.nome }} • {{ compra.centro_custo.nome }}
+                {{ compra.categoria.nome }} - {{ compra.tipo.nome }} - {{ compra.centro_custo.nome }}
               </div>
             </div>
           {% endfor %}
         </div>
       {% else %}
         <p class="muted">Selecione um caderno para listar compras.</p>
+      {% endif %}
+    </div>
+
+    <div class="finance-card">
+      <div class="panel-title">Ultimos gastos</div>
+      {% if ultimas_compras %}
+        <div class="proposal-grid">
+          {% for compra in ultimas_compras %}
+            <div class="proposal-card">
+              <a class="proposal-link" href="{% url 'financeiro_compra_detail' compra.pk %}" aria-label="Abrir compra"></a>
+              <div class="proposal-head">
+                <div>
+                  <div class="proposal-title">{{ compra.descricao }}</div>
+                  <div class="proposal-meta">{{ compra.data }} - R$ {{ compra.valor }}</div>
+                </div>
+                <span class="badge">{{ compra.status.nome }}</span>
+              </div>
+              <div class="proposal-meta">Caderno: {{ compra.caderno.nome }}</div>
+              <div class="proposal-meta">
+                {{ compra.categoria.nome }} - {{ compra.tipo.nome }} - {{ compra.centro_custo.nome }}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Sem gastos registrados.</p>
       {% endif %}
     </div>
   </section>

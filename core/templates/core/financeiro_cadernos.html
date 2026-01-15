@@ -7,6 +7,9 @@
   <div class="page-logo">
     <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
   </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">???</a>
+  </div>
   <section class="card stack">
     <div class="finance-header">
       <div>
@@ -35,6 +38,7 @@
         <div class="proposal-grid">
           {% for c in cadernos %}
             <div class="proposal-card">
+              <a class="proposal-link" href="{% url 'financeiro_caderno_detail' c.id %}" aria-label="Abrir caderno"></a>
               <div class="proposal-head">
                 <div>
                   <div class="proposal-title">{{ c.nome }}</div>
@@ -42,7 +46,7 @@
                 </div>
                 <span class="badge">{{ c.ativo|yesno:"Ativo,Inativo" }}</span>
               </div>
-              <form method="post">
+              <form method="post" class="proposal-actions">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_caderno">
                 <input type="hidden" name="caderno_id" value="{{ c.id }}">

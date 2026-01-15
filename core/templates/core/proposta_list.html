@@ -7,6 +7,9 @@
   <div class="page-logo">
     <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
   </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">???</a>
+  </div>
   <section class="card stack">
     <div class="client-meta">
       {% if cliente.logo %}
@@ -53,7 +56,7 @@
                   <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
                     {% csrf_token %}
                     <button class="btn btn-outline icon-only" type="submit" title="Reprovar" aria-label="Reprovar">
-                      ✕
+                      ???
                     </button>
                   </form>
                 {% endif %}

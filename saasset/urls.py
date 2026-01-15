@@ -38,6 +38,8 @@ urlpatterns = [
     path('financeiro/', views.financeiro_overview, name="financeiro"),
     path('financeiro/nova/', views.financeiro_nova, name="financeiro_nova"),
     path('financeiro/cadernos/', views.financeiro_cadernos, name="financeiro_cadernos"),
+    path('financeiro/cadernos/<int:pk>/', views.financeiro_caderno_detail, name="financeiro_caderno_detail"),
+    path('financeiro/compras/<int:pk>/', views.financeiro_compra_detail, name="financeiro_compra_detail"),
 ]
 
 if settings.DEBUG:

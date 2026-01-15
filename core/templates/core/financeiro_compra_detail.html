@@ -1,0 +1,34 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Compra{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">???</a>
+  </div>
+  <section class="card stack">
+    <div class="finance-header">
+      <div>
+        <h1 style="margin: 0;">Compra</h1>
+        <p class="muted">{{ compra.descricao }}</p>
+      </div>
+      <div class="finance-actions">
+        <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div><strong>Data:</strong> {{ compra.data }}</div>
+      <div><strong>Valor:</strong> R$ {{ compra.valor }}</div>
+      <div><strong>Status:</strong> {{ compra.status.nome }}</div>
+      <div><strong>Caderno:</strong> {{ compra.caderno.nome }}</div>
+      <div><strong>Categoria:</strong> {{ compra.categoria.nome }}</div>
+      <div><strong>Tipo:</strong> {{ compra.tipo.nome }}</div>
+      <div><strong>Centro de custo:</strong> {{ compra.centro_custo.nome }}</div>
+    </div>
+  </section>
+{% endblock %}
