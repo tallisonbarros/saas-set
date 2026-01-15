@@ -70,9 +70,13 @@ class TipoPerfilAdmin(admin.ModelAdmin):
 
 @admin.register(Caderno)
 class CadernoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "cliente", "ativo")
+    list_display = ("nome", "clientes_display", "ativo")
     search_fields = ("nome", "cliente__nome")
     list_filter = ("ativo",)
+
+    def clientes_display(self, obj):
+        return ", ".join(obj.clientes.values_list("nome", flat=True))
+    clientes_display.short_description = "Clientes"
 
 
 @admin.register(CategoriaCompra)
