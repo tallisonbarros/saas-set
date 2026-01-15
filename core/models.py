@@ -11,6 +11,14 @@ class Cliente(models.Model):
     logo = models.ImageField(upload_to="clientes/logos/", blank=True, null=True)
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)  # login do cliente
     ativo = models.BooleanField(default=True)
+    tipos = models.ManyToManyField("TipoPerfil", blank=True, related_name="clientes")
+
+    def __str__(self):
+        return self.nome
+
+
+class TipoPerfil(models.Model):
+    nome = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
         return self.nome

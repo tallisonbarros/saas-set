@@ -1,14 +1,15 @@
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 from django.db.models import Case, IntegerField, Value, When
 
-from .forms import GroupCreateForm, UserCreateForm
-from .models import Cliente, Proposta
+from .forms import TipoPerfilCreateForm, UserCreateForm
+from .models import Cliente, Proposta, TipoPerfil
 
 
 def _get_cliente(user):
@@ -18,21 +19,24 @@ def _get_cliente(user):
         return None
 
 
-def _has_group(user, name):
-    return user.groups.filter(name=name).exists()
-
-
 def _user_role(user):
     if user.is_superuser or user.is_staff:
         return "ADMIN"
-    if _has_group(user, "Financeiro"):
-        return "FINANCEIRO"
-    if _has_group(user, "Cliente"):
+    cliente = _get_cliente(user)
+    if not cliente:
         return "CLIENTE"
+    has_cliente = cliente.tipos.filter(nome__iexact="Cliente").exists()
+    has_financeiro = cliente.tipos.filter(nome__iexact="Financeiro").exists()
+    if has_cliente:
+        return "CLIENTE"
+    if has_financeiro:
+        return "FINANCEIRO"
     return "CLIENTE"
 
 
 def home(request):
+    if request.user.is_authenticated:
+        logout(request)
     return render(request, "core/home.html")
 
 
@@ -140,7 +144,13 @@ def user_management(request):
         return HttpResponseForbidden("Sem permissao.")
     message = None
     form = UserCreateForm()
+    tipo_form = TipoPerfilCreateForm()
     if request.method == "POST":
+        if request.POST.get("create_tipo") == "1":
+            tipo_form = TipoPerfilCreateForm(request.POST)
+            if tipo_form.is_valid():
+                tipo_form.save()
+                return redirect("usuarios")
         if request.POST.get("create_user") == "1":
             form = UserCreateForm(request.POST)
             if form.is_valid():
@@ -154,11 +164,6 @@ def user_management(request):
                 user.is_active = not user.is_active
                 user.save(update_fields=["is_active"])
                 return redirect("usuarios")
-            if action == "set_groups":
-                group_ids = request.POST.getlist("groups")
-                groups = Group.objects.filter(id__in=group_ids)
-                user.groups.set(groups)
-                return redirect("usuarios")
             if action == "set_password":
                 new_password = request.POST.get("new_password", "").strip()
                 if new_password:
@@ -167,6 +172,15 @@ def user_management(request):
                     message = "Senha atualizada."
                 else:
                     message = "Informe uma senha valida."
+            if action == "set_tipos":
+                tipo_ids = request.POST.getlist("tipos")
+                cliente = _get_cliente(user)
+                if not cliente:
+                    message = "Usuario sem cadastro de cliente."
+                else:
+                    tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
+                    cliente.tipos.set(tipos)
+                    return redirect("usuarios?user_id=%s" % user.id)
     else:
         form = UserCreateForm()
     users = User.objects.order_by("username")
@@ -174,7 +188,6 @@ def user_management(request):
     selected_user = None
     if selected_user_id:
         selected_user = get_object_or_404(User, pk=selected_user_id)
-    groups = Group.objects.order_by("name")
     return render(
         request,
         "core/usuarios.html",
@@ -182,36 +195,14 @@ def user_management(request):
             "form": form,
             "users": users,
             "selected_user": selected_user,
-            "groups": groups,
+            "tipos": TipoPerfil.objects.order_by("nome"),
+            "tipo_form": tipo_form,
             "message": message,
         },
     )
 
 
 @login_required
-def group_management(request):
-    if not request.user.is_staff:
-        return HttpResponseForbidden("Sem permissao.")
-    group_form = GroupCreateForm()
-    if request.method == "POST":
-        if request.POST.get("create_group") == "1":
-            group_form = GroupCreateForm(request.POST)
-            if group_form.is_valid():
-                group_form.save()
-                return redirect("grupos")
-        elif request.POST.get("delete_group") == "1":
-            group_id = request.POST.get("group_id")
-            group = get_object_or_404(Group, pk=group_id)
-            group.delete()
-            return redirect("grupos")
-    groups = Group.objects.order_by("name")
-    return render(
-        request,
-        "core/grupos.html",
-        {"group_form": group_form, "groups": groups},
-    )
-
-
 def admin_explorar(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")

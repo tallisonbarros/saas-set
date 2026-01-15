@@ -14,8 +14,12 @@ admin.site.index_title = "Painel administrativo"
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
     form = ClienteAdminForm
-    list_display = ("nome", "email", "ativo")
+    list_display = ("nome", "email", "tipos_display", "ativo")
     search_fields = ("nome", "email")
+
+    def tipos_display(self, obj):
+        return ", ".join(obj.tipos.values_list("nome", flat=True))
+    tipos_display.short_description = "Tipos"
 
 
 @admin.register(Proposta)

@@ -1,7 +1,7 @@
 from django import forms
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 
-from .models import Cliente
+from .models import Cliente, TipoPerfil
 
 
 class ClienteAdminForm(forms.ModelForm):
@@ -13,7 +13,7 @@ class ClienteAdminForm(forms.ModelForm):
 
     class Meta:
         model = Cliente
-        fields = ["nome", "empresa", "sigla_cidade", "email", "logo", "ativo"]
+        fields = ["nome", "empresa", "sigla_cidade", "email", "logo", "ativo", "tipos"]
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -51,12 +51,6 @@ class UserCreateForm(forms.Form):
     username = forms.EmailField(label="Email")
     password = forms.CharField(label="Senha", widget=forms.PasswordInput)
     is_staff = forms.BooleanField(label="Administrador", required=False)
-    groups = forms.ModelMultipleChoiceField(
-        label="Grupos",
-        queryset=Group.objects.all(),
-        required=False,
-        widget=forms.SelectMultiple,
-    )
 
     def clean_username(self):
         username = self.cleaned_data["username"].strip().lower()
@@ -68,7 +62,6 @@ class UserCreateForm(forms.Form):
         username = self.cleaned_data["username"]
         password = self.cleaned_data["password"]
         is_staff = self.cleaned_data["is_staff"]
-        groups = self.cleaned_data.get("groups")
         user = User.objects.create_user(
             username=username,
             email=username,
@@ -76,20 +69,18 @@ class UserCreateForm(forms.Form):
         )
         user.is_staff = is_staff
         user.save(update_fields=["is_staff"])
-        if groups:
-            user.groups.set(groups)
         return user
 
 
-class GroupCreateForm(forms.Form):
-    name = forms.CharField(label="Nome do grupo", max_length=150)
+class TipoPerfilCreateForm(forms.Form):
+    nome = forms.CharField(label="Nome do tipo", max_length=50)
 
-    def clean_name(self):
-        name = self.cleaned_data["name"].strip()
-        if Group.objects.filter(name=name).exists():
-            raise forms.ValidationError("Grupo ja existe.")
-        return name
+    def clean_nome(self):
+        nome = self.cleaned_data["nome"].strip()
+        if TipoPerfil.objects.filter(nome__iexact=nome).exists():
+            raise forms.ValidationError("Tipo ja existe.")
+        return nome
 
     def save(self):
-        name = self.cleaned_data["name"]
-        return Group.objects.create(name=name)
+        nome = self.cleaned_data["nome"].strip()
+        return TipoPerfil.objects.create(nome=nome)
