@@ -568,6 +568,30 @@ select {
   }
 }
 
+.checkbox-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tipo-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.tipo-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .detail-actions form {
   display: grid;
   gap: 8px;

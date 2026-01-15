@@ -51,6 +51,22 @@
           <p class="muted">Erro ao criar tipo. Verifique o nome.</p>
         {% endif %}
       </form>
+      <div style="margin-top: 16px;">
+        <div class="panel-title">Tipos existentes</div>
+        <div class="tipo-list">
+          {% for tipo in tipos %}
+            <form method="post" class="tipo-row">
+              {% csrf_token %}
+              <input type="hidden" name="tipo_id" value="{{ tipo.id }}">
+              <input type="text" name="novo_nome" value="{{ tipo.nome }}">
+              <button class="btn btn-ghost" type="submit" name="update_tipo" value="1">Salvar</button>
+              <button class="btn btn-outline" type="submit" name="delete_tipo" value="1">Excluir</button>
+            </form>
+          {% empty %}
+            <p class="muted">Nenhum tipo cadastrado.</p>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
     <div class="card" style="box-shadow: none;">
@@ -118,12 +134,15 @@
               <input type="hidden" name="action" value="set_tipos">
               <label>Tipos de perfil</label>
               {% if selected_user.cliente %}
-                <select name="tipos" multiple>
+                <div class="checkbox-grid">
                   {% for tipo in tipos %}
-                    <option value="{{ tipo.id }}" {% if tipo in selected_user.cliente.tipos.all %}selected{% endif %}>{{ tipo.nome }}</option>
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if tipo in selected_user.cliente.tipos.all %}checked{% endif %}>
+                      {{ tipo.nome }}
+                    </label>
                   {% endfor %}
-                </select>
-                <button class="btn btn-ghost" type="submit">Salvar tipos</button>
+                </div>
+                <button class="btn btn-primary" type="submit">Salvar tipos</button>
               {% else %}
                 <p class="muted">Crie um cliente para este usuario no admin.</p>
               {% endif %}

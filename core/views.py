@@ -151,6 +151,24 @@ def user_management(request):
             if tipo_form.is_valid():
                 tipo_form.save()
                 return redirect("usuarios")
+        elif request.POST.get("update_tipo") == "1":
+            tipo_id = request.POST.get("tipo_id")
+            novo_nome = request.POST.get("novo_nome", "").strip()
+            tipo = get_object_or_404(TipoPerfil, pk=tipo_id)
+            if novo_nome:
+                if TipoPerfil.objects.exclude(pk=tipo.id).filter(nome__iexact=novo_nome).exists():
+                    message = "Tipo ja existe."
+                else:
+                    tipo.nome = novo_nome
+                    tipo.save(update_fields=["nome"])
+                    return redirect("usuarios")
+            else:
+                message = "Informe um nome valido."
+        elif request.POST.get("delete_tipo") == "1":
+            tipo_id = request.POST.get("tipo_id")
+            tipo = get_object_or_404(TipoPerfil, pk=tipo_id)
+            tipo.delete()
+            return redirect("usuarios")
         if request.POST.get("create_user") == "1":
             form = UserCreateForm(request.POST)
             if form.is_valid():
