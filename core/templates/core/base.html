@@ -11,7 +11,13 @@
   <body class="{% block body_class %}page{% endblock %}">
     <div class="bg"></div>
     {% block header %}
-      <header class="site-header"></header>
+      <header class="site-header">
+        {% if request.user.is_authenticated and request.path != "/painel/" %}
+          <div class="panel-shortcut">
+            <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">▦</a>
+          </div>
+        {% endif %}
+      </header>
     {% endblock %}
     <main class="main">
       {% block content %}{% endblock %}

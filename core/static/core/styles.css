@@ -37,7 +37,7 @@ body {
 .site-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   padding: 20px 8vw;
 }
@@ -507,6 +507,12 @@ select {
 
 .panel-title {
   font-weight: 600;
+}
+
+.panel-shortcut {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
 }
 
 .panel-disabled {
