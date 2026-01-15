@@ -325,6 +325,8 @@ def financeiro_nova(request):
             tipo_id = request.POST.get("tipo")
             centro_id = request.POST.get("centro_custo")
             status_id = request.POST.get("status")
+            pago = request.POST.get("pago") == "on"
+            data_pagamento_raw = request.POST.get("data_pagamento", "").strip()
             try:
                 valor = Decimal(valor_raw)
             except (InvalidOperation, ValueError):
@@ -333,6 +335,12 @@ def financeiro_nova(request):
                 data = datetime.strptime(data_raw, "%Y-%m-%d").date()
             except ValueError:
                 data = None
+            try:
+                data_pagamento = datetime.strptime(data_pagamento_raw, "%Y-%m-%d").date()
+            except ValueError:
+                data_pagamento = None
+            if pago and not data_pagamento:
+                return redirect("financeiro_nova")
             if all([caderno_id, descricao, valor, data, categoria_id, tipo_id, centro_id, status_id]):
                 Compra.objects.create(
                     caderno_id=caderno_id,
@@ -343,6 +351,8 @@ def financeiro_nova(request):
                     tipo_id=tipo_id,
                     centro_custo_id=centro_id,
                     status_id=status_id,
+                    pago=pago,
+                    data_pagamento=data_pagamento if pago else None,
                 )
             return redirect("financeiro")
 

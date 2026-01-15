@@ -71,6 +71,8 @@ class Compra(models.Model):
     tipo = models.ForeignKey(TipoCompra, on_delete=models.PROTECT)
     centro_custo = models.ForeignKey(CentroCusto, on_delete=models.PROTECT)
     status = models.ForeignKey(StatusCompra, on_delete=models.PROTECT)
+    pago = models.BooleanField(default=False)
+    data_pagamento = models.DateField(null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

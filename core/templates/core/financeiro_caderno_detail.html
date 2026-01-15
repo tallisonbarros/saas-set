@@ -8,7 +8,7 @@
     <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
   </div>
   <div class="page-panel-link">
-    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">???</a>
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">P</a>
   </div>
   <section class="card stack">
     <div class="finance-header">
@@ -29,13 +29,16 @@
             <div class="proposal-head">
               <div>
                 <div class="proposal-title">{{ compra.descricao }}</div>
-                <div class="proposal-meta">{{ compra.data }} ??? R$ {{ compra.valor }}</div>
+                <div class="proposal-meta">{{ compra.data }} - R$ {{ compra.valor }}</div>
               </div>
               <span class="badge">{{ compra.status.nome }}</span>
             </div>
             <div class="proposal-meta">
-              {{ compra.categoria.nome }} ??? {{ compra.tipo.nome }} ??? {{ compra.centro_custo.nome }}
+              {{ compra.categoria.nome }} - {{ compra.tipo.nome }} - {{ compra.centro_custo.nome }}
             </div>
+            {% if compra.pago %}
+              <div class="proposal-meta">Pago em: {{ compra.data_pagamento }}</div>
+            {% endif %}
           </div>
         {% endfor %}
       </div>

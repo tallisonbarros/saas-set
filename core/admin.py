@@ -106,6 +106,6 @@ class StatusCompraAdmin(admin.ModelAdmin):
 
 @admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
-    list_display = ("descricao", "caderno", "valor", "data", "status")
+    list_display = ("descricao", "caderno", "valor", "data", "status", "pago", "data_pagamento")
     list_filter = ("status", "tipo", "categoria")
     search_fields = ("descricao", "caderno__nome")
