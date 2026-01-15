@@ -172,7 +172,18 @@ def user_management(request):
         if request.POST.get("create_user") == "1":
             form = UserCreateForm(request.POST)
             if form.is_valid():
-                form.save()
+                user = form.save()
+                tipo_ids = request.POST.getlist("tipos")
+                if tipo_ids:
+                    tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
+                    nome = user.username.split("@")[0]
+                    cliente = Cliente.objects.create(
+                        nome=nome,
+                        email=user.username,
+                        usuario=user,
+                        ativo=True,
+                    )
+                    cliente.tipos.set(tipos)
                 return redirect("usuarios")
         else:
             user_id = request.POST.get("user_id")

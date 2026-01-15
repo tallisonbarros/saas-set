@@ -13,155 +13,168 @@
       <p class="muted">{{ message }}</p>
     {% endif %}
 
-    <div class="card" style="box-shadow: none;">
-      <h2 style="margin-top: 0;">Criar usuario</h2>
-      <form method="post" class="stack">
-        {% csrf_token %}
-        <input type="hidden" name="create_user" value="1">
-        <div class="field">
-          <label for="id_username">Email</label>
-          {{ form.username }}
-        </div>
-        <div class="field">
-          <label for="id_password">Senha</label>
-          {{ form.password }}
-        </div>
-        <div class="field">
-          <label for="id_is_staff">Administrador</label>
-          {{ form.is_staff }}
-        </div>
-        <button class="btn btn-primary" type="submit">Criar</button>
-        {% if form.errors %}
-          <p class="muted">Erro ao criar usuario. Verifique os dados.</p>
-        {% endif %}
-      </form>
-    </div>
+    <div class="user-page-grid">
+      <div class="card compact-card">
+        <h2 style="margin-top: 0;">Criar usuario</h2>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="create_user" value="1">
+          <div class="field">
+            <label for="id_username">Email</label>
+            {{ form.username }}
+          </div>
+          <div class="field">
+            <label for="id_password">Senha</label>
+            {{ form.password }}
+          </div>
+          <div class="field">
+            <label for="id_is_staff">Administrador</label>
+            {{ form.is_staff }}
+          </div>
+          <div class="field">
+            <label>Tipos de perfil</label>
+            <div class="checkbox-grid">
+              {% for tipo in tipos %}
+                <label class="checkbox-item">
+                  <input type="checkbox" name="tipos" value="{{ tipo.id }}">
+                  {{ tipo.nome }}
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+          <button class="btn btn-primary" type="submit">Criar</button>
+          {% if form.errors %}
+            <p class="muted">Erro ao criar usuario. Verifique os dados.</p>
+          {% endif %}
+        </form>
+      </div>
 
-    <div class="card" style="box-shadow: none;">
-      <h2 style="margin-top: 0;">Criar tipo de perfil</h2>
-      <form method="post" class="stack">
-        {% csrf_token %}
-        <input type="hidden" name="create_tipo" value="1">
-        <div class="field">
-          <label for="id_nome">Nome do tipo</label>
-          {{ tipo_form.nome }}
-        </div>
-        <button class="btn btn-primary" type="submit">Criar tipo</button>
-        {% if tipo_form.errors %}
-          <p class="muted">Erro ao criar tipo. Verifique o nome.</p>
-        {% endif %}
-      </form>
-      <div style="margin-top: 16px;">
-        <div class="panel-title">Tipos existentes</div>
-        <div class="tipo-list">
-          {% for tipo in tipos %}
-            <form method="post" class="tipo-row">
-              {% csrf_token %}
-              <input type="hidden" name="tipo_id" value="{{ tipo.id }}">
-              <input type="text" name="novo_nome" value="{{ tipo.nome }}">
-              <button class="btn btn-ghost" type="submit" name="update_tipo" value="1">Salvar</button>
-              <button class="btn btn-outline" type="submit" name="delete_tipo" value="1">Excluir</button>
-            </form>
-          {% empty %}
-            <p class="muted">Nenhum tipo cadastrado.</p>
-          {% endfor %}
+      <div class="card compact-card">
+        <h2 style="margin-top: 0;">Tipos de perfil</h2>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="create_tipo" value="1">
+          <div class="field">
+            <label for="id_nome">Nome do tipo</label>
+            {{ tipo_form.nome }}
+          </div>
+          <button class="btn btn-primary" type="submit">Criar tipo</button>
+          {% if tipo_form.errors %}
+            <p class="muted">Erro ao criar tipo. Verifique o nome.</p>
+          {% endif %}
+        </form>
+        <div style="margin-top: 12px;">
+          <div class="panel-title">Tipos existentes</div>
+          <div class="tipo-list">
+            {% for tipo in tipos %}
+              <form method="post" class="tipo-row">
+                {% csrf_token %}
+                <input type="hidden" name="tipo_id" value="{{ tipo.id }}">
+                <input type="text" name="novo_nome" value="{{ tipo.nome }}">
+                <button class="btn btn-ghost" type="submit" name="update_tipo" value="1">Salvar</button>
+                <button class="btn btn-outline" type="submit" name="delete_tipo" value="1">Excluir</button>
+              </form>
+            {% empty %}
+              <p class="muted">Nenhum tipo cadastrado.</p>
+            {% endfor %}
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="card" style="box-shadow: none;">
-      <h2 style="margin-top: 0;">Usuarios</h2>
-      <form method="get" class="stack">
-        <label for="id_user_filter">Buscar usuario</label>
-        <input id="id_user_filter" type="text" placeholder="Digite parte do email">
-        <label for="id_user_select">Escolha o usuario</label>
-        <select id="id_user_select" name="user_id">
-          <option value="">Selecione</option>
-          {% for user in users %}
-            <option value="{{ user.id }}" {% if selected_user and selected_user.id == user.id %}selected{% endif %}>
-              {{ user.username }}
-            </option>
-          {% endfor %}
-        </select>
-        <button class="btn btn-ghost" type="submit">Carregar</button>
-      </form>
+      <div class="card compact-card">
+        <h2 style="margin-top: 0;">Usuarios</h2>
+        <form method="get" class="stack">
+          <label for="id_user_filter">Buscar usuario</label>
+          <input id="id_user_filter" type="text" placeholder="Digite parte do email">
+          <label for="id_user_select">Escolha o usuario</label>
+          <select id="id_user_select" name="user_id">
+            <option value="">Selecione</option>
+            {% for user in users %}
+              <option value="{{ user.id }}" {% if selected_user and selected_user.id == user.id %}selected{% endif %}>
+                {{ user.username }}
+              </option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-ghost" type="submit">Carregar</button>
+        </form>
 
-      {% if selected_user %}
-        <div class="user-grid two-col">
-          <div class="user-card">
-            <div class="panel-title">Resumo</div>
-            <div class="user-summary">
-              <div>
-                <div class="summary-label">Email</div>
-                <div>{{ selected_user.username }}</div>
-              </div>
-              <div>
-                <div class="summary-label">Admin</div>
-                <div>{{ selected_user.is_staff|yesno:"Sim,Nao" }}</div>
-              </div>
-              <div>
-                <div class="summary-label">Ativo</div>
-                <div>{{ selected_user.is_active|yesno:"Sim,Nao" }}</div>
-              </div>
-              <div>
-                <div class="summary-label">Tipos</div>
+        {% if selected_user %}
+          <div class="user-grid two-col">
+            <div class="user-card">
+              <div class="panel-title">Resumo</div>
+              <div class="user-summary">
                 <div>
-                  {% if selected_user.cliente and selected_user.cliente.tipos.all %}
-                    {% for t in selected_user.cliente.tipos.all %}
-                      {{ t.nome }}{% if not forloop.last %}, {% endif %}
-                    {% endfor %}
-                  {% else %}
-                    Sem perfil
-                  {% endif %}
+                  <div class="summary-label">Email</div>
+                  <div>{{ selected_user.username }}</div>
+                </div>
+                <div>
+                  <div class="summary-label">Admin</div>
+                  <div>{{ selected_user.is_staff|yesno:"Sim,Nao" }}</div>
+                </div>
+                <div>
+                  <div class="summary-label">Ativo</div>
+                  <div>{{ selected_user.is_active|yesno:"Sim,Nao" }}</div>
+                </div>
+                <div>
+                  <div class="summary-label">Tipos</div>
+                  <div>
+                    {% if selected_user.cliente and selected_user.cliente.tipos.all %}
+                      {% for t in selected_user.cliente.tipos.all %}
+                        {{ t.nome }}{% if not forloop.last %}, {% endif %}
+                      {% endfor %}
+                    {% else %}
+                      Sem perfil
+                    {% endif %}
+                  </div>
                 </div>
               </div>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ selected_user.id }}">
+                <input type="hidden" name="action" value="toggle_active">
+                <button class="btn btn-outline" type="submit">
+                  {% if selected_user.is_active %}Desativar usuario{% else %}Ativar usuario{% endif %}
+                </button>
+              </form>
             </div>
-            <form method="post">
-              {% csrf_token %}
-              <input type="hidden" name="user_id" value="{{ selected_user.id }}">
-              <input type="hidden" name="action" value="toggle_active">
-              <button class="btn btn-outline" type="submit">
-                {% if selected_user.is_active %}Desativar usuario{% else %}Ativar usuario{% endif %}
-              </button>
-            </form>
-          </div>
 
-          <div class="user-card">
-            <div class="panel-title">Editar tipos</div>
-            <form method="post" class="stack">
-              {% csrf_token %}
-              <input type="hidden" name="user_id" value="{{ selected_user.id }}">
-              <input type="hidden" name="action" value="set_tipos">
-              <label>Tipos de perfil</label>
-              {% if selected_user.cliente %}
-                <div class="checkbox-grid">
-                  {% for tipo in tipos %}
-                    <label class="checkbox-item">
-                      <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if tipo in selected_user.cliente.tipos.all %}checked{% endif %}>
-                      {{ tipo.nome }}
-                    </label>
-                  {% endfor %}
-                </div>
-                <button class="btn btn-primary" type="submit">Salvar tipos</button>
-              {% else %}
-                <p class="muted">Crie um cliente para este usuario no admin.</p>
-              {% endif %}
-            </form>
-          </div>
+            <div class="user-card">
+              <div class="panel-title">Editar tipos</div>
+              <form method="post" class="stack">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ selected_user.id }}">
+                <input type="hidden" name="action" value="set_tipos">
+                <label>Tipos de perfil</label>
+                {% if selected_user.cliente %}
+                  <div class="checkbox-grid">
+                    {% for tipo in tipos %}
+                      <label class="checkbox-item">
+                        <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if tipo in selected_user.cliente.tipos.all %}checked{% endif %}>
+                        {{ tipo.nome }}
+                      </label>
+                    {% endfor %}
+                  </div>
+                  <button class="btn btn-primary" type="submit">Salvar tipos</button>
+                {% else %}
+                  <p class="muted">Crie um cliente para este usuario no admin.</p>
+                {% endif %}
+              </form>
+            </div>
 
-          <div class="user-card">
-            <div class="panel-title">Atualizar senha</div>
-            <form method="post" class="stack">
-              {% csrf_token %}
-              <input type="hidden" name="user_id" value="{{ selected_user.id }}">
-              <input type="hidden" name="action" value="set_password">
-              <label>Nova senha</label>
-              <input type="password" name="new_password" placeholder="Digite a nova senha">
-              <button class="btn btn-ghost" type="submit">Atualizar senha</button>
-            </form>
+            <div class="user-card">
+              <div class="panel-title">Atualizar senha</div>
+              <form method="post" class="stack">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ selected_user.id }}">
+                <input type="hidden" name="action" value="set_password">
+                <label>Nova senha</label>
+                <input type="password" name="new_password" placeholder="Digite a nova senha">
+                <button class="btn btn-ghost" type="submit">Atualizar senha</button>
+              </form>
+            </div>
           </div>
-        </div>
-      {% endif %}
+        {% endif %}
+      </div>
     </div>
   </section>
   <script>
