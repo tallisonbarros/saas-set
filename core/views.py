@@ -193,14 +193,20 @@ def ios_rack_detail(request, pk):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_rack":
-            if not cliente:
-                return HttpResponseForbidden("Sem cadastro de cliente.")
+            if not request.user.is_staff and rack.cliente != cliente:
+                return HttpResponseForbidden("Sem permissao.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
+            id_planta_raw = request.POST.get("id_planta", "").strip()
             if nome:
                 rack.nome = nome
             rack.descricao = descricao
-            rack.save(update_fields=["nome", "descricao"])
+            if id_planta_raw:
+                planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
+                rack.id_planta = planta
+            else:
+                rack.id_planta = None
+            rack.save(update_fields=["nome", "descricao", "id_planta"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action in ["add_first", "add_to_slot"]:
             module_id = request.POST.get("module_id")
@@ -640,71 +646,107 @@ def user_management(request):
             if form.is_valid():
                 user = form.save()
                 tipo_ids = request.POST.getlist("tipos")
-                if tipo_ids:
-                    tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
-                    nome = user.username.split("@")[0]
-                    cliente = PerfilUsuario.objects.create(
-                        nome=nome,
-                        email=user.username,
-                        usuario=user,
-                        ativo=True,
-                    )
+                tipos = TipoPerfil.objects.filter(id__in=tipo_ids) if tipo_ids else TipoPerfil.objects.none()
+                nome = user.username.split("@")[0]
+                cliente = PerfilUsuario.objects.create(
+                    nome=nome,
+                    email=user.username,
+                    usuario=user,
+                    ativo=True,
+                )
+                if tipos:
                     cliente.tipos.set(tipos)
                 return redirect("usuarios")
-        else:
-            user_id = request.POST.get("user_id")
-            action = request.POST.get("action")
-            user = get_object_or_404(User, pk=user_id)
-            if action == "toggle_active":
-                user.is_active = not user.is_active
-                user.save(update_fields=["is_active"])
-                return redirect("usuarios")
-            if action == "set_password":
-                new_password = request.POST.get("new_password", "").strip()
-                if new_password:
-                    user.set_password(new_password)
-                    user.save(update_fields=["password"])
-                    message = "Senha atualizada."
-                else:
-                    message = "Informe uma senha valida."
-            if action == "set_plantas":
-                plantas_raw = request.POST.get("plantas", "")
-                cliente = _get_cliente(user)
-                if not cliente:
-                    message = "Usuario sem cadastro de cliente."
-                else:
-                    cleaned = plantas_raw
-                    for sep in [";", "\n", "\r", "\t"]:
-                        cleaned = cleaned.replace(sep, ",")
-                    codes = [code.strip().upper() for code in cleaned.split(",") if code.strip()]
-                    plantas = [PlantaIO.objects.get_or_create(codigo=code)[0] for code in codes]
-                    cliente.plantas.set(plantas)
-                    return redirect("usuarios?user_id=%s" % user.id)
-            if action == "set_tipos":
-                tipo_ids = request.POST.getlist("tipos")
-                cliente = _get_cliente(user)
-                if not cliente:
-                    message = "Usuario sem cadastro de cliente."
-                else:
-                    tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
-                    cliente.tipos.set(tipos)
-                    return redirect("usuarios?user_id=%s" % user.id)
     else:
         form = UserCreateForm()
     users = User.objects.order_by("username")
-    selected_user_id = request.GET.get("user_id")
-    selected_user = None
-    if selected_user_id:
-        selected_user = get_object_or_404(User, pk=selected_user_id)
     return render(
         request,
         "core/usuarios.html",
         {
             "form": form,
             "users": users,
-            "selected_user": selected_user,
             "tipos": TipoPerfil.objects.order_by("nome"),
             "tipo_form": tipo_form,
+            "message": message,
+        },
+    )
+
+
+@login_required
+def usuarios_gerenciar_usuario(request, pk):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    user = get_object_or_404(User, pk=pk)
+    perfil = _get_cliente(user)
+    message = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_user":
+            email = request.POST.get("email", "").strip().lower()
+            is_staff = request.POST.get("is_staff") == "on"
+            is_active = request.POST.get("is_active") == "on"
+            if not email:
+                message = "Informe um email valido."
+            else:
+                existing = User.objects.filter(username=email).exclude(pk=user.pk)
+                if existing.exists():
+                    message = "Email ja cadastrado."
+                else:
+                    user.username = email
+                    user.email = email
+                    user.is_staff = is_staff
+                    user.is_active = is_active
+                    user.save(update_fields=["username", "email", "is_staff", "is_active"])
+                    if perfil:
+                        perfil.email = email
+                        perfil.save(update_fields=["email"])
+                    return redirect("usuarios_gerenciar_usuario", pk=user.pk)
+        if action == "update_perfil":
+            nome = request.POST.get("nome", "").strip()
+            empresa = request.POST.get("empresa", "").strip()
+            sigla_cidade = request.POST.get("sigla_cidade", "").strip()
+            tipo_ids = request.POST.getlist("tipos")
+            plantas_raw = request.POST.get("plantas", "")
+            if not perfil:
+                perfil = PerfilUsuario.objects.create(
+                    nome=nome or user.username.split("@")[0],
+                    email=user.email or user.username,
+                    usuario=user,
+                    ativo=True,
+                    empresa=empresa,
+                    sigla_cidade=sigla_cidade,
+                )
+            else:
+                if nome:
+                    perfil.nome = nome
+                perfil.empresa = empresa
+                perfil.sigla_cidade = sigla_cidade
+                perfil.save(update_fields=["nome", "empresa", "sigla_cidade"])
+            tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
+            perfil.tipos.set(tipos)
+            cleaned = plantas_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned = cleaned.replace(sep, ",")
+            codes = [code.strip().upper() for code in cleaned.split(",") if code.strip()]
+            plantas = [PlantaIO.objects.get_or_create(codigo=code)[0] for code in codes]
+            perfil.plantas.set(plantas)
+            return redirect("usuarios_gerenciar_usuario", pk=user.pk)
+        if action == "set_password":
+            new_password = request.POST.get("new_password", "").strip()
+            if new_password:
+                user.set_password(new_password)
+                user.save(update_fields=["password"])
+                message = "Senha atualizada."
+            else:
+                message = "Informe uma senha valida."
+    return render(
+        request,
+        "core/usuarios_gerenciar_usuario.html",
+        {
+            "user_item": user,
+            "perfil": perfil,
+            "tipos": TipoPerfil.objects.order_by("nome"),
             "message": message,
         },
     )
