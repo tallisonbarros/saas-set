@@ -14,14 +14,15 @@
       </svg>
     </a>
   </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
+    <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
+  </div>
   <section class="card ios-hero">
     <div class="ios-hero-head">
       <div>
         <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
         <p class="hero-subtitle">{{ module.modulo_modelo.marca }} - {{ module.modulo_modelo.modelo }}</p>
-      </div>
-      <div class="hero-links">
-        <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Voltar</a>
       </div>
     </div>
     <div class="rack-status">
