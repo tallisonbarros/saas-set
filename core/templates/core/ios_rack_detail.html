@@ -4,6 +4,9 @@
 {% block title %}{{ rack.nome }}{% endblock %}
 
 {% block content %}
+  <div class="page-panel-link">
+    <a class="btn btn-ghost" href="{% url 'painel' %}">Painel</a>
+  </div>
   <section class="card ios-hero">
     <div class="ios-hero-head">
       <div>
@@ -26,7 +29,7 @@
       </div>
       <div>
         <div class="meta-label">Slots livres</div>
-        <div class="meta-value">{{ rack.slots_total|add:-ocupados }}</div>
+        <div class="meta-value">{{ slots_livres }}</div>
       </div>
     </div>
   </section>

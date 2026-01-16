@@ -172,6 +172,7 @@ def ios_rack_detail(request, pk):
     slots = rack.slots.select_related("modulo").order_by("posicao")
     modules = ModuloIO.objects.filter(cliente=rack.cliente).select_related("tipo_base").order_by("nome")
     ocupados = rack.slots.filter(modulo__isnull=False).count()
+    slots_livres = max(rack.slots_total - ocupados, 0)
     return render(
         request,
         "core/ios_rack_detail.html",
@@ -180,6 +181,7 @@ def ios_rack_detail(request, pk):
             "slots": slots,
             "modules": modules,
             "ocupados": ocupados,
+            "slots_livres": slots_livres,
         },
     )
 
