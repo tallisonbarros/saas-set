@@ -1,0 +1,48 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Nova proposta{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
+  </div>
+  <section class="card stack">
+    <div>
+      <h1 style="margin: 0 0 8px 0;">Criar proposta</h1>
+      <p class="muted">Informe o email do destinatario e os dados da proposta.</p>
+    </div>
+    {% if message %}
+      <div class="alert alert-warning">{{ message }}</div>
+    {% endif %}
+    <form class="stack" method="post">
+      {% csrf_token %}
+      <label for="id_email">Email do destinatario</label>
+      <input id="id_email" type="email" name="email" value="{{ form_data.email }}" required>
+
+      <label for="id_nome">Nome</label>
+      <input id="id_nome" type="text" name="nome" value="{{ form_data.nome }}" required>
+
+      <label for="id_descricao">Descricao</label>
+      <textarea id="id_descricao" name="descricao" required>{{ form_data.descricao }}</textarea>
+
+      <label for="id_valor">Valor</label>
+      <input id="id_valor" type="text" name="valor" value="{{ form_data.valor }}" required>
+
+      <label for="id_prioridade">Prioridade (1 a 99)</label>
+      <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ form_data.prioridade }}">
+
+      <div class="detail-actions">
+        <button class="btn btn-primary" type="submit">Enviar proposta</button>
+        <a class="btn btn-outline" href="{% url 'propostas' %}">Voltar</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

@@ -89,6 +89,13 @@ class Proposta(models.Model):
         FINALIZADO = "FINALIZADO", "Finalizado"
 
     cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="propostas")
+    criada_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="propostas_criadas",
+    )
     nome = models.CharField(max_length=120)
     codigo = models.CharField(max_length=40, blank=True)
     descricao = models.TextField()

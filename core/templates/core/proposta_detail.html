@@ -24,6 +24,10 @@
       <div><strong>Prioridade:</strong> {{ proposta.prioridade }}</div>
       <div><strong>Status:</strong> {{ proposta.get_status_display }}</div>
       <div><strong>Valor:</strong> R$ {{ proposta.valor }}</div>
+      <div><strong>Enviada para:</strong> {{ proposta.cliente.nome }} ({{ proposta.cliente.email }})</div>
+      {% if proposta.criada_por %}
+        <div><strong>Criada por:</strong> {{ proposta.criada_por.username }}</div>
+      {% endif %}
       <div><strong>Criado em:</strong> {{ proposta.criado_em }}</div>
       {% if proposta.decidido_em %}
         <div><strong>Decidido em:</strong> {{ proposta.decidido_em }}</div>

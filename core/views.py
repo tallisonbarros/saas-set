@@ -48,10 +48,13 @@ def _user_role(user):
         nome__iexact="Cliente"
     ).exists()
     has_financeiro = cliente.tipos.filter(nome__iexact="Financeiro").exists()
+    has_vendedor = cliente.tipos.filter(nome__iexact="Vendedor").exists()
     if has_cliente:
         return "CLIENTE"
     if has_financeiro:
         return "FINANCEIRO"
+    if has_vendedor:
+        return "VENDEDOR"
     return "CLIENTE"
 
 
@@ -84,6 +87,7 @@ def painel(request):
             "role": _user_role(request.user),
             "is_financeiro": _has_tipo(request.user, "Financeiro") or request.user.is_staff,
             "is_cliente": _has_tipo_any(request.user, ["Contratante", "Cliente"]),
+            "is_vendedor": _has_tipo(request.user, "Vendedor"),
         },
     )
 
@@ -400,7 +404,9 @@ def proposta_list(request):
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     propostas = Proposta.objects.none()
-    if cliente:
+    if _has_tipo(request.user, "Vendedor"):
+        propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
+    elif cliente:
         propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
     status = request.GET.get("status")
     if status in Proposta.Status.values:
@@ -422,7 +428,12 @@ def proposta_list(request):
     return render(
         request,
         "core/proposta_list.html",
-        {"cliente": cliente, "propostas": propostas, "status_filter": status},
+        {
+            "cliente": cliente,
+            "propostas": propostas,
+            "status_filter": status,
+            "is_vendedor": _has_tipo(request.user, "Vendedor"),
+        },
     )
 
 
@@ -431,8 +442,67 @@ def proposta_detail(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    if _has_tipo(request.user, "Vendedor"):
+        proposta = get_object_or_404(Proposta, pk=pk, criada_por=request.user)
+    else:
+        proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     return render(request, "core/proposta_detail.html", {"cliente": cliente, "proposta": proposta})
+
+
+@login_required
+def proposta_nova_vendedor(request):
+    if not (_has_tipo(request.user, "Vendedor") or request.user.is_staff):
+        return HttpResponseForbidden("Sem permissao.")
+    message = None
+    form_data = {"email": "", "nome": "", "descricao": "", "valor": "", "prioridade": "50"}
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip().lower()
+        nome = request.POST.get("nome", "").strip()
+        descricao = request.POST.get("descricao", "").strip()
+        valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
+        prioridade_raw = request.POST.get("prioridade", "").strip()
+        form_data = {
+            "email": email,
+            "nome": nome,
+            "descricao": descricao,
+            "valor": valor_raw,
+            "prioridade": prioridade_raw or "50",
+        }
+
+        destinatario = PerfilUsuario.objects.filter(email__iexact=email).first() if email else None
+        if not destinatario:
+            message = "Usuario nao encontrado para este email."
+        else:
+            try:
+                valor = Decimal(valor_raw)
+            except (InvalidOperation, ValueError):
+                valor = None
+            try:
+                prioridade = int(prioridade_raw) if prioridade_raw else 50
+            except ValueError:
+                prioridade = 50
+            prioridade = max(1, min(99, prioridade))
+            if not nome or not descricao or valor is None:
+                message = "Preencha nome, descricao e valor valido."
+            else:
+                proposta = Proposta.objects.create(
+                    cliente=destinatario,
+                    criada_por=request.user,
+                    nome=nome,
+                    descricao=descricao,
+                    valor=valor,
+                    prioridade=prioridade,
+                )
+                return redirect("proposta_detail", pk=proposta.pk)
+
+    return render(
+        request,
+        "core/proposta_nova.html",
+        {
+            "message": message,
+            "form_data": form_data,
+        },
+    )
 
 
 @login_required
@@ -471,7 +541,10 @@ def salvar_observacao(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    if _has_tipo(request.user, "Vendedor"):
+        proposta = get_object_or_404(Proposta, pk=pk, criada_por=request.user)
+    else:
+        proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     observacao = request.POST.get("observacao", "").strip()
     prioridade_raw = request.POST.get("prioridade", "").strip()
     proposta.observacao_cliente = observacao

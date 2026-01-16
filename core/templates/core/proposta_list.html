@@ -27,6 +27,9 @@
     {% if not cliente %}
       <p>Usuario sem cliente associado. Fale com o administrador.</p>
     {% else %}
+      {% if is_vendedor %}
+        <div class="muted">Propostas criadas por voce.</div>
+      {% endif %}
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
         <a href="{% url 'propostas' %}?status=PENDENTE" class="filter-pill {% if status_filter == 'PENDENTE' %}active{% endif %}">Pendentes</a>
@@ -45,6 +48,10 @@
                 <div>
                   <div class="proposal-title">{{ proposta.nome }}</div>
                   <div class="proposal-meta">R$ {{ proposta.valor }}</div>
+                  <div class="proposal-meta">Enviada para: {{ proposta.cliente.nome }}</div>
+                  {% if proposta.criada_por %}
+                    <div class="proposal-meta">Criada por: {{ proposta.criada_por.username }}</div>
+                  {% endif %}
                 </div>
                 <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
               </div>
