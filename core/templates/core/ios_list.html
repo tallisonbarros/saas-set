@@ -1,0 +1,94 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Listas de IOs{% endblock %}
+
+{% block content %}
+  <section class="card hero ios-hero">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+    <div>
+      <h1 class="hero-title">Listas de IOs</h1>
+      <p class="hero-subtitle">Organize racks, crie modulos e nomeie cada canal.</p>
+    </div>
+    <div class="hero-links">
+      <a class="btn btn-primary" href="{% url 'ios_modulos' %}">Catalogo de modulos</a>
+      <button class="btn btn-outline" type="button">Novo rack</button>
+    </div>
+  </section>
+
+  <div class="io-layout">
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Racks cadastrados</h2>
+          <p class="muted">Escolha um rack para adicionar modulos e ajustar os slots.</p>
+        </div>
+        <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+      </div>
+      <div class="io-grid">
+        {% for rack in racks %}
+          <article class="rack-card">
+            <div class="rack-head">
+              <div>
+                <div class="rack-title">{{ rack.nome }}</div>
+                <div class="muted">{{ rack.descricao }}</div>
+              </div>
+              <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots }} slots</span>
+            </div>
+            <div class="rack-meta">
+              <div>
+                <div class="meta-label">Total de slots</div>
+                <div class="meta-value">{{ rack.slots }}</div>
+              </div>
+              <div>
+                <div class="meta-label">Modulos ativos</div>
+                <div class="meta-value">{{ rack.ocupados }}</div>
+              </div>
+            </div>
+            <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack</a>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Modulos criados</h2>
+          <p class="muted">Seus modulos ficam disponiveis para qualquer rack.</p>
+        </div>
+        <a class="btn btn-outline" href="{% url 'ios_modulos' %}">Gerenciar modulos</a>
+      </div>
+      <div class="module-list">
+        {% for module in modules %}
+          <article class="module-card">
+            <div>
+              <div class="module-title">{{ module.nome }}</div>
+              <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
+            </div>
+            <div class="module-meta">
+              <span class="slot-badge">{{ module.canais }} canais</span>
+              <span class="module-pill">{{ module.tipo }}</span>
+            </div>
+            <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="io-card io-wide">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Classificacao de canais</h2>
+          <p class="muted">Padroes atuais para os tipos de I/O.</p>
+        </div>
+      </div>
+      <div class="channel-types">
+        {% for channel in channel_types %}
+          <span class="channel-pill">{{ channel }}</span>
+        {% endfor %}
+        <button class="btn btn-outline" type="button">Adicionar tipo</button>
+      </div>
+    </section>
+  </div>
+{% endblock %}

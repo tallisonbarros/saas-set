@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden
+from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -78,6 +78,155 @@ def painel(request):
             "role": _user_role(request.user),
             "is_financeiro": _has_tipo(request.user, "Financeiro") or request.user.is_staff,
             "is_cliente": _has_tipo_any(request.user, ["Contratante", "Cliente"]),
+        },
+    )
+
+
+IO_CHANNEL_TYPES = ["DI", "DO", "AI", "AO", "RTD", "TC", "Pulso"]
+IO_MODULES_SAMPLE = [
+    {
+        "id": 1,
+        "nome": "Modulo de Entradas Digitais",
+        "modelo": "DI-16X",
+        "marca": "SET",
+        "canais": 16,
+        "tipo": "DI",
+    },
+    {
+        "id": 2,
+        "nome": "Modulo de Saidas Digitais",
+        "modelo": "DO-16R",
+        "marca": "SET",
+        "canais": 16,
+        "tipo": "DO",
+    },
+    {
+        "id": 3,
+        "nome": "Modulo de Entradas Analogicas",
+        "modelo": "AI-08H",
+        "marca": "Festo",
+        "canais": 8,
+        "tipo": "AI",
+    },
+    {
+        "id": 4,
+        "nome": "Modulo de Saidas Analogicas",
+        "modelo": "AO-04P",
+        "marca": "Siemens",
+        "canais": 4,
+        "tipo": "AO",
+    },
+]
+IO_RACKS_SAMPLE = [
+    {
+        "id": 1,
+        "nome": "Rack Principal",
+        "descricao": "Linha 01 - Esteira e empacotamento",
+        "slots": 10,
+        "ocupados": 6,
+    },
+    {
+        "id": 2,
+        "nome": "Rack Remoto",
+        "descricao": "Sala de bombas e utilidades",
+        "slots": 8,
+        "ocupados": 3,
+    },
+]
+
+
+def _get_module(module_id):
+    for module in IO_MODULES_SAMPLE:
+        if module["id"] == module_id:
+            return module
+    return None
+
+
+@login_required
+def ios_list(request):
+    return render(
+        request,
+        "core/ios_list.html",
+        {
+            "racks": IO_RACKS_SAMPLE,
+            "modules": IO_MODULES_SAMPLE,
+            "channel_types": IO_CHANNEL_TYPES,
+        },
+    )
+
+
+@login_required
+def ios_rack_detail(request, pk):
+    rack = next((item for item in IO_RACKS_SAMPLE if item["id"] == pk), None)
+    if not rack:
+        raise Http404("Rack nao encontrado.")
+    layout = [
+        {"slot": "S1", "module_id": 1},
+        {"slot": "S2", "module_id": 2},
+        {"slot": "S3", "module_id": None},
+        {"slot": "S4", "module_id": 3},
+        {"slot": "S5", "module_id": None},
+        {"slot": "S6", "module_id": 4},
+        {"slot": "S7", "module_id": None},
+        {"slot": "S8", "module_id": None},
+        {"slot": "S9", "module_id": None},
+        {"slot": "S10", "module_id": None},
+    ]
+    slots = []
+    for item in layout:
+        module = _get_module(item["module_id"]) if item["module_id"] else None
+        slots.append(
+            {
+                "slot": item["slot"],
+                "module": module,
+            }
+        )
+    return render(
+        request,
+        "core/ios_rack_detail.html",
+        {
+            "rack": rack,
+            "slots": slots,
+            "modules": IO_MODULES_SAMPLE,
+        },
+    )
+
+
+@login_required
+def ios_modulos(request):
+    return render(
+        request,
+        "core/ios_modulos.html",
+        {
+            "modules": IO_MODULES_SAMPLE,
+            "channel_types": IO_CHANNEL_TYPES,
+        },
+    )
+
+
+@login_required
+def ios_modulo_detail(request, pk):
+    module = _get_module(pk)
+    if not module:
+        raise Http404("Modulo nao encontrado.")
+    max_channels = min(module["canais"], 12)
+    channels = []
+    for index in range(1, max_channels + 1):
+        channels.append(
+            {
+                "index": index,
+                "nome": "Canal %02d" % index,
+                "tipo": module["tipo"],
+            }
+        )
+    return render(
+        request,
+        "core/ios_modulo_detail.html",
+        {
+            "module": module,
+            "channels": channels,
+            "channel_types": IO_CHANNEL_TYPES,
+            "remaining_channels": module["canais"] - max_channels,
         },
     )
 

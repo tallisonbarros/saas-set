@@ -1,0 +1,90 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ rack.nome }}{% endblock %}
+
+{% block content %}
+  <section class="card ios-hero">
+    <div class="ios-hero-head">
+      <div>
+        <h1 class="hero-title">{{ rack.nome }}</h1>
+        <p class="hero-subtitle">{{ rack.descricao }}</p>
+      </div>
+      <div class="hero-links">
+        <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
+        <button class="btn btn-outline" type="button">Editar rack</button>
+      </div>
+    </div>
+    <div class="rack-status">
+      <div>
+        <div class="meta-label">Slots totais</div>
+        <div class="meta-value">{{ rack.slots }}</div>
+      </div>
+      <div>
+        <div class="meta-label">Slots ocupados</div>
+        <div class="meta-value">{{ rack.ocupados }}</div>
+      </div>
+      <div>
+        <div class="meta-label">Slots livres</div>
+        <div class="meta-value">{{ rack.slots|add:-rack.ocupados }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="io-card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Layout do rack</h2>
+        <p class="muted">Adicione modulos no primeiro slot livre e mova para esquerda ou direita.</p>
+      </div>
+      <button class="btn btn-primary" type="button">Adicionar modulo</button>
+    </div>
+    <div class="rack-layout">
+      {% for slot in slots %}
+        <div class="rack-slot {% if slot.module %}filled{% else %}empty{% endif %}">
+          <div class="slot-label">{{ slot.slot }}</div>
+          {% if slot.module %}
+            <div class="slot-module">
+              <div class="slot-title">{{ slot.module.nome }}</div>
+              <div class="muted">{{ slot.module.marca }} · {{ slot.module.modelo }}</div>
+              <div class="slot-actions">
+                <button class="btn btn-ghost icon-only" type="button">←</button>
+                <button class="btn btn-ghost icon-only" type="button">→</button>
+              </div>
+            </div>
+          {% else %}
+            <div class="slot-empty">
+              <span>Slot livre</span>
+              <button class="btn btn-outline" type="button">Adicionar</button>
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="io-card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Modulos disponiveis</h2>
+        <p class="muted">Escolha um modulo para preencher o slot selecionado.</p>
+      </div>
+      <a class="btn btn-outline" href="{% url 'ios_modulos' %}">Criar modulo</a>
+    </div>
+    <div class="module-list">
+      {% for module in modules %}
+        <article class="module-card compact">
+          <div>
+            <div class="module-title">{{ module.nome }}</div>
+            <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
+          </div>
+          <div class="module-meta">
+            <span class="slot-badge">{{ module.canais }} canais</span>
+            <span class="module-pill">{{ module.tipo }}</span>
+          </div>
+          <button class="btn btn-ghost" type="button">Adicionar ao rack</button>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

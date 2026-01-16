@@ -40,6 +40,10 @@ urlpatterns = [
     path('financeiro/cadernos/', views.financeiro_cadernos, name="financeiro_cadernos"),
     path('financeiro/cadernos/<int:pk>/', views.financeiro_caderno_detail, name="financeiro_caderno_detail"),
     path('financeiro/compras/<int:pk>/', views.financeiro_compra_detail, name="financeiro_compra_detail"),
+    path('ios/', views.ios_list, name="ios_list"),
+    path('ios/racks/<int:pk>/', views.ios_rack_detail, name="ios_rack_detail"),
+    path('ios/modulos/', views.ios_modulos, name="ios_modulos"),
+    path('ios/modulos/<int:pk>/', views.ios_modulo_detail, name="ios_modulo_detail"),
 ]
 
 if settings.DEBUG:

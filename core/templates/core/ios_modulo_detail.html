@@ -1,0 +1,57 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ module.nome }}{% endblock %}
+
+{% block content %}
+  <section class="card ios-hero">
+    <div class="ios-hero-head">
+      <div>
+        <h1 class="hero-title">{{ module.nome }}</h1>
+        <p class="hero-subtitle">{{ module.marca }} · {{ module.modelo }}</p>
+      </div>
+      <div class="hero-links">
+        <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Voltar</a>
+        <button class="btn btn-primary" type="button">Salvar ajustes</button>
+      </div>
+    </div>
+    <div class="rack-status">
+      <div>
+        <div class="meta-label">Total de canais</div>
+        <div class="meta-value">{{ module.canais }}</div>
+      </div>
+      <div>
+        <div class="meta-label">Tipo base</div>
+        <div class="meta-value">{{ module.tipo }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="io-card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Nomes dos canais</h2>
+        <p class="muted">Ajuste o nome e a classificacao de cada canal.</p>
+      </div>
+      <button class="btn btn-outline" type="button">Importar nomes</button>
+    </div>
+    <form class="channel-form">
+      {% for channel in channels %}
+        <div class="channel-row">
+          <div class="channel-index">Canal {{ channel.index }}</div>
+          <input type="text" value="{{ channel.nome }}">
+          <select>
+            {% for channel_type in channel_types %}
+              <option value="{{ channel_type }}" {% if channel_type == channel.tipo %}selected{% endif %}>
+                {{ channel_type }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endfor %}
+    </form>
+    {% if remaining_channels > 0 %}
+      <div class="muted channel-hint">+ {{ remaining_channels }} canais adicionais aguardando configuracao.</div>
+    {% endif %}
+  </section>
+{% endblock %}

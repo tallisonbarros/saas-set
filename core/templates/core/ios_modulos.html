@@ -1,0 +1,87 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Catalogo de Modulos{% endblock %}
+
+{% block content %}
+  <section class="card ios-hero">
+    <div class="ios-hero-head">
+      <div>
+        <h1 class="hero-title">Catalogo de Modulos</h1>
+        <p class="hero-subtitle">Crie, configure e reutilize modulos em qualquer rack.</p>
+      </div>
+      <div class="hero-links">
+        <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
+        <button class="btn btn-primary" type="button">Novo modulo</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="io-layout">
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Criar novo modulo</h2>
+          <p class="muted">Defina as informacoes basicas e a quantidade de canais.</p>
+        </div>
+      </div>
+      <form class="io-form">
+        <div class="io-form-grid">
+          <label class="field">
+            <span>Nome do modulo</span>
+            <input type="text" placeholder="Modulo de entradas digitais">
+          </label>
+          <label class="field">
+            <span>Modelo</span>
+            <input type="text" placeholder="DI-16X">
+          </label>
+          <label class="field">
+            <span>Marca</span>
+            <input type="text" placeholder="SET">
+          </label>
+          <label class="field">
+            <span>Quantidade de canais</span>
+            <input type="number" min="1" value="16">
+          </label>
+        </div>
+        <div class="channel-types">
+          {% for channel in channel_types %}
+            <span class="channel-pill">{{ channel }}</span>
+          {% endfor %}
+          <button class="btn btn-outline" type="button">Adicionar tipo</button>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="button">Salvar modulo</button>
+          <button class="btn btn-ghost" type="button">Limpar</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="io-card io-wide">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Modulos cadastrados</h2>
+          <p class="muted">Clique para renomear canais ou duplicar um modulo.</p>
+        </div>
+      </div>
+      <div class="module-list">
+        {% for module in modules %}
+          <article class="module-card">
+            <div>
+              <div class="module-title">{{ module.nome }}</div>
+              <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
+            </div>
+            <div class="module-meta">
+              <span class="slot-badge">{{ module.canais }} canais</span>
+              <span class="module-pill">{{ module.tipo }}</span>
+            </div>
+            <div class="module-actions">
+              <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
+              <button class="btn btn-outline" type="button">Duplicar</button>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+{% endblock %}

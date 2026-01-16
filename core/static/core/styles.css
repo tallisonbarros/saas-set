@@ -710,6 +710,260 @@ select {
   gap: 8px;
 }
 
+.ios-hero {
+  display: grid;
+  gap: 16px;
+  text-align: left;
+}
+
+.ios-hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.io-layout {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.io-card {
+  border: 1px solid rgba(255, 102, 0, 0.18);
+  border-radius: 14px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.io-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.io-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.io-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.io-wide {
+  grid-column: 1 / -1;
+}
+
+.rack-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.rack-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rack-title {
+  font-weight: 600;
+}
+
+.rack-meta {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.meta-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.meta-value {
+  font-weight: 600;
+}
+
+.slot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.module-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.module-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.module-card.compact {
+  box-shadow: none;
+}
+
+.module-title {
+  font-weight: 600;
+}
+
+.module-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.module-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #ffd3b8;
+  background: #fff4ed;
+  color: #b84800;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.module-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.channel-types {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.channel-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff6ef;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.io-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.io-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rack-status {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.rack-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.rack-slot {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed #f0cbb6;
+  background: #fffaf6;
+  min-height: 150px;
+}
+
+.rack-slot.filled {
+  border-style: solid;
+  border-color: rgba(255, 102, 0, 0.2);
+  background: #fff;
+}
+
+.slot-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.slot-module {
+  display: grid;
+  gap: 8px;
+}
+
+.slot-title {
+  font-weight: 600;
+}
+
+.slot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.slot-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.channel-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.channel-row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  grid-template-columns: 120px 1fr 140px;
+}
+
+.channel-index {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.channel-hint {
+  margin-top: 12px;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -757,5 +1011,15 @@ select {
   .config-grid,
   .finance-filter {
     grid-template-columns: 1fr;
+  }
+
+  .ios-hero-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .channel-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 }
