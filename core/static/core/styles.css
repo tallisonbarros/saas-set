@@ -968,6 +968,41 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+.io-discrete {
+  padding: 0;
+  overflow: hidden;
+}
+
+.io-discrete-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+}
+
+.io-discrete-summary::-webkit-details-marker {
+  display: none;
+}
+
+.io-discrete[open] .io-discrete-summary {
+  border-bottom: 1px solid var(--border);
+  background: #fff6ef;
+}
+
+.io-discrete-body {
+  padding: 16px 20px 20px;
+}
+
+.io-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .io-search-form {
   margin-top: 12px;
 }
