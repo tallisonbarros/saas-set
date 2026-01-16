@@ -22,9 +22,23 @@
       </div>
       <div class="hero-links">
         <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
-        <button class="btn btn-outline" type="button">Editar rack</button>
       </div>
     </div>
+    <form class="channel-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_rack">
+      <div class="channel-row">
+        <div class="channel-index">Nome</div>
+        <input type="text" name="nome" value="{{ rack.nome }}" required>
+      </div>
+      <div class="channel-row">
+        <div class="channel-index">Descricao</div>
+        <input type="text" name="descricao" value="{{ rack.descricao }}">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Salvar rack</button>
+      </div>
+    </form>
     <div class="rack-status">
       <div>
         <div class="meta-label">Slots totais</div>

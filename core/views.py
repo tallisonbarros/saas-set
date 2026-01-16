@@ -169,6 +169,16 @@ def ios_rack_detail(request, pk):
     rack = get_object_or_404(RackIO, pk=pk, cliente=cliente) if cliente else get_object_or_404(RackIO, pk=pk)
     if request.method == "POST":
         action = request.POST.get("action")
+        if action == "update_rack":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            if nome:
+                rack.nome = nome
+            rack.descricao = descricao
+            rack.save(update_fields=["nome", "descricao"])
+            return redirect("ios_rack_detail", pk=rack.pk)
         if action in ["add_first", "add_to_slot"]:
             module_id = request.POST.get("module_id")
             module_modelo = get_object_or_404(
