@@ -35,7 +35,10 @@ def _get_cliente(user):
     try:
         return user.perfilusuario
     except PerfilUsuario.DoesNotExist:
-        return None
+        email = (user.email or user.username or "").strip().lower()
+        if not email:
+            return None
+        return PerfilUsuario.objects.filter(email__iexact=email).first()
 
 
 def _user_role(user):
@@ -724,18 +727,30 @@ def financeiro_nova(request):
                 data_pagamento = datetime.strptime(data_pagamento_raw, "%Y-%m-%d").date()
             except ValueError:
                 data_pagamento = None
-            if pago and not data_pagamento:
-                return redirect("financeiro_nova")
-            if all([caderno_id, descricao, valor, data, categoria_id, tipo_id, centro_id, status_id]):
+            has_any = any(
+                [
+                    caderno_id,
+                    descricao,
+                    valor is not None,
+                    data is not None,
+                    categoria_id,
+                    tipo_id,
+                    centro_id,
+                    status_id,
+                    data_pagamento is not None,
+                    pago,
+                ]
+            )
+            if has_any:
                 Compra.objects.create(
-                    caderno_id=caderno_id,
+                    caderno_id=caderno_id or None,
                     descricao=descricao,
                     valor=valor,
                     data=data,
-                    categoria_id=categoria_id,
-                    tipo_id=tipo_id,
-                    centro_custo_id=centro_id,
-                    status_id=status_id,
+                    categoria_id=categoria_id or None,
+                    tipo_id=tipo_id or None,
+                    centro_custo_id=centro_id or None,
+                    status_id=status_id or None,
                     pago=pago,
                     data_pagamento=data_pagamento if pago else None,
                 )
@@ -746,6 +761,7 @@ def financeiro_nova(request):
     tipos = TipoCompra.objects.order_by("nome")
     centros = CentroCusto.objects.order_by("nome")
     status_list = StatusCompra.objects.filter(ativo=True).order_by("nome")
+    selected_caderno_id = request.GET.get("caderno_id") or ""
 
     return render(
         request,
@@ -757,6 +773,7 @@ def financeiro_nova(request):
             "tipos": tipos,
             "centros": centros,
             "status_list": status_list,
+            "selected_caderno_id": str(selected_caderno_id),
         },
     )
 
@@ -816,6 +833,12 @@ def financeiro_compra_detail(request, pk):
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
     compra = get_object_or_404(Compra, pk=pk, caderno__clientes=cliente)
+    if request.method == "POST" and request.POST.get("action") == "delete_compra":
+        caderno_id = compra.caderno_id
+        compra.delete()
+        if caderno_id:
+            return redirect("financeiro_caderno_detail", pk=caderno_id)
+        return redirect("financeiro")
     return render(
         request,
         "core/financeiro_compra_detail.html",

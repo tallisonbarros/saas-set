@@ -22,6 +22,7 @@
       </div>
       <div class="finance-actions">
         <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Voltar</a>
+        <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
       </div>
     </div>
 
@@ -32,13 +33,17 @@
             <a class="proposal-link" href="{% url 'financeiro_compra_detail' compra.pk %}" aria-label="Abrir compra"></a>
             <div class="proposal-head">
               <div>
-                <div class="proposal-title">{{ compra.descricao }}</div>
-                <div class="proposal-meta">{{ compra.data }} - R$ {{ compra.valor }}</div>
+                <div class="proposal-title">{{ compra.descricao|default:"Compra sem descricao" }}</div>
+                <div class="proposal-meta">
+                  {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} - R$ {{ compra.valor|default:"0,00" }}
+                </div>
               </div>
-              <span class="badge">{{ compra.status.nome }}</span>
+              <span class="badge">{% if compra.status %}{{ compra.status.nome }}{% else %}Sem status{% endif %}</span>
             </div>
             <div class="proposal-meta">
-              {{ compra.categoria.nome }} - {{ compra.tipo.nome }} - {{ compra.centro_custo.nome }}
+              {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}Sem categoria{% endif %} -
+              {% if compra.tipo %}{{ compra.tipo.nome }}{% else %}Sem tipo{% endif %} -
+              {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}Sem centro{% endif %}
             </div>
             {% if compra.pago %}
               <div class="proposal-meta">Pago em: {{ compra.data_pagamento }}</div>

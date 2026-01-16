@@ -33,31 +33,31 @@
           <input type="hidden" name="action" value="create_compra">
           <div class="field">
             <label>Caderno</label>
-            <select name="caderno" required>
+            <select name="caderno">
               <option value="">Selecione</option>
               {% for c in cadernos %}
-                <option value="{{ c.id }}">{{ c.nome }}</option>
+                <option value="{{ c.id }}" {% if selected_caderno_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="field">
             <label>Descricao</label>
-            <textarea name="descricao" rows="3" required></textarea>
+            <textarea name="descricao" rows="3"></textarea>
           </div>
           <div class="finance-form-grid">
             <div class="field">
               <label>Valor</label>
-              <input type="text" name="valor" placeholder="0,00" required>
+              <input type="text" name="valor" placeholder="0,00">
             </div>
             <div class="field">
               <label>Data</label>
-              <input type="date" name="data" required>
+              <input type="date" name="data">
             </div>
           </div>
           <div class="finance-form-grid">
             <div class="field">
               <label>Categoria</label>
-              <select name="categoria" required>
+              <select name="categoria">
                 <option value="">Selecione</option>
                 {% for c in categorias %}
                   <option value="{{ c.id }}">{{ c.nome }}</option>
@@ -66,7 +66,7 @@
             </div>
             <div class="field">
               <label>Tipo</label>
-              <select name="tipo" required>
+              <select name="tipo">
                 <option value="">Selecione</option>
                 {% for t in tipos %}
                   <option value="{{ t.id }}">{{ t.nome }}</option>
@@ -77,7 +77,7 @@
           <div class="finance-form-grid">
             <div class="field">
               <label>Centro de custo</label>
-              <select name="centro_custo" required>
+              <select name="centro_custo">
                 <option value="">Selecione</option>
                 {% for c in centros %}
                   <option value="{{ c.id }}">{{ c.nome }}</option>
@@ -86,7 +86,7 @@
             </div>
             <div class="field">
               <label>Status</label>
-              <select name="status" required>
+              <select name="status">
                 <option value="">Selecione</option>
                 {% for s in status_list %}
                   <option value="{{ s.id }}">{{ s.nome }}</option>
@@ -116,7 +116,7 @@
           {% csrf_token %}
           <input type="hidden" name="action" value="create_status">
           <label>Novo status</label>
-          <input type="text" name="nome" placeholder="Pendente/Pago/Cotando" required>
+          <input type="text" name="nome" placeholder="Pendente/Pago/Cotando">
           <button class="btn btn-ghost" type="submit">Criar status</button>
         </form>
       </div>

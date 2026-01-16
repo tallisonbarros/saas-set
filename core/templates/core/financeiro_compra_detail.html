@@ -26,17 +26,22 @@
     </div>
 
     <div class="stack">
-      <div><strong>Data:</strong> {{ compra.data }}</div>
-      <div><strong>Valor:</strong> R$ {{ compra.valor }}</div>
-      <div><strong>Status:</strong> {{ compra.status.nome }}</div>
+      <div><strong>Data:</strong> {{ compra.data|default:"-" }}</div>
+      <div><strong>Valor:</strong> R$ {{ compra.valor|default:"0,00" }}</div>
+      <div><strong>Status:</strong> {% if compra.status %}{{ compra.status.nome }}{% else %}-{% endif %}</div>
       <div><strong>Pago:</strong> {{ compra.pago|yesno:"Sim,Nao" }}</div>
       {% if compra.pago %}
-        <div><strong>Data de pagamento:</strong> {{ compra.data_pagamento }}</div>
+        <div><strong>Data de pagamento:</strong> {{ compra.data_pagamento|default:"-" }}</div>
       {% endif %}
-      <div><strong>Caderno:</strong> {{ compra.caderno.nome }}</div>
-      <div><strong>Categoria:</strong> {{ compra.categoria.nome }}</div>
-      <div><strong>Tipo:</strong> {{ compra.tipo.nome }}</div>
-      <div><strong>Centro de custo:</strong> {{ compra.centro_custo.nome }}</div>
+      <div><strong>Caderno:</strong> {% if compra.caderno %}{{ compra.caderno.nome }}{% else %}-{% endif %}</div>
+      <div><strong>Categoria:</strong> {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}-{% endif %}</div>
+      <div><strong>Tipo:</strong> {% if compra.tipo %}{{ compra.tipo.nome }}{% else %}-{% endif %}</div>
+      <div><strong>Centro de custo:</strong> {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}-{% endif %}</div>
     </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_compra">
+      <button class="btn btn-outline" type="submit">Excluir compra</button>
+    </form>
   </section>
 {% endblock %}

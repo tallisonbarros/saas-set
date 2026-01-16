@@ -63,14 +63,14 @@ class StatusCompra(models.Model):
 
 
 class Compra(models.Model):
-    caderno = models.ForeignKey(Caderno, on_delete=models.CASCADE, related_name="compras")
-    descricao = models.TextField()
-    valor = models.DecimalField(max_digits=12, decimal_places=2)
-    data = models.DateField()
-    categoria = models.ForeignKey(CategoriaCompra, on_delete=models.PROTECT)
-    tipo = models.ForeignKey(TipoCompra, on_delete=models.PROTECT)
-    centro_custo = models.ForeignKey(CentroCusto, on_delete=models.PROTECT)
-    status = models.ForeignKey(StatusCompra, on_delete=models.PROTECT)
+    caderno = models.ForeignKey(Caderno, on_delete=models.CASCADE, related_name="compras", null=True, blank=True)
+    descricao = models.TextField(blank=True)
+    valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    data = models.DateField(null=True, blank=True)
+    categoria = models.ForeignKey(CategoriaCompra, on_delete=models.PROTECT, null=True, blank=True)
+    tipo = models.ForeignKey(TipoCompra, on_delete=models.PROTECT, null=True, blank=True)
+    centro_custo = models.ForeignKey(CentroCusto, on_delete=models.PROTECT, null=True, blank=True)
+    status = models.ForeignKey(StatusCompra, on_delete=models.PROTECT, null=True, blank=True)
     pago = models.BooleanField(default=False)
     data_pagamento = models.DateField(null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
