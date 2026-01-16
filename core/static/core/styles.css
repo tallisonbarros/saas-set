@@ -859,6 +859,32 @@ select {
   flex-wrap: wrap;
 }
 
+.io-proposal-card {
+  border: 1px solid rgba(255, 102, 0, 0.22);
+  background: linear-gradient(140deg, #ffffff 0%, #fff4ed 100%);
+}
+
+.rack-grid {
+  align-items: stretch;
+}
+
+.slot-card {
+  min-height: 160px;
+}
+
+.slot-card .proposal-link {
+  z-index: 1;
+}
+
+.slot-card.slot-empty {
+  border-style: dashed;
+  background: #fffaf6;
+}
+
+.slot-card.slot-filled {
+  border-color: rgba(255, 102, 0, 0.28);
+}
+
 .channel-types {
   display: flex;
   gap: 8px;
@@ -917,15 +943,14 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-.rack-add-form {
-  display: flex;
+.slot-form {
+  display: grid;
   gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
+  margin-top: 8px;
 }
 
-.rack-add-form select {
-  min-width: 220px;
+.slot-form select {
+  min-width: 160px;
 }
 
 .rack-slot {
@@ -973,6 +998,9 @@ select {
 .slot-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
 }
 
 .slot-empty {

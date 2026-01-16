@@ -146,10 +146,17 @@ def ios_rack_detail(request, pk):
     rack = get_object_or_404(RackIO, pk=pk, cliente=cliente) if cliente else get_object_or_404(RackIO, pk=pk)
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "add_first":
+        if action in ["add_first", "add_to_slot"]:
             module_id = request.POST.get("module_id")
             module_modelo = get_object_or_404(ModuloIO, pk=module_id, cliente=rack.cliente)
-            slot = RackSlotIO.objects.filter(rack=rack, modulo__isnull=True).order_by("posicao").first()
+            slot = None
+            if action == "add_to_slot":
+                slot_id = request.POST.get("slot_id")
+                slot = get_object_or_404(RackSlotIO, pk=slot_id, rack=rack)
+                if slot.modulo_id:
+                    return redirect("ios_rack_detail", pk=rack.pk)
+            else:
+                slot = RackSlotIO.objects.filter(rack=rack, modulo__isnull=True).order_by("posicao").first()
             if slot:
                 modulo = ModuloRackIO.objects.create(
                     rack=rack,
@@ -242,6 +249,52 @@ def ios_modulos(request):
             "modules": modules,
             "channel_types": channel_types,
             "can_manage": bool(cliente),
+        },
+    )
+
+
+@login_required
+def ios_modulo_modelo_detail(request, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    module_qs = ModuloIO.objects.select_related("tipo_base")
+    module = get_object_or_404(module_qs, pk=pk, cliente=cliente) if cliente else get_object_or_404(module_qs, pk=pk)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_model":
+            nome = request.POST.get("nome", "").strip()
+            modelo = request.POST.get("modelo", "").strip()
+            marca = request.POST.get("marca", "").strip()
+            canais_raw = request.POST.get("quantidade_canais", "").strip()
+            tipo_id = request.POST.get("tipo_base")
+            try:
+                quantidade_canais = int(canais_raw)
+            except (TypeError, ValueError):
+                quantidade_canais = module.quantidade_canais
+            quantidade_canais = max(1, min(512, quantidade_canais))
+            if nome:
+                module.nome = nome
+            module.modelo = modelo
+            module.marca = marca
+            if tipo_id:
+                module.tipo_base_id = tipo_id
+            module.quantidade_canais = quantidade_canais
+            module.save(update_fields=["nome", "modelo", "marca", "tipo_base", "quantidade_canais"])
+            return redirect("ios_modulo_modelo_detail", pk=module.pk)
+        if action == "delete_model":
+            if not module.instancias.exists():
+                module.delete()
+                return redirect("ios_modulos")
+            return redirect("ios_modulo_modelo_detail", pk=module.pk)
+
+    channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+    return render(
+        request,
+        "core/ios_modulo_modelo_detail.html",
+        {
+            "module": module,
+            "channel_types": channel_types,
         },
     )
 

@@ -4,11 +4,17 @@
 {% block title %}Listas de IOs{% endblock %}
 
 {% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
   <div class="page-panel-link">
-    <a class="btn btn-ghost" href="{% url 'painel' %}">Painel</a>
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
   </div>
   <section class="card hero ios-hero">
-    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
     <div>
       <h1 class="hero-title">Listas de IOs</h1>
       <p class="hero-subtitle">Organize racks, crie modulos e nomeie cada canal.</p>
@@ -30,27 +36,20 @@
         </div>
         <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
       </div>
-      <div class="io-grid">
+      <div class="proposal-grid">
         {% for rack in racks %}
-          <article class="rack-card">
-            <div class="rack-head">
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
+            <div class="proposal-head">
               <div>
-                <div class="rack-title">{{ rack.nome }}</div>
-                <div class="muted">{{ rack.descricao }}</div>
+                <div class="proposal-title">{{ rack.nome }}</div>
+                <div class="proposal-meta">{{ rack.descricao }}</div>
               </div>
               <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
             </div>
-            <div class="rack-meta">
-              <div>
-                <div class="meta-label">Total de slots</div>
-                <div class="meta-value">{{ rack.slots_total }}</div>
-              </div>
-              <div>
-                <div class="meta-label">Modulos ativos</div>
-                <div class="meta-value">{{ rack.ocupados }}</div>
-              </div>
+            <div class="proposal-meta">
+              Total: {{ rack.slots_total }} slots - Modulos: {{ rack.ocupados }}
             </div>
-            <a class="btn btn-primary rack-open" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack</a>
           </article>
         {% empty %}
           <div class="muted">Nenhum rack cadastrado ainda.</div>

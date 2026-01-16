@@ -4,8 +4,15 @@
 {% block title %}Catalogo de Modulos{% endblock %}
 
 {% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
   <div class="page-panel-link">
-    <a class="btn btn-ghost" href="{% url 'painel' %}">Painel</a>
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
   </div>
   <section class="card ios-hero">
     <div class="ios-hero-head">
@@ -75,19 +82,22 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Modulos cadastrados</h2>
-          <p class="muted">Clique para renomear canais ou duplicar um modulo.</p>
+          <p class="muted">Clique em um card para editar o modelo do modulo.</p>
         </div>
       </div>
-      <div class="module-list">
+      <div class="proposal-grid">
         {% for module in modules %}
-          <article class="module-card">
-            <div>
-              <div class="module-title">{{ module.nome }}</div>
-              <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
-            </div>
-            <div class="module-meta">
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'ios_modulo_modelo_detail' module.id %}" aria-label="Editar modulo"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ module.nome }}</div>
+                <div class="proposal-meta">{{ module.marca }} - {{ module.modelo }}</div>
+              </div>
               <span class="slot-badge">{{ module.quantidade_canais }} canais</span>
-              <span class="module-pill">{{ module.tipo_base.nome }}</span>
+            </div>
+            <div class="proposal-meta">
+              Tipo base: {{ module.tipo_base.nome }}
             </div>
           </article>
         {% empty %}

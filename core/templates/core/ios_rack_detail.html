@@ -4,8 +4,15 @@
 {% block title %}{{ rack.nome }}{% endblock %}
 
 {% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
   <div class="page-panel-link">
-    <a class="btn btn-ghost" href="{% url 'painel' %}">Painel</a>
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
   </div>
   <section class="card ios-hero">
     <div class="ios-hero-head">
@@ -38,52 +45,60 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Layout do rack</h2>
-        <p class="muted">Adicione modulos no primeiro slot livre e clique para editar os canais.</p>
+        <p class="muted">Clique em um slot livre para escolher o modulo.</p>
       </div>
-      <form class="rack-add-form" method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="add_first">
-        <select name="module_id" required>
-          <option value="">Selecione um modulo</option>
-          {% for module in modules %}
-            <option value="{{ module.id }}">{{ module.nome }} ({{ module.tipo_base.nome }})</option>
-          {% endfor %}
-        </select>
-        <button class="btn btn-primary" type="submit">Adicionar modulo</button>
-      </form>
     </div>
-    <div class="rack-layout">
+    <div class="proposal-grid rack-grid">
       {% for slot in slots %}
-        <div class="rack-slot {% if slot.modulo %}filled{% else %}empty{% endif %}">
-          <div class="slot-label">S{{ slot.posicao }}</div>
+        <article class="proposal-card slot-card {% if slot.modulo %}slot-filled{% else %}slot-empty{% endif %}">
           {% if slot.modulo %}
-            <div class="slot-module">
-              <a class="slot-link" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}">
-                <div class="slot-title">{{ slot.modulo.nome|default:slot.modulo.modulo_modelo.nome }}</div>
-                <div class="muted">{{ slot.modulo.modulo_modelo.marca }} · {{ slot.modulo.modulo_modelo.modelo }}</div>
-              </a>
-              <div class="slot-actions">
-                <form method="post">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="move_left">
-                  <input type="hidden" name="slot_id" value="{{ slot.id }}">
-                  <button class="btn btn-ghost icon-only" type="submit">←</button>
-                </form>
-                <form method="post">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="move_right">
-                  <input type="hidden" name="slot_id" value="{{ slot.id }}">
-                  <button class="btn btn-ghost icon-only" type="submit">→</button>
-                </form>
-              </div>
+            <a class="proposal-link" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}" aria-label="Editar canais"></a>
+          {% endif %}
+          <div class="proposal-head">
+            <div>
+              <div class="proposal-title">S{{ slot.posicao }}</div>
+              {% if slot.modulo %}
+                <div class="proposal-meta">{{ slot.modulo.nome|default:slot.modulo.modulo_modelo.nome }}</div>
+              {% else %}
+                <div class="proposal-meta">Slot livre</div>
+              {% endif %}
+            </div>
+            {% if slot.modulo %}
+              <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
+            {% endif %}
+          </div>
+          {% if slot.modulo %}
+            <div class="proposal-meta">{{ slot.modulo.modulo_modelo.marca }} - {{ slot.modulo.modulo_modelo.modelo }}</div>
+            <div class="slot-actions">
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="move_left">
+                <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                <button class="btn btn-ghost icon-only" type="submit">&lt;</button>
+              </form>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="move_right">
+                <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                <button class="btn btn-ghost icon-only" type="submit">&gt;</button>
+              </form>
             </div>
           {% else %}
-            <div class="slot-empty">
-              <span>Slot livre</span>
-              <span class="muted">Use o botao acima para inserir.</span>
-            </div>
+            <div class="proposal-meta">Escolha um modulo para este slot.</div>
+            <form class="slot-form" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="add_to_slot">
+              <input type="hidden" name="slot_id" value="{{ slot.id }}">
+              <select name="module_id" required>
+                <option value="">Selecione um modulo</option>
+                {% for module in modules %}
+                  <option value="{{ module.id }}">{{ module.nome }} ({{ module.tipo_base.nome }})</option>
+                {% endfor %}
+              </select>
+              <button class="btn btn-primary" type="submit">Adicionar</button>
+            </form>
           {% endif %}
-        </div>
+        </article>
       {% endfor %}
     </div>
   </section>

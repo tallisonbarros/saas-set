@@ -43,6 +43,7 @@ urlpatterns = [
     path('ios/', views.ios_list, name="ios_list"),
     path('ios/racks/<int:pk>/', views.ios_rack_detail, name="ios_rack_detail"),
     path('ios/modulos/', views.ios_modulos, name="ios_modulos"),
+    path('ios/modulos/<int:pk>/', views.ios_modulo_modelo_detail, name="ios_modulo_modelo_detail"),
     path('ios/racks/modulos/<int:pk>/', views.ios_rack_modulo_detail, name="ios_rack_modulo_detail"),
 ]
 

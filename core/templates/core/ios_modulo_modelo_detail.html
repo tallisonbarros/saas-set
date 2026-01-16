@@ -1,0 +1,90 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Modulo - {{ module.nome }}{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
+  </div>
+  <section class="card ios-hero">
+    <div class="ios-hero-head">
+      <div>
+        <h1 class="hero-title">{{ module.nome }}</h1>
+        <p class="hero-subtitle">{{ module.marca }} - {{ module.modelo }}</p>
+      </div>
+      <div class="hero-links">
+        <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Voltar</a>
+      </div>
+    </div>
+    <div class="rack-status">
+      <div>
+        <div class="meta-label">Canais do modelo</div>
+        <div class="meta-value">{{ module.quantidade_canais }}</div>
+      </div>
+      <div>
+        <div class="meta-label">Tipo base</div>
+        <div class="meta-value">{{ module.tipo_base.nome }}</div>
+      </div>
+      <div>
+        <div class="meta-label">Instancias em racks</div>
+        <div class="meta-value">{{ module.instancias.count }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="io-card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Editar modelo</h2>
+        <p class="muted">Atualizacoes afetam novos usos do modulo no rack.</p>
+      </div>
+    </div>
+    <form class="io-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_model">
+      <div class="io-form-grid">
+        <label class="field">
+          <span>Nome do modulo</span>
+          <input type="text" name="nome" value="{{ module.nome }}" required>
+        </label>
+        <label class="field">
+          <span>Modelo</span>
+          <input type="text" name="modelo" value="{{ module.modelo }}">
+        </label>
+        <label class="field">
+          <span>Marca</span>
+          <input type="text" name="marca" value="{{ module.marca }}">
+        </label>
+        <label class="field">
+          <span>Quantidade de canais</span>
+          <input type="number" name="quantidade_canais" min="1" max="512" value="{{ module.quantidade_canais }}" required>
+        </label>
+      </div>
+      <label class="field">
+        <span>Tipo base do canal</span>
+        <select name="tipo_base" required>
+          {% for channel in channel_types %}
+            <option value="{{ channel.id }}" {% if channel.id == module.tipo_base.id %}selected{% endif %}>{{ channel.nome }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Salvar ajustes</button>
+        <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Cancelar</a>
+      </div>
+    </form>
+    <form method="post" class="form-actions">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_model">
+      <button class="btn btn-outline" type="submit">Excluir modulo</button>
+    </form>
+  </section>
+{% endblock %}
