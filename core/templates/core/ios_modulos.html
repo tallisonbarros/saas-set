@@ -12,49 +12,60 @@
       </div>
       <div class="hero-links">
         <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
-        <button class="btn btn-primary" type="button">Novo modulo</button>
+        {% if can_manage %}
+          <a class="btn btn-primary" href="#novo-modulo">Novo modulo</a>
+        {% endif %}
       </div>
     </div>
   </section>
 
   <div class="io-layout">
-    <section class="io-card">
+    <section class="io-card" id="novo-modulo">
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Criar novo modulo</h2>
           <p class="muted">Defina as informacoes basicas e a quantidade de canais.</p>
         </div>
       </div>
-      <form class="io-form">
-        <div class="io-form-grid">
+      {% if can_manage %}
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_module">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome do modulo</span>
+              <input type="text" name="nome" placeholder="Modulo de entradas digitais" required>
+            </label>
+            <label class="field">
+              <span>Modelo</span>
+              <input type="text" name="modelo" placeholder="DI-16X">
+            </label>
+            <label class="field">
+              <span>Marca</span>
+              <input type="text" name="marca" placeholder="SET">
+            </label>
+            <label class="field">
+              <span>Quantidade de canais</span>
+              <input type="number" name="quantidade_canais" min="1" max="512" value="16" required>
+            </label>
+          </div>
           <label class="field">
-            <span>Nome do modulo</span>
-            <input type="text" placeholder="Modulo de entradas digitais">
+            <span>Tipo base do canal</span>
+            <select name="tipo_base" required>
+              <option value="">Selecione</option>
+              {% for channel in channel_types %}
+                <option value="{{ channel.id }}">{{ channel.nome }}</option>
+              {% endfor %}
+            </select>
           </label>
-          <label class="field">
-            <span>Modelo</span>
-            <input type="text" placeholder="DI-16X">
-          </label>
-          <label class="field">
-            <span>Marca</span>
-            <input type="text" placeholder="SET">
-          </label>
-          <label class="field">
-            <span>Quantidade de canais</span>
-            <input type="number" min="1" value="16">
-          </label>
-        </div>
-        <div class="channel-types">
-          {% for channel in channel_types %}
-            <span class="channel-pill">{{ channel }}</span>
-          {% endfor %}
-          <button class="btn btn-outline" type="button">Adicionar tipo</button>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-primary" type="button">Salvar modulo</button>
-          <button class="btn btn-ghost" type="button">Limpar</button>
-        </div>
-      </form>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar modulo</button>
+            <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
+          </div>
+        </form>
+      {% else %}
+        <div class="muted">Apenas clientes cadastrados podem criar modulos.</div>
+      {% endif %}
     </section>
 
     <section class="io-card io-wide">
@@ -72,14 +83,15 @@
               <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
             </div>
             <div class="module-meta">
-              <span class="slot-badge">{{ module.canais }} canais</span>
-              <span class="module-pill">{{ module.tipo }}</span>
+              <span class="slot-badge">{{ module.quantidade_canais }} canais</span>
+              <span class="module-pill">{{ module.tipo_base.nome }}</span>
             </div>
             <div class="module-actions">
               <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
-              <button class="btn btn-outline" type="button">Duplicar</button>
             </div>
           </article>
+        {% empty %}
+          <div class="muted">Nenhum modulo cadastrado ainda.</div>
         {% endfor %}
       </div>
     </section>

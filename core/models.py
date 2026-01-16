@@ -139,3 +139,85 @@ class Proposta(models.Model):
         if not self.codigo:
             self.codigo = self._proximo_codigo()
         super().save(*args, **kwargs)
+
+
+class TipoCanalIO(models.Model):
+    nome = models.CharField(max_length=20, unique=True)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class ModuloIO(models.Model):
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="io_modulos")
+    nome = models.CharField(max_length=120)
+    modelo = models.CharField(max_length=80, blank=True)
+    marca = models.CharField(max_length=80, blank=True)
+    quantidade_canais = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(512)],
+    )
+    tipo_base = models.ForeignKey(TipoCanalIO, on_delete=models.PROTECT, related_name="modulos_base")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class CanalIO(models.Model):
+    modulo = models.ForeignKey(ModuloIO, on_delete=models.CASCADE, related_name="canais")
+    indice = models.PositiveSmallIntegerField()
+    nome = models.CharField(max_length=120, blank=True)
+    tipo = models.ForeignKey(TipoCanalIO, on_delete=models.PROTECT, related_name="canais")
+
+    class Meta:
+        ordering = ["indice"]
+        constraints = [
+            models.UniqueConstraint(fields=["modulo", "indice"], name="unique_modulo_canal_indice"),
+        ]
+
+    def __str__(self):
+        return f"{self.modulo.nome} - {self.indice}"
+
+
+class RackIO(models.Model):
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="io_racks")
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    slots_total = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(60)],
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class RackSlotIO(models.Model):
+    rack = models.ForeignKey(RackIO, on_delete=models.CASCADE, related_name="slots")
+    posicao = models.PositiveSmallIntegerField()
+    modulo = models.ForeignKey(
+        ModuloIO,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="slots",
+    )
+
+    class Meta:
+        ordering = ["posicao"]
+        constraints = [
+            models.UniqueConstraint(fields=["rack", "posicao"], name="unique_rack_slot_posicao"),
+        ]
+
+    def __str__(self):
+        return f"{self.rack.nome} - S{self.posicao}"

@@ -12,17 +12,16 @@
       </div>
       <div class="hero-links">
         <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Voltar</a>
-        <button class="btn btn-primary" type="button">Salvar ajustes</button>
       </div>
     </div>
     <div class="rack-status">
       <div>
         <div class="meta-label">Total de canais</div>
-        <div class="meta-value">{{ module.canais }}</div>
+        <div class="meta-value">{{ module.quantidade_canais }}</div>
       </div>
       <div>
         <div class="meta-label">Tipo base</div>
-        <div class="meta-value">{{ module.tipo }}</div>
+        <div class="meta-value">{{ module.tipo_base.nome }}</div>
       </div>
     </div>
   </section>
@@ -33,25 +32,26 @@
         <h2 class="io-title">Nomes dos canais</h2>
         <p class="muted">Ajuste o nome e a classificacao de cada canal.</p>
       </div>
-      <button class="btn btn-outline" type="button">Importar nomes</button>
     </div>
-    <form class="channel-form">
+    <form class="channel-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_channels">
       {% for channel in channels %}
         <div class="channel-row">
-          <div class="channel-index">Canal {{ channel.index }}</div>
-          <input type="text" value="{{ channel.nome }}">
-          <select>
+          <div class="channel-index">Canal {{ channel.indice }}</div>
+          <input type="text" name="nome_{{ channel.id }}" value="{{ channel.nome }}">
+          <select name="tipo_{{ channel.id }}">
             {% for channel_type in channel_types %}
-              <option value="{{ channel_type }}" {% if channel_type == channel.tipo %}selected{% endif %}>
-                {{ channel_type }}
+              <option value="{{ channel_type.id }}" {% if channel_type.id == channel.tipo.id %}selected{% endif %}>
+                {{ channel_type.nome }}
               </option>
             {% endfor %}
           </select>
         </div>
       {% endfor %}
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Salvar ajustes</button>
+      </div>
     </form>
-    {% if remaining_channels > 0 %}
-      <div class="muted channel-hint">+ {{ remaining_channels }} canais adicionais aguardando configuracao.</div>
-    {% endif %}
   </section>
 {% endblock %}

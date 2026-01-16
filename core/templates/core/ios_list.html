@@ -12,7 +12,9 @@
     </div>
     <div class="hero-links">
       <a class="btn btn-primary" href="{% url 'ios_modulos' %}">Catalogo de modulos</a>
-      <button class="btn btn-outline" type="button">Novo rack</button>
+      {% if can_manage %}
+        <a class="btn btn-outline" href="#novo-rack">Novo rack</a>
+      {% endif %}
     </div>
   </section>
 
@@ -33,22 +35,58 @@
                 <div class="rack-title">{{ rack.nome }}</div>
                 <div class="muted">{{ rack.descricao }}</div>
               </div>
-              <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots }} slots</span>
+              <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
             </div>
             <div class="rack-meta">
               <div>
                 <div class="meta-label">Total de slots</div>
-                <div class="meta-value">{{ rack.slots }}</div>
+                <div class="meta-value">{{ rack.slots_total }}</div>
               </div>
               <div>
                 <div class="meta-label">Modulos ativos</div>
                 <div class="meta-value">{{ rack.ocupados }}</div>
               </div>
             </div>
-            <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack</a>
+            <a class="btn btn-primary rack-open" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack</a>
           </article>
+        {% empty %}
+          <div class="muted">Nenhum rack cadastrado ainda.</div>
         {% endfor %}
       </div>
+    </section>
+
+    <section class="io-card" id="novo-rack">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Cadastrar rack</h2>
+          <p class="muted">Defina o nome, a descricao e o total de slots.</p>
+        </div>
+      </div>
+      {% if can_manage %}
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_rack">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome do rack</span>
+              <input type="text" name="nome" placeholder="Rack Principal" required>
+            </label>
+            <label class="field">
+              <span>Descricao</span>
+              <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
+            </label>
+            <label class="field">
+              <span>Slots totais</span>
+              <input type="number" name="slots_total" min="1" max="60" value="10" required>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar rack</button>
+          </div>
+        </form>
+      {% else %}
+        <div class="muted">Apenas clientes cadastrados podem criar racks.</div>
+      {% endif %}
     </section>
 
     <section class="io-card">
@@ -67,11 +105,13 @@
               <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
             </div>
             <div class="module-meta">
-              <span class="slot-badge">{{ module.canais }} canais</span>
-              <span class="module-pill">{{ module.tipo }}</span>
+              <span class="slot-badge">{{ module.quantidade_canais }} canais</span>
+              <span class="module-pill">{{ module.tipo_base.nome }}</span>
             </div>
             <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
           </article>
+        {% empty %}
+          <div class="muted">Nenhum modulo cadastrado ainda.</div>
         {% endfor %}
       </div>
     </section>
@@ -85,9 +125,16 @@
       </div>
       <div class="channel-types">
         {% for channel in channel_types %}
-          <span class="channel-pill">{{ channel }}</span>
+          <span class="channel-pill">{{ channel.nome }}</span>
         {% endfor %}
-        <button class="btn btn-outline" type="button">Adicionar tipo</button>
+        {% if can_manage %}
+          <form method="post" class="channel-type-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_channel_type">
+            <input type="text" name="nome" placeholder="NOVO TIPO" maxlength="20" required>
+            <button class="btn btn-outline" type="submit">Adicionar tipo</button>
+          </form>
+        {% endif %}
       </div>
     </section>
   </div>

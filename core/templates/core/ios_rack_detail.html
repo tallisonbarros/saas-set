@@ -18,15 +18,15 @@
     <div class="rack-status">
       <div>
         <div class="meta-label">Slots totais</div>
-        <div class="meta-value">{{ rack.slots }}</div>
+        <div class="meta-value">{{ rack.slots_total }}</div>
       </div>
       <div>
         <div class="meta-label">Slots ocupados</div>
-        <div class="meta-value">{{ rack.ocupados }}</div>
+        <div class="meta-value">{{ ocupados }}</div>
       </div>
       <div>
         <div class="meta-label">Slots livres</div>
-        <div class="meta-value">{{ rack.slots|add:-rack.ocupados }}</div>
+        <div class="meta-value">{{ rack.slots_total|add:-ocupados }}</div>
       </div>
     </div>
   </section>
@@ -37,25 +37,45 @@
         <h2 class="io-title">Layout do rack</h2>
         <p class="muted">Adicione modulos no primeiro slot livre e mova para esquerda ou direita.</p>
       </div>
-      <button class="btn btn-primary" type="button">Adicionar modulo</button>
+      <form class="rack-add-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_first">
+        <select name="module_id" required>
+          <option value="">Selecione um modulo</option>
+          {% for module in modules %}
+            <option value="{{ module.id }}">{{ module.nome }} ({{ module.tipo_base.nome }})</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-primary" type="submit">Adicionar modulo</button>
+      </form>
     </div>
     <div class="rack-layout">
       {% for slot in slots %}
-        <div class="rack-slot {% if slot.module %}filled{% else %}empty{% endif %}">
-          <div class="slot-label">{{ slot.slot }}</div>
-          {% if slot.module %}
+        <div class="rack-slot {% if slot.modulo %}filled{% else %}empty{% endif %}">
+          <div class="slot-label">S{{ slot.posicao }}</div>
+          {% if slot.modulo %}
             <div class="slot-module">
-              <div class="slot-title">{{ slot.module.nome }}</div>
-              <div class="muted">{{ slot.module.marca }} · {{ slot.module.modelo }}</div>
+              <div class="slot-title">{{ slot.modulo.nome }}</div>
+              <div class="muted">{{ slot.modulo.marca }} · {{ slot.modulo.modelo }}</div>
               <div class="slot-actions">
-                <button class="btn btn-ghost icon-only" type="button">←</button>
-                <button class="btn btn-ghost icon-only" type="button">→</button>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="move_left">
+                  <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                  <button class="btn btn-ghost icon-only" type="submit">←</button>
+                </form>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="move_right">
+                  <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                  <button class="btn btn-ghost icon-only" type="submit">→</button>
+                </form>
               </div>
             </div>
           {% else %}
             <div class="slot-empty">
               <span>Slot livre</span>
-              <button class="btn btn-outline" type="button">Adicionar</button>
+              <span class="muted">Use o botao acima para inserir.</span>
             </div>
           {% endif %}
         </div>
@@ -79,11 +99,13 @@
             <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
           </div>
           <div class="module-meta">
-            <span class="slot-badge">{{ module.canais }} canais</span>
-            <span class="module-pill">{{ module.tipo }}</span>
+            <span class="slot-badge">{{ module.quantidade_canais }} canais</span>
+            <span class="module-pill">{{ module.tipo_base.nome }}</span>
           </div>
-          <button class="btn btn-ghost" type="button">Adicionar ao rack</button>
+          <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
         </article>
+      {% empty %}
+        <div class="muted">Nenhum modulo cadastrado para este cliente.</div>
       {% endfor %}
     </div>
   </section>

@@ -3,24 +3,29 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponseForbidden
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from django.contrib.auth.models import User
-from django.db.models import Case, IntegerField, Sum, Value, When
+from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
 
 from .forms import TipoPerfilCreateForm, UserCreateForm
 from .models import (
+    CanalIO,
     CategoriaCompra,
     Caderno,
     CentroCusto,
     Cliente,
     Compra,
+    ModuloIO,
     Proposta,
     StatusCompra,
+    RackIO,
+    RackSlotIO,
     TipoCompra,
+    TipoCanalIO,
     TipoPerfil,
 )
 
@@ -82,151 +87,185 @@ def painel(request):
     )
 
 
-IO_CHANNEL_TYPES = ["DI", "DO", "AI", "AO", "RTD", "TC", "Pulso"]
-IO_MODULES_SAMPLE = [
-    {
-        "id": 1,
-        "nome": "Modulo de Entradas Digitais",
-        "modelo": "DI-16X",
-        "marca": "SET",
-        "canais": 16,
-        "tipo": "DI",
-    },
-    {
-        "id": 2,
-        "nome": "Modulo de Saidas Digitais",
-        "modelo": "DO-16R",
-        "marca": "SET",
-        "canais": 16,
-        "tipo": "DO",
-    },
-    {
-        "id": 3,
-        "nome": "Modulo de Entradas Analogicas",
-        "modelo": "AI-08H",
-        "marca": "Festo",
-        "canais": 8,
-        "tipo": "AI",
-    },
-    {
-        "id": 4,
-        "nome": "Modulo de Saidas Analogicas",
-        "modelo": "AO-04P",
-        "marca": "Siemens",
-        "canais": 4,
-        "tipo": "AO",
-    },
-]
-IO_RACKS_SAMPLE = [
-    {
-        "id": 1,
-        "nome": "Rack Principal",
-        "descricao": "Linha 01 - Esteira e empacotamento",
-        "slots": 10,
-        "ocupados": 6,
-    },
-    {
-        "id": 2,
-        "nome": "Rack Remoto",
-        "descricao": "Sala de bombas e utilidades",
-        "slots": 8,
-        "ocupados": 3,
-    },
-]
-
-
-def _get_module(module_id):
-    for module in IO_MODULES_SAMPLE:
-        if module["id"] == module_id:
-            return module
-    return None
-
-
 @login_required
 def ios_list(request):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_rack":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            slots_raw = request.POST.get("slots_total", "").strip()
+            try:
+                slots_total = int(slots_raw)
+            except (TypeError, ValueError):
+                slots_total = None
+            if slots_total is not None:
+                slots_total = max(1, min(60, slots_total))
+            if nome and slots_total:
+                rack = RackIO.objects.create(
+                    cliente=cliente,
+                    nome=nome,
+                    descricao=descricao,
+                    slots_total=slots_total,
+                )
+                slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
+                RackSlotIO.objects.bulk_create(slots)
+            return redirect("ios_list")
+        if action == "create_channel_type":
+            nome = request.POST.get("nome", "").strip().upper()
+            if nome:
+                TipoCanalIO.objects.get_or_create(nome=nome, defaults={"ativo": True})
+            return redirect("ios_list")
+
+    racks = RackIO.objects.all() if request.user.is_staff and not cliente else RackIO.objects.filter(cliente=cliente)
+    racks = racks.annotate(ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)))
+    modules = (
+        ModuloIO.objects.all() if request.user.is_staff and not cliente else ModuloIO.objects.filter(cliente=cliente)
+    )
+    modules = modules.select_related("tipo_base")
+    channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     return render(
         request,
         "core/ios_list.html",
         {
-            "racks": IO_RACKS_SAMPLE,
-            "modules": IO_MODULES_SAMPLE,
-            "channel_types": IO_CHANNEL_TYPES,
+            "racks": racks,
+            "modules": modules,
+            "channel_types": channel_types,
+            "can_manage": bool(cliente),
         },
     )
 
 
 @login_required
 def ios_rack_detail(request, pk):
-    rack = next((item for item in IO_RACKS_SAMPLE if item["id"] == pk), None)
-    if not rack:
-        raise Http404("Rack nao encontrado.")
-    layout = [
-        {"slot": "S1", "module_id": 1},
-        {"slot": "S2", "module_id": 2},
-        {"slot": "S3", "module_id": None},
-        {"slot": "S4", "module_id": 3},
-        {"slot": "S5", "module_id": None},
-        {"slot": "S6", "module_id": 4},
-        {"slot": "S7", "module_id": None},
-        {"slot": "S8", "module_id": None},
-        {"slot": "S9", "module_id": None},
-        {"slot": "S10", "module_id": None},
-    ]
-    slots = []
-    for item in layout:
-        module = _get_module(item["module_id"]) if item["module_id"] else None
-        slots.append(
-            {
-                "slot": item["slot"],
-                "module": module,
-            }
-        )
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    rack = get_object_or_404(RackIO, pk=pk, cliente=cliente) if cliente else get_object_or_404(RackIO, pk=pk)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "add_first":
+            module_id = request.POST.get("module_id")
+            module = get_object_or_404(ModuloIO, pk=module_id, cliente=rack.cliente)
+            slot = RackSlotIO.objects.filter(rack=rack, modulo__isnull=True).order_by("posicao").first()
+            if slot:
+                slot.modulo = module
+                slot.save(update_fields=["modulo"])
+            return redirect("ios_rack_detail", pk=rack.pk)
+        if action in ["move_left", "move_right"]:
+            slot_id = request.POST.get("slot_id")
+            slot = get_object_or_404(RackSlotIO, pk=slot_id, rack=rack)
+            delta = -1 if action == "move_left" else 1
+            neighbor = RackSlotIO.objects.filter(rack=rack, posicao=slot.posicao + delta).first()
+            if neighbor:
+                slot.modulo, neighbor.modulo = neighbor.modulo, slot.modulo
+                slot.save(update_fields=["modulo"])
+                neighbor.save(update_fields=["modulo"])
+            return redirect("ios_rack_detail", pk=rack.pk)
+
+    slots = rack.slots.select_related("modulo").order_by("posicao")
+    modules = ModuloIO.objects.filter(cliente=rack.cliente).select_related("tipo_base").order_by("nome")
+    ocupados = rack.slots.filter(modulo__isnull=False).count()
     return render(
         request,
         "core/ios_rack_detail.html",
         {
             "rack": rack,
             "slots": slots,
-            "modules": IO_MODULES_SAMPLE,
+            "modules": modules,
+            "ocupados": ocupados,
         },
     )
 
 
 @login_required
 def ios_modulos(request):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_module":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            modelo = request.POST.get("modelo", "").strip()
+            marca = request.POST.get("marca", "").strip()
+            canais_raw = request.POST.get("quantidade_canais", "").strip()
+            tipo_id = request.POST.get("tipo_base")
+            try:
+                quantidade_canais = int(canais_raw)
+            except (TypeError, ValueError):
+                quantidade_canais = None
+            if quantidade_canais is not None:
+                quantidade_canais = max(1, min(512, quantidade_canais))
+            if nome and quantidade_canais and tipo_id:
+                tipo_base = get_object_or_404(TipoCanalIO, pk=tipo_id)
+                modulo = ModuloIO.objects.create(
+                    cliente=cliente,
+                    nome=nome,
+                    modelo=modelo,
+                    marca=marca,
+                    quantidade_canais=quantidade_canais,
+                    tipo_base=tipo_base,
+                )
+                canais = [
+                    CanalIO(modulo=modulo, indice=index, nome=f"Canal {index:02d}", tipo=tipo_base)
+                    for index in range(1, quantidade_canais + 1)
+                ]
+                CanalIO.objects.bulk_create(canais)
+            return redirect("ios_modulos")
+
+    modules = (
+        ModuloIO.objects.all() if request.user.is_staff and not cliente else ModuloIO.objects.filter(cliente=cliente)
+    )
+    modules = modules.select_related("tipo_base")
+    channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     return render(
         request,
         "core/ios_modulos.html",
         {
-            "modules": IO_MODULES_SAMPLE,
-            "channel_types": IO_CHANNEL_TYPES,
+            "modules": modules,
+            "channel_types": channel_types,
+            "can_manage": bool(cliente),
         },
     )
 
 
 @login_required
 def ios_modulo_detail(request, pk):
-    module = _get_module(pk)
-    if not module:
-        raise Http404("Modulo nao encontrado.")
-    max_channels = min(module["canais"], 12)
-    channels = []
-    for index in range(1, max_channels + 1):
-        channels.append(
-            {
-                "index": index,
-                "nome": "Canal %02d" % index,
-                "tipo": module["tipo"],
-            }
-        )
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    module = get_object_or_404(ModuloIO, pk=pk, cliente=cliente) if cliente else get_object_or_404(ModuloIO, pk=pk)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_channels":
+            for channel in module.canais.all():
+                nome_raw = request.POST.get(f"nome_{channel.id}")
+                tipo_id = request.POST.get(f"tipo_{channel.id}")
+                if nome_raw is None:
+                    continue
+                channel.nome = nome_raw.strip()
+                if tipo_id:
+                    channel.tipo_id = tipo_id
+                channel.save(update_fields=["nome", "tipo_id"])
+            return redirect("ios_modulo_detail", pk=module.pk)
+    channels = module.canais.select_related("tipo").order_by("indice")
+    channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     return render(
         request,
         "core/ios_modulo_detail.html",
         {
             "module": module,
             "channels": channels,
-            "channel_types": IO_CHANNEL_TYPES,
-            "remaining_channels": module["canais"] - max_channels,
+            "channel_types": channel_types,
         },
     )
 
