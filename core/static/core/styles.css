@@ -460,6 +460,18 @@ body {
   margin: 16px 0;
 }
 
+.proposal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 102, 0, 0.2);
+  background: linear-gradient(135deg, #fff 0%, #fff1e7 100%);
+  margin-bottom: 12px;
+}
+
 .filter-pill {
   padding: 6px 12px;
   border-radius: 999px;

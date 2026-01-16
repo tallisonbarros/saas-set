@@ -28,12 +28,13 @@
       <p>Usuario sem cliente associado. Fale com o administrador.</p>
     {% else %}
       {% if is_vendedor %}
-        <div class="finance-actions" style="justify-content: flex-start; gap: 12px;">
+        <div class="proposal-toolbar">
+          <div>
+            <div class="panel-title">Propostas enviadas e recebidas</div>
+            <div class="muted">Voce pode criar novas propostas diretamente daqui.</div>
+          </div>
           <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
         </div>
-      {% endif %}
-      {% if is_vendedor %}
-        <div class="muted">Propostas enviadas ou recebidas por voce.</div>
       {% endif %}
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
@@ -54,8 +55,12 @@
                   <div class="proposal-title">{{ proposta.nome }}</div>
                   <div class="proposal-meta">R$ {{ proposta.valor }}</div>
                   <div class="proposal-meta">Enviada para: {{ proposta.cliente.nome }}</div>
-                  {% if proposta.criada_por %}
-                    <div class="proposal-meta">Criada por: {{ proposta.criada_por.username }}</div>
+                  {% if proposta.criada_por_id == current_user_id %}
+                    <div class="proposal-meta">Enviada por voce</div>
+                  {% elif proposta.criada_por %}
+                    <div class="proposal-meta">Recebida de: {{ proposta.criada_por.username }}</div>
+                  {% else %}
+                    <div class="proposal-meta">Recebida</div>
                   {% endif %}
                 </div>
                 <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.get_status_display }}</span>
