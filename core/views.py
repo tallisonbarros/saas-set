@@ -13,13 +13,14 @@ from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
 
 from .forms import TipoPerfilCreateForm, UserCreateForm
 from .models import (
-    CanalIO,
+    CanalRackIO,
     CategoriaCompra,
     Caderno,
     CentroCusto,
     Cliente,
     Compra,
     ModuloIO,
+    ModuloRackIO,
     Proposta,
     StatusCompra,
     RackIO,
@@ -125,17 +126,12 @@ def ios_list(request):
 
     racks = RackIO.objects.all() if request.user.is_staff and not cliente else RackIO.objects.filter(cliente=cliente)
     racks = racks.annotate(ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)))
-    modules = (
-        ModuloIO.objects.all() if request.user.is_staff and not cliente else ModuloIO.objects.filter(cliente=cliente)
-    )
-    modules = modules.select_related("tipo_base")
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     return render(
         request,
         "core/ios_list.html",
         {
             "racks": racks,
-            "modules": modules,
             "channel_types": channel_types,
             "can_manage": bool(cliente),
         },
@@ -152,10 +148,25 @@ def ios_rack_detail(request, pk):
         action = request.POST.get("action")
         if action == "add_first":
             module_id = request.POST.get("module_id")
-            module = get_object_or_404(ModuloIO, pk=module_id, cliente=rack.cliente)
+            module_modelo = get_object_or_404(ModuloIO, pk=module_id, cliente=rack.cliente)
             slot = RackSlotIO.objects.filter(rack=rack, modulo__isnull=True).order_by("posicao").first()
             if slot:
-                slot.modulo = module
+                modulo = ModuloRackIO.objects.create(
+                    rack=rack,
+                    modulo_modelo=module_modelo,
+                    nome=module_modelo.nome,
+                )
+                canais = [
+                    CanalRackIO(
+                        modulo=modulo,
+                        indice=index,
+                        nome=f"Canal {index:02d}",
+                        tipo=module_modelo.tipo_base,
+                    )
+                    for index in range(1, module_modelo.quantidade_canais + 1)
+                ]
+                CanalRackIO.objects.bulk_create(canais)
+                slot.modulo = modulo
                 slot.save(update_fields=["modulo"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action in ["move_left", "move_right"]:
@@ -169,7 +180,7 @@ def ios_rack_detail(request, pk):
                 neighbor.save(update_fields=["modulo"])
             return redirect("ios_rack_detail", pk=rack.pk)
 
-    slots = rack.slots.select_related("modulo").order_by("posicao")
+    slots = rack.slots.select_related("modulo", "modulo__modulo_modelo").order_by("posicao")
     modules = ModuloIO.objects.filter(cliente=rack.cliente).select_related("tipo_base").order_by("nome")
     ocupados = rack.slots.filter(modulo__isnull=False).count()
     slots_livres = max(rack.slots_total - ocupados, 0)
@@ -217,11 +228,6 @@ def ios_modulos(request):
                     quantidade_canais=quantidade_canais,
                     tipo_base=tipo_base,
                 )
-                canais = [
-                    CanalIO(modulo=modulo, indice=index, nome=f"Canal {index:02d}", tipo=tipo_base)
-                    for index in range(1, quantidade_canais + 1)
-                ]
-                CanalIO.objects.bulk_create(canais)
             return redirect("ios_modulos")
 
     modules = (
@@ -241,11 +247,16 @@ def ios_modulos(request):
 
 
 @login_required
-def ios_modulo_detail(request, pk):
+def ios_rack_modulo_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    module = get_object_or_404(ModuloIO, pk=pk, cliente=cliente) if cliente else get_object_or_404(ModuloIO, pk=pk)
+    module_qs = ModuloRackIO.objects.select_related("modulo_modelo", "rack")
+    module = (
+        get_object_or_404(module_qs, pk=pk, rack__cliente=cliente)
+        if cliente
+        else get_object_or_404(module_qs, pk=pk)
+    )
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_channels":
@@ -258,7 +269,7 @@ def ios_modulo_detail(request, pk):
                 if tipo_id:
                     channel.tipo_id = tipo_id
                 channel.save(update_fields=["nome", "tipo_id"])
-            return redirect("ios_modulo_detail", pk=module.pk)
+            return redirect("ios_rack_modulo_detail", pk=module.pk)
     channels = module.canais.select_related("tipo").order_by("indice")
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     return render(
@@ -268,6 +279,7 @@ def ios_modulo_detail(request, pk):
             "module": module,
             "channels": channels,
             "channel_types": channel_types,
+            "rack": module.rack,
         },
     )
 

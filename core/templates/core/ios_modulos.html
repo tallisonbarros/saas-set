@@ -11,7 +11,7 @@
     <div class="ios-hero-head">
       <div>
         <h1 class="hero-title">Catalogo de Modulos</h1>
-        <p class="hero-subtitle">Crie, configure e reutilize modulos em qualquer rack.</p>
+        <p class="hero-subtitle">Crie modelos de modulo para reutilizar em qualquer rack.</p>
       </div>
       <div class="hero-links">
         <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
@@ -27,7 +27,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Criar novo modulo</h2>
-          <p class="muted">Defina as informacoes basicas e a quantidade de canais.</p>
+          <p class="muted">Defina o molde. Os nomes dos canais serao definidos no rack.</p>
         </div>
       </div>
       {% if can_manage %}
@@ -88,9 +88,6 @@
             <div class="module-meta">
               <span class="slot-badge">{{ module.quantidade_canais }} canais</span>
               <span class="module-pill">{{ module.tipo_base.nome }}</span>
-            </div>
-            <div class="module-actions">
-              <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
             </div>
           </article>
         {% empty %}

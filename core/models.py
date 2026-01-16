@@ -170,8 +170,21 @@ class ModuloIO(models.Model):
         return self.nome
 
 
-class CanalIO(models.Model):
-    modulo = models.ForeignKey(ModuloIO, on_delete=models.CASCADE, related_name="canais")
+class ModuloRackIO(models.Model):
+    rack = models.ForeignKey("RackIO", on_delete=models.CASCADE, related_name="modulos")
+    modulo_modelo = models.ForeignKey(ModuloIO, on_delete=models.PROTECT, related_name="instancias")
+    nome = models.CharField(max_length=120, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.nome or self.modulo_modelo.nome
+
+
+class CanalRackIO(models.Model):
+    modulo = models.ForeignKey(ModuloRackIO, on_delete=models.CASCADE, related_name="canais")
     indice = models.PositiveSmallIntegerField()
     nome = models.CharField(max_length=120, blank=True)
     tipo = models.ForeignKey(TipoCanalIO, on_delete=models.PROTECT, related_name="canais")
@@ -179,11 +192,11 @@ class CanalIO(models.Model):
     class Meta:
         ordering = ["indice"]
         constraints = [
-            models.UniqueConstraint(fields=["modulo", "indice"], name="unique_modulo_canal_indice"),
+            models.UniqueConstraint(fields=["modulo", "indice"], name="unique_modulo_rack_canal_indice"),
         ]
 
     def __str__(self):
-        return f"{self.modulo.nome} - {self.indice}"
+        return f"{self.modulo} - {self.indice}"
 
 
 class RackIO(models.Model):
@@ -206,7 +219,7 @@ class RackSlotIO(models.Model):
     rack = models.ForeignKey(RackIO, on_delete=models.CASCADE, related_name="slots")
     posicao = models.PositiveSmallIntegerField()
     modulo = models.ForeignKey(
-        ModuloIO,
+        ModuloRackIO,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

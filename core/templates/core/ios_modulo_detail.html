@@ -10,21 +10,25 @@
   <section class="card ios-hero">
     <div class="ios-hero-head">
       <div>
-        <h1 class="hero-title">{{ module.nome }}</h1>
-        <p class="hero-subtitle">{{ module.marca }} · {{ module.modelo }}</p>
+        <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
+        <p class="hero-subtitle">{{ module.modulo_modelo.marca }} · {{ module.modulo_modelo.modelo }}</p>
       </div>
       <div class="hero-links">
-        <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Voltar</a>
+        <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Voltar</a>
       </div>
     </div>
     <div class="rack-status">
       <div>
         <div class="meta-label">Total de canais</div>
-        <div class="meta-value">{{ module.quantidade_canais }}</div>
+        <div class="meta-value">{{ module.modulo_modelo.quantidade_canais }}</div>
       </div>
       <div>
         <div class="meta-label">Tipo base</div>
-        <div class="meta-value">{{ module.tipo_base.nome }}</div>
+        <div class="meta-value">{{ module.modulo_modelo.tipo_base.nome }}</div>
+      </div>
+      <div>
+        <div class="meta-label">Rack</div>
+        <div class="meta-value">{{ rack.nome }}</div>
       </div>
     </div>
   </section>

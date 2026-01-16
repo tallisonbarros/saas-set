@@ -38,7 +38,7 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Layout do rack</h2>
-        <p class="muted">Adicione modulos no primeiro slot livre e mova para esquerda ou direita.</p>
+        <p class="muted">Adicione modulos no primeiro slot livre e clique para editar os canais.</p>
       </div>
       <form class="rack-add-form" method="post">
         {% csrf_token %}
@@ -58,8 +58,10 @@
           <div class="slot-label">S{{ slot.posicao }}</div>
           {% if slot.modulo %}
             <div class="slot-module">
-              <div class="slot-title">{{ slot.modulo.nome }}</div>
-              <div class="muted">{{ slot.modulo.marca }} · {{ slot.modulo.modelo }}</div>
+              <a class="slot-link" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}">
+                <div class="slot-title">{{ slot.modulo.nome|default:slot.modulo.modulo_modelo.nome }}</div>
+                <div class="muted">{{ slot.modulo.modulo_modelo.marca }} · {{ slot.modulo.modulo_modelo.modelo }}</div>
+              </a>
               <div class="slot-actions">
                 <form method="post">
                   {% csrf_token %}
@@ -86,30 +88,4 @@
     </div>
   </section>
 
-  <section class="io-card">
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Modulos disponiveis</h2>
-        <p class="muted">Escolha um modulo para preencher o slot selecionado.</p>
-      </div>
-      <a class="btn btn-outline" href="{% url 'ios_modulos' %}">Criar modulo</a>
-    </div>
-    <div class="module-list">
-      {% for module in modules %}
-        <article class="module-card compact">
-          <div>
-            <div class="module-title">{{ module.nome }}</div>
-            <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
-          </div>
-          <div class="module-meta">
-            <span class="slot-badge">{{ module.quantidade_canais }} canais</span>
-            <span class="module-pill">{{ module.tipo_base.nome }}</span>
-          </div>
-          <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
-        </article>
-      {% empty %}
-        <div class="muted">Nenhum modulo cadastrado para este cliente.</div>
-      {% endfor %}
-    </div>
-  </section>
 {% endblock %}

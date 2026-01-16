@@ -92,33 +92,6 @@
       {% endif %}
     </section>
 
-    <section class="io-card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Modulos criados</h2>
-          <p class="muted">Seus modulos ficam disponiveis para qualquer rack.</p>
-        </div>
-        <a class="btn btn-outline" href="{% url 'ios_modulos' %}">Gerenciar modulos</a>
-      </div>
-      <div class="module-list">
-        {% for module in modules %}
-          <article class="module-card">
-            <div>
-              <div class="module-title">{{ module.nome }}</div>
-              <div class="muted">{{ module.marca }} · {{ module.modelo }}</div>
-            </div>
-            <div class="module-meta">
-              <span class="slot-badge">{{ module.quantidade_canais }} canais</span>
-              <span class="module-pill">{{ module.tipo_base.nome }}</span>
-            </div>
-            <a class="btn btn-ghost" href="{% url 'ios_modulo_detail' module.id %}">Editar canais</a>
-          </article>
-        {% empty %}
-          <div class="muted">Nenhum modulo cadastrado ainda.</div>
-        {% endfor %}
-      </div>
-    </section>
-
     <section class="io-card io-wide">
       <div class="io-card-head">
         <div>
