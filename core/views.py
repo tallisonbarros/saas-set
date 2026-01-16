@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from django.contrib.auth.models import User
-from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
+from django.db.models import Case, Count, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
 
 from .forms import TipoPerfilCreateForm, UserCreateForm
 from .models import (
@@ -127,6 +127,26 @@ def ios_list(request):
     racks = RackIO.objects.all() if request.user.is_staff and not cliente else RackIO.objects.filter(cliente=cliente)
     racks = racks.annotate(ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)))
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+    search_term = request.GET.get("q", "").strip()
+    search_results = []
+    search_count = 0
+    if search_term:
+        slot_pos_subquery = RackSlotIO.objects.filter(modulo_id=OuterRef("modulo_id")).values("posicao")[:1]
+        search_filter = (
+            Q(nome__icontains=search_term)
+            | Q(modulo__nome__icontains=search_term)
+            | Q(modulo__modulo_modelo__nome__icontains=search_term)
+            | Q(modulo__rack__nome__icontains=search_term)
+        )
+        channels = (
+            CanalRackIO.objects.filter(modulo__rack__in=racks)
+            .filter(search_filter)
+            .select_related("modulo", "modulo__rack", "modulo__modulo_modelo", "tipo")
+            .annotate(slot_pos=Subquery(slot_pos_subquery))
+            .order_by("modulo__rack__nome", "slot_pos", "indice")[:200]
+        )
+        search_results = list(channels)
+        search_count = len(search_results)
     return render(
         request,
         "core/ios_list.html",
@@ -134,6 +154,9 @@ def ios_list(request):
             "racks": racks,
             "channel_types": channel_types,
             "can_manage": bool(cliente),
+            "search_term": search_term,
+            "search_results": search_results,
+            "search_count": search_count,
         },
     )
 
@@ -148,7 +171,10 @@ def ios_rack_detail(request, pk):
         action = request.POST.get("action")
         if action in ["add_first", "add_to_slot"]:
             module_id = request.POST.get("module_id")
-            module_modelo = get_object_or_404(ModuloIO, pk=module_id, cliente=rack.cliente)
+            module_modelo = get_object_or_404(
+                ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True)),
+                pk=module_id,
+            )
             slot = None
             if action == "add_to_slot":
                 slot_id = request.POST.get("slot_id")
@@ -174,6 +200,14 @@ def ios_rack_detail(request, pk):
                 ]
                 CanalRackIO.objects.bulk_create(canais)
                 slot.modulo = modulo
+                slot.save(update_fields=["modulo"])
+            return redirect("ios_rack_detail", pk=rack.pk)
+        if action == "remove_from_slot":
+            slot_id = request.POST.get("slot_id")
+            slot = get_object_or_404(RackSlotIO, pk=slot_id, rack=rack)
+            if slot.modulo_id:
+                slot.modulo.delete()
+                slot.modulo = None
                 slot.save(update_fields=["modulo"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action in ["move_left", "move_right"]:

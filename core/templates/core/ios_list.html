@@ -28,6 +28,80 @@
   </section>
 
   <div class="io-layout">
+    <section class="io-card io-wide io-search">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Pesquisa de I/Os</h2>
+          <p class="muted">Busque por rack, modulo ou canal e localize o slot e o canal.</p>
+        </div>
+      </div>
+      <form class="io-search-form" method="get">
+        <div class="io-search-row">
+          <label class="field io-search-field">
+            <span>Pesquisar</span>
+            <input type="text" name="q" value="{{ search_term }}" placeholder="Ex: Rack Principal, Modulo A, Canal 05" autocomplete="off">
+          </label>
+          <div class="io-search-actions">
+            <button class="btn btn-primary" type="submit">Pesquisar</button>
+            {% if search_term %}
+              <a class="btn btn-ghost" href="{% url 'ios_list' %}">Limpar</a>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+      {% if search_term %}
+        <div class="io-search-meta">
+          <span class="slot-badge">{{ search_count }} resultado{{ search_count|pluralize }}</span>
+          <span class="muted">Mostrando ate 200 correspondencias.</span>
+        </div>
+        {% if search_results %}
+          <div class="table-wrap">
+            <table class="table io-search-table">
+              <thead>
+                <tr>
+                  <th>Rack</th>
+                  <th>Slot</th>
+                  <th>Modulo</th>
+                  <th>Canal</th>
+                  <th>Tipo</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for channel in search_results %}
+                  <tr>
+                    <td>{{ channel.modulo.rack.nome }}</td>
+                    <td>
+                      {% if channel.slot_pos %}
+                        S{{ channel.slot_pos }}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                    <td>{{ channel.modulo.nome|default:channel.modulo.modulo_modelo.nome }}</td>
+                    <td>
+                      CH{{ channel.indice }} -
+                      {% if channel.nome %}
+                        {{ channel.nome }}
+                      {% else %}
+                        Sem nome
+                      {% endif %}
+                    </td>
+                    <td>{{ channel.tipo.nome }}</td>
+                    <td>
+                      <a class="btn btn-ghost" href="{% url 'ios_rack_modulo_detail' channel.modulo.id %}">Abrir modulo</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="muted">Nenhum resultado encontrado.</div>
+        {% endif %}
+      {% endif %}
+    </section>
+
     <section class="io-card">
       <div class="io-card-head">
         <div>

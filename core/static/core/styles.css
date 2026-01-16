@@ -925,6 +925,35 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+.io-search-form {
+  margin-top: 12px;
+}
+
+.io-search-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.io-search-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.io-search-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.io-search-table td:last-child {
+  white-space: nowrap;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -1083,6 +1112,10 @@ select {
   .ios-hero-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .io-search-row {
+    grid-template-columns: 1fr;
   }
 
   .channel-row {
