@@ -58,7 +58,12 @@
             <div>
               <div class="proposal-title">S{{ slot.posicao }}</div>
               {% if slot.modulo %}
-                <div class="proposal-meta">{{ slot.modulo.nome|default:slot.modulo.modulo_modelo.nome }}</div>
+                {% if slot.modulo.nome %}
+                  <div class="proposal-meta">{{ slot.modulo.nome }}</div>
+                  <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
+                {% else %}
+                  <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
+                {% endif %}
               {% else %}
                 <div class="proposal-meta">Slot livre</div>
               {% endif %}
