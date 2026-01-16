@@ -9,6 +9,7 @@ from .models import (
     Caderno,
     CentroCusto,
     PerfilUsuario,
+    PlantaIO,
     Compra,
     Proposta,
     StatusCompra,
@@ -66,6 +67,12 @@ class PropostaAdmin(admin.ModelAdmin):
 class TipoPerfilAdmin(admin.ModelAdmin):
     list_display = ("nome",)
     search_fields = ("nome",)
+
+
+@admin.register(PlantaIO)
+class PlantaIOAdmin(admin.ModelAdmin):
+    list_display = ("codigo",)
+    search_fields = ("codigo",)
 
 
 @admin.register(Caderno)

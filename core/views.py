@@ -21,6 +21,7 @@ from .models import (
     Compra,
     ModuloIO,
     ModuloRackIO,
+    PlantaIO,
     Proposta,
     StatusCompra,
     RackIO,
@@ -108,6 +109,7 @@ def ios_list(request):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
+            id_planta_raw = request.POST.get("id_planta", "").strip()
             slots_raw = request.POST.get("slots_total", "").strip()
             try:
                 slots_total = int(slots_raw)
@@ -116,10 +118,14 @@ def ios_list(request):
             if slots_total is not None:
                 slots_total = max(1, min(60, slots_total))
             if nome and slots_total:
+                planta = None
+                if id_planta_raw:
+                    planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
                 rack = RackIO.objects.create(
                     cliente=cliente,
                     nome=nome,
                     descricao=descricao,
+                    id_planta=planta,
                     slots_total=slots_total,
                 )
                 slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
@@ -131,7 +137,10 @@ def ios_list(request):
                 TipoCanalIO.objects.get_or_create(nome=nome, defaults={"ativo": True})
             return redirect("ios_list")
 
-    racks = RackIO.objects.all() if request.user.is_staff and not cliente else RackIO.objects.filter(cliente=cliente)
+    if request.user.is_staff and not cliente:
+        racks = RackIO.objects.all()
+    else:
+        racks = RackIO.objects.filter(Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()))
     racks = racks.annotate(ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)))
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     search_term = request.GET.get("q", "").strip()
@@ -173,7 +182,14 @@ def ios_rack_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    rack = get_object_or_404(RackIO, pk=pk, cliente=cliente) if cliente else get_object_or_404(RackIO, pk=pk)
+    if cliente:
+        rack = get_object_or_404(
+            RackIO,
+            Q(pk=pk),
+            Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()),
+        )
+    else:
+        rack = get_object_or_404(RackIO, pk=pk)
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_rack":
@@ -362,11 +378,14 @@ def ios_rack_modulo_detail(request, pk):
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
     module_qs = ModuloRackIO.objects.select_related("modulo_modelo", "rack")
-    module = (
-        get_object_or_404(module_qs, pk=pk, rack__cliente=cliente)
-        if cliente
-        else get_object_or_404(module_qs, pk=pk)
-    )
+    if cliente:
+        module = get_object_or_404(
+            module_qs,
+            Q(pk=pk),
+            Q(rack__cliente=cliente) | Q(rack__id_planta__in=cliente.plantas.all()),
+        )
+    else:
+        module = get_object_or_404(module_qs, pk=pk)
     slot = RackSlotIO.objects.filter(modulo=module).select_related("rack").first()
     if request.method == "POST":
         action = request.POST.get("action")
@@ -648,6 +667,19 @@ def user_management(request):
                     message = "Senha atualizada."
                 else:
                     message = "Informe uma senha valida."
+            if action == "set_plantas":
+                plantas_raw = request.POST.get("plantas", "")
+                cliente = _get_cliente(user)
+                if not cliente:
+                    message = "Usuario sem cadastro de cliente."
+                else:
+                    cleaned = plantas_raw
+                    for sep in [";", "\n", "\r", "\t"]:
+                        cleaned = cleaned.replace(sep, ",")
+                    codes = [code.strip().upper() for code in cleaned.split(",") if code.strip()]
+                    plantas = [PlantaIO.objects.get_or_create(codigo=code)[0] for code in codes]
+                    cliente.plantas.set(plantas)
+                    return redirect("usuarios?user_id=%s" % user.id)
             if action == "set_tipos":
                 tipo_ids = request.POST.getlist("tipos")
                 cliente = _get_cliente(user)

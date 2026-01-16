@@ -12,6 +12,7 @@ class PerfilUsuario(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)  # login do cliente
     ativo = models.BooleanField(default=True)
     tipos = models.ManyToManyField("TipoPerfil", blank=True, related_name="clientes")
+    plantas = models.ManyToManyField("PlantaIO", blank=True, related_name="usuarios")
 
     def __str__(self):
         return self.nome
@@ -159,6 +160,16 @@ class TipoCanalIO(models.Model):
         return self.nome
 
 
+class PlantaIO(models.Model):
+    codigo = models.CharField(max_length=40, unique=True)
+
+    class Meta:
+        ordering = ["codigo"]
+
+    def __str__(self):
+        return self.codigo
+
+
 class ModuloIO(models.Model):
     cliente = models.ForeignKey(
         "PerfilUsuario",
@@ -215,6 +226,13 @@ class CanalRackIO(models.Model):
 
 class RackIO(models.Model):
     cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="io_racks")
+    id_planta = models.ForeignKey(
+        PlantaIO,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="racks",
+    )
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)
     slots_total = models.PositiveSmallIntegerField(

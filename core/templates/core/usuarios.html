@@ -137,6 +137,18 @@
                     {% endif %}
                   </div>
                 </div>
+                <div>
+                  <div class="summary-label">ID_PLANTA</div>
+                  <div>
+                    {% if selected_user.perfilusuario and selected_user.perfilusuario.plantas.all %}
+                      {% for planta in selected_user.perfilusuario.plantas.all %}
+                        {{ planta.codigo }}{% if not forloop.last %}, {% endif %}
+                      {% endfor %}
+                    {% else %}
+                      Nenhum
+                    {% endif %}
+                  </div>
+                </div>
               </div>
               <form method="post">
                 {% csrf_token %}
@@ -180,6 +192,23 @@
                 <label>Nova senha</label>
                 <input type="password" name="new_password" placeholder="Digite a nova senha">
                 <button class="btn btn-ghost" type="submit">Atualizar senha</button>
+              </form>
+            </div>
+
+            <div class="user-card">
+              <div class="panel-title">ID_PLANTA</div>
+              <form method="post" class="stack">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ selected_user.id }}">
+                <input type="hidden" name="action" value="set_plantas">
+                <label>Codigos (separados por virgula)</label>
+                <input
+                  type="text"
+                  name="plantas"
+                  placeholder="PLANTA-001, PLANTA-002"
+                  value="{% if selected_user.perfilusuario %}{% for planta in selected_user.perfilusuario.plantas.all %}{{ planta.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+                >
+                <button class="btn btn-primary" type="submit">Salvar IDs</button>
               </form>
             </div>
           </div>

@@ -47,6 +47,9 @@
             <div class="proposal-meta">
               Total: {{ rack.slots_total }} slots - Modulos: {{ rack.ocupados }}
             </div>
+            {% if rack.id_planta %}
+              <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
+            {% endif %}
           </article>
         {% empty %}
           <div class="muted">Nenhum rack cadastrado ainda.</div>
@@ -73,6 +76,10 @@
             <label class="field">
               <span>Descricao</span>
               <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
+            </label>
+            <label class="field">
+              <span>ID_PLANTA</span>
+              <input type="text" name="id_planta" placeholder="PLANTA-001">
             </label>
             <label class="field">
               <span>Slots totais</span>
