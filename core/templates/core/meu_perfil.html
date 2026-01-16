@@ -1,0 +1,88 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Meu Perfil{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+  </div>
+
+  <section class="card stack">
+    <div>
+      <h1 style="margin: 0;">Meu Perfil</h1>
+      <p class="muted">Atualize seus dados pessoais e ID_PLANTA.</p>
+    </div>
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
+
+    <div class="user-page-grid">
+      <div class="card compact-card">
+        <h2 style="margin-top: 0;">Conta</h2>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_user">
+          <label class="field">
+            <span>Email</span>
+            <input type="email" name="email" value="{{ request.user.username }}" required>
+          </label>
+          <button class="btn btn-primary" type="submit">Salvar conta</button>
+        </form>
+      </div>
+
+      <div class="card compact-card">
+        <h2 style="margin-top: 0;">Perfil</h2>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_profile">
+          <label class="field">
+            <span>Nome</span>
+            <input type="text" name="nome" value="{% if perfil %}{{ perfil.nome }}{% endif %}">
+          </label>
+          <label class="field">
+            <span>Empresa</span>
+            <input type="text" name="empresa" value="{% if perfil %}{{ perfil.empresa }}{% endif %}">
+          </label>
+          <label class="field">
+            <span>Sigla cidade</span>
+            <input type="text" name="sigla_cidade" value="{% if perfil %}{{ perfil.sigla_cidade }}{% endif %}">
+          </label>
+          <label class="field">
+            <span>ID_PLANTA (separados por virgula)</span>
+            <input
+              type="text"
+              name="plantas"
+              placeholder="PLANTA-001, PLANTA-002"
+              value="{% if perfil %}{% for planta in perfil.plantas.all %}{{ planta.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+            >
+          </label>
+          <button class="btn btn-primary" type="submit">Salvar perfil</button>
+        </form>
+      </div>
+
+      <div class="card compact-card">
+        <h2 style="margin-top: 0;">Senha</h2>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="set_password">
+          <label class="field">
+            <span>Nova senha</span>
+            <input type="password" name="new_password" placeholder="Digite a nova senha">
+          </label>
+          <button class="btn btn-ghost" type="submit">Atualizar senha</button>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}

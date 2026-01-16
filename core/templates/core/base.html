@@ -11,7 +11,11 @@
   <body class="{% block body_class %}page{% endblock %}">
     <div class="bg"></div>
     {% block header %}
-      <header class="site-header"></header>
+      <header class="site-header">
+        {% if request.user.is_authenticated %}
+          <div class="user-banner">Logado: {{ request.user.username }}</div>
+        {% endif %}
+      </header>
     {% endblock %}
     <main class="main">
       {% block content %}{% endblock %}

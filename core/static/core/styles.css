@@ -44,6 +44,15 @@ body {
   padding: 20px 8vw;
 }
 
+.user-banner {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff6ef;
+  border: 1px solid var(--border);
+}
+
 .logo {
   height: 56px;
   width: auto;

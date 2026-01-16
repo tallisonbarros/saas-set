@@ -753,6 +753,74 @@ def usuarios_gerenciar_usuario(request, pk):
 
 
 @login_required
+def meu_perfil(request):
+    user = request.user
+    perfil = _get_cliente(user)
+    message = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_user":
+            email = request.POST.get("email", "").strip().lower()
+            if not email:
+                message = "Informe um email valido."
+            else:
+                existing = User.objects.filter(username=email).exclude(pk=user.pk)
+                if existing.exists():
+                    message = "Email ja cadastrado."
+                else:
+                    user.username = email
+                    user.email = email
+                    user.save(update_fields=["username", "email"])
+                    if perfil:
+                        perfil.email = email
+                        perfil.save(update_fields=["email"])
+                    return redirect("meu_perfil")
+        if action == "update_profile":
+            nome = request.POST.get("nome", "").strip()
+            empresa = request.POST.get("empresa", "").strip()
+            sigla_cidade = request.POST.get("sigla_cidade", "").strip()
+            plantas_raw = request.POST.get("plantas", "")
+            if not perfil:
+                perfil = PerfilUsuario.objects.create(
+                    nome=nome or (user.username.split("@")[0] if user.username else "Usuario"),
+                    email=user.email or user.username,
+                    usuario=user,
+                    ativo=True,
+                    empresa=empresa,
+                    sigla_cidade=sigla_cidade,
+                )
+            else:
+                if nome:
+                    perfil.nome = nome
+                perfil.empresa = empresa
+                perfil.sigla_cidade = sigla_cidade
+                perfil.save(update_fields=["nome", "empresa", "sigla_cidade"])
+            cleaned = plantas_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned = cleaned.replace(sep, ",")
+            codes = [code.strip().upper() for code in cleaned.split(",") if code.strip()]
+            plantas = [PlantaIO.objects.get_or_create(codigo=code)[0] for code in codes]
+            perfil.plantas.set(plantas)
+            return redirect("meu_perfil")
+        if action == "set_password":
+            new_password = request.POST.get("new_password", "").strip()
+            if new_password:
+                user.set_password(new_password)
+                user.save(update_fields=["password"])
+                message = "Senha atualizada."
+            else:
+                message = "Informe uma senha valida."
+    return render(
+        request,
+        "core/meu_perfil.html",
+        {
+            "perfil": perfil,
+            "message": message,
+        },
+    )
+
+
+@login_required
 def financeiro_overview(request):
     if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
         return HttpResponseForbidden("Sem permissao.")
