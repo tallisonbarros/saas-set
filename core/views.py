@@ -350,8 +350,14 @@ def ios_rack_modulo_detail(request, pk):
         if cliente
         else get_object_or_404(module_qs, pk=pk)
     )
+    slot = RackSlotIO.objects.filter(modulo=module).select_related("rack").first()
     if request.method == "POST":
         action = request.POST.get("action")
+        if action == "update_module_name":
+            nome = request.POST.get("nome", "").strip()
+            module.nome = nome
+            module.save(update_fields=["nome"])
+            return redirect("ios_rack_modulo_detail", pk=module.pk)
         if action == "update_channels":
             for channel in module.canais.all():
                 nome_raw = request.POST.get(f"nome_{channel.id}")
@@ -373,6 +379,7 @@ def ios_rack_modulo_detail(request, pk):
             "channels": channels,
             "channel_types": channel_types,
             "rack": module.rack,
+            "slot": slot,
         },
     )
 
