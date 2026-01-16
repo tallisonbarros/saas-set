@@ -3,12 +3,12 @@ from django.http import JsonResponse
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
 
-from .forms import ClienteAdminForm
+from .forms import PerfilUsuarioAdminForm
 from .models import (
     CategoriaCompra,
     Caderno,
     CentroCusto,
-    Cliente,
+    PerfilUsuario,
     Compra,
     Proposta,
     StatusCompra,
@@ -21,9 +21,9 @@ admin.site.site_title = "SET Admin"
 admin.site.index_title = "Painel administrativo"
 
 
-@admin.register(Cliente)
-class ClienteAdmin(admin.ModelAdmin):
-    form = ClienteAdminForm
+@admin.register(PerfilUsuario)
+class PerfilUsuarioAdmin(admin.ModelAdmin):
+    form = PerfilUsuarioAdminForm
     list_display = ("nome", "email", "tipos_display", "ativo")
     search_fields = ("nome", "email")
 
@@ -55,8 +55,8 @@ class PropostaAdmin(admin.ModelAdmin):
         if not cliente_id:
             return JsonResponse({"error": _("Selecione um cliente.")}, status=400)
         try:
-            cliente = Cliente.objects.get(pk=cliente_id)
-        except Cliente.DoesNotExist:
+            cliente = PerfilUsuario.objects.get(pk=cliente_id)
+        except PerfilUsuario.DoesNotExist:
             return JsonResponse({"error": _("Cliente invalido.")}, status=400)
         proposta = Proposta(cliente=cliente)
         return JsonResponse({"codigo": proposta._proximo_codigo()})

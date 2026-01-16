@@ -1,10 +1,10 @@
 from django import forms
 from django.contrib.auth.models import User
 
-from .models import Cliente, TipoPerfil
+from .models import PerfilUsuario, TipoPerfil
 
 
-class ClienteAdminForm(forms.ModelForm):
+class PerfilUsuarioAdminForm(forms.ModelForm):
     senha_inicial = forms.CharField(
         label="Senha inicial",
         required=False,
@@ -12,7 +12,7 @@ class ClienteAdminForm(forms.ModelForm):
     )
 
     class Meta:
-        model = Cliente
+        model = PerfilUsuario
         fields = ["nome", "empresa", "sigla_cidade", "email", "logo", "ativo", "tipos"]
 
     def clean_email(self):

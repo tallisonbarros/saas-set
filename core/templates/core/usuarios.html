@@ -128,8 +128,8 @@
                 <div>
                   <div class="summary-label">Tipos</div>
                   <div>
-                    {% if selected_user.cliente and selected_user.cliente.tipos.all %}
-                      {% for t in selected_user.cliente.tipos.all %}
+                    {% if selected_user.perfilusuario and selected_user.perfilusuario.tipos.all %}
+                      {% for t in selected_user.perfilusuario.tipos.all %}
                         {{ t.nome }}{% if not forloop.last %}, {% endif %}
                       {% endfor %}
                     {% else %}
@@ -155,11 +155,11 @@
                 <input type="hidden" name="user_id" value="{{ selected_user.id }}">
                 <input type="hidden" name="action" value="set_tipos">
                 <label>Tipos de perfil</label>
-                {% if selected_user.cliente %}
+                {% if selected_user.perfilusuario %}
                   <div class="checkbox-grid">
                     {% for tipo in tipos %}
                       <label class="checkbox-item">
-                        <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if tipo in selected_user.cliente.tipos.all %}checked{% endif %}>
+                        <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if tipo in selected_user.perfilusuario.tipos.all %}checked{% endif %}>
                         {{ tipo.nome }}
                       </label>
                     {% endfor %}

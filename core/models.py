@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils import timezone
 
-class Cliente(models.Model):
+class PerfilUsuario(models.Model):
     nome = models.CharField(max_length=120)
     email = models.EmailField()
     empresa = models.CharField(max_length=120, blank=True)
@@ -26,7 +26,7 @@ class TipoPerfil(models.Model):
 
 class Caderno(models.Model):
     nome = models.CharField(max_length=80)
-    clientes = models.ManyToManyField(Cliente, related_name="cadernos", blank=True)
+    clientes = models.ManyToManyField("PerfilUsuario", related_name="cadernos", blank=True)
     ativo = models.BooleanField(default=True)
 
     def __str__(self):
@@ -88,7 +88,7 @@ class Proposta(models.Model):
         EXECUTANDO = "EXECUTANDO", "Executando"
         FINALIZADO = "FINALIZADO", "Finalizado"
 
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="propostas")
+    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="propostas")
     nome = models.CharField(max_length=120)
     codigo = models.CharField(max_length=40, blank=True)
     descricao = models.TextField()
@@ -153,7 +153,13 @@ class TipoCanalIO(models.Model):
 
 
 class ModuloIO(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="io_modulos", null=True, blank=True)
+    cliente = models.ForeignKey(
+        "PerfilUsuario",
+        on_delete=models.CASCADE,
+        related_name="io_modulos",
+        null=True,
+        blank=True,
+    )
     nome = models.CharField(max_length=120)
     modelo = models.CharField(max_length=80, blank=True)
     marca = models.CharField(max_length=80, blank=True)
@@ -201,7 +207,7 @@ class CanalRackIO(models.Model):
 
 
 class RackIO(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="io_racks")
+    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="io_racks")
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)
     slots_total = models.PositiveSmallIntegerField(
