@@ -153,7 +153,7 @@ class TipoCanalIO(models.Model):
 
 
 class ModuloIO(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="io_modulos")
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="io_modulos", null=True, blank=True)
     nome = models.CharField(max_length=120)
     modelo = models.CharField(max_length=80, blank=True)
     marca = models.CharField(max_length=80, blank=True)
@@ -161,6 +161,7 @@ class ModuloIO(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(512)],
     )
     tipo_base = models.ForeignKey(TipoCanalIO, on_delete=models.PROTECT, related_name="modulos_base")
+    is_default = models.BooleanField(default=False)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:

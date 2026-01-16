@@ -188,7 +188,11 @@ def ios_rack_detail(request, pk):
             return redirect("ios_rack_detail", pk=rack.pk)
 
     slots = rack.slots.select_related("modulo", "modulo__modulo_modelo").order_by("posicao")
-    modules = ModuloIO.objects.filter(cliente=rack.cliente).select_related("tipo_base").order_by("nome")
+    modules = (
+        ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True))
+        .select_related("tipo_base")
+        .order_by("nome")
+    )
     ocupados = rack.slots.filter(modulo__isnull=False).count()
     slots_livres = max(rack.slots_total - ocupados, 0)
     return render(
@@ -237,10 +241,10 @@ def ios_modulos(request):
                 )
             return redirect("ios_modulos")
 
-    modules = (
-        ModuloIO.objects.all() if request.user.is_staff and not cliente else ModuloIO.objects.filter(cliente=cliente)
-    )
-    modules = modules.select_related("tipo_base")
+    if not cliente:
+        modules = ModuloIO.objects.none()
+    else:
+        modules = ModuloIO.objects.filter(cliente=cliente, is_default=False).select_related("tipo_base")
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     return render(
         request,
@@ -260,6 +264,8 @@ def ios_modulo_modelo_detail(request, pk):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     module_qs = ModuloIO.objects.select_related("tipo_base")
     module = get_object_or_404(module_qs, pk=pk, cliente=cliente) if cliente else get_object_or_404(module_qs, pk=pk)
+    if module.is_default and not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_model":
