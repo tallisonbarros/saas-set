@@ -23,11 +23,16 @@
       <div>
         <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
         <p class="hero-subtitle">{{ module.modulo_modelo.marca }} - {{ module.modulo_modelo.modelo }}</p>
-        {% if slot %}
-          <p class="hero-subtitle"><strong>{{ rack.nome }} - SLOT {{ slot.posicao }}</strong></p>
-        {% else %}
-          <p class="hero-subtitle"><strong>{{ rack.nome }} - SLOT --</strong></p>
-        {% endif %}
+        <div class="rack-highlight">
+          {% if slot %}
+            <span class="rack-highlight-title">{{ rack.nome }} - Slot{{ slot.posicao|stringformat:"02d" }}</span>
+          {% else %}
+            <span class="rack-highlight-title">{{ rack.nome }} - Slot--</span>
+          {% endif %}
+          {% if rack.descricao %}
+            <span class="rack-highlight-meta">{{ rack.descricao }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
     <div class="rack-status">

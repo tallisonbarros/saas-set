@@ -41,6 +41,9 @@
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Salvar rack</button>
+        <button class="btn btn-outline" type="submit" name="action" value="delete_rack" data-confirm="1">
+          Excluir rack
+        </button>
       </div>
     </form>
     <div class="rack-status">
@@ -78,7 +81,7 @@
           {% endif %}
           <div class="proposal-head">
             <div>
-              <div class="proposal-title">S{{ slot.posicao }}</div>
+              <div class="proposal-title">Slot{{ slot.posicao|stringformat:"02d" }}</div>
               {% if slot.modulo %}
                 {% if slot.modulo.nome %}
                   <div class="proposal-meta">{{ slot.modulo.nome }}</div>

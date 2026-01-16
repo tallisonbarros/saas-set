@@ -208,6 +208,11 @@ def ios_rack_detail(request, pk):
                 rack.id_planta = None
             rack.save(update_fields=["nome", "descricao", "id_planta"])
             return redirect("ios_rack_detail", pk=rack.pk)
+        if action == "delete_rack":
+            if not request.user.is_staff and rack.cliente != cliente:
+                return HttpResponseForbidden("Sem permissao.")
+            rack.delete()
+            return redirect("ios_list")
         if action in ["add_first", "add_to_slot"]:
             module_id = request.POST.get("module_id")
             module_modelo = get_object_or_404(
