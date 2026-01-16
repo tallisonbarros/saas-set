@@ -277,6 +277,11 @@ body {
   color: inherit;
 }
 
+.proposal-card-sent {
+  background: linear-gradient(140deg, #ffffff 0%, #ffe7d7 100%);
+  border-color: rgba(255, 102, 0, 0.35);
+}
+
 .proposal-card:hover {
   box-shadow: var(--shadow-strong);
   transform: translateY(-1px);

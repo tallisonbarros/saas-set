@@ -28,7 +28,12 @@
       <p>Usuario sem cliente associado. Fale com o administrador.</p>
     {% else %}
       {% if is_vendedor %}
-        <div class="muted">Propostas criadas por voce.</div>
+        <div class="finance-actions" style="justify-content: flex-start; gap: 12px;">
+          <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
+        </div>
+      {% endif %}
+      {% if is_vendedor %}
+        <div class="muted">Propostas enviadas ou recebidas por voce.</div>
       {% endif %}
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
@@ -42,7 +47,7 @@
       {% if propostas %}
         <div class="proposal-grid">
           {% for proposta in propostas %}
-            <div class="proposal-card">
+            <div class="proposal-card{% if proposta.criada_por_id == current_user_id %} proposal-card-sent{% endif %}">
               <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
               <div class="proposal-head">
                 <div>

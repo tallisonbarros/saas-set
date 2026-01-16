@@ -45,7 +45,7 @@
         <textarea id="id_observacao" name="observacao">{{ proposta.observacao_cliente }}</textarea>
         <button class="btn btn-ghost" type="submit">Salvar</button>
       </form>
-      {% if proposta.status == "PENDENTE" %}
+      {% if proposta.status == "PENDENTE" and is_contratante %}
         <div style="display: flex; gap: 12px;">
           <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
             {% csrf_token %}

@@ -408,7 +408,14 @@ def proposta_list(request):
     cliente = _get_cliente(request.user)
     propostas = Proposta.objects.none()
     if _has_tipo(request.user, "Vendedor"):
-        propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
+        if cliente:
+            propostas = (
+                Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
+                .distinct()
+                .order_by("-criado_em")
+            )
+        else:
+            propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
     elif cliente:
         propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
     status = request.GET.get("status")
@@ -436,6 +443,7 @@ def proposta_list(request):
             "propostas": propostas,
             "status_filter": status,
             "is_vendedor": _has_tipo(request.user, "Vendedor"),
+            "current_user_id": request.user.id,
         },
     )
 
@@ -445,11 +453,23 @@ def proposta_detail(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    if _has_tipo(request.user, "Vendedor"):
-        proposta = get_object_or_404(Proposta, pk=pk, criada_por=request.user)
+    if _has_tipo(request.user, "Vendedor") and cliente:
+        proposta = get_object_or_404(
+            Proposta,
+            pk=pk,
+            Q(criada_por=request.user) | Q(cliente=cliente),
+        )
     else:
         proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
-    return render(request, "core/proposta_detail.html", {"cliente": cliente, "proposta": proposta})
+    return render(
+        request,
+        "core/proposta_detail.html",
+        {
+            "cliente": cliente,
+            "proposta": proposta,
+            "is_contratante": _has_tipo(request.user, "Contratante"),
+        },
+    )
 
 
 @login_required
@@ -514,6 +534,8 @@ def aprovar_proposta(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
+    if not _has_tipo(request.user, "Contratante"):
+        return HttpResponseForbidden("Somente contratante pode aprovar.")
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.status == Proposta.Status.PENDENTE:
         proposta.status = Proposta.Status.APROVADA
@@ -529,6 +551,8 @@ def reprovar_proposta(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
+    if not _has_tipo(request.user, "Contratante"):
+        return HttpResponseForbidden("Somente contratante pode reprovar.")
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.status == Proposta.Status.PENDENTE:
         proposta.status = Proposta.Status.REPROVADA
@@ -544,8 +568,12 @@ def salvar_observacao(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    if _has_tipo(request.user, "Vendedor"):
-        proposta = get_object_or_404(Proposta, pk=pk, criada_por=request.user)
+    if _has_tipo(request.user, "Vendedor") and cliente:
+        proposta = get_object_or_404(
+            Proposta,
+            pk=pk,
+            Q(criada_por=request.user) | Q(cliente=cliente),
+        )
     else:
         proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     observacao = request.POST.get("observacao", "").strip()

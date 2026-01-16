@@ -26,12 +26,6 @@
           <div class="muted">Visualizar e aprovar propostas.</div>
         </a>
       {% endif %}
-      {% if is_vendedor %}
-        <a class="panel-card" href="{% url 'proposta_nova_vendedor' %}">
-          <div class="panel-title">Criar proposta</div>
-          <div class="muted">Enviar nova proposta para um cliente.</div>
-        </a>
-      {% endif %}
       {% if is_financeiro %}
         <a class="panel-card" href="{% url 'financeiro' %}">
           <div class="panel-title">Financeiro</div>
