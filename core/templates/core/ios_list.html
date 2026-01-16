@@ -21,13 +21,95 @@
     </div>
     <div class="hero-links">
       <a class="btn btn-primary" href="{% url 'ios_modulos' %}">Catalogo de modulos</a>
-      {% if can_manage %}
-        <a class="btn btn-outline" href="#novo-rack">Novo rack</a>
-      {% endif %}
     </div>
   </section>
 
   <div class="io-layout">
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Racks cadastrados</h2>
+          <p class="muted">Escolha um rack para adicionar modulos e ajustar os slots.</p>
+        </div>
+        <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+      </div>
+      <div class="proposal-grid">
+        {% for rack in racks %}
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ rack.nome }}</div>
+                <div class="proposal-meta">{{ rack.descricao }}</div>
+              </div>
+              <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
+            </div>
+            <div class="proposal-meta">
+              Total: {{ rack.slots_total }} slots - Modulos: {{ rack.ocupados }}
+            </div>
+          </article>
+        {% empty %}
+          <div class="muted">Nenhum rack cadastrado ainda.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="io-card" id="novo-rack">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Novo rack</h2>
+          <p class="muted">Defina o nome, a descricao e o total de slots.</p>
+        </div>
+      </div>
+      {% if can_manage %}
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_rack">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome do rack</span>
+              <input type="text" name="nome" placeholder="Rack Principal" required>
+            </label>
+            <label class="field">
+              <span>Descricao</span>
+              <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
+            </label>
+            <label class="field">
+              <span>Slots totais</span>
+              <input type="number" name="slots_total" min="1" max="60" value="10" required>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar rack</button>
+          </div>
+        </form>
+      {% else %}
+        <div class="muted">Apenas clientes cadastrados podem criar racks.</div>
+      {% endif %}
+    </section>
+
+    <section class="io-card io-wide">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Classificacao de canais</h2>
+          <p class="muted">Padroes atuais para os tipos de I/O.</p>
+        </div>
+      </div>
+      <div class="channel-types">
+        {% for channel in channel_types %}
+          <span class="channel-pill">{{ channel.nome }}</span>
+        {% endfor %}
+        {% if can_manage %}
+          <form method="post" class="channel-type-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_channel_type">
+            <input type="text" name="nome" placeholder="NOVO TIPO" maxlength="20" required>
+            <button class="btn btn-outline" type="submit">Adicionar tipo</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+
     <section class="io-card io-wide io-search">
       <div class="io-card-head">
         <div>
@@ -100,91 +182,6 @@
           <div class="muted">Nenhum resultado encontrado.</div>
         {% endif %}
       {% endif %}
-    </section>
-
-    <section class="io-card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Racks cadastrados</h2>
-          <p class="muted">Escolha um rack para adicionar modulos e ajustar os slots.</p>
-        </div>
-        <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-      </div>
-      <div class="proposal-grid">
-        {% for rack in racks %}
-          <article class="proposal-card io-proposal-card">
-            <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
-            <div class="proposal-head">
-              <div>
-                <div class="proposal-title">{{ rack.nome }}</div>
-                <div class="proposal-meta">{{ rack.descricao }}</div>
-              </div>
-              <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
-            </div>
-            <div class="proposal-meta">
-              Total: {{ rack.slots_total }} slots - Modulos: {{ rack.ocupados }}
-            </div>
-          </article>
-        {% empty %}
-          <div class="muted">Nenhum rack cadastrado ainda.</div>
-        {% endfor %}
-      </div>
-    </section>
-
-    <section class="io-card" id="novo-rack">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Cadastrar rack</h2>
-          <p class="muted">Defina o nome, a descricao e o total de slots.</p>
-        </div>
-      </div>
-      {% if can_manage %}
-        <form class="io-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_rack">
-          <div class="io-form-grid">
-            <label class="field">
-              <span>Nome do rack</span>
-              <input type="text" name="nome" placeholder="Rack Principal" required>
-            </label>
-            <label class="field">
-              <span>Descricao</span>
-              <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
-            </label>
-            <label class="field">
-              <span>Slots totais</span>
-              <input type="number" name="slots_total" min="1" max="60" value="10" required>
-            </label>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Salvar rack</button>
-          </div>
-        </form>
-      {% else %}
-        <div class="muted">Apenas clientes cadastrados podem criar racks.</div>
-      {% endif %}
-    </section>
-
-    <section class="io-card io-wide">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Classificacao de canais</h2>
-          <p class="muted">Padroes atuais para os tipos de I/O.</p>
-        </div>
-      </div>
-      <div class="channel-types">
-        {% for channel in channel_types %}
-          <span class="channel-pill">{{ channel.nome }}</span>
-        {% endfor %}
-        {% if can_manage %}
-          <form method="post" class="channel-type-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_channel_type">
-            <input type="text" name="nome" placeholder="NOVO TIPO" maxlength="20" required>
-            <button class="btn btn-outline" type="submit">Adicionar tipo</button>
-          </form>
-        {% endif %}
-      </div>
     </section>
   </div>
 {% endblock %}
