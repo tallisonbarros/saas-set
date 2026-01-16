@@ -454,11 +454,8 @@ def proposta_detail(request, pk):
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     if _has_tipo(request.user, "Vendedor") and cliente:
-        proposta = get_object_or_404(
-            Proposta,
-            pk=pk,
-            Q(criada_por=request.user) | Q(cliente=cliente),
-        )
+        proposta_qs = Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
+        proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
         proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     return render(
@@ -569,11 +566,8 @@ def salvar_observacao(request, pk):
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     if _has_tipo(request.user, "Vendedor") and cliente:
-        proposta = get_object_or_404(
-            Proposta,
-            pk=pk,
-            Q(criada_por=request.user) | Q(cliente=cliente),
-        )
+        proposta_qs = Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
+        proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
         proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     observacao = request.POST.get("observacao", "").strip()
