@@ -17,7 +17,23 @@
   <section class="card ios-hero io-compact">
     <div class="ios-hero-head io-center">
       <div>
+        <div class="module-top-actions">
+          <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
+          <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
+        </div>
         <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
+        <form class="module-rename-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_module_name">
+          <input type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
+          <button class="btn btn-ghost icon-only" type="submit" title="Salvar nome" aria-label="Salvar nome">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 5h10l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+              <path d="M8 5v6h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+              <path d="M8 19v-6h8v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+            </svg>
+          </button>
+        </form>
         <p class="module-center-meta">Rack</p>
         <div class="rack-slot-title">{{ rack.nome }}</div>
         <div class="rack-slot-nav">
@@ -73,13 +89,9 @@
         <button class="btn btn-primary" type="submit">Salvar ajustes</button>
       </div>
     </form>
-    <div class="module-actions-centered">
-      <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
-      <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
-    </div>
   </section>
 
-  <section class="io-card io-compact">
+  <section class="io-card io-compact io-compact-card">
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Mover modulo</h2>
@@ -104,7 +116,7 @@
     </form>
   </section>
 
-  <section class="io-card io-compact">
+  <section class="io-card io-compact io-compact-card">
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Excluir modulo</h2>
@@ -120,23 +132,4 @@
     </form>
   </section>
 
-  <section class="io-card io-compact">
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Nome do modulo</h2>
-        <p class="muted">Defina o nome que aparecera no rack.</p>
-      </div>
-    </div>
-    <form class="channel-form" method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="update_module_name">
-      <div class="channel-row">
-        <div class="channel-index">Nome</div>
-        <input type="text" name="nome" value="{{ module.nome }}" placeholder="{{ module.modulo_modelo.nome }}">
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Salvar nome</button>
-      </div>
-    </form>
-  </section>
 {% endblock %}

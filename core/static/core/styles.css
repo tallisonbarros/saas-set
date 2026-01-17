@@ -1181,6 +1181,31 @@ select {
   margin-top: 16px;
 }
 
+.module-top-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.module-rename-form {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin: 10px 0 0;
+}
+
+.module-rename-form input {
+  max-width: 260px;
+}
+
+.io-compact-card {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
 .rack-name-highlight {
   margin-top: 8px;
   font-size: 22px;

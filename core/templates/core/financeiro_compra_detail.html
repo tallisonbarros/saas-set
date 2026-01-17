@@ -28,12 +28,49 @@
     <div class="stack">
       <div><strong>Nome:</strong> {{ compra.nome|default:"-" }}</div>
       <div><strong>Data:</strong> {{ compra.data|default:"-" }}</div>
-      <div><strong>Valor:</strong> R$ {{ compra.valor|default:"0,00" }}</div>
+      <div><strong>Total:</strong> R$ {{ compra.total_itens|default:"0,00" }}</div>
       <div><strong>Status:</strong> {{ compra.status_label }}</div>
       <div><strong>Caderno:</strong> {% if compra.caderno %}{{ compra.caderno.nome }}{% else %}-{% endif %}</div>
       <div><strong>Categoria:</strong> {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}-{% endif %}</div>
       <div><strong>Centro de custo:</strong> {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}-{% endif %}</div>
     </div>
+
+    <details class="io-card io-compact io-compact-card">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Editar compra</span>
+        <span class="muted">Ajuste dados basicos da compra.</span>
+      </summary>
+      <div class="io-discrete-body">
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_compra">
+          <label>Nome</label>
+          <input type="text" name="nome" value="{{ compra.nome }}">
+          <label>Caderno</label>
+          <select name="caderno">
+            <option value="">Selecione</option>
+            {% for c in cadernos %}
+              <option value="{{ c.id }}" {% if compra.caderno and compra.caderno.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+          <label>Categoria</label>
+          <select name="categoria">
+            <option value="">Selecione</option>
+            {% for c in categorias %}
+              <option value="{{ c.id }}" {% if compra.categoria and compra.categoria.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+          <label>Centro de custo</label>
+          <select name="centro_custo">
+            <option value="">Selecione</option>
+            {% for c in centros %}
+              <option value="{{ c.id }}" {% if compra.centro_custo and compra.centro_custo.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-ghost" type="submit">Salvar</button>
+        </form>
+      </div>
+    </details>
 
     <div class="finance-card">
       <div class="panel-title">Itens da compra</div>
@@ -45,6 +82,7 @@
                 <th>Nome</th>
                 <th>Quantidade</th>
                 <th>Valor</th>
+                <th>Total</th>
                 <th>Tipo</th>
                 <th>Pago</th>
                 <th></th>
@@ -53,16 +91,34 @@
             <tbody>
               {% for item in itens %}
                 <tr>
-                  <td>{{ item.nome }}</td>
-                  <td>{{ item.quantidade }}</td>
-                  <td>R$ {{ item.valor|default:"0,00" }}</td>
-                  <td>{% if item.tipo %}{{ item.tipo.nome }}{% else %}-{% endif %}</td>
                   <td>
                     <form method="post">
                       {% csrf_token %}
-                      <input type="hidden" name="action" value="toggle_item_pago">
+                      <input type="hidden" name="action" value="update_item">
                       <input type="hidden" name="item_id" value="{{ item.id }}">
-                      <button class="btn btn-ghost" type="submit">{{ item.pago|yesno:"Sim,Nao" }}</button>
+                      <input type="text" name="nome" value="{{ item.nome }}">
+                  </td>
+                  <td>
+                      <input type="number" name="quantidade" min="1" value="{{ item.quantidade }}">
+                  </td>
+                  <td>
+                      <input type="text" name="valor" value="{{ item.valor|default_if_none:'' }}">
+                  </td>
+                  <td>R$ {{ item.total_valor|default:"0,00" }}</td>
+                  <td>
+                      <select name="tipo">
+                        <option value="">Selecione</option>
+                        {% for t in tipos %}
+                          <option value="{{ t.id }}" {% if item.tipo and item.tipo.id == t.id %}selected{% endif %}>{{ t.nome }}</option>
+                        {% endfor %}
+                      </select>
+                  </td>
+                  <td>
+                      <label class="checkbox-item">
+                        <input type="checkbox" name="pago" {% if item.pago %}checked{% endif %}>
+                        Pago
+                      </label>
+                      <button class="btn btn-ghost" type="submit">Salvar</button>
                     </form>
                   </td>
                   <td>

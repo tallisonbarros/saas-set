@@ -35,7 +35,7 @@
               <div>
                 <div class="proposal-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</div>
                 <div class="proposal-meta">
-                  {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} - R$ {{ compra.valor|default:"0,00" }}
+                  {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} - R$ {{ compra.total_itens|default:"0,00" }}
                 </div>
               </div>
               <span class="badge">{{ compra.status_label }}</span>

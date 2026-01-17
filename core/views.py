@@ -9,7 +9,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from django.contrib.auth.models import User
-from django.db.models import Case, Count, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
+from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
+from django.db.models.expressions import ExpressionWrapper
 
 from .forms import TipoPerfilCreateForm, UserCreateForm
 from .models import (
@@ -1064,13 +1065,17 @@ def financeiro_overview(request):
         cadernos = Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()))
     else:
         cadernos = Caderno.objects.none()
-    cadernos = cadernos.annotate(total=Sum("compras__valor")).order_by("nome")
+    total_expr = ExpressionWrapper(
+        F("compras__itens__valor") * F("compras__itens__quantidade"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+    cadernos = cadernos.annotate(total=Sum(total_expr)).order_by("nome")
     if cliente:
         compras_qs = Compra.objects.filter(
             Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())
         )
-        total_geral = compras_qs.aggregate(total=Sum("valor")).get("total")
-        ultimas_compras = compras_qs.order_by("-data")[:6]
+        total_geral = compras_qs.aggregate(total=Sum(total_expr)).get("total")
+        ultimas_compras = compras_qs.prefetch_related("itens").order_by("-data")[:6]
     else:
         total_geral = None
         ultimas_compras = Compra.objects.none()
@@ -1082,6 +1087,7 @@ def financeiro_overview(request):
             Q(caderno_id=caderno_id),
             Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all()),
         ).order_by("-data")
+        compras = compras.prefetch_related("itens")
 
     return render(
         request,
@@ -1113,14 +1119,9 @@ def financeiro_nova(request):
             caderno_id = request.POST.get("caderno")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
-            valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
             data_raw = request.POST.get("data", "").strip()
             categoria_id = request.POST.get("categoria")
             centro_id = request.POST.get("centro_custo")
-            try:
-                valor = Decimal(valor_raw)
-            except (InvalidOperation, ValueError):
-                valor = None
             try:
                 data = datetime.strptime(data_raw, "%Y-%m-%d").date()
             except ValueError:
@@ -1133,7 +1134,6 @@ def financeiro_nova(request):
                     caderno_id,
                     nome,
                     descricao,
-                    valor is not None,
                     data is not None,
                     categoria_id,
                     centro_id,
@@ -1146,7 +1146,6 @@ def financeiro_nova(request):
                     caderno_id=caderno_id or None,
                     nome=nome,
                     descricao=descricao,
-                    valor=valor,
                     data=data,
                     categoria_id=categoria_id or None,
                     centro_custo_id=centro_id or None,
@@ -1213,9 +1212,13 @@ def financeiro_cadernos(request):
             caderno.delete()
             return redirect("financeiro_cadernos")
 
+    total_expr = ExpressionWrapper(
+        F("compras__itens__valor") * F("compras__itens__quantidade"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
     cadernos = (
         Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()))
-        .annotate(total=Sum("compras__valor"))
+        .annotate(total=Sum(total_expr))
         .order_by("nome")
     )
     return render(
@@ -1240,6 +1243,9 @@ def financeiro_caderno_detail(request, pk):
     compras = Compra.objects.filter(caderno=caderno).prefetch_related("itens").order_by("-data")
     for compra in compras:
         compra.status_label = _compra_status_label(compra)
+        compra.total_itens = sum(
+            (item.valor or 0) * (item.quantidade or 0) for item in compra.itens.all()
+        )
     return render(
         request,
         "core/financeiro_caderno_detail.html",
@@ -1267,6 +1273,23 @@ def financeiro_compra_detail(request, pk):
             if caderno_id:
                 return redirect("financeiro_caderno_detail", pk=caderno_id)
             return redirect("financeiro")
+        if action == "update_compra":
+            nome = request.POST.get("nome", "").strip()
+            categoria_id = request.POST.get("categoria")
+            centro_id = request.POST.get("centro_custo")
+            caderno_id = request.POST.get("caderno")
+            allowed_cadernos = Caderno.objects.filter(
+                Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())
+            )
+            if caderno_id and not allowed_cadernos.filter(id=caderno_id).exists():
+                return redirect("financeiro_compra_detail", pk=compra.pk)
+            compra.nome = nome
+            compra.categoria_id = categoria_id or None
+            compra.centro_custo_id = centro_id or None
+            if caderno_id:
+                compra.caderno_id = caderno_id
+            compra.save(update_fields=["nome", "categoria", "centro_custo", "caderno"])
+            return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "add_item":
             nome = request.POST.get("nome", "").strip()
             valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
@@ -1298,18 +1321,56 @@ def financeiro_compra_detail(request, pk):
             item.pago = not item.pago
             item.save(update_fields=["pago"])
             return redirect("financeiro_compra_detail", pk=compra.pk)
+        if action == "update_item":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(CompraItem, pk=item_id, compra=compra)
+            nome = request.POST.get("nome", "").strip()
+            valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
+            quantidade_raw = request.POST.get("quantidade", "").strip()
+            tipo_id = request.POST.get("tipo")
+            pago = request.POST.get("pago") == "on"
+            try:
+                valor = Decimal(valor_raw)
+            except (InvalidOperation, ValueError):
+                valor = None
+            try:
+                quantidade = int(quantidade_raw) if quantidade_raw else item.quantidade
+            except ValueError:
+                quantidade = item.quantidade
+            quantidade = max(1, quantidade)
+            if nome:
+                item.nome = nome
+            item.valor = valor
+            item.quantidade = quantidade
+            item.tipo_id = tipo_id or None
+            item.pago = pago
+            item.save(update_fields=["nome", "valor", "quantidade", "tipo", "pago"])
+            return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "delete_item":
             item_id = request.POST.get("item_id")
             item = get_object_or_404(CompraItem, pk=item_id, compra=compra)
             item.delete()
             return redirect("financeiro_compra_detail", pk=compra.pk)
     compra.status_label = _compra_status_label(compra)
-    itens = compra.itens.select_related("tipo").order_by("id")
+    itens = list(compra.itens.select_related("tipo").order_by("id"))
+    for item in itens:
+        item.total_valor = (item.valor or 0) * (item.quantidade or 0)
+    compra.total_itens = sum(item.total_valor for item in itens)
     tipos = TipoCompra.objects.order_by("nome")
+    categorias = CategoriaCompra.objects.order_by("nome")
+    centros = CentroCusto.objects.order_by("nome")
+    cadernos = Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())).order_by("nome")
     return render(
         request,
         "core/financeiro_compra_detail.html",
-        {"compra": compra, "itens": itens, "tipos": tipos},
+        {
+            "compra": compra,
+            "itens": itens,
+            "tipos": tipos,
+            "categorias": categorias,
+            "centros": centros,
+            "cadernos": cadernos,
+        },
     )
 
 

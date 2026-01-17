@@ -134,7 +134,7 @@ class StatusCompraAdmin(admin.ModelAdmin):
 
 @admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
-    list_display = ("nome", "descricao", "caderno", "valor", "data", "status_label")
+    list_display = ("nome", "descricao", "caderno", "total_itens", "data", "status_label")
     list_filter = ("categoria",)
     search_fields = ("nome", "descricao", "caderno__nome")
 
@@ -144,3 +144,10 @@ class CompraAdmin(admin.ModelAdmin):
             return "Pago"
         return "Pendente"
     status_label.short_description = "Status"
+
+    def total_itens(self, obj):
+        total = 0
+        for item in obj.itens.all():
+            total += (item.valor or 0) * (item.quantidade or 0)
+        return total
+    total_itens.short_description = "Total"
