@@ -10,6 +10,7 @@ from .models import (
     CentroCusto,
     PerfilUsuario,
     PlantaIO,
+    FinanceiroID,
     Compra,
     Proposta,
     StatusCompra,
@@ -75,15 +76,17 @@ class PlantaIOAdmin(admin.ModelAdmin):
     search_fields = ("codigo",)
 
 
+@admin.register(FinanceiroID)
+class FinanceiroIDAdmin(admin.ModelAdmin):
+    list_display = ("codigo",)
+    search_fields = ("codigo",)
+
+
 @admin.register(Caderno)
 class CadernoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "clientes_display", "ativo")
-    search_fields = ("nome", "cliente__nome")
+    list_display = ("nome", "criador", "id_financeiro", "ativo", "criado_em")
+    search_fields = ("nome", "criador__nome", "id_financeiro__codigo")
     list_filter = ("ativo",)
-
-    def clientes_display(self, obj):
-        return ", ".join(obj.clientes.values_list("nome", flat=True))
-    clientes_display.short_description = "Clientes"
 
 
 @admin.register(CategoriaCompra)

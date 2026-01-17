@@ -32,6 +32,8 @@
         <input type="hidden" name="action" value="create_caderno">
         <label>Nome</label>
         <input type="text" name="nome" placeholder="Nome do caderno" required>
+        <label>ID_FINANCEIRO</label>
+        <input type="text" name="id_financeiro" placeholder="FIN-001">
         <button class="btn btn-primary" type="submit">Criar caderno</button>
       </form>
     </div>
@@ -47,6 +49,13 @@
                 <div>
                   <div class="proposal-title">{{ c.nome }}</div>
                   <div class="proposal-meta">Total: R$ {{ c.total|default:0 }}</div>
+                  {% if c.id_financeiro %}
+                    <div class="proposal-meta">ID_FINANCEIRO: {{ c.id_financeiro.codigo }}</div>
+                  {% endif %}
+                  {% if c.criador %}
+                    <div class="proposal-meta">Criado por: {{ c.criador.nome }}</div>
+                  {% endif %}
+                  <div class="proposal-meta">Criado em: {{ c.criado_em|date:"d/m/Y" }}</div>
                 </div>
                 <span class="badge">{{ c.ativo|yesno:"Ativo,Inativo" }}</span>
               </div>

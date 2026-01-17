@@ -13,6 +13,7 @@ class PerfilUsuario(models.Model):
     ativo = models.BooleanField(default=True)
     tipos = models.ManyToManyField("TipoPerfil", blank=True, related_name="clientes")
     plantas = models.ManyToManyField("PlantaIO", blank=True, related_name="usuarios")
+    financeiros = models.ManyToManyField("FinanceiroID", blank=True, related_name="usuarios")
 
     def __str__(self):
         return self.nome
@@ -27,8 +28,22 @@ class TipoPerfil(models.Model):
 
 class Caderno(models.Model):
     nome = models.CharField(max_length=80)
-    clientes = models.ManyToManyField("PerfilUsuario", related_name="cadernos", blank=True)
+    criador = models.ForeignKey(
+        "PerfilUsuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cadernos_criados",
+    )
+    id_financeiro = models.ForeignKey(
+        "FinanceiroID",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cadernos",
+    )
     ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.nome
@@ -170,6 +185,16 @@ class PlantaIO(models.Model):
         return self.codigo
 
 
+class FinanceiroID(models.Model):
+    codigo = models.CharField(max_length=40, unique=True)
+
+    class Meta:
+        ordering = ["codigo"]
+
+    def __str__(self):
+        return self.codigo
+
+
 class ModuloIO(models.Model):
     cliente = models.ForeignKey(
         "PerfilUsuario",
@@ -245,6 +270,8 @@ class RackIO(models.Model):
 
     def __str__(self):
         return self.nome
+
+
 
 
 class RackSlotIO(models.Model):

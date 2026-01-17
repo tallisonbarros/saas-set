@@ -84,6 +84,15 @@
               value="{% if perfil %}{% for planta in perfil.plantas.all %}{{ planta.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
             >
           </label>
+          <label class="field">
+            <span>ID_FINANCEIRO (separados por virgula)</span>
+            <input
+              type="text"
+              name="financeiros"
+              placeholder="FIN-001, FIN-002"
+              value="{% if perfil %}{% for fin in perfil.financeiros.all %}{{ fin.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+            >
+          </label>
           <button class="btn btn-primary" type="submit">Salvar perfil</button>
         </form>
       </div>
