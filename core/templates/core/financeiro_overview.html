@@ -26,13 +26,6 @@
       </div>
     </div>
 
-    <div class="finance-summary">
-      <div class="summary-card">
-        <div class="summary-label">Total geral</div>
-        <div class="summary-value">R$ {{ total_geral }}</div>
-      </div>
-    </div>
-
     <div class="finance-card">
       <div class="panel-title">Cadernos</div>
       {% if cadernos %}
@@ -43,7 +36,7 @@
               <div class="proposal-head">
                 <div>
                   <div class="proposal-title">{{ c.nome }}</div>
-                  <div class="proposal-meta">Total: R$ {{ c.total|default:0 }}</div>
+                  <div class="proposal-meta">Total do mes: R$ {{ c.total_mes|default:0 }}</div>
                 </div>
                 <span class="badge">{{ c.ativo|yesno:"Ativo,Inativo" }}</span>
               </div>

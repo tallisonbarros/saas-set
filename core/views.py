@@ -370,6 +370,16 @@ def ios_rack_detail(request, pk):
         .select_related("tipo_base")
         .order_by("nome")
     )
+    available_qs = (
+        CanalRackIO.objects.filter(modulo__rack=rack)
+        .filter(Q(nome__isnull=True) | Q(nome__exact=""))
+        .values("tipo__nome")
+        .annotate(total=Count("id"))
+        .order_by("tipo__nome")
+    )
+    canais_disponiveis = [
+        {"tipo": row["tipo__nome"], "total": row["total"]} for row in available_qs
+    ]
     ocupados = rack.slots.filter(modulo__isnull=False).count()
     slots_livres = max(rack.slots_total - ocupados, 0)
     return render(
@@ -381,6 +391,7 @@ def ios_rack_detail(request, pk):
             "modules": modules,
             "ocupados": ocupados,
             "slots_livres": slots_livres,
+            "canais_disponiveis": canais_disponiveis,
             "message": message,
         },
     )
@@ -1099,11 +1110,22 @@ def financeiro_overview(request):
         F("compras__itens__valor") * F("compras__itens__quantidade"),
         output_field=DecimalField(max_digits=12, decimal_places=2),
     )
+    today = timezone.localdate()
+    start_date = date(today.year, today.month, 1)
+    if today.month == 12:
+        end_date = date(today.year + 1, 1, 1)
+    else:
+        end_date = date(today.year, today.month + 1, 1)
     item_expr = ExpressionWrapper(
         F("itens__valor") * F("itens__quantidade"),
         output_field=DecimalField(max_digits=12, decimal_places=2),
     )
-    cadernos = cadernos.annotate(total=Sum(total_expr)).order_by("nome")
+    cadernos = cadernos.annotate(
+        total_mes=Sum(
+            total_expr,
+            filter=Q(compras__data__gte=start_date, compras__data__lt=end_date),
+        )
+    ).order_by("nome")
     if cliente:
         compras_qs = Compra.objects.filter(
             Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())

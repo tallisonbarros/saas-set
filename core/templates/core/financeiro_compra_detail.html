@@ -17,11 +17,16 @@
   <section class="card stack">
     <div class="finance-header">
       <div>
-        <h1 style="margin: 0;">Compra</h1>
-        <p class="muted">{{ compra.nome|default:compra.descricao }}</p>
+        <div class="module-center-meta">Compra</div>
+        <h1 style="margin: 0;">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</h1>
+        <p class="muted">Detalhes da compra.</p>
       </div>
       <div class="finance-actions">
-        <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+        {% if compra.caderno %}
+          <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Caderno</a>
+        {% else %}
+          <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+        {% endif %}
       </div>
     </div>
 
