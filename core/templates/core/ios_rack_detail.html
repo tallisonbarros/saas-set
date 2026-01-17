@@ -71,6 +71,10 @@
         <div class="meta-label">ID_PLANTA</div>
         <div class="meta-value">{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% else %}-{% endif %}</div>
       </div>
+      <div>
+        <div class="meta-label">Criado por</div>
+        <div class="meta-value">{{ rack.cliente.nome }}</div>
+      </div>
     </div>
   </section>
 
