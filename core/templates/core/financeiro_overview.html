@@ -15,19 +15,27 @@
     </a>
   </div>
   <section class="card stack">
-    <div class="finance-header">
-      <div>
-        <h1 style="margin: 0;">Compras</h1>
-        <p class="muted">Resumo por caderno e ultimas compras.</p>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel financeiro</div>
+        <div class="hud-pill">Controle geral</div>
       </div>
-      <div class="finance-actions">
-        <a class="btn btn-primary" href="{% url 'financeiro_nova' %}">Nova compra</a>
-        <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Financeiro</div>
+          <h1 class="page-title">Controle financeiro</h1>
+          <p class="page-subtitle">Resumo por caderno e ultimas compras.</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-primary" href="{% url 'financeiro_nova' %}">Nova compra</a>
+          <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
+        </div>
       </div>
+      <div class="hud-meta">Visao tatico do mes e status dos cadernos.</div>
     </div>
 
     <div class="finance-card">
-      <div class="panel-title">Cadernos</div>
+      <div class="panel-title">Meus cadernos</div>
       {% if cadernos %}
         <div class="proposal-grid">
           {% for c in cadernos %}
@@ -37,9 +45,13 @@
                 <div>
                   <div class="proposal-title">{{ c.nome }}</div>
                   <div class="proposal-meta">Total do mes: R$ {{ c.total_mes|default:0 }}</div>
+                  <div class="proposal-meta">
+                    {% if c.id_financeiro %}ID_FINANCEIRO: {{ c.id_financeiro.codigo }}{% else %}Sem ID_FINANCEIRO{% endif %}
+                  </div>
                 </div>
                 <span class="badge">{{ c.ativo|yesno:"Ativo,Inativo" }}</span>
               </div>
+              <div class="proposal-meta">Criado em: {{ c.criado_em|date:"d/m/Y" }}</div>
             </div>
           {% endfor %}
         </div>

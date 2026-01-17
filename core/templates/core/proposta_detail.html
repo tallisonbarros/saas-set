@@ -15,22 +15,33 @@
     </a>
   </div>
   <section class="card stack">
-    <div>
-      <div class="proposal-head-row">
-        <a class="btn btn-outline" href="{% url 'propostas' %}">&lt; PROPOSTAS</a>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel da proposta</div>
+        <div class="hud-pill">Detalhe</div>
       </div>
-      <h1 style="margin: 6px 0 8px 0;">{{ proposta.nome }}</h1>
-      <div class="proposal-origin{% if proposta.criada_por_id == request.user.id %} sent{% else %} received{% endif %}">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-          {% if proposta.criada_por_id == request.user.id %}
-            <path d="M5 12h12m0 0-4-4m4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-          {% else %}
-            <path d="M12 5v12m0 0-4-4m4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-          {% endif %}
-        </svg>
-        {% if proposta.criada_por_id == request.user.id %}Enviada{% else %}Recebida{% endif %}
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Proposta</div>
+          <h1 class="page-title">{{ proposta.nome }}</h1>
+          <p class="page-subtitle">{{ proposta.descricao|linebreaksbr }}</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-outline" href="{% url 'propostas' %}">&lt; PROPOSTAS</a>
+        </div>
       </div>
-      <div class="muted">{{ proposta.descricao|linebreaksbr }}</div>
+      <div class="hud-meta">
+        <span class="proposal-origin{% if proposta.criada_por_id == request.user.id %} sent{% else %} received{% endif %}">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            {% if proposta.criada_por_id == request.user.id %}
+              <path d="M5 12h12m0 0-4-4m4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            {% else %}
+              <path d="M12 5v12m0 0-4-4m4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            {% endif %}
+          </svg>
+          {% if proposta.criada_por_id == request.user.id %}Enviada{% else %}Recebida{% endif %}
+        </span>
+      </div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>

@@ -18,8 +18,18 @@
   </div>
   <div class="page-center">
     <div class="card" style="max-width: 380px; width: 100%;">
-      <div class="stack centered" style="text-align: center;">
-        <h1 style="margin: 0; font-size: 18px;">Login do Cliente</h1>
+      <div class="page-hud">
+        <div class="hud-top">
+          <div class="hud-title">Painel de acesso</div>
+          <div class="hud-pill">Login</div>
+        </div>
+        <div class="page-hud-head">
+          <div>
+            <div class="page-kicker">Conta</div>
+            <h1 class="page-title" style="font-size: 20px;">Login do cliente</h1>
+            <p class="page-subtitle">Use seu email e senha.</p>
+          </div>
+        </div>
       </div>
       {% if form.errors %}
         <p class="muted">Usuario ou senha invalidos.</p>

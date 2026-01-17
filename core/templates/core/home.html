@@ -17,13 +17,24 @@
     </a>
   </div>
   <section class="card hero">
-    <div class="slogan">Indústria e tecnologia.</div>
-    <div>
-      <h1 class="hero-title">Aprove propostas em minutos</h1>
-      <p class="hero-subtitle">Centralize propostas e aprovacoes com um fluxo simples.</p>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel de inicio</div>
+        <div class="hud-pill">Bem-vindo</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Inicio</div>
+          <h1 class="page-title">Aprove propostas em minutos</h1>
+          <p class="page-subtitle">Centralize propostas e aprovacoes com um fluxo simples.</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-primary" href="{% url 'login' %}">Entrar</a>
+        </div>
+      </div>
+      <div class="hud-meta">Industria e tecnologia.</div>
     </div>
     <div class="actions">
-      <a class="btn btn-primary" href="{% url 'login' %}">Entrar</a>
       <div class="icon-row">
         {% if request.user.is_staff %}
           <a class="icon-btn" href="/admin/" title="Admin" aria-label="Admin">
@@ -45,8 +56,8 @@
     </div>
     <div class="steps">
       <div class="step-card">
-        <div class="step-title">1. Faça seu login</div>
-        <p class="muted">Utilize o Email e senha encaminhado.</p>
+        <div class="step-title">1. Faca seu login</div>
+        <p class="muted">Utilize o email e senha encaminhado.</p>
       </div>
       <div class="step-card">
         <div class="step-title">2. Monitore as propostas</div>

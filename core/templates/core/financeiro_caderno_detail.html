@@ -15,22 +15,21 @@
     </a>
   </div>
   <section class="card stack">
-    <div class="finance-header">
-      <div>
-        <div class="module-center-meta">Caderno</div>
-        <h1 style="margin: 0;">{{ caderno.nome }}</h1>
-        <p class="muted">Visao mensal do caderno com foco em fluxo e status.</p>
-      </div>
-      <div class="finance-actions">
-        <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Voltar</a>
-        <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
-      </div>
-    </div>
-
-    <div class="finance-hud">
+    <div class="page-hud">
       <div class="hud-top">
-        <div class="hud-title">HUD Mensal</div>
+        <div class="hud-title">Painel mensal</div>
         <div class="hud-pill">Mes: {{ mes_referencia|date:"F Y" }}</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Caderno</div>
+          <h1 class="page-title">{{ caderno.nome }}</h1>
+          <p class="page-subtitle">Visao mensal do caderno com foco em fluxo e status.</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
+          <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
+        </div>
       </div>
       <div class="hud-meta">Modo acompanhamento de contas e ritmo de pagamentos.</div>
     </div>

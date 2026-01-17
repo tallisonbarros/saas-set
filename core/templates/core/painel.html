@@ -14,11 +14,26 @@
       </svg>
     </a>
   </div>
-  <section class="card hero">
-    <div>
-      <h1 class="hero-title">Painel</h1>
-      <p class="hero-subtitle">Bem vindo {{ request.user.username }}</p>
-      <p class="muted">Escolha para onde deseja ir.</p>
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel principal</div>
+        <div class="hud-pill">Navegacao</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Painel</div>
+          <h1 class="page-title">Bem vindo {{ request.user.username }}</h1>
+          <p class="page-subtitle">Escolha para onde deseja ir.</p>
+        </div>
+        <div class="page-actions">
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="btn btn-ghost" type="submit">Sair</button>
+          </form>
+        </div>
+      </div>
+      <div class="hud-meta">Modulos disponiveis para seu perfil.</div>
     </div>
     <div class="panel-grid">
       {% if is_cliente or role == "ADMIN" %}
@@ -68,9 +83,5 @@
         </a>
       {% endif %}
     </div>
-    <form method="post" action="{% url 'logout' %}">
-      {% csrf_token %}
-      <button class="btn btn-ghost" type="submit">Sair</button>
-    </form>
   </section>
 {% endblock %}

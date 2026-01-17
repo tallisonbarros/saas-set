@@ -14,18 +14,23 @@
       </svg>
     </a>
   </div>
-  <section class="card ios-hero io-compact">
-    <div class="ios-hero-head io-center">
-      <div>
-        <h1 class="hero-title">Lista de IOs</h1>
-        <div class="rack-name-highlight">{{ rack.nome }}</div>
-        {% if rack.descricao %}
-          <p class="rack-desc-highlight">{{ rack.descricao }}</p>
-        {% endif %}
-        <div class="module-actions-centered">
+  <section class="card io-compact">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel de I/O</div>
+        <div class="hud-pill">Lista completa</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Rack</div>
+          <h1 class="page-title">Lista de IOs</h1>
+          <p class="page-subtitle">{{ rack.nome }}{% if rack.descricao %} • {{ rack.descricao }}{% endif %}</p>
+        </div>
+        <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Voltar ao rack</a>
         </div>
       </div>
+      <div class="hud-meta">Visualizacao concentrada por slot, modulo e canal.</div>
     </div>
   </section>
 

@@ -15,6 +15,25 @@
     </a>
   </div>
   <section class="card stack">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel de propostas</div>
+        <div class="hud-pill">Portfolio</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Propostas</div>
+          <h1 class="page-title">Visao geral</h1>
+          <p class="page-subtitle">Envios, recebimentos e status por cliente.</p>
+        </div>
+        <div class="page-actions">
+          {% if is_vendedor %}
+            <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="hud-meta">Cliente ativo: {{ cliente.nome }}</div>
+    </div>
     <div class="client-meta">
       <div>
         <div><strong>{{ cliente.nome }}</strong></div>
@@ -27,15 +46,6 @@
       {% if not cliente %}
         <p>Usuario sem cliente associado. Fale com o administrador.</p>
       {% else %}
-        {% if is_vendedor %}
-          <div class="proposal-toolbar">
-            <div>
-              <div class="panel-title">Criar proposta</div>
-              <div class="muted">Voce pode criar novas propostas diretamente daqui.</div>
-            </div>
-            <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
-          </div>
-        {% endif %}
         <div class="proposal-summary">
           <div class="panel-title">Propostas enviadas e recebidas</div>
           <div class="muted">Os cards abaixo mostram se a proposta foi enviada ou recebida.</div>

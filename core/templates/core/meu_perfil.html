@@ -14,14 +14,23 @@
       </svg>
     </a>
   </div>
-  <div class="page-actions">
-    <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-  </div>
-
   <section class="card stack">
-    <div>
-      <h1 style="margin: 0;">Meu Perfil</h1>
-      <p class="muted">Atualize seus dados pessoais e ID_PLANTA.</p>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel de perfil</div>
+        <div class="hud-pill">Conta</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Usuario</div>
+          <h1 class="page-title">Meu perfil</h1>
+          <p class="page-subtitle">Atualize seus dados pessoais e IDs.</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+        </div>
+      </div>
+      <div class="hud-meta">Dados de contato, plantas e financeiros.</div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>

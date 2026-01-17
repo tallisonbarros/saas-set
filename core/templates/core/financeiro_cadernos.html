@@ -15,14 +15,22 @@
     </a>
   </div>
   <section class="card stack">
-    <div class="finance-header">
-      <div>
-        <h1 style="margin: 0;">Cadernos</h1>
-        <p class="muted">Crie e gerencie cadernos de compras.</p>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel de cadernos</div>
+        <div class="hud-pill">Gestao</div>
       </div>
-      <div class="finance-actions">
-        <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Financeiro</div>
+          <h1 class="page-title">Cadernos</h1>
+          <p class="page-subtitle">Crie e gerencie cadernos de compras.</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+        </div>
       </div>
+      <div class="hud-meta">Controle de IDs e status dos cadernos.</div>
     </div>
 
     <div class="finance-card">

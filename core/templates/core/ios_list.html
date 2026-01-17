@@ -14,10 +14,26 @@
       </svg>
     </a>
   </div>
-  <section class="card hero ios-hero">
-    <div>
-      <h1 class="hero-title">Listas de IOs</h1>
-      <p class="hero-subtitle">Organize racks, crie modulos e nomeie cada canal.</p>
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel de I/O</div>
+        <div class="hud-pill">Racks</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">I/O</div>
+          <h1 class="page-title">Listas de IOs</h1>
+          <p class="page-subtitle">Organize racks, crie modulos e nomeie cada canal.</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-outline" href="{% url 'ios_modulos' %}">Catalogo de modulos</a>
+          {% if can_manage %}
+            <a class="btn btn-ghost" href="#novo-rack">Novo rack</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="hud-meta">Pesquisa rapida por racks, modulos e canais.</div>
     </div>
   </section>
 
@@ -164,11 +180,5 @@
         {% endif %}
       {% endif %}
     </section>
-    <div class="io-actions">
-      <a class="btn btn-outline" href="{% url 'ios_modulos' %}">Catalogo de modulos</a>
-      {% if can_manage %}
-        <a class="btn btn-ghost" href="#novo-rack">Novo rack</a>
-      {% endif %}
-    </div>
   </div>
 {% endblock %}

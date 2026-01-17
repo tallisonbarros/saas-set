@@ -14,49 +14,55 @@
       </svg>
     </a>
   </div>
-  <section class="card ios-hero io-compact">
-    <div class="ios-hero-head io-center">
-      <div>
-        <div class="module-top-actions">
+  <section class="card io-compact">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel do modulo</div>
+        <div class="hud-pill">Rack</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Modulo</div>
+          <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
+          <p class="page-subtitle">{{ rack.nome }}</p>
+        </div>
+        <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
           <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
         </div>
-        <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
-        <form class="module-rename-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_module_name">
-          <input type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
-          <button class="btn btn-ghost icon-only" type="submit" title="Salvar nome" aria-label="Salvar nome">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 5h10l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
-              <path d="M8 5v6h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-              <path d="M8 19v-6h8v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-            </svg>
-          </button>
-        </form>
-        <p class="module-center-meta">Rack</p>
-        <div class="rack-slot-title">{{ rack.nome }}</div>
-        <div class="rack-slot-nav">
-          {% if prev_slot %}
-            <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}" aria-label="Slot anterior">&lt;</a>
+      </div>
+      <div class="hud-meta">
+        {% if rack.descricao %}{{ rack.descricao }}{% else %}Slots e canais do modulo no rack.{% endif %}
+      </div>
+      <form class="module-rename-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_module_name">
+        <input type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
+        <button class="btn btn-ghost icon-only" type="submit" title="Salvar nome" aria-label="Salvar nome">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5h10l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+            <path d="M8 5v6h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+            <path d="M8 19v-6h8v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </form>
+      <div class="rack-slot-nav">
+        {% if prev_slot %}
+          <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}" aria-label="Slot anterior">&lt;</a>
+        {% else %}
+          <span class="rack-slot-arrow disabled">&lt;</span>
+        {% endif %}
+        <span class="rack-slot-label">
+          {% if slot %}
+            SLOT{{ slot.posicao|stringformat:"02d" }}
           {% else %}
-            <span class="rack-slot-arrow disabled">&lt;</span>
+            SLOT--
           {% endif %}
-          <span class="rack-slot-label">
-            {% if slot %}
-              SLOT{{ slot.posicao|stringformat:"02d" }}
-            {% else %}
-              SLOT--
-            {% endif %}
-          </span>
-          {% if next_slot %}
-            <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}" aria-label="Proximo slot">&gt;</a>
-          {% else %}
-            <span class="rack-slot-arrow disabled">&gt;</span>
-          {% endif %}
-        </div>
-        {% if rack.descricao %}
-          <p class="module-center-desc">{{ rack.descricao }}</p>
+        </span>
+        {% if next_slot %}
+          <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}" aria-label="Proximo slot">&gt;</a>
+        {% else %}
+          <span class="rack-slot-arrow disabled">&gt;</span>
         {% endif %}
       </div>
     </div>

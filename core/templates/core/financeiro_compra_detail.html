@@ -15,19 +15,26 @@
     </a>
   </div>
   <section class="card stack">
-    <div class="finance-header">
-      <div>
-        <div class="module-center-meta">Compra</div>
-        <h1 style="margin: 0;">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</h1>
-        <p class="muted">Detalhes da compra.</p>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel da compra</div>
+        <div class="hud-pill">Detalhe</div>
       </div>
-      <div class="finance-actions">
-        {% if compra.caderno %}
-          <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Caderno</a>
-        {% else %}
-          <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
-        {% endif %}
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Compra</div>
+          <h1 class="page-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</h1>
+          <p class="page-subtitle">Detalhes da compra.</p>
+        </div>
+        <div class="page-actions">
+          {% if compra.caderno %}
+            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Caderno</a>
+          {% else %}
+            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+          {% endif %}
+        </div>
       </div>
+      <div class="hud-meta">Itens, status e classificacao da compra.</div>
     </div>
 
     <div class="stack">

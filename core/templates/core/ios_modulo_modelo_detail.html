@@ -14,15 +14,23 @@
       </svg>
     </a>
   </div>
-  <section class="card ios-hero">
-    <div class="ios-hero-head">
-      <div>
-        <h1 class="hero-title">{{ module.nome }}</h1>
-        <p class="hero-subtitle">{{ module.marca }} - {{ module.modelo }}</p>
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel do modulo</div>
+        <div class="hud-pill">Modelo</div>
       </div>
-      <div class="hero-links">
-        <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Voltar</a>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Catalogo</div>
+          <h1 class="page-title">{{ module.nome }}</h1>
+          <p class="page-subtitle">{{ module.marca }} - {{ module.modelo }}</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Voltar</a>
+        </div>
       </div>
+      <div class="hud-meta">Atualizacoes afetam novos usos do modulo no rack.</div>
     </div>
     <div class="rack-status">
       <div>
@@ -78,7 +86,6 @@
       </label>
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Salvar ajustes</button>
-        <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Cancelar</a>
       </div>
     </form>
     <form method="post" class="form-actions">

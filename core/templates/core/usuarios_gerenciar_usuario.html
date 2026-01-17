@@ -14,14 +14,23 @@
       </svg>
     </a>
   </div>
-  <div class="page-actions">
-    <a class="btn btn-ghost" href="{% url 'usuarios' %}">Voltar para usuarios</a>
-  </div>
-
   <section class="card stack">
-    <div>
-      <h1 style="margin: 0;">Gerenciar usuario</h1>
-      <p class="muted">ID: {{ user_item.id }} | Email: {{ user_item.username }}</p>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Painel do usuario</div>
+        <div class="hud-pill">Detalhe</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Administracao</div>
+          <h1 class="page-title">Gerenciar usuario</h1>
+          <p class="page-subtitle">ID: {{ user_item.id }} | Email: {{ user_item.username }}</p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-ghost" href="{% url 'usuarios' %}">Voltar para usuarios</a>
+        </div>
+      </div>
+      <div class="hud-meta">Dados da conta e perfil do usuario.</div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
