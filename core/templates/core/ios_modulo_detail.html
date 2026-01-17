@@ -41,14 +41,24 @@
     </div>
     <div class="rack-status module-header-grid">
       <div>
-        <div class="meta-label">Rack</div>
-        <div class="meta-value">{{ rack.nome }}</div>
-        <div class="meta-label">Slot</div>
-        <div class="meta-value">
-          {% if slot %}
-            Slot{{ slot.posicao|stringformat:"02d" }}
+        <div class="rack-slot-title">{{ rack.nome }}</div>
+        <div class="rack-slot-nav">
+          {% if prev_slot %}
+            <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}" aria-label="Slot anterior">&lt;</a>
           {% else %}
-            Slot--
+            <span class="rack-slot-arrow disabled">&lt;</span>
+          {% endif %}
+          <span class="rack-slot-label">
+            {% if slot %}
+              SLOT{{ slot.posicao|stringformat:"02d" }}
+            {% else %}
+              SLOT--
+            {% endif %}
+          </span>
+          {% if next_slot %}
+            <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}" aria-label="Proximo slot">&gt;</a>
+          {% else %}
+            <span class="rack-slot-arrow disabled">&gt;</span>
           {% endif %}
         </div>
       </div>

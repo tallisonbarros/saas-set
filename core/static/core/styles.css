@@ -1094,6 +1094,50 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.rack-slot-title {
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.rack-slot-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff6ef;
+}
+
+.rack-slot-label {
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.rack-slot-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 700;
+  background: #fff;
+}
+
+.rack-slot-arrow:hover {
+  background: #fff1e7;
+}
+
+.rack-slot-arrow.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 .rack-layout {
   display: grid;
   gap: 12px;
