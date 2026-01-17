@@ -1069,12 +1069,16 @@ def financeiro_overview(request):
         F("compras__itens__valor") * F("compras__itens__quantidade"),
         output_field=DecimalField(max_digits=12, decimal_places=2),
     )
+    item_expr = ExpressionWrapper(
+        F("itens__valor") * F("itens__quantidade"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
     cadernos = cadernos.annotate(total=Sum(total_expr)).order_by("nome")
     if cliente:
         compras_qs = Compra.objects.filter(
             Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())
         )
-        total_geral = compras_qs.aggregate(total=Sum(total_expr)).get("total")
+        total_geral = compras_qs.aggregate(total=Sum(item_expr)).get("total")
         ultimas_compras = compras_qs.prefetch_related("itens").order_by("-data")[:6]
     else:
         total_geral = None
