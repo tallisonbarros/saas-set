@@ -246,6 +246,43 @@ def ios_rack_detail(request, pk):
                 slot.modulo = modulo
                 slot.save(update_fields=["modulo"])
             return redirect("ios_rack_detail", pk=rack.pk)
+        if action == "assign_modules":
+            if not request.user.is_staff and rack.cliente != cliente:
+                return HttpResponseForbidden("Sem permissao.")
+            modules_qs = ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True))
+            for key, value in request.POST.items():
+                if not key.startswith("slot_"):
+                    continue
+                if not value:
+                    continue
+                try:
+                    slot_id = int(key.split("_", 1)[1])
+                except (TypeError, ValueError):
+                    continue
+                slot = RackSlotIO.objects.filter(pk=slot_id, rack=rack, modulo__isnull=True).first()
+                if not slot:
+                    continue
+                module_modelo = modules_qs.filter(pk=value).first()
+                if not module_modelo:
+                    continue
+                modulo = ModuloRackIO.objects.create(
+                    rack=rack,
+                    modulo_modelo=module_modelo,
+                    nome=module_modelo.nome,
+                )
+                canais = [
+                    CanalRackIO(
+                        modulo=modulo,
+                        indice=index,
+                        nome=f"Canal {index:02d}",
+                        tipo=module_modelo.tipo_base,
+                    )
+                    for index in range(1, module_modelo.quantidade_canais + 1)
+                ]
+                CanalRackIO.objects.bulk_create(canais)
+                slot.modulo = modulo
+                slot.save(update_fields=["modulo"])
+            return redirect("ios_rack_detail", pk=rack.pk)
         if action == "remove_from_slot":
             slot_id = request.POST.get("slot_id")
             slot = get_object_or_404(RackSlotIO, pk=slot_id, rack=rack)

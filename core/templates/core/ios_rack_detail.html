@@ -73,53 +73,56 @@
         <p class="muted">Clique em um slot livre para escolher o modulo.</p>
       </div>
     </div>
-    <div class="proposal-grid rack-grid">
-      {% for slot in slots %}
-        <article class="proposal-card slot-card {% if slot.modulo %}slot-filled{% else %}slot-empty{% endif %}">
-          {% if slot.modulo %}
-            <a class="proposal-link" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}" aria-label="Editar canais"></a>
-          {% endif %}
-          <div class="proposal-head">
-            <div>
-              <div class="proposal-title">Slot{{ slot.posicao|stringformat:"02d" }}</div>
-              {% if slot.modulo %}
-                {% if slot.modulo.nome %}
-                  <div class="proposal-meta">{{ slot.modulo.nome }}</div>
-                  <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="assign_modules">
+      <div class="proposal-grid rack-grid">
+        {% for slot in slots %}
+          <article class="proposal-card slot-card {% if slot.modulo %}slot-filled{% else %}slot-empty{% endif %}">
+            {% if slot.modulo %}
+              <a class="proposal-link" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}" aria-label="Editar canais"></a>
+            {% endif %}
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">Slot{{ slot.posicao|stringformat:"02d" }}</div>
+                {% if slot.modulo %}
+                  {% if slot.modulo.nome %}
+                    <div class="proposal-meta">{{ slot.modulo.nome }}</div>
+                    <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
+                  {% else %}
+                    <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
+                  {% endif %}
                 {% else %}
-                  <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
+                  <div class="proposal-meta">Slot livre</div>
                 {% endif %}
-              {% else %}
-                <div class="proposal-meta">Slot livre</div>
+              </div>
+              {% if slot.modulo %}
+                <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
               {% endif %}
             </div>
             {% if slot.modulo %}
-              <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
+              <div class="proposal-meta">{{ slot.modulo.modulo_modelo.marca }} - {{ slot.modulo.modulo_modelo.modelo }}</div>
+              <div class="slot-actions">
+                <span class="slot-hint">...</span>
+              </div>
+            {% else %}
+              <div class="proposal-meta">Escolha um modulo para este slot.</div>
+              <div class="slot-form">
+                <select name="slot_{{ slot.id }}">
+                  <option value="">Selecione um modulo</option>
+                  {% for module in modules %}
+                    <option value="{{ module.id }}">{{ module.nome }} ({{ module.tipo_base.nome }})</option>
+                  {% endfor %}
+                </select>
+              </div>
             {% endif %}
-          </div>
-          {% if slot.modulo %}
-            <div class="proposal-meta">{{ slot.modulo.modulo_modelo.marca }} - {{ slot.modulo.modulo_modelo.modelo }}</div>
-            <div class="slot-actions">
-              <span class="slot-hint">...</span>
-            </div>
-          {% else %}
-            <div class="proposal-meta">Escolha um modulo para este slot.</div>
-            <form class="slot-form" method="post">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="add_to_slot">
-              <input type="hidden" name="slot_id" value="{{ slot.id }}">
-              <select name="module_id" required>
-                <option value="">Selecione um modulo</option>
-                {% for module in modules %}
-                  <option value="{{ module.id }}">{{ module.nome }} ({{ module.tipo_base.nome }})</option>
-                {% endfor %}
-              </select>
-              <button class="btn btn-primary" type="submit">Adicionar</button>
-            </form>
-          {% endif %}
-        </article>
-      {% endfor %}
-    </div>
+          </article>
+        {% endfor %}
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Salvar</button>
+      </div>
+    </form>
   </section>
 
 {% endblock %}
