@@ -37,6 +37,8 @@ class Migration(migrations.Migration):
         ("core", "0023_financeiro_id"),
     ]
 
+    atomic = False
+
     operations = [
         migrations.AddField(
             model_name="caderno",
