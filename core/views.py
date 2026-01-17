@@ -191,6 +191,7 @@ def ios_rack_detail(request, pk):
         )
     else:
         rack = get_object_or_404(RackIO, pk=pk)
+    message = None
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_rack":

@@ -51,6 +51,26 @@ body {
   border-radius: 999px;
   background: #fff6ef;
   border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  text-decoration: none;
+  background: #fff;
+}
+
+.profile-icon-btn:hover {
+  background: #fff1e7;
 }
 
 .logo {

@@ -21,10 +21,6 @@
       <p class="muted">Escolha para onde deseja ir.</p>
     </div>
     <div class="panel-grid">
-      <a class="panel-card" href="{% url 'meu_perfil' %}">
-        <div class="panel-title">Meu Perfil</div>
-        <div class="muted">Atualize seus dados e IDs de planta.</div>
-      </a>
       {% if is_cliente or role == "ADMIN" %}
         <a class="panel-card" href="{% url 'propostas' %}">
           <div class="panel-title">Propostas</div>
