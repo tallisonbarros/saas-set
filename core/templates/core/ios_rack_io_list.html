@@ -17,10 +17,10 @@
   <section class="card ios-hero io-compact">
     <div class="ios-hero-head io-center">
       <div>
-        <h1 class="hero-title">IOs do rack</h1>
-        <p class="hero-subtitle">{{ rack.nome }}</p>
+        <h1 class="hero-title">Lista de IOs</h1>
+        <div class="rack-name-highlight">{{ rack.nome }}</div>
         {% if rack.descricao %}
-          <p class="muted">{{ rack.descricao }}</p>
+          <p class="rack-desc-highlight">{{ rack.descricao }}</p>
         {% endif %}
         <div class="module-actions-centered">
           <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Voltar ao rack</a>
