@@ -198,6 +198,13 @@ def ios_rack_detail(request, pk):
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             id_planta_raw = request.POST.get("id_planta", "").strip()
+            slots_raw = request.POST.get("slots_total", "").strip()
+            try:
+                slots_total = int(slots_raw)
+            except (TypeError, ValueError):
+                slots_total = None
+            if slots_total is not None:
+                slots_total = max(1, min(60, slots_total))
             if nome:
                 rack.nome = nome
             rack.descricao = descricao
@@ -206,7 +213,20 @@ def ios_rack_detail(request, pk):
                 rack.id_planta = planta
             else:
                 rack.id_planta = None
-            rack.save(update_fields=["nome", "descricao", "id_planta"])
+            if slots_total is not None and slots_total != rack.slots_total:
+                if slots_total > rack.slots_total:
+                    novos = [
+                        RackSlotIO(rack=rack, posicao=index)
+                        for index in range(rack.slots_total + 1, slots_total + 1)
+                    ]
+                    RackSlotIO.objects.bulk_create(novos)
+                else:
+                    slots_para_remover = rack.slots.filter(posicao__gt=slots_total).order_by("posicao")
+                    if slots_para_remover.filter(modulo__isnull=False).exists():
+                        return redirect("ios_rack_detail", pk=rack.pk)
+                    slots_para_remover.delete()
+                rack.slots_total = slots_total
+            rack.save(update_fields=["nome", "descricao", "id_planta", "slots_total"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "delete_rack":
             if not request.user.is_staff and rack.cliente != cliente:
