@@ -43,6 +43,7 @@
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
         <a href="{% url 'propostas' %}?status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>
+        <a href="{% url 'propostas' %}?status=levantamento" class="filter-pill {% if status_filter == 'levantamento' %}active{% endif %}">Levantamento</a>
         <a href="{% url 'propostas' %}?status=aprovada" class="filter-pill {% if status_filter == 'aprovada' %}active{% endif %}">Aprovadas</a>
         <a href="{% url 'propostas' %}?status=reprovada" class="filter-pill {% if status_filter == 'reprovada' %}active{% endif %}">Reprovadas</a>
         <a href="{% url 'propostas' %}?status=finalizada" class="filter-pill {% if status_filter == 'finalizada' %}active{% endif %}">Finalizadas</a>
@@ -86,7 +87,7 @@
                 {% endif %}
               </div>
               <div class="proposal-actions">
-                {% if proposta.aprovada == None and proposta.cliente.usuario_id == request.user.id %}
+                {% if proposta.aprovada == None and proposta.valor != 0 and proposta.cliente.usuario_id == request.user.id %}
                   <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
                     {% csrf_token %}
                     <button class="btn btn-primary" type="submit">Aprovar</button>

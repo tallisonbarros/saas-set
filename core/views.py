@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import logout
@@ -614,7 +614,9 @@ def proposta_list(request):
         propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
     status = request.GET.get("status")
     if status == "pendente":
-        propostas = propostas.filter(aprovada__isnull=True)
+        propostas = propostas.filter(aprovada__isnull=True).exclude(valor=0)
+    elif status == "levantamento":
+        propostas = propostas.filter(aprovada__isnull=True, valor=0)
     elif status == "aprovada":
         propostas = propostas.filter(aprovada=True)
     elif status == "reprovada":
@@ -625,15 +627,19 @@ def proposta_list(request):
         propostas = propostas.exclude(aprovada=False).exclude(finalizada=True)
     propostas = propostas.annotate(
         status_order=Case(
-            When(finalizada=True, then=Value(4)),
-            When(aprovada=True, then=Value(2)),
-            When(aprovada=False, then=Value(3)),
-            default=Value(1),
+            When(finalizada=True, then=Value(6)),
+            When(andamento="EXECUTANDO", then=Value(4)),
+            When(aprovada=True, then=Value(3)),
+            When(aprovada=False, then=Value(5)),
+            When(aprovada__isnull=True, valor=0, then=Value(1)),
+            default=Value(2),
             output_field=IntegerField(),
         )
     ).order_by("status_order", "-criado_em")
     propostas = propostas.annotate(
         status_label=Case(
+            When(andamento="EXECUTANDO", then=Value("Executando")),
+            When(aprovada__isnull=True, valor=0, then=Value("Levantamento")),
             When(aprovada=True, then=Value("Aprovada")),
             When(aprovada=False, then=Value("Reprovada")),
             default=Value("Pendente"),
@@ -691,6 +697,15 @@ def proposta_detail(request, pk):
                 proposta.finalizada = True
                 proposta.save(update_fields=["finalizada"])
                 return redirect("proposta_detail", pk=proposta.pk)
+        if action == "set_executando":
+            if proposta.criada_por_id != request.user.id:
+                return HttpResponseForbidden("Sem permissao.")
+            if proposta.aprovada is not True:
+                message = "Somente propostas aprovadas podem ir para Executando."
+            else:
+                proposta.andamento = "EXECUTANDO"
+                proposta.save(update_fields=["andamento"])
+                return redirect("proposta_detail", pk=proposta.pk)
         if action == "delete_proposta":
             if proposta.criada_por_id != request.user.id:
                 return HttpResponseForbidden("Sem permissao.")
@@ -699,6 +714,18 @@ def proposta_detail(request, pk):
             else:
                 proposta.delete()
                 return redirect("propostas")
+    if proposta.finalizada:
+        status_label = "Finalizada"
+    elif proposta.andamento == "EXECUTANDO":
+        status_label = "Executando"
+    elif proposta.aprovada is True:
+        status_label = "Aprovada"
+    elif proposta.aprovada is False:
+        status_label = "Reprovada"
+    elif proposta.valor == 0:
+        status_label = "Levantamento"
+    else:
+        status_label = "Pendente"
     return render(
         request,
         "core/proposta_detail.html",
@@ -707,6 +734,7 @@ def proposta_detail(request, pk):
             "proposta": proposta,
             "is_contratante": _has_tipo(request.user, "Contratante"),
             "message": message,
+            "status_label": status_label,
         },
     )
 
@@ -776,6 +804,8 @@ def aprovar_proposta(request, pk):
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
         return HttpResponseForbidden("Somente o destinatario pode aprovar.")
+    if proposta.valor == 0:
+        return HttpResponseForbidden("Proposta em levantamento.")
     if proposta.aprovada is None:
         proposta.aprovada = True
         proposta.decidido_em = timezone.now()
@@ -1244,16 +1274,142 @@ def financeiro_caderno_detail(request, pk):
         Q(pk=pk),
         Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()),
     )
-    compras = Compra.objects.filter(caderno=caderno).prefetch_related("itens").order_by("-data")
-    for compra in compras:
+    today = timezone.localdate()
+    selected_month = request.GET.get("mes", "").strip()
+    if selected_month:
+        try:
+            selected_dt = datetime.strptime(selected_month, "%Y-%m")
+        except ValueError:
+            selected_dt = datetime(today.year, today.month, 1)
+            selected_month = selected_dt.strftime("%Y-%m")
+    else:
+        selected_dt = datetime(today.year, today.month, 1)
+        selected_month = selected_dt.strftime("%Y-%m")
+    start_date = date(selected_dt.year, selected_dt.month, 1)
+    if selected_dt.month == 12:
+        end_date = date(selected_dt.year + 1, 1, 1)
+    else:
+        end_date = date(selected_dt.year, selected_dt.month + 1, 1)
+
+    status_filter = request.GET.get("status", "").strip().lower()
+    categoria_filter = request.GET.get("categoria", "").strip()
+    centro_filter = request.GET.get("centro", "").strip()
+
+    compras_base_qs = (
+        Compra.objects.filter(caderno=caderno)
+        .select_related("categoria", "centro_custo")
+        .prefetch_related("itens")
+        .order_by("-data", "-id")
+    )
+    if categoria_filter:
+        compras_base_qs = compras_base_qs.filter(categoria_id=categoria_filter)
+    if centro_filter:
+        compras_base_qs = compras_base_qs.filter(centro_custo_id=centro_filter)
+
+    compras_qs = compras_base_qs.filter(data__gte=start_date, data__lt=end_date)
+    compras_sem_data_qs = compras_base_qs.filter(data__isnull=True)
+
+    compras = []
+    compras_sem_data = []
+    total_mes = Decimal(0)
+    total_pago = Decimal(0)
+    total_pendente = Decimal(0)
+    total_compras = 0
+    total_pagas = 0
+    total_pendentes = 0
+
+    for compra in compras_qs:
+        itens = list(compra.itens.all())
         compra.status_label = _compra_status_label(compra)
         compra.total_itens = sum(
-            (item.valor or 0) * (item.quantidade or 0) for item in compra.itens.all()
+            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens
         )
+        compra.total_pago = sum(
+            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens if item.pago
+        )
+        compra.total_pendente = compra.total_itens - compra.total_pago
+        compra.itens_count = len(itens)
+        if status_filter == "pago" and compra.status_label.lower() != "pago":
+            continue
+        if status_filter == "pendente" and compra.status_label.lower() != "pendente":
+            continue
+        compras.append(compra)
+        total_mes += compra.total_itens
+        total_pago += compra.total_pago
+        total_pendente += compra.total_pendente
+        total_compras += 1
+        if compra.status_label.lower() == "pago":
+            total_pagas += 1
+        else:
+            total_pendentes += 1
+    ticket_medio = total_mes / total_compras if total_compras else Decimal(0)
+
+    for compra in compras_sem_data_qs:
+        itens = list(compra.itens.all())
+        compra.status_label = _compra_status_label(compra)
+        if status_filter == "pago" and compra.status_label.lower() != "pago":
+            continue
+        if status_filter == "pendente" and compra.status_label.lower() != "pendente":
+            continue
+        compra.total_itens = sum(
+            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens
+        )
+        compra.total_pago = sum(
+            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens if item.pago
+        )
+        compra.total_pendente = compra.total_itens - compra.total_pago
+        compra.itens_count = len(itens)
+        compras_sem_data.append(compra)
+
+    categorias = CategoriaCompra.objects.order_by("nome")
+    centros = CentroCusto.objects.order_by("nome")
+    search_query = request.GET.get("q", "").strip()
+    if search_query:
+        compras = [
+            compra
+            for compra in compras
+            if search_query.lower()
+            in (
+                (compra.nome or compra.descricao or "")
+                .strip()
+                .lower()
+            )
+        ]
+        compras_sem_data = [
+            compra
+            for compra in compras_sem_data
+            if search_query.lower()
+            in (
+                (compra.nome or compra.descricao or "")
+                .strip()
+                .lower()
+            )
+        ]
     return render(
         request,
         "core/financeiro_caderno_detail.html",
-        {"caderno": caderno, "compras": compras},
+        {
+            "caderno": caderno,
+            "compras": compras,
+            "compras_sem_data": compras_sem_data,
+            "selected_month": selected_month,
+            "mes_referencia": start_date,
+            "status_filter": status_filter,
+            "categoria_filter": categoria_filter,
+            "centro_filter": centro_filter,
+            "search_query": search_query,
+            "categorias": categorias,
+            "centros": centros,
+            "resumo": {
+                "total_mes": total_mes,
+                "total_pago": total_pago,
+                "total_pendente": total_pendente,
+                "total_compras": total_compras,
+                "total_pagas": total_pagas,
+                "total_pendentes": total_pendentes,
+                "ticket_medio": ticket_medio,
+            },
+        },
     )
 
 

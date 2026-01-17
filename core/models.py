@@ -127,6 +127,7 @@ class Proposta(models.Model):
     )
     aprovada = models.BooleanField(null=True, blank=True)
     finalizada = models.BooleanField(default=False)
+    andamento = models.CharField(max_length=20, blank=True, default="")
     criado_em = models.DateTimeField(auto_now_add=True)
     decidido_em = models.DateTimeField(null=True, blank=True)
     aprovado_por = models.ForeignKey(

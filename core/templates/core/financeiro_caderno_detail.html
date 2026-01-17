@@ -18,7 +18,7 @@
     <div class="finance-header">
       <div>
         <h1 style="margin: 0;">{{ caderno.nome }}</h1>
-        <p class="muted">Compras do caderno selecionado.</p>
+        <p class="muted">Visao mensal do caderno com foco em fluxo e status.</p>
       </div>
       <div class="finance-actions">
         <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Voltar</a>
@@ -26,29 +26,132 @@
       </div>
     </div>
 
-    {% if compras %}
-      <div class="proposal-grid">
-        {% for compra in compras %}
-          <div class="proposal-card">
-            <a class="proposal-link" href="{% url 'financeiro_compra_detail' compra.pk %}" aria-label="Abrir compra"></a>
-            <div class="proposal-head">
-              <div>
-                <div class="proposal-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</div>
-                <div class="proposal-meta">
-                  {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} - R$ {{ compra.total_itens|default:"0,00" }}
-                </div>
-              </div>
-              <span class="badge">{{ compra.status_label }}</span>
-            </div>
-            <div class="proposal-meta">
-              {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}Sem categoria{% endif %} -
-              {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}Sem centro{% endif %}
-            </div>
-          </div>
-        {% endfor %}
+    <div class="finance-hud">
+      <div class="hud-top">
+        <div class="hud-title">HUD Mensal</div>
+        <div class="hud-pill">Mes: {{ mes_referencia|date:"F Y" }}</div>
       </div>
-    {% else %}
-      <p class="muted">Sem compras neste caderno.</p>
-    {% endif %}
+      <div class="hud-meta">Modo acompanhamento de contas e ritmo de pagamentos.</div>
+    </div>
+
+    <form class="finance-filter hud-filter" method="get">
+      <div class="field">
+        <label>Mes</label>
+        <input type="month" name="mes" value="{{ selected_month }}">
+      </div>
+      <div class="field">
+        <label>Busca</label>
+        <input type="search" name="q" value="{{ search_query }}" placeholder="Nome ou descricao">
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select name="status">
+          <option value="" {% if not status_filter %}selected{% endif %}>Todos</option>
+          <option value="pago" {% if status_filter == "pago" %}selected{% endif %}>Pago</option>
+          <option value="pendente" {% if status_filter == "pendente" %}selected{% endif %}>Pendente</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Categoria</label>
+        <select name="categoria">
+          <option value="" {% if not categoria_filter %}selected{% endif %}>Todas</option>
+          {% for categoria in categorias %}
+            <option value="{{ categoria.id }}" {% if categoria.id|stringformat:"s" == categoria_filter %}selected{% endif %}>{{ categoria.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Centro de custo</label>
+        <select name="centro">
+          <option value="" {% if not centro_filter %}selected{% endif %}>Todos</option>
+          {% for centro in centros %}
+            <option value="{{ centro.id }}" {% if centro.id|stringformat:"s" == centro_filter %}selected{% endif %}>{{ centro.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Aplicar filtros</button>
+        <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' caderno.id %}">Limpar</a>
+      </div>
+    </form>
+
+    <div class="finance-summary">
+      <div class="summary-card hud-card">
+        <div class="summary-label">Total do mes</div>
+        <div class="summary-value">R$ {{ resumo.total_mes|floatformat:2 }}</div>
+        <div class="summary-meta">Ticket medio: R$ {{ resumo.ticket_medio|floatformat:2 }}</div>
+      </div>
+      <div class="summary-card hud-card">
+        <div class="summary-label">Pago</div>
+        <div class="summary-value">R$ {{ resumo.total_pago|floatformat:2 }}</div>
+        <div class="summary-meta">Compras pagas: {{ resumo.total_pagas }}</div>
+      </div>
+      <div class="summary-card hud-card">
+        <div class="summary-label">Pendente</div>
+        <div class="summary-value">R$ {{ resumo.total_pendente|floatformat:2 }}</div>
+        <div class="summary-meta">Compras pendentes: {{ resumo.total_pendentes }}</div>
+      </div>
+      <div class="summary-card hud-card">
+        <div class="summary-label">Total de compras</div>
+        <div class="summary-value">{{ resumo.total_compras }}</div>
+        <div class="summary-meta">Ritmo mensal do caderno.</div>
+      </div>
+    </div>
+
+    <div class="finance-card">
+      <div class="panel-title">Compras do mes</div>
+      {% if compras %}
+        <div class="proposal-grid">
+          {% for compra in compras %}
+            <div class="proposal-card">
+              <a class="proposal-link" href="{% url 'financeiro_compra_detail' compra.pk %}" aria-label="Abrir compra"></a>
+              <div class="proposal-head">
+                <div>
+                  <div class="proposal-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</div>
+                  <div class="proposal-meta">
+                    {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} • Itens: {{ compra.itens_count }}
+                  </div>
+                </div>
+                <span class="badge badge-{{ compra.status_label|lower }}">{{ compra.status_label }}</span>
+              </div>
+              <div class="proposal-meta">Total: R$ {{ compra.total_itens|floatformat:2 }} • Pago: R$ {{ compra.total_pago|floatformat:2 }}</div>
+              <div class="proposal-meta">
+                {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}Sem categoria{% endif %} -
+                {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}Sem centro{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Sem compras para o mes e filtros selecionados.</p>
+      {% endif %}
+    </div>
+
+    <div class="finance-card finance-card-muted">
+      <div class="panel-title">Compras sem data</div>
+      {% if compras_sem_data %}
+        <div class="proposal-grid">
+          {% for compra in compras_sem_data %}
+            <div class="proposal-card">
+              <a class="proposal-link" href="{% url 'financeiro_compra_detail' compra.pk %}" aria-label="Abrir compra"></a>
+              <div class="proposal-head">
+                <div>
+                  <div class="proposal-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</div>
+                  <div class="proposal-meta">Sem data • Itens: {{ compra.itens_count }}</div>
+                </div>
+                <span class="badge badge-{{ compra.status_label|lower }}">{{ compra.status_label }}</span>
+              </div>
+              <div class="proposal-meta">Total: R$ {{ compra.total_itens|floatformat:2 }} • Pago: R$ {{ compra.total_pago|floatformat:2 }}</div>
+              <div class="proposal-meta">
+                {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}Sem categoria{% endif %} -
+                {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}Sem centro{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Nenhuma compra sem data para os filtros atuais.</p>
+      {% endif %}
+    </div>
   </section>
 {% endblock %}

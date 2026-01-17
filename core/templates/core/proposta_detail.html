@@ -38,6 +38,7 @@
     <div class="stack">
       <div><strong>Codigo:</strong> {{ proposta.codigo }}</div>
       <div><strong>Prioridade:</strong> {{ proposta.prioridade }}</div>
+      <div><strong>Status:</strong> {{ status_label }}</div>
       <div><strong>Aprovada:</strong> {% if proposta.aprovada == True %}Sim{% elif proposta.aprovada == False %}Nao{% else %}Pendente{% endif %}</div>
       <div><strong>Finalizada:</strong> {{ proposta.finalizada|yesno:"Sim,Nao" }}</div>
       <div><strong>Valor:</strong> R$ {{ proposta.valor }}</div>
@@ -71,13 +72,15 @@
       {% if proposta.criada_por_id == request.user.id %}
         <div class="user-card">
           <div class="panel-title">Gerenciar proposta</div>
-          <form method="post" class="stack">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_value">
-            <label>Valor (alteravel antes da aprovacao)</label>
-            <input type="text" name="valor" value="{{ proposta.valor }}">
-            <button class="btn btn-primary" type="submit">Atualizar valor</button>
-          </form>
+          {% if proposta.aprovada == None %}
+            <form method="post" class="stack">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_value">
+              <label>Valor (alteravel antes da aprovacao)</label>
+              <input type="text" name="valor" value="{{ proposta.valor }}">
+              <button class="btn btn-primary" type="submit">Atualizar valor</button>
+            </form>
+          {% endif %}
           <form method="post" class="stack">
             {% csrf_token %}
             <input type="hidden" name="action" value="set_finalizada">
@@ -86,6 +89,14 @@
               {% if proposta.finalizada %}Ja finalizada{% else %}Marcar como finalizada{% endif %}
             </button>
           </form>
+          {% if proposta.aprovada == True and proposta.andamento != "EXECUTANDO" %}
+            <form method="post" class="stack">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="set_executando">
+              <label>Status</label>
+              <button class="btn btn-outline" type="submit">Marcar como Executando</button>
+            </form>
+          {% endif %}
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete_proposta">
@@ -93,7 +104,7 @@
           </form>
         </div>
       {% endif %}
-      {% if proposta.aprovada == None and proposta.cliente.usuario_id == request.user.id %}
+      {% if proposta.aprovada == None and proposta.valor != 0 and proposta.cliente.usuario_id == request.user.id %}
         <div style="display: flex; gap: 12px;">
           <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
             {% csrf_token %}
