@@ -18,7 +18,7 @@
     <div class="finance-header">
       <div>
         <h1 style="margin: 0;">Nova Compra</h1>
-        <p class="muted">Registre compras e crie status.</p>
+        <p class="muted">Registre compras e depois adicione itens.</p>
       </div>
       <div class="finance-actions">
         <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
@@ -39,6 +39,10 @@
                 <option value="{{ c.id }}" {% if selected_caderno_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
               {% endfor %}
             </select>
+          </div>
+          <div class="field">
+            <label>Nome da compra</label>
+            <input type="text" name="nome" placeholder="Compra de insumos">
           </div>
           <div class="field">
             <label>Descricao</label>
@@ -64,15 +68,6 @@
                 {% endfor %}
               </select>
             </div>
-            <div class="field">
-              <label>Tipo</label>
-              <select name="tipo">
-                <option value="">Selecione</option>
-                {% for t in tipos %}
-                  <option value="{{ t.id }}">{{ t.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
           </div>
           <div class="finance-form-grid">
             <div class="field">
@@ -84,40 +79,8 @@
                 {% endfor %}
               </select>
             </div>
-            <div class="field">
-              <label>Status</label>
-              <select name="status">
-                <option value="">Selecione</option>
-                {% for s in status_list %}
-                  <option value="{{ s.id }}">{{ s.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
-          <div class="finance-form-grid">
-            <div class="field">
-              <label>
-                <input type="checkbox" name="pago">
-                Pago
-              </label>
-            </div>
-            <div class="field">
-              <label>Data de pagamento</label>
-              <input type="date" name="data_pagamento">
-            </div>
           </div>
           <button class="btn btn-primary" type="submit">Registrar</button>
-        </form>
-      </div>
-
-      <div class="finance-card">
-        <div class="panel-title">Status de compra</div>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_status">
-          <label>Novo status</label>
-          <input type="text" name="nome" placeholder="Pendente/Pago/Cotando">
-          <button class="btn btn-ghost" type="submit">Criar status</button>
         </form>
       </div>
     </div>

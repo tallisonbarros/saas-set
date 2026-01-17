@@ -48,12 +48,10 @@
         <input type="hidden" name="cliente_sort" value="{{ cliente_sort }}">
         <select name="proposta_status">
           <option value="" {% if not proposta_status %}selected{% endif %}>Todos os status</option>
-          <option value="PENDENTE" {% if proposta_status == "PENDENTE" %}selected{% endif %}>Pendente</option>
-          <option value="LEVANTAMENTO" {% if proposta_status == "LEVANTAMENTO" %}selected{% endif %}>Levantamento</option>
-          <option value="EXECUTANDO" {% if proposta_status == "EXECUTANDO" %}selected{% endif %}>Executando</option>
-          <option value="APROVADA" {% if proposta_status == "APROVADA" %}selected{% endif %}>Aprovada</option>
-          <option value="REPROVADA" {% if proposta_status == "REPROVADA" %}selected{% endif %}>Reprovada</option>
-          <option value="FINALIZADO" {% if proposta_status == "FINALIZADO" %}selected{% endif %}>Finalizado</option>
+          <option value="pendente" {% if proposta_status == "pendente" %}selected{% endif %}>Pendente</option>
+          <option value="aprovada" {% if proposta_status == "aprovada" %}selected{% endif %}>Aprovada</option>
+          <option value="reprovada" {% if proposta_status == "reprovada" %}selected{% endif %}>Reprovada</option>
+          <option value="finalizada" {% if proposta_status == "finalizada" %}selected{% endif %}>Finalizada</option>
         </select>
         <select name="proposta_sort">
           <option value="-criado_em" {% if proposta_sort == "-criado_em" %}selected{% endif %}>Mais recentes</option>
@@ -78,7 +76,17 @@
             <tr>
               <td>{{ p.nome }}</td>
               <td>{{ p.codigo }}</td>
-              <td>{{ p.get_status_display }}</td>
+              <td>
+                {% if p.finalizada %}
+                  Finalizada
+                {% elif p.aprovada == True %}
+                  Aprovada
+                {% elif p.aprovada == False %}
+                  Reprovada
+                {% else %}
+                  Pendente
+                {% endif %}
+              </td>
               <td>{{ p.prioridade }}</td>
               <td>R$ {{ p.valor }}</td>
               <td><a class="button" href="/admin/core/proposta/{{ p.id }}/change/">Abrir</a></td>

@@ -18,7 +18,7 @@
     <div class="finance-header">
       <div>
         <h1 style="margin: 0;">Compra</h1>
-        <p class="muted">{{ compra.descricao }}</p>
+        <p class="muted">{{ compra.nome|default:compra.descricao }}</p>
       </div>
       <div class="finance-actions">
         <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
@@ -26,17 +26,99 @@
     </div>
 
     <div class="stack">
+      <div><strong>Nome:</strong> {{ compra.nome|default:"-" }}</div>
       <div><strong>Data:</strong> {{ compra.data|default:"-" }}</div>
       <div><strong>Valor:</strong> R$ {{ compra.valor|default:"0,00" }}</div>
-      <div><strong>Status:</strong> {% if compra.status %}{{ compra.status.nome }}{% else %}-{% endif %}</div>
-      <div><strong>Pago:</strong> {{ compra.pago|yesno:"Sim,Nao" }}</div>
-      {% if compra.pago %}
-        <div><strong>Data de pagamento:</strong> {{ compra.data_pagamento|default:"-" }}</div>
-      {% endif %}
+      <div><strong>Status:</strong> {{ compra.status_label }}</div>
       <div><strong>Caderno:</strong> {% if compra.caderno %}{{ compra.caderno.nome }}{% else %}-{% endif %}</div>
       <div><strong>Categoria:</strong> {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}-{% endif %}</div>
-      <div><strong>Tipo:</strong> {% if compra.tipo %}{{ compra.tipo.nome }}{% else %}-{% endif %}</div>
       <div><strong>Centro de custo:</strong> {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}-{% endif %}</div>
+    </div>
+
+    <div class="finance-card">
+      <div class="panel-title">Itens da compra</div>
+      {% if itens %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Quantidade</th>
+                <th>Valor</th>
+                <th>Tipo</th>
+                <th>Pago</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in itens %}
+                <tr>
+                  <td>{{ item.nome }}</td>
+                  <td>{{ item.quantidade }}</td>
+                  <td>R$ {{ item.valor|default:"0,00" }}</td>
+                  <td>{% if item.tipo %}{{ item.tipo.nome }}{% else %}-{% endif %}</td>
+                  <td>
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_item_pago">
+                      <input type="hidden" name="item_id" value="{{ item.id }}">
+                      <button class="btn btn-ghost" type="submit">{{ item.pago|yesno:"Sim,Nao" }}</button>
+                    </form>
+                  </td>
+                  <td>
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete_item">
+                      <input type="hidden" name="item_id" value="{{ item.id }}">
+                      <button class="btn btn-outline" type="submit">Excluir</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted">Nenhum item cadastrado.</p>
+      {% endif %}
+    </div>
+
+    <div class="finance-card">
+      <div class="panel-title">Adicionar item</div>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_item">
+        <div class="finance-form-grid">
+          <div class="field">
+            <label>Nome</label>
+            <input type="text" name="nome" placeholder="Item">
+          </div>
+          <div class="field">
+            <label>Quantidade</label>
+            <input type="number" name="quantidade" min="1" value="1">
+          </div>
+        </div>
+        <div class="finance-form-grid">
+          <div class="field">
+            <label>Valor</label>
+            <input type="text" name="valor" placeholder="0,00">
+          </div>
+          <div class="field">
+            <label>Tipo</label>
+            <select name="tipo">
+              <option value="">Selecione</option>
+              {% for t in tipos %}
+                <option value="{{ t.id }}">{{ t.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <label class="checkbox-item">
+          <input type="checkbox" name="pago">
+          Pago
+        </label>
+        <button class="btn btn-primary" type="submit">Adicionar item</button>
+      </form>
     </div>
     <form method="post">
       {% csrf_token %}

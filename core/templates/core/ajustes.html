@@ -47,56 +47,6 @@
       </a>
     </div>
 
-    <div class="card compact-card">
-      <div class="panel-title">Status de propostas</div>
-      <form method="post" class="stack">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="create_proposta_status">
-        <label>Codigo</label>
-        <input type="text" name="codigo" placeholder="PENDENTE" required>
-        <label>Nome</label>
-        <input type="text" name="nome" placeholder="Pendente" required>
-        <label>Ordem</label>
-        <input type="number" name="ordem" min="1" max="999" value="10">
-        <button class="btn btn-primary" type="submit">Adicionar status</button>
-      </form>
-      <div class="tipo-list">
-        {% for status in status_list %}
-          <form method="post" class="tipo-row">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_proposta_status">
-            <input type="hidden" name="status_id" value="{{ status.id }}">
-            {% if status.codigo in locked_status %}
-              <input type="text" name="nome" value="{{ status.nome }}" readonly>
-              <input type="number" name="ordem" min="1" max="999" value="{{ status.ordem }}" readonly>
-              <label class="checkbox-item">
-                <input type="checkbox" name="ativo" {% if status.ativo %}checked{% endif %} disabled>
-                Ativo
-              </label>
-              <button class="btn btn-ghost" type="submit" disabled>Salvar</button>
-            {% else %}
-              <input type="text" name="nome" value="{{ status.nome }}">
-              <input type="number" name="ordem" min="1" max="999" value="{{ status.ordem }}">
-              <label class="checkbox-item">
-                <input type="checkbox" name="ativo" {% if status.ativo %}checked{% endif %}>
-                Ativo
-              </label>
-              <button class="btn btn-ghost" type="submit">Salvar</button>
-            {% endif %}
-          </form>
-          <form method="post" class="tipo-row">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_proposta_status">
-            <input type="hidden" name="status_id" value="{{ status.id }}">
-            <button class="btn btn-outline" type="submit" {% if status.codigo in locked_status %}disabled{% endif %}>
-              Excluir
-            </button>
-          </form>
-        {% empty %}
-          <p class="muted">Nenhum status cadastrado.</p>
-        {% endfor %}
-      </div>
-    </div>
 
     <div class="card compact-card">
       <div class="panel-title">Classificacao de canais</div>
@@ -112,5 +62,6 @@
         </form>
       </div>
     </div>
+
   </section>
 {% endblock %}

@@ -49,19 +49,6 @@ class Caderno(models.Model):
         return self.nome
 
 
-class StatusProposta(models.Model):
-    codigo = models.CharField(max_length=20, unique=True)
-    nome = models.CharField(max_length=60)
-    ativo = models.BooleanField(default=True)
-    ordem = models.PositiveSmallIntegerField(default=10)
-
-    class Meta:
-        ordering = ["ordem", "nome"]
-
-    def __str__(self):
-        return self.nome
-
-
 class CategoriaCompra(models.Model):
     nome = models.CharField(max_length=80, unique=True)
 
@@ -93,30 +80,35 @@ class StatusCompra(models.Model):
 
 class Compra(models.Model):
     caderno = models.ForeignKey(Caderno, on_delete=models.CASCADE, related_name="compras", null=True, blank=True)
+    nome = models.CharField(max_length=120, blank=True)
     descricao = models.TextField(blank=True)
     valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     data = models.DateField(null=True, blank=True)
     categoria = models.ForeignKey(CategoriaCompra, on_delete=models.PROTECT, null=True, blank=True)
-    tipo = models.ForeignKey(TipoCompra, on_delete=models.PROTECT, null=True, blank=True)
     centro_custo = models.ForeignKey(CentroCusto, on_delete=models.PROTECT, null=True, blank=True)
-    status = models.ForeignKey(StatusCompra, on_delete=models.PROTECT, null=True, blank=True)
-    pago = models.BooleanField(default=False)
-    data_pagamento = models.DateField(null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.descricao} - {self.valor}"
+        base = self.nome or self.descricao or "Compra"
+        return f"{base} - {self.valor}"
+
+
+class CompraItem(models.Model):
+    compra = models.ForeignKey(Compra, on_delete=models.CASCADE, related_name="itens")
+    nome = models.CharField(max_length=120)
+    valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    quantidade = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    tipo = models.ForeignKey(TipoCompra, on_delete=models.PROTECT, null=True, blank=True)
+    pago = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.nome
 
 
 class Proposta(models.Model):
-    class Status(models.TextChoices):
-        PENDENTE = "PENDENTE", "Pendente"
-        APROVADA = "APROVADA", "Aprovada"
-        REPROVADA = "REPROVADA", "Reprovada"
-        LEVANTAMENTO = "LEVANTAMENTO", "Levantamento"
-        EXECUTANDO = "EXECUTANDO", "Executando"
-        FINALIZADO = "FINALIZADO", "Finalizado"
-
     cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="propostas")
     criada_por = models.ForeignKey(
         User,
@@ -133,7 +125,8 @@ class Proposta(models.Model):
         default=50,
         validators=[MinValueValidator(1), MaxValueValidator(99)],
     )
-    status = models.CharField(max_length=20, default=Status.PENDENTE)
+    aprovada = models.BooleanField(null=True, blank=True)
+    finalizada = models.BooleanField(default=False)
     criado_em = models.DateTimeField(auto_now_add=True)
     decidido_em = models.DateTimeField(null=True, blank=True)
     aprovado_por = models.ForeignKey(

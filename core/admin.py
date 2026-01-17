@@ -37,8 +37,18 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
 @admin.register(Proposta)
 class PropostaAdmin(admin.ModelAdmin):
     change_form_template = "admin/core/proposta/change_form.html"
-    list_display = ("nome", "codigo", "cliente", "status", "prioridade", "valor", "criado_em", "decidido_em")
-    list_filter = ("status",)
+    list_display = (
+        "nome",
+        "codigo",
+        "cliente",
+        "aprovacao_display",
+        "finalizada",
+        "prioridade",
+        "valor",
+        "criado_em",
+        "decidido_em",
+    )
+    list_filter = ("aprovada", "finalizada")
     search_fields = ("nome", "codigo", "cliente__nome")
 
     def get_urls(self):
@@ -62,6 +72,14 @@ class PropostaAdmin(admin.ModelAdmin):
             return JsonResponse({"error": _("Cliente invalido.")}, status=400)
         proposta = Proposta(cliente=cliente)
         return JsonResponse({"codigo": proposta._proximo_codigo()})
+
+    def aprovacao_display(self, obj):
+        if obj.aprovada is True:
+            return "Aprovada"
+        if obj.aprovada is False:
+            return "Reprovada"
+        return "Pendente"
+    aprovacao_display.short_description = "Aprovacao"
 
 
 @admin.register(TipoPerfil)
@@ -116,6 +134,13 @@ class StatusCompraAdmin(admin.ModelAdmin):
 
 @admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
-    list_display = ("descricao", "caderno", "valor", "data", "status", "pago", "data_pagamento")
-    list_filter = ("status", "tipo", "categoria")
-    search_fields = ("descricao", "caderno__nome")
+    list_display = ("nome", "descricao", "caderno", "valor", "data", "status_label")
+    list_filter = ("categoria",)
+    search_fields = ("nome", "descricao", "caderno__nome")
+
+    def status_label(self, obj):
+        itens = list(obj.itens.all())
+        if itens and all(item.pago for item in itens):
+            return "Pago"
+        return "Pendente"
+    status_label.short_description = "Status"

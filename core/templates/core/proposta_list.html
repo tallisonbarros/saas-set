@@ -42,11 +42,10 @@
         </div>
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
-        {% for status in status_options %}
-          <a href="{% url 'propostas' %}?status={{ status.codigo }}" class="filter-pill {% if status_filter == status.codigo %}active{% endif %}">
-            {{ status.nome }}
-          </a>
-        {% endfor %}
+        <a href="{% url 'propostas' %}?status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>
+        <a href="{% url 'propostas' %}?status=aprovada" class="filter-pill {% if status_filter == 'aprovada' %}active{% endif %}">Aprovadas</a>
+        <a href="{% url 'propostas' %}?status=reprovada" class="filter-pill {% if status_filter == 'reprovada' %}active{% endif %}">Reprovadas</a>
+        <a href="{% url 'propostas' %}?status=finalizada" class="filter-pill {% if status_filter == 'finalizada' %}active{% endif %}">Finalizadas</a>
       </div>
       {% if propostas %}
         <div class="proposal-grid">
@@ -81,10 +80,13 @@
                     <div class="proposal-meta">Recebida</div>
                   {% endif %}
                 </div>
-                <span class="badge badge-{{ proposta.status|lower }}">{{ proposta.status_label|default:proposta.status }}</span>
+                <span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span>
+                {% if proposta.finalizada %}
+                  <span class="badge badge-finalizada">Finalizada</span>
+                {% endif %}
               </div>
               <div class="proposal-actions">
-                {% if proposta.status == "PENDENTE" and proposta.cliente.usuario_id == request.user.id %}
+                {% if proposta.aprovada == None and proposta.cliente.usuario_id == request.user.id %}
                   <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
                     {% csrf_token %}
                     <button class="btn btn-primary" type="submit">Aprovar</button>

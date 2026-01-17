@@ -16,16 +16,15 @@ from .models import (
     CanalRackIO,
     CategoriaCompra,
     Caderno,
-    StatusProposta,
     CentroCusto,
     PerfilUsuario,
     Compra,
+    CompraItem,
     ModuloIO,
     ModuloRackIO,
     FinanceiroID,
     PlantaIO,
     Proposta,
-    StatusCompra,
     RackIO,
     RackSlotIO,
     TipoCompra,
@@ -87,6 +86,13 @@ def _ensure_default_cadernos(cliente):
     opex = Caderno.objects.filter(nome="OPEX", criador=cliente).first()
     if not opex:
         Caderno.objects.create(nome="OPEX", ativo=True, criador=cliente)
+
+
+def _compra_status_label(compra):
+    itens = list(compra.itens.all())
+    if itens and all(item.pago for item in itens):
+        return "Pago"
+    return "Pendente"
 
 
 def home(request):
@@ -605,39 +611,33 @@ def proposta_list(request):
             propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
     elif cliente:
         propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
-    status_options = list(StatusProposta.objects.filter(ativo=True).order_by("ordem", "nome"))
-    status_codes = [status.codigo for status in status_options]
-    label_cases = [When(status=status.codigo, then=Value(status.nome)) for status in status_options]
     status = request.GET.get("status")
-    if status in status_codes:
-        propostas = propostas.filter(status=status)
-        if status == Proposta.Status.APROVADA:
-            propostas = propostas.order_by("prioridade", "-criado_em")
+    if status == "pendente":
+        propostas = propostas.filter(aprovada__isnull=True)
+    elif status == "aprovada":
+        propostas = propostas.filter(aprovada=True)
+    elif status == "reprovada":
+        propostas = propostas.filter(aprovada=False)
+    elif status == "finalizada":
+        propostas = propostas.filter(finalizada=True)
     else:
-        exclude_codes = [
-            code
-            for code in [Proposta.Status.REPROVADA, Proposta.Status.FINALIZADO]
-            if code in status_codes
-        ]
-        if exclude_codes:
-            propostas = propostas.exclude(status__in=exclude_codes)
-        order_cases = [When(status=status.codigo, then=Value(status.ordem)) for status in status_options]
-        propostas = propostas.annotate(
-            status_order=Case(
-                *order_cases,
-                default=Value(999),
-                output_field=IntegerField(),
-            )
-        ).order_by("status_order", "-criado_em")
-    if label_cases:
-        propostas = propostas.annotate(
-            status_label=Case(
-                *label_cases,
-                default=Value(""),
-            )
+        propostas = propostas.exclude(aprovada=False).exclude(finalizada=True)
+    propostas = propostas.annotate(
+        status_order=Case(
+            When(finalizada=True, then=Value(4)),
+            When(aprovada=True, then=Value(2)),
+            When(aprovada=False, then=Value(3)),
+            default=Value(1),
+            output_field=IntegerField(),
         )
-    else:
-        propostas = propostas.annotate(status_label=Value(""))
+    ).order_by("status_order", "-criado_em")
+    propostas = propostas.annotate(
+        status_label=Case(
+            When(aprovada=True, then=Value("Aprovada")),
+            When(aprovada=False, then=Value("Reprovada")),
+            default=Value("Pendente"),
+        )
+    )
     return render(
         request,
         "core/proposta_list.html",
@@ -647,7 +647,6 @@ def proposta_list(request):
             "status_filter": status,
             "is_vendedor": _has_tipo(request.user, "Vendedor"),
             "current_user_id": request.user.id,
-            "status_options": status_options,
         },
     )
 
@@ -668,7 +667,7 @@ def proposta_detail(request, pk):
         if action == "update_value":
             if proposta.criada_por_id != request.user.id:
                 return HttpResponseForbidden("Sem permissao.")
-            if proposta.status != Proposta.Status.PENDENTE:
+            if proposta.aprovada is not None:
                 message = "Nao e possivel alterar o valor apos aprovacao."
             else:
                 valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
@@ -682,30 +681,23 @@ def proposta_detail(request, pk):
                     proposta.valor = valor
                     proposta.save(update_fields=["valor"])
                     return redirect("proposta_detail", pk=proposta.pk)
-        if action == "update_status":
+        if action == "set_finalizada":
             if proposta.criada_por_id != request.user.id:
                 return HttpResponseForbidden("Sem permissao.")
-            if proposta.status == Proposta.Status.PENDENTE:
-                message = "Aguardando aprovacao. Status so pode ser alterado apos aprovacao."
+            if proposta.aprovada is None:
+                message = "Aguardando aprovacao. Finalizacao so e possivel apos aprovacao."
             else:
-                novo_status = request.POST.get("status")
-                if novo_status in Proposta.Status.values:
-                    proposta.status = novo_status
-                    proposta.save(update_fields=["status"])
-                    return redirect("proposta_detail", pk=proposta.pk)
+                proposta.finalizada = True
+                proposta.save(update_fields=["finalizada"])
+                return redirect("proposta_detail", pk=proposta.pk)
         if action == "delete_proposta":
             if proposta.criada_por_id != request.user.id:
                 return HttpResponseForbidden("Sem permissao.")
-            if proposta.status != Proposta.Status.PENDENTE:
+            if proposta.aprovada is not None:
                 message = "Nao e possivel excluir apos aprovacao."
             else:
                 proposta.delete()
                 return redirect("propostas")
-    status_options = list(StatusProposta.objects.filter(ativo=True).order_by("ordem", "nome"))
-    status_label = (
-        StatusProposta.objects.filter(codigo=proposta.status).values_list("nome", flat=True).first()
-        or proposta.status
-    )
     return render(
         request,
         "core/proposta_detail.html",
@@ -714,8 +706,6 @@ def proposta_detail(request, pk):
             "proposta": proposta,
             "is_contratante": _has_tipo(request.user, "Contratante"),
             "message": message,
-            "status_options": status_options,
-            "status_label": status_label,
         },
     )
 
@@ -785,11 +775,11 @@ def aprovar_proposta(request, pk):
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
         return HttpResponseForbidden("Somente o destinatario pode aprovar.")
-    if proposta.status == Proposta.Status.PENDENTE:
-        proposta.status = Proposta.Status.APROVADA
+    if proposta.aprovada is None:
+        proposta.aprovada = True
         proposta.decidido_em = timezone.now()
         proposta.aprovado_por = request.user
-        proposta.save(update_fields=["status", "decidido_em", "aprovado_por"])
+        proposta.save(update_fields=["aprovada", "decidido_em", "aprovado_por"])
     return redirect("propostas")
 
 
@@ -802,11 +792,11 @@ def reprovar_proposta(request, pk):
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
         return HttpResponseForbidden("Somente o destinatario pode reprovar.")
-    if proposta.status == Proposta.Status.PENDENTE:
-        proposta.status = Proposta.Status.REPROVADA
+    if proposta.aprovada is None:
+        proposta.aprovada = False
         proposta.decidido_em = timezone.now()
         proposta.aprovado_por = request.user
-        proposta.save(update_fields=["status", "decidido_em", "aprovado_por"])
+        proposta.save(update_fields=["aprovada", "decidido_em", "aprovado_por"])
     return redirect("propostas")
 
 
@@ -1117,24 +1107,16 @@ def financeiro_nova(request):
 
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "create_status":
-            nome = request.POST.get("nome", "").strip()
-            if nome:
-                StatusCompra.objects.get_or_create(nome=nome, defaults={"ativo": True})
-            return redirect("financeiro_nova")
         if action == "create_compra":
             if not cliente:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             caderno_id = request.POST.get("caderno")
+            nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
             data_raw = request.POST.get("data", "").strip()
             categoria_id = request.POST.get("categoria")
-            tipo_id = request.POST.get("tipo")
             centro_id = request.POST.get("centro_custo")
-            status_id = request.POST.get("status")
-            pago = request.POST.get("pago") == "on"
-            data_pagamento_raw = request.POST.get("data_pagamento", "").strip()
             try:
                 valor = Decimal(valor_raw)
             except (InvalidOperation, ValueError):
@@ -1143,25 +1125,18 @@ def financeiro_nova(request):
                 data = datetime.strptime(data_raw, "%Y-%m-%d").date()
             except ValueError:
                 data = None
-            try:
-                data_pagamento = datetime.strptime(data_pagamento_raw, "%Y-%m-%d").date()
-            except ValueError:
-                data_pagamento = None
             allowed_cadernos = Caderno.objects.filter(
                 Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())
             )
             has_any = any(
                 [
                     caderno_id,
+                    nome,
                     descricao,
                     valor is not None,
                     data is not None,
                     categoria_id,
-                    tipo_id,
                     centro_id,
-                    status_id,
-                    data_pagamento is not None,
-                    pago,
                 ]
             )
             if has_any:
@@ -1169,15 +1144,12 @@ def financeiro_nova(request):
                     return redirect("financeiro")
                 Compra.objects.create(
                     caderno_id=caderno_id or None,
+                    nome=nome,
                     descricao=descricao,
                     valor=valor,
                     data=data,
                     categoria_id=categoria_id or None,
-                    tipo_id=tipo_id or None,
                     centro_custo_id=centro_id or None,
-                    status_id=status_id or None,
-                    pago=pago,
-                    data_pagamento=data_pagamento if pago else None,
                 )
             return redirect("financeiro")
 
@@ -1186,9 +1158,7 @@ def financeiro_nova(request):
     else:
         cadernos = Caderno.objects.none()
     categorias = CategoriaCompra.objects.order_by("nome")
-    tipos = TipoCompra.objects.order_by("nome")
     centros = CentroCusto.objects.order_by("nome")
-    status_list = StatusCompra.objects.filter(ativo=True).order_by("nome")
     selected_caderno_id = request.GET.get("caderno_id") or ""
 
     return render(
@@ -1198,9 +1168,7 @@ def financeiro_nova(request):
             "cliente": cliente,
             "cadernos": cadernos,
             "categorias": categorias,
-            "tipos": tipos,
             "centros": centros,
-            "status_list": status_list,
             "selected_caderno_id": str(selected_caderno_id),
         },
     )
@@ -1269,7 +1237,9 @@ def financeiro_caderno_detail(request, pk):
         Q(pk=pk),
         Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()),
     )
-    compras = Compra.objects.filter(caderno=caderno).order_by("-data")
+    compras = Compra.objects.filter(caderno=caderno).prefetch_related("itens").order_by("-data")
+    for compra in compras:
+        compra.status_label = _compra_status_label(compra)
     return render(
         request,
         "core/financeiro_caderno_detail.html",
@@ -1289,16 +1259,57 @@ def financeiro_compra_detail(request, pk):
         Q(pk=pk),
         Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all()),
     )
-    if request.method == "POST" and request.POST.get("action") == "delete_compra":
-        caderno_id = compra.caderno_id
-        compra.delete()
-        if caderno_id:
-            return redirect("financeiro_caderno_detail", pk=caderno_id)
-        return redirect("financeiro")
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "delete_compra":
+            caderno_id = compra.caderno_id
+            compra.delete()
+            if caderno_id:
+                return redirect("financeiro_caderno_detail", pk=caderno_id)
+            return redirect("financeiro")
+        if action == "add_item":
+            nome = request.POST.get("nome", "").strip()
+            valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
+            quantidade_raw = request.POST.get("quantidade", "").strip()
+            tipo_id = request.POST.get("tipo")
+            pago = request.POST.get("pago") == "on"
+            try:
+                valor = Decimal(valor_raw)
+            except (InvalidOperation, ValueError):
+                valor = None
+            try:
+                quantidade = int(quantidade_raw) if quantidade_raw else 1
+            except ValueError:
+                quantidade = 1
+            quantidade = max(1, quantidade)
+            if nome:
+                CompraItem.objects.create(
+                    compra=compra,
+                    nome=nome,
+                    valor=valor,
+                    quantidade=quantidade,
+                    tipo_id=tipo_id or None,
+                    pago=pago,
+                )
+            return redirect("financeiro_compra_detail", pk=compra.pk)
+        if action == "toggle_item_pago":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(CompraItem, pk=item_id, compra=compra)
+            item.pago = not item.pago
+            item.save(update_fields=["pago"])
+            return redirect("financeiro_compra_detail", pk=compra.pk)
+        if action == "delete_item":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(CompraItem, pk=item_id, compra=compra)
+            item.delete()
+            return redirect("financeiro_compra_detail", pk=compra.pk)
+    compra.status_label = _compra_status_label(compra)
+    itens = compra.itens.select_related("tipo").order_by("id")
+    tipos = TipoCompra.objects.order_by("nome")
     return render(
         request,
         "core/financeiro_compra_detail.html",
-        {"compra": compra},
+        {"compra": compra, "itens": itens, "tipos": tipos},
     )
 
 
@@ -1327,8 +1338,14 @@ def admin_explorar(request):
     if cliente_id:
         cliente = get_object_or_404(PerfilUsuario, pk=cliente_id)
         propostas = Proposta.objects.filter(cliente=cliente)
-        if proposta_status in Proposta.Status.values:
-            propostas = propostas.filter(status=proposta_status)
+        if proposta_status == "pendente":
+            propostas = propostas.filter(aprovada__isnull=True)
+        elif proposta_status == "aprovada":
+            propostas = propostas.filter(aprovada=True)
+        elif proposta_status == "reprovada":
+            propostas = propostas.filter(aprovada=False)
+        elif proposta_status == "finalizada":
+            propostas = propostas.filter(finalizada=True)
         if proposta_sort == "prioridade":
             propostas = propostas.order_by("prioridade", "-criado_em")
         elif proposta_sort == "valor":
@@ -1354,87 +1371,19 @@ def admin_explorar(request):
 def ajustes_sistema(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
-    locked_status = {Proposta.Status.PENDENTE, Proposta.Status.APROVADA, Proposta.Status.REPROVADA}
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "create_proposta_status":
-            codigo = request.POST.get("codigo", "").strip().upper()
-            nome = request.POST.get("nome", "").strip()
-            ordem_raw = request.POST.get("ordem", "").strip()
-            try:
-                ordem = int(ordem_raw) if ordem_raw else 10
-            except ValueError:
-                ordem = 10
-            if not codigo or not nome:
-                message = "Informe codigo e nome."
-            elif StatusProposta.objects.filter(codigo=codigo).exists():
-                message = "Codigo ja cadastrado."
-            else:
-                StatusProposta.objects.create(codigo=codigo, nome=nome, ativo=True, ordem=ordem)
         if action == "create_channel_type":
             nome = request.POST.get("nome", "").strip().upper()
             if nome:
                 TipoCanalIO.objects.get_or_create(nome=nome, defaults={"ativo": True})
-        if action == "update_proposta_status":
-            status_id = request.POST.get("status_id")
-            status_obj = get_object_or_404(StatusProposta, pk=status_id)
-            if status_obj.codigo in locked_status:
-                message = "Este status e padrao e nao pode ser editado."
-                status_list = StatusProposta.objects.order_by("ordem", "nome")
-                channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
-                return render(
-                    request,
-                    "core/ajustes.html",
-                    {
-                        "status_list": status_list,
-                        "message": message,
-                        "channel_types": channel_types,
-                        "locked_status": locked_status,
-                    },
-                )
-            nome = request.POST.get("nome", "").strip()
-            ordem_raw = request.POST.get("ordem", "").strip()
-            ativo = request.POST.get("ativo") == "on"
-            try:
-                ordem = int(ordem_raw) if ordem_raw else status_obj.ordem
-            except ValueError:
-                ordem = status_obj.ordem
-            if nome:
-                status_obj.nome = nome
-            status_obj.ordem = ordem
-            status_obj.ativo = ativo
-            status_obj.save(update_fields=["nome", "ordem", "ativo"])
-        if action == "delete_proposta_status":
-            status_id = request.POST.get("status_id")
-            status_obj = get_object_or_404(StatusProposta, pk=status_id)
-            if status_obj.codigo in locked_status:
-                message = "Este status e padrao e nao pode ser excluido."
-                status_list = StatusProposta.objects.order_by("ordem", "nome")
-                channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
-                return render(
-                    request,
-                    "core/ajustes.html",
-                    {
-                        "status_list": status_list,
-                        "message": message,
-                        "channel_types": channel_types,
-                        "locked_status": locked_status,
-                    },
-                )
-            if Proposta.objects.filter(status=status_obj.codigo).exists():
-                message = "Nao e possivel excluir: ha propostas com este status."
-            else:
-                status_obj.delete()
-    status_list = StatusProposta.objects.order_by("ordem", "nome")
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     return render(
         request,
         "core/ajustes.html",
         {
-            "status_list": status_list,
             "message": message,
             "channel_types": channel_types,
-            "locked_status": locked_status,
         },
     )
