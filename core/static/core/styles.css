@@ -388,6 +388,13 @@ body {
   color: #2c6f4f;
 }
 
+.proposal-head-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .finance-toolbar {
   display: flex;
   justify-content: space-between;
