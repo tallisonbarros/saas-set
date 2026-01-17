@@ -24,14 +24,14 @@
         <div>
           <div class="page-kicker">Caderno</div>
           <h1 class="page-title">{{ caderno.nome }}</h1>
-          <p class="page-subtitle">Visao mensal do caderno com foco em fluxo e status.</p>
+          <p class="page-subtitle">Acompanhe pagamentos, pendencias e categorias.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
           <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
         </div>
       </div>
-      <div class="hud-meta">Modo acompanhamento de contas e ritmo de pagamentos.</div>
+      <div class="hud-meta">Resumo do mes com filtros e totais.</div>
     </div>
 
     <form class="finance-filter hud-filter" method="get">

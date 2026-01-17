@@ -18,13 +18,13 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel da compra</div>
-        <div class="hud-pill">Detalhe</div>
+        <div class="hud-pill">Resumo</div>
       </div>
       <div class="page-hud-head">
         <div>
           <div class="page-kicker">Compra</div>
           <h1 class="page-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</h1>
-          <p class="page-subtitle">Detalhes da compra.</p>
+          <p class="page-subtitle">Resumo da compra e seus itens.</p>
         </div>
         <div class="page-actions">
           {% if compra.caderno %}
@@ -34,7 +34,7 @@
           {% endif %}
         </div>
       </div>
-      <div class="hud-meta">Itens, status e classificacao da compra.</div>
+      <div class="hud-meta">Edite itens, status e classificacao.</div>
     </div>
 
     <div class="stack">

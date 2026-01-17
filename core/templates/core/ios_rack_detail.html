@@ -18,7 +18,7 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel do rack</div>
-        <div class="hud-pill">Detalhe</div>
+        <div class="hud-pill">Mapa do rack</div>
       </div>
       <div class="page-hud-head">
         <div>
@@ -31,7 +31,7 @@
           <a class="btn btn-outline" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
         </div>
       </div>
-      <div class="hud-meta">Slots, modulos e canais do rack.</div>
+      <div class="hud-meta">Resumo de slots, modulos e canais.</div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>

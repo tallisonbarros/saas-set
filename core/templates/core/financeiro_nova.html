@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}Nova Compra{% endblock %}
+{% block title %}Nova compra{% endblock %}
 
 {% block content %}
   <div class="page-logo">
@@ -18,19 +18,19 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel da compra</div>
-        <div class="hud-pill">Cadastro</div>
+        <div class="hud-pill">Nova compra</div>
       </div>
       <div class="page-hud-head">
         <div>
           <div class="page-kicker">Financeiro</div>
           <h1 class="page-title">Nova compra</h1>
-          <p class="page-subtitle">Registre compras e depois adicione itens.</p>
+          <p class="page-subtitle">Cadastre a compra antes dos itens.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
         </div>
       </div>
-      <div class="hud-meta">Defina caderno, data e categorias.</div>
+      <div class="hud-meta">Campos essenciais para registrar.</div>
     </div>
 
     <div class="finance-grid">

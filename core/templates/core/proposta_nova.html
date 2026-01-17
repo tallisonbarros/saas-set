@@ -18,19 +18,19 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel da proposta</div>
-        <div class="hud-pill">Nova</div>
+        <div class="hud-pill">Nova proposta</div>
       </div>
       <div class="page-hud-head">
         <div>
           <div class="page-kicker">Propostas</div>
           <h1 class="page-title">Criar proposta</h1>
-          <p class="page-subtitle">Informe o email do destinatario e os dados da proposta.</p>
+          <p class="page-subtitle">Preencha os dados para enviar.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-outline" href="{% url 'propostas' %}">Voltar</a>
         </div>
       </div>
-      <div class="hud-meta">Preencha os campos para enviar ao cliente.</div>
+      <div class="hud-meta">Revise antes de enviar.</div>
     </div>
     {% if message %}
       <div class="alert alert-warning">{{ message }}</div>

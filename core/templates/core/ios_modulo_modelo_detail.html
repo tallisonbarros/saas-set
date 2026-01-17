@@ -18,11 +18,11 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel do modulo</div>
-        <div class="hud-pill">Modelo</div>
+        <div class="hud-pill">Ficha do modelo</div>
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Catalogo</div>
+          <div class="page-kicker">Modelos</div>
           <h1 class="page-title">{{ module.nome }}</h1>
           <p class="page-subtitle">{{ module.marca }} - {{ module.modelo }}</p>
         </div>
@@ -30,7 +30,7 @@
           <a class="btn btn-ghost" href="{% url 'ios_modulos' %}">Voltar</a>
         </div>
       </div>
-      <div class="hud-meta">Atualizacoes afetam novos usos do modulo no rack.</div>
+      <div class="hud-meta">Detalhes do modelo e impacto em novos racks.</div>
     </div>
     <div class="rack-status">
       <div>
@@ -52,7 +52,7 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Editar modelo</h2>
-        <p class="muted">Atualizacoes afetam novos usos do modulo no rack.</p>
+        <p class="muted">Alteracoes impactam novos usos do modulo no rack.</p>
       </div>
     </div>
     <form class="io-form" method="post">

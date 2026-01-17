@@ -18,19 +18,19 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel de perfil</div>
-        <div class="hud-pill">Conta</div>
+        <div class="hud-pill">Dados</div>
       </div>
       <div class="page-hud-head">
         <div>
           <div class="page-kicker">Usuario</div>
           <h1 class="page-title">Meu perfil</h1>
-          <p class="page-subtitle">Atualize seus dados pessoais e IDs.</p>
+          <p class="page-subtitle">Atualize dados e IDs vinculados.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
         </div>
       </div>
-      <div class="hud-meta">Dados de contato, plantas e financeiros.</div>
+      <div class="hud-meta">Perfil, plantas e financeiros.</div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
@@ -38,7 +38,7 @@
 
     <div class="user-page-grid">
       <div class="card compact-card">
-        <h2 style="margin-top: 0;">Conta</h2>
+        <h2 style="margin-top: 0;">Dados</h2>
         <form method="post" class="stack">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_user">

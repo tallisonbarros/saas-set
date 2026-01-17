@@ -18,13 +18,13 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel de propostas</div>
-        <div class="hud-pill">Portfolio</div>
+        <div class="hud-pill">Carteira</div>
       </div>
       <div class="page-hud-head">
         <div>
           <div class="page-kicker">Propostas</div>
           <h1 class="page-title">Visao geral</h1>
-          <p class="page-subtitle">Envios, recebimentos e status por cliente.</p>
+          <p class="page-subtitle">Acompanhe propostas por status.</p>
         </div>
         <div class="page-actions">
           {% if is_vendedor %}
@@ -32,7 +32,7 @@
           {% endif %}
         </div>
       </div>
-      <div class="hud-meta">Cliente ativo: {{ cliente.nome }}</div>
+      <div class="hud-meta">Cliente em foco: {{ cliente.nome }}</div>
     </div>
     <div class="client-meta">
       <div>

@@ -18,11 +18,11 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel de usuarios</div>
-        <div class="hud-pill">Admin</div>
+        <div class="hud-pill">Administracao</div>
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Administracao</div>
+          <div class="page-kicker">Administracaoistracao</div>
           <h1 class="page-title">Gerenciar usuarios</h1>
           <p class="page-subtitle">Usuario atual: {{ request.user.username }}</p>
         </div>
@@ -30,7 +30,7 @@
           <a class="btn btn-ghost" href="{% url 'painel' %}">Painel</a>
         </div>
       </div>
-      <div class="hud-meta">Crie perfis, tipos e controle de acesso.</div>
+      <div class="hud-meta">Perfis, tipos e acessos.</div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
@@ -51,7 +51,7 @@
             {{ form.password }}
           </div>
           <div class="field">
-            <label for="id_is_staff">Administrador</label>
+            <label for="id_is_staff">Administracaoistrador</label>
             {{ form.is_staff }}
           </div>
           <div class="field">

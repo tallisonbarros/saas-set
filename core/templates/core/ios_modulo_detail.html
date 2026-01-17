@@ -18,13 +18,13 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel do modulo</div>
-        <div class="hud-pill">Rack</div>
+        <div class="hud-pill">Modulo no rack</div>
       </div>
       <div class="page-hud-head">
         <div>
           <div class="page-kicker">Modulo</div>
           <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
-          <p class="page-subtitle">{{ rack.nome }}</p>
+          <p class="page-subtitle">Rack: {{ rack.nome }}</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
@@ -32,7 +32,7 @@
         </div>
       </div>
       <div class="hud-meta">
-        {% if rack.descricao %}{{ rack.descricao }}{% else %}Slots e canais do modulo no rack.{% endif %}
+        {% if rack.descricao %}{{ rack.descricao }}{% else %}Identifique o slot e ajuste os canais.{% endif %}
       </div>
       <form class="module-rename-form" method="post">
         {% csrf_token %}

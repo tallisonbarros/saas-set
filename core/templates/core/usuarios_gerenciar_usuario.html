@@ -18,11 +18,11 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel do usuario</div>
-        <div class="hud-pill">Detalhe</div>
+        <div class="hud-pill">Perfil</div>
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Administracao</div>
+          <div class="page-kicker">Administracaoistracao</div>
           <h1 class="page-title">Gerenciar usuario</h1>
           <p class="page-subtitle">ID: {{ user_item.id }} | Email: {{ user_item.username }}</p>
         </div>
@@ -30,7 +30,7 @@
           <a class="btn btn-ghost" href="{% url 'usuarios' %}">Voltar para usuarios</a>
         </div>
       </div>
-      <div class="hud-meta">Dados da conta e perfil do usuario.</div>
+      <div class="hud-meta">Conta, perfil e permissoes.</div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
@@ -38,7 +38,7 @@
 
     <div class="user-page-grid">
       <div class="card compact-card">
-        <h2 style="margin-top: 0;">Conta</h2>
+        <h2 style="margin-top: 0;">Dados</h2>
         <form method="post" class="stack">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_user">
@@ -48,7 +48,7 @@
           </label>
           <label class="checkbox-item">
             <input type="checkbox" name="is_staff" {% if user_item.is_staff %}checked{% endif %}>
-            Administrador
+            Administracaoistrador
           </label>
           <label class="checkbox-item">
             <input type="checkbox" name="is_active" {% if user_item.is_active %}checked{% endif %}>

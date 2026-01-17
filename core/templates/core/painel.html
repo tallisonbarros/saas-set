@@ -18,13 +18,13 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel principal</div>
-        <div class="hud-pill">Navegacao</div>
+        <div class="hud-pill">Acesso rapido</div>
       </div>
       <div class="page-hud-head">
         <div>
           <div class="page-kicker">Painel</div>
           <h1 class="page-title">Bem vindo {{ request.user.username }}</h1>
-          <p class="page-subtitle">Escolha para onde deseja ir.</p>
+          <p class="page-subtitle">Selecione um modulo para continuar.</p>
         </div>
         <div class="page-actions">
           <form method="post" action="{% url 'logout' %}">
@@ -33,7 +33,7 @@
           </form>
         </div>
       </div>
-      <div class="hud-meta">Modulos disponiveis para seu perfil.</div>
+      <div class="hud-meta">Acesso conforme seu perfil.</div>
     </div>
     <div class="panel-grid">
       {% if is_cliente or role == "ADMIN" %}
@@ -66,11 +66,11 @@
       </div>
       {% if role == "ADMIN" %}
         <a class="panel-card" href="/admin/">
-          <div class="panel-title">Admin</div>
+          <div class="panel-title">Administracao</div>
           <div class="muted">Gerenciar dados do sistema.</div>
         </a>
         <a class="panel-card" href="{% url 'ajustes_sistema' %}">
-          <div class="panel-title">Ajustes do sistema</div>
+          <div class="panel-title">Configuracoes do sistema</div>
           <div class="muted">Configuracoes gerais e cadastros base.</div>
         </a>
         <a class="panel-card" href="/admin/explorar/">
