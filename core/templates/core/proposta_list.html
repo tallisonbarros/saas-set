@@ -24,7 +24,7 @@
         <div>
           <div class="page-kicker">Propostas</div>
           <h1 class="page-title">Visao geral</h1>
-          <p class="page-subtitle">Acompanhe propostas por status.</p>
+          <p class="page-subtitle">Acompanhe propostas.</p>
         </div>
         <div class="page-actions">
           {% if is_vendedor %}
@@ -32,24 +32,13 @@
           {% endif %}
         </div>
       </div>
-      <div class="hud-meta">Cliente em foco: {{ cliente.nome }}</div>
-    </div>
-    <div class="client-meta">
-      <div>
-        <div><strong>{{ cliente.nome }}</strong></div>
-        {% if cliente.empresa %}
-          <div class="muted">{{ cliente.empresa }}</div>
-        {% endif %}
-        <div class="muted">{{ cliente.email }}</div>
+      <div class="hud-meta">
+        <strong>{{ cliente.nome }}</strong>{% if cliente.empresa %} · {{ cliente.empresa }}{% endif %} · {{ cliente.email }}
       </div>
     </div>
       {% if not cliente %}
         <p>Usuario sem cliente associado. Fale com o administrador.</p>
       {% else %}
-        <div class="proposal-summary">
-          <div class="panel-title">Propostas enviadas e recebidas</div>
-          <div class="muted">Os cards abaixo mostram se a proposta foi enviada ou recebida.</div>
-        </div>
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
         <a href="{% url 'propostas' %}?status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>

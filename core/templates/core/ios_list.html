@@ -27,13 +27,15 @@
           <p class="page-subtitle">Gerencie racks, modulos e canais.</p>
         </div>
         <div class="page-actions">
-          <a class="btn btn-outline" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
+          <a class="btn btn-outline btn-compact" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
           {% if can_manage %}
-            <a class="btn btn-ghost" href="#novo-rack">Novo rack</a>
+            <a class="btn btn-ghost btn-compact" href="#novo-rack">Novo rack</a>
           {% endif %}
         </div>
       </div>
-      <div class="hud-meta">Busca rapida por rack, modulo ou canal.</div>
+      <div class="hud-meta">
+        <a class="hud-link" href="#pesquisa-io">Busca rapida por rack, modulo ou canal.</a>
+      </div>
     </div>
   </section>
 
@@ -107,7 +109,7 @@
       </div>
     </details>
 
-    <section class="io-card io-wide io-search">
+    <section class="io-card io-wide io-search" id="pesquisa-io">
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Pesquisa de I/Os</h2>

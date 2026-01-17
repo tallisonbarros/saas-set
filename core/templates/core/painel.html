@@ -18,12 +18,10 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel principal</div>
-        <div class="hud-pill">Acesso rapido</div>
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Painel</div>
-          <h1 class="page-title">Bem vindo {{ request.user.username }}</h1>
+          <h1 class="page-title">Bem vindo {{ request.user.first_name|default:request.user.username }}</h1>
           <p class="page-subtitle">Selecione um modulo para continuar.</p>
         </div>
         <div class="page-actions">
@@ -33,9 +31,8 @@
           </form>
         </div>
       </div>
-      <div class="hud-meta">Acesso conforme seu perfil.</div>
     </div>
-    <div class="panel-grid">
+    <div class="panel-grid panel-grid-spaced">
       {% if is_cliente or role == "ADMIN" %}
         <a class="panel-card" href="{% url 'propostas' %}">
           <div class="panel-title">Propostas</div>

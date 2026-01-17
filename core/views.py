@@ -561,6 +561,25 @@ def ios_rack_modulo_detail(request, pk):
             module.nome = nome
             module.save(update_fields=["nome"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
+        if action == "update_module":
+            nome = request.POST.get("nome", "").strip()
+            if nome:
+                module.nome = nome
+                module.save(update_fields=["nome"])
+            if request.POST.get("delete_module") == "on":
+                rack_id = module.rack_id
+                module.delete()
+                return redirect("ios_rack_detail", pk=rack_id)
+            target_slot_id = request.POST.get("slot_id")
+            if target_slot_id:
+                target_slot = get_object_or_404(RackSlotIO, pk=target_slot_id, rack=module.rack)
+                if not target_slot.modulo_id:
+                    if slot:
+                        slot.modulo = None
+                        slot.save(update_fields=["modulo"])
+                    target_slot.modulo = module
+                    target_slot.save(update_fields=["modulo"])
+            return redirect("ios_rack_modulo_detail", pk=module.pk)
         if action == "move_to_slot":
             target_slot_id = request.POST.get("slot_id")
             target_slot = get_object_or_404(RackSlotIO, pk=target_slot_id, rack=module.rack)
@@ -600,6 +619,7 @@ def ios_rack_modulo_detail(request, pk):
             "rack": module.rack,
             "slot": slot,
             "vacant_slots": vacant_slots,
+            "has_vacant_slots": vacant_slots.exists(),
             "prev_slot": prev_slot,
             "next_slot": next_slot,
         },

@@ -34,46 +34,54 @@
       <div class="hud-meta">Resumo do mes com filtros e totais.</div>
     </div>
 
-    <form class="finance-filter hud-filter" method="get">
-      <div class="field">
-        <label>Mes</label>
-        <input type="month" name="mes" value="{{ selected_month }}">
+    <details class="io-card io-discrete hud-filter" {% if status_filter or categoria_filter or centro_filter or search_query %}open{% endif %}>
+      <summary class="io-discrete-summary">
+        <span class="io-title">Filtros</span>
+        <span class="muted">Clique para abrir e filtrar.</span>
+      </summary>
+      <div class="io-discrete-body">
+        <form class="finance-filter" method="get">
+          <div class="field">
+            <label>Mes</label>
+            <input type="month" name="mes" value="{{ selected_month }}">
+          </div>
+          <div class="field">
+            <label>Busca</label>
+            <input type="search" name="q" value="{{ search_query }}" placeholder="Nome ou descricao">
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <select name="status">
+              <option value="" {% if not status_filter %}selected{% endif %}>Todos</option>
+              <option value="pago" {% if status_filter == "pago" %}selected{% endif %}>Pago</option>
+              <option value="pendente" {% if status_filter == "pendente" %}selected{% endif %}>Pendente</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Categoria</label>
+            <select name="categoria">
+              <option value="" {% if not categoria_filter %}selected{% endif %}>Todas</option>
+              {% for categoria in categorias %}
+                <option value="{{ categoria.id }}" {% if categoria.id|stringformat:"s" == categoria_filter %}selected{% endif %}>{{ categoria.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Centro de custo</label>
+            <select name="centro">
+              <option value="" {% if not centro_filter %}selected{% endif %}>Todos</option>
+              {% for centro in centros %}
+                <option value="{{ centro.id }}" {% if centro.id|stringformat:"s" == centro_filter %}selected{% endif %}>{{ centro.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Aplicar filtros</button>
+            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' caderno.id %}">Limpar</a>
+          </div>
+        </form>
       </div>
-      <div class="field">
-        <label>Busca</label>
-        <input type="search" name="q" value="{{ search_query }}" placeholder="Nome ou descricao">
-      </div>
-      <div class="field">
-        <label>Status</label>
-        <select name="status">
-          <option value="" {% if not status_filter %}selected{% endif %}>Todos</option>
-          <option value="pago" {% if status_filter == "pago" %}selected{% endif %}>Pago</option>
-          <option value="pendente" {% if status_filter == "pendente" %}selected{% endif %}>Pendente</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Categoria</label>
-        <select name="categoria">
-          <option value="" {% if not categoria_filter %}selected{% endif %}>Todas</option>
-          {% for categoria in categorias %}
-            <option value="{{ categoria.id }}" {% if categoria.id|stringformat:"s" == categoria_filter %}selected{% endif %}>{{ categoria.nome }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label>Centro de custo</label>
-        <select name="centro">
-          <option value="" {% if not centro_filter %}selected{% endif %}>Todos</option>
-          {% for centro in centros %}
-            <option value="{{ centro.id }}" {% if centro.id|stringformat:"s" == centro_filter %}selected{% endif %}>{{ centro.nome }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Aplicar filtros</button>
-        <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' caderno.id %}">Limpar</a>
-      </div>
-    </form>
+    </details>
 
     <div class="finance-summary">
       <div class="summary-card hud-card">

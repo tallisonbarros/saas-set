@@ -32,48 +32,49 @@
         </div>
       </div>
       <div class="hud-meta">Resumo de slots, modulos e canais.</div>
+      <div class="hud-info">
+        <div class="rack-status">
+          <div>
+            <div class="meta-label">Slots totais</div>
+            <div class="meta-value">{{ rack.slots_total }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Slots ocupados</div>
+            <div class="meta-value">{{ ocupados }}</div>
+          </div>
+          <div>
+            <div class="meta-label">Slots livres</div>
+            <div class="meta-value">{{ slots_livres }}</div>
+          </div>
+          <div>
+            <div class="meta-label">ID_PLANTA</div>
+            <div class="meta-value">{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% else %}-{% endif %}</div>
+          </div>
+          <div>
+            <div class="meta-label">Criado por</div>
+            <div class="meta-value">{{ rack.cliente.nome }}</div>
+          </div>
+        </div>
+        <div class="rack-highlight">
+          <div class="rack-highlight-title">Disponiveis</div>
+          {% if canais_disponiveis %}
+            <div class="module-meta-row">
+              {% for item in canais_disponiveis %}
+                <span class="module-meta-pill">{{ item.tipo }} {{ item.total|stringformat:"02d" }}</span>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="muted">Sem canais disponiveis.</div>
+          {% endif %}
+        </div>
+      </div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
     {% endif %}
-    <div class="rack-status">
-      <div>
-        <div class="meta-label">Slots totais</div>
-        <div class="meta-value">{{ rack.slots_total }}</div>
-      </div>
-      <div>
-        <div class="meta-label">Slots ocupados</div>
-        <div class="meta-value">{{ ocupados }}</div>
-      </div>
-      <div>
-        <div class="meta-label">Slots livres</div>
-        <div class="meta-value">{{ slots_livres }}</div>
-      </div>
-      <div>
-        <div class="meta-label">ID_PLANTA</div>
-        <div class="meta-value">{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% else %}-{% endif %}</div>
-      </div>
-      <div>
-        <div class="meta-label">Criado por</div>
-        <div class="meta-value">{{ rack.cliente.nome }}</div>
-      </div>
-    </div>
-    <div class="rack-highlight">
-      <div class="rack-highlight-title">Disponiveis</div>
-      {% if canais_disponiveis %}
-        <div class="module-meta-row">
-          {% for item in canais_disponiveis %}
-            <span class="module-meta-pill">{{ item.tipo }} {{ item.total|stringformat:"02d" }}</span>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="muted">Sem canais disponiveis.</div>
-      {% endif %}
-    </div>
     <details class="io-card io-discrete">
-      <summary class="io-discrete-summary">
+      <summary class="io-discrete-summary compact">
         <span class="io-title">Editar rack</span>
-        <span class="muted">Clique para ajustar informacoes do rack.</span>
       </summary>
       <div class="io-discrete-body">
         <form class="channel-form" method="post">
