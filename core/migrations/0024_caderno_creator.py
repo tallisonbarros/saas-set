@@ -16,6 +16,9 @@ def set_caderno_creator(apps, schema_editor):
         if link:
             caderno.criador_id = link.perfilusuario_id
             caderno.save(update_fields=["criador"])
+        if not caderno.criado_em:
+            caderno.criado_em = timezone.now()
+            caderno.save(update_fields=["criado_em"])
 
 
 def ensure_default_cadernos(apps, schema_editor):
@@ -23,9 +26,9 @@ def ensure_default_cadernos(apps, schema_editor):
     PerfilUsuario = apps.get_model("core", "PerfilUsuario")
     for perfil in PerfilUsuario.objects.all():
         if not Caderno.objects.filter(nome="CAPEX", criador_id=perfil.id).exists():
-            Caderno.objects.create(nome="CAPEX", ativo=True, criador_id=perfil.id)
+            Caderno.objects.create(nome="CAPEX", ativo=True, criador_id=perfil.id, criado_em=timezone.now())
         if not Caderno.objects.filter(nome="OPEX", criador_id=perfil.id).exists():
-            Caderno.objects.create(nome="OPEX", ativo=True, criador_id=perfil.id)
+            Caderno.objects.create(nome="OPEX", ativo=True, criador_id=perfil.id, criado_em=timezone.now())
 
 
 class Migration(migrations.Migration):
@@ -50,7 +53,6 @@ class Migration(migrations.Migration):
             model_name="caderno",
             name="criado_em",
             field=models.DateTimeField(default=timezone.now),
-            preserve_default=False,
         ),
         migrations.RunPython(set_caderno_creator, migrations.RunPython.noop),
         migrations.RemoveField(
