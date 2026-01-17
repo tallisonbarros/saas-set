@@ -6,8 +6,18 @@ from django.db import migrations
 def add_default_cadernos(apps, schema_editor):
     Caderno = apps.get_model("core", "Caderno")
     PerfilUsuario = apps.get_model("core", "PerfilUsuario")
-    capex, _ = Caderno.objects.get_or_create(nome="CAPEX", defaults={"ativo": True})
-    opex, _ = Caderno.objects.get_or_create(nome="OPEX", defaults={"ativo": True})
+    capex = Caderno.objects.filter(nome="CAPEX").order_by("id").first()
+    if not capex:
+        capex = Caderno.objects.create(nome="CAPEX", ativo=True)
+    else:
+        capex.ativo = True
+        capex.save(update_fields=["ativo"])
+    opex = Caderno.objects.filter(nome="OPEX").order_by("id").first()
+    if not opex:
+        opex = Caderno.objects.create(nome="OPEX", ativo=True)
+    else:
+        opex.ativo = True
+        opex.save(update_fields=["ativo"])
     clientes = PerfilUsuario.objects.all()
     if clientes.exists():
         capex.clientes.add(*clientes)
