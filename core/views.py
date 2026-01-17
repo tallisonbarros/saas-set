@@ -641,6 +641,45 @@ def proposta_detail(request, pk):
         proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
         proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    message = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_value":
+            if proposta.criada_por_id != request.user.id:
+                return HttpResponseForbidden("Sem permissao.")
+            if proposta.status != Proposta.Status.PENDENTE:
+                message = "Nao e possivel alterar o valor apos aprovacao."
+            else:
+                valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
+                try:
+                    valor = Decimal(valor_raw)
+                except (InvalidOperation, ValueError):
+                    valor = None
+                if valor is None:
+                    message = "Informe um valor valido."
+                else:
+                    proposta.valor = valor
+                    proposta.save(update_fields=["valor"])
+                    return redirect("proposta_detail", pk=proposta.pk)
+        if action == "update_status":
+            if proposta.criada_por_id != request.user.id:
+                return HttpResponseForbidden("Sem permissao.")
+            if proposta.status == Proposta.Status.PENDENTE:
+                message = "Aguardando aprovacao. Status so pode ser alterado apos aprovacao."
+            else:
+                novo_status = request.POST.get("status")
+                if novo_status in Proposta.Status.values:
+                    proposta.status = novo_status
+                    proposta.save(update_fields=["status"])
+                    return redirect("proposta_detail", pk=proposta.pk)
+        if action == "delete_proposta":
+            if proposta.criada_por_id != request.user.id:
+                return HttpResponseForbidden("Sem permissao.")
+            if proposta.status != Proposta.Status.PENDENTE:
+                message = "Nao e possivel excluir apos aprovacao."
+            else:
+                proposta.delete()
+                return redirect("propostas")
     return render(
         request,
         "core/proposta_detail.html",
@@ -648,6 +687,7 @@ def proposta_detail(request, pk):
             "cliente": cliente,
             "proposta": proposta,
             "is_contratante": _has_tipo(request.user, "Contratante"),
+            "message": message,
         },
     )
 

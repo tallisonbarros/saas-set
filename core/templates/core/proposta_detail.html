@@ -29,6 +29,9 @@
       <h1 style="margin: 6px 0 8px 0;">{{ proposta.nome }}</h1>
       <div class="muted">{{ proposta.descricao|linebreaksbr }}</div>
     </div>
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
     <div class="stack">
       <div><strong>Codigo:</strong> {{ proposta.codigo }}</div>
       <div><strong>Prioridade:</strong> {{ proposta.prioridade }}</div>
@@ -53,8 +56,44 @@
         <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ proposta.prioridade }}">
         <label for="id_observacao">Observacao</label>
         <textarea id="id_observacao" name="observacao">{{ proposta.observacao_cliente }}</textarea>
-        <button class="btn btn-ghost" type="submit">Salvar</button>
+        <button class="btn btn-ghost icon-only" type="submit" title="Salvar" aria-label="Salvar">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5h10l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+            <path d="M8 5v6h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+            <path d="M8 19v-6h8v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+          </svg>
+        </button>
       </form>
+      {% if proposta.criada_por_id == request.user.id %}
+        <div class="user-card">
+          <div class="panel-title">Gerenciar proposta</div>
+          <form method="post" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_value">
+            <label>Valor (antes da aprovacao)</label>
+            <input type="text" name="valor" value="{{ proposta.valor }}">
+            <button class="btn btn-primary" type="submit">Atualizar valor</button>
+          </form>
+          <form method="post" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_status">
+            <label>Status (apos aprovacao)</label>
+            <select name="status">
+              {% for status, label in proposta.Status.choices %}
+                <option value="{{ status }}" {% if status == proposta.status %}selected{% endif %}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-outline" type="submit">Atualizar status</button>
+          </form>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_proposta">
+            <button class="btn btn-outline" type="submit">Excluir proposta</button>
+          </form>
+        </div>
+      {% endif %}
       {% if proposta.status == "PENDENTE" and proposta.cliente.usuario_id == request.user.id %}
         <div style="display: flex; gap: 12px;">
           <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
@@ -68,6 +107,6 @@
         </div>
       {% endif %}
     </div>
-    <a class="btn btn-outline" href="{% url 'propostas' %}">Voltar</a>
+    <a class="btn btn-outline" href="{% url 'propostas' %}">&lt; PROPOSTAS</a>
   </section>
 {% endblock %}
