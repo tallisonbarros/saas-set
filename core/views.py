@@ -367,6 +367,36 @@ def ios_rack_detail(request, pk):
 
 
 @login_required
+def ios_rack_io_list(request, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    if cliente:
+        rack = get_object_or_404(
+            RackIO,
+            Q(pk=pk),
+            Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()),
+        )
+    else:
+        rack = get_object_or_404(RackIO, pk=pk)
+    slot_pos_subquery = RackSlotIO.objects.filter(modulo_id=OuterRef("modulo_id")).values("posicao")[:1]
+    canais = (
+        CanalRackIO.objects.filter(modulo__rack=rack)
+        .select_related("modulo", "modulo__modulo_modelo", "tipo")
+        .annotate(slot_pos=Subquery(slot_pos_subquery))
+        .order_by("slot_pos", "indice")
+    )
+    return render(
+        request,
+        "core/ios_rack_io_list.html",
+        {
+            "rack": rack,
+            "canais": canais,
+        },
+    )
+
+
+@login_required
 def ios_modulos(request):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:

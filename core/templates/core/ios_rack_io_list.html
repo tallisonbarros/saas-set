@@ -1,0 +1,80 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}IOs - {{ rack.nome }}{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
+  </div>
+  <section class="card ios-hero io-compact">
+    <div class="ios-hero-head io-center">
+      <div>
+        <h1 class="hero-title">IOs do rack</h1>
+        <p class="hero-subtitle">{{ rack.nome }}</p>
+        {% if rack.descricao %}
+          <p class="muted">{{ rack.descricao }}</p>
+        {% endif %}
+        <div class="module-actions-centered">
+          <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Voltar ao rack</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="io-card io-compact">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Lista completa de IOs</h2>
+        <p class="muted">Visualizacao concentrada por slot, modulo e canal.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="table io-search-table">
+        <thead>
+          <tr>
+            <th>Slot</th>
+            <th>Modulo</th>
+            <th>Canal</th>
+            <th>Nome</th>
+            <th>Tipo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for canal in canais %}
+            <tr>
+              <td>
+                {% if canal.slot_pos %}
+                  Slot{{ canal.slot_pos|stringformat:"02d" }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ canal.modulo.nome|default:canal.modulo.modulo_modelo.nome }}</td>
+              <td>CH{{ canal.indice|stringformat:"02d" }}</td>
+              <td>
+                {% if canal.nome %}
+                  {{ canal.nome }}
+                {% else %}
+                  Sem nome
+                {% endif %}
+              </td>
+              <td>{{ canal.tipo.nome }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="muted">Nenhum IO cadastrado neste rack.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
