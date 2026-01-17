@@ -15,32 +15,10 @@
     </a>
   </div>
   <section class="card ios-hero io-compact">
-    <div class="ios-hero-head">
+    <div class="ios-hero-head io-center">
       <div>
         <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
-        <div class="module-meta-row">
-          <span class="module-meta-pill">{{ module.modulo_modelo.marca }} - {{ module.modulo_modelo.modelo }}</span>
-          <span class="module-meta-pill">Tipo base: {{ module.modulo_modelo.tipo_base.nome }}</span>
-          <span class="module-meta-pill">Canais: {{ module.modulo_modelo.quantidade_canais }}</span>
-        </div>
-        <div class="module-header-actions">
-          <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
-          <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
-          {% if prev_slot %}
-            <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}">
-              Modulo anterior
-            </a>
-          {% endif %}
-          {% if next_slot %}
-            <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}">
-              Proximo modulo
-            </a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    <div class="rack-status module-header-grid">
-      <div>
+        <p class="module-center-meta">Rack</p>
         <div class="rack-slot-title">{{ rack.nome }}</div>
         <div class="rack-slot-nav">
           {% if prev_slot %}
@@ -61,10 +39,9 @@
             <span class="rack-slot-arrow disabled">&gt;</span>
           {% endif %}
         </div>
-      </div>
-      <div>
-        <div class="meta-label">Descricao do rack</div>
-        <div class="meta-value">{% if rack.descricao %}{{ rack.descricao }}{% else %}-{% endif %}</div>
+        {% if rack.descricao %}
+          <p class="module-center-desc">{{ rack.descricao }}</p>
+        {% endif %}
       </div>
     </div>
   </section>
@@ -96,6 +73,10 @@
         <button class="btn btn-primary" type="submit">Salvar ajustes</button>
       </div>
     </form>
+    <div class="module-actions-centered">
+      <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
+      <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
+    </div>
   </section>
 
   <section class="io-card io-compact">
