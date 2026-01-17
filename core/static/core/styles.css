@@ -1160,6 +1160,12 @@ select {
   z-index: 2;
 }
 
+.slot-hint {
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 2px;
+}
+
 .slot-empty {
   display: grid;
   gap: 8px;

@@ -100,7 +100,7 @@
           {% if slot.modulo %}
             <div class="proposal-meta">{{ slot.modulo.modulo_modelo.marca }} - {{ slot.modulo.modulo_modelo.modelo }}</div>
             <div class="slot-actions">
-              <a class="btn btn-ghost" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}">Abrir modulo</a>
+              <span class="slot-hint">...</span>
             </div>
           {% else %}
             <div class="proposal-meta">Escolha um modulo para este slot.</div>
