@@ -1067,6 +1067,33 @@ select {
   color: var(--muted);
 }
 
+.module-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.module-meta-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff6ef;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.module-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.module-header-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .rack-layout {
   display: grid;
   gap: 12px;

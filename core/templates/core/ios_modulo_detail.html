@@ -14,71 +14,51 @@
       </svg>
     </a>
   </div>
-  <div class="page-actions">
-    <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
-    <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
-    {% if prev_slot %}
-      <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}">
-        Modulo anterior
-      </a>
-    {% endif %}
-    {% if next_slot %}
-      <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}">
-        Proximo modulo
-      </a>
-    {% endif %}
-  </div>
   <section class="card ios-hero io-compact">
     <div class="ios-hero-head">
       <div>
         <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
-        <p class="hero-subtitle">{{ module.modulo_modelo.marca }} - {{ module.modulo_modelo.modelo }}</p>
-        <div class="rack-highlight">
-          {% if slot %}
-            <span class="rack-highlight-title">{{ rack.nome }} - Slot{{ slot.posicao|stringformat:"02d" }}</span>
-          {% else %}
-            <span class="rack-highlight-title">{{ rack.nome }} - Slot--</span>
+        <div class="module-meta-row">
+          <span class="module-meta-pill">{{ module.modulo_modelo.marca }} - {{ module.modulo_modelo.modelo }}</span>
+          <span class="module-meta-pill">Tipo base: {{ module.modulo_modelo.tipo_base.nome }}</span>
+          <span class="module-meta-pill">Canais: {{ module.modulo_modelo.quantidade_canais }}</span>
+        </div>
+        <div class="module-header-actions">
+          <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
+          <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
+          {% if prev_slot %}
+            <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}">
+              Modulo anterior
+            </a>
           {% endif %}
-          {% if rack.descricao %}
-            <span class="rack-highlight-meta">{{ rack.descricao }}</span>
+          {% if next_slot %}
+            <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}">
+              Proximo modulo
+            </a>
           {% endif %}
         </div>
       </div>
     </div>
-    <div class="rack-status">
-      <div>
-        <div class="meta-label">Total de canais</div>
-        <div class="meta-value">{{ module.modulo_modelo.quantidade_canais }}</div>
-      </div>
-      <div>
-        <div class="meta-label">Tipo base</div>
-        <div class="meta-value">{{ module.modulo_modelo.tipo_base.nome }}</div>
-      </div>
+    <div class="rack-status module-header-grid">
       <div>
         <div class="meta-label">Rack</div>
         <div class="meta-value">{{ rack.nome }}</div>
       </div>
-    </div>
-  </section>
-
-  <section class="io-card io-compact">
-    <div class="io-card-head">
       <div>
-        <h2 class="io-title">Nome do modulo</h2>
-        <p class="muted">Defina o nome que aparecera no rack.</p>
+        <div class="meta-label">Slot</div>
+        <div class="meta-value">
+          {% if slot %}
+            Slot{{ slot.posicao|stringformat:"02d" }}
+          {% else %}
+            Slot--
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <div class="meta-label">Descricao do rack</div>
+        <div class="meta-value">{% if rack.descricao %}{{ rack.descricao }}{% else %}-{% endif %}</div>
       </div>
     </div>
-    <form class="channel-form" method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="update_module_name">
-      <div class="channel-row">
-        <div class="channel-index">Nome</div>
-        <input type="text" name="nome" value="{{ module.nome }}" placeholder="{{ module.modulo_modelo.nome }}">
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Salvar nome</button>
-      </div>
-    </form>
   </section>
 
   <section class="io-card io-compact">
@@ -147,6 +127,26 @@
       <input type="hidden" name="action" value="delete_module">
       <div class="form-actions">
         <button class="btn btn-outline" type="submit">Excluir modulo</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="io-card io-compact">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Nome do modulo</h2>
+        <p class="muted">Defina o nome que aparecera no rack.</p>
+      </div>
+    </div>
+    <form class="channel-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_module_name">
+      <div class="channel-row">
+        <div class="channel-index">Nome</div>
+        <input type="text" name="nome" value="{{ module.nome }}" placeholder="{{ module.modulo_modelo.nome }}">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Salvar nome</button>
       </div>
     </form>
   </section>
