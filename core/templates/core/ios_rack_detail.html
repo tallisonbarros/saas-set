@@ -100,24 +100,7 @@
           {% if slot.modulo %}
             <div class="proposal-meta">{{ slot.modulo.modulo_modelo.marca }} - {{ slot.modulo.modulo_modelo.modelo }}</div>
             <div class="slot-actions">
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="move_left">
-                <input type="hidden" name="slot_id" value="{{ slot.id }}">
-                <button class="btn btn-ghost icon-only" type="submit">&lt;</button>
-              </form>
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="move_right">
-                <input type="hidden" name="slot_id" value="{{ slot.id }}">
-                <button class="btn btn-ghost icon-only" type="submit">&gt;</button>
-              </form>
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="remove_from_slot">
-                <input type="hidden" name="slot_id" value="{{ slot.id }}">
-                <button class="btn btn-outline icon-only" type="submit">X</button>
-              </form>
+              <a class="btn btn-ghost" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}">Abrir modulo</a>
             </div>
           {% else %}
             <div class="proposal-meta">Escolha um modulo para este slot.</div>

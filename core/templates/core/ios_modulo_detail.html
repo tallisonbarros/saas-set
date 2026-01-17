@@ -17,8 +17,18 @@
   <div class="page-actions">
     <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar aos IOs</a>
     <a class="btn btn-primary" href="{% url 'ios_rack_detail' rack.id %}">Abrir rack do modulo</a>
+    {% if prev_slot %}
+      <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}">
+        Modulo anterior
+      </a>
+    {% endif %}
+    {% if next_slot %}
+      <a class="btn btn-outline" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}">
+        Proximo modulo
+      </a>
+    {% endif %}
   </div>
-  <section class="card ios-hero">
+  <section class="card ios-hero io-compact">
     <div class="ios-hero-head">
       <div>
         <h1 class="hero-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
@@ -51,7 +61,7 @@
     </div>
   </section>
 
-  <section class="io-card">
+  <section class="io-card io-compact">
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Nome do modulo</h2>
@@ -71,7 +81,7 @@
     </form>
   </section>
 
-  <section class="io-card">
+  <section class="io-card io-compact">
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Nomes dos canais</h2>
@@ -96,6 +106,47 @@
       {% endfor %}
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Salvar ajustes</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="io-card io-compact">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Mover modulo</h2>
+        <p class="muted">Escolha um slot vazio no rack.</p>
+      </div>
+    </div>
+    <form class="channel-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="move_to_slot">
+      <div class="channel-row">
+        <div class="channel-index">Slot vazio</div>
+        <select name="slot_id" required>
+          <option value="">Selecione</option>
+          {% for vacant in vacant_slots %}
+            <option value="{{ vacant.id }}">Slot{{ vacant.posicao|stringformat:"02d" }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-outline" type="submit">Mover modulo</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="io-card io-compact">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Excluir modulo</h2>
+        <p class="muted">Remove o modulo e libera o slot.</p>
+      </div>
+    </div>
+    <form class="channel-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_module">
+      <div class="form-actions">
+        <button class="btn btn-outline" type="submit">Excluir modulo</button>
       </div>
     </form>
   </section>

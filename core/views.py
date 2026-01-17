@@ -398,6 +398,21 @@ def ios_rack_modulo_detail(request, pk):
     else:
         module = get_object_or_404(module_qs, pk=pk)
     slot = RackSlotIO.objects.filter(modulo=module).select_related("rack").first()
+    prev_slot = None
+    next_slot = None
+    if slot:
+        prev_slot = (
+            RackSlotIO.objects.filter(rack=module.rack, modulo__isnull=False, posicao__lt=slot.posicao)
+            .select_related("modulo")
+            .order_by("-posicao")
+            .first()
+        )
+        next_slot = (
+            RackSlotIO.objects.filter(rack=module.rack, modulo__isnull=False, posicao__gt=slot.posicao)
+            .select_related("modulo")
+            .order_by("posicao")
+            .first()
+        )
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_module_name":
@@ -405,6 +420,21 @@ def ios_rack_modulo_detail(request, pk):
             module.nome = nome
             module.save(update_fields=["nome"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
+        if action == "move_to_slot":
+            target_slot_id = request.POST.get("slot_id")
+            target_slot = get_object_or_404(RackSlotIO, pk=target_slot_id, rack=module.rack)
+            if target_slot.modulo_id:
+                return redirect("ios_rack_modulo_detail", pk=module.pk)
+            if slot:
+                slot.modulo = None
+                slot.save(update_fields=["modulo"])
+            target_slot.modulo = module
+            target_slot.save(update_fields=["modulo"])
+            return redirect("ios_rack_modulo_detail", pk=module.pk)
+        if action == "delete_module":
+            rack_id = module.rack_id
+            module.delete()
+            return redirect("ios_rack_detail", pk=rack_id)
         if action == "update_channels":
             for channel in module.canais.all():
                 nome_raw = request.POST.get(f"nome_{channel.id}")
@@ -418,6 +448,7 @@ def ios_rack_modulo_detail(request, pk):
             return redirect("ios_rack_modulo_detail", pk=module.pk)
     channels = module.canais.select_related("tipo").order_by("indice")
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+    vacant_slots = RackSlotIO.objects.filter(rack=module.rack, modulo__isnull=True).order_by("posicao")
     return render(
         request,
         "core/ios_modulo_detail.html",
@@ -427,6 +458,9 @@ def ios_rack_modulo_detail(request, pk):
             "channel_types": channel_types,
             "rack": module.rack,
             "slot": slot,
+            "vacant_slots": vacant_slots,
+            "prev_slot": prev_slot,
+            "next_slot": next_slot,
         },
     )
 

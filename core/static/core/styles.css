@@ -909,10 +909,13 @@ select {
 
 .rack-grid {
   align-items: stretch;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .slot-card {
-  min-height: 160px;
+  min-height: 120px;
+  padding: 12px;
 }
 
 .slot-card .proposal-link {
@@ -1140,6 +1143,10 @@ select {
   display: grid;
   gap: 10px;
   margin-top: 12px;
+}
+
+.io-compact {
+  padding: 16px;
 }
 
 .channel-row {
