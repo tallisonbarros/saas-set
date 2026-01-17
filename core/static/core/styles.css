@@ -364,6 +364,30 @@ body {
   flex-wrap: wrap;
 }
 
+.proposal-summary {
+  margin: 12px 0 8px;
+}
+
+.proposal-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.proposal-origin.sent {
+  color: #a84200;
+}
+
+.proposal-origin.received {
+  color: #2c6f4f;
+}
+
 .finance-toolbar {
   display: flex;
   justify-content: space-between;

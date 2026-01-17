@@ -76,6 +76,15 @@ def _has_tipo_any(user, nomes):
     return cliente.tipos.filter(nome__in=nomes).exists()
 
 
+def _ensure_default_cadernos(cliente):
+    if not cliente:
+        return
+    capex, _ = Caderno.objects.get_or_create(nome="CAPEX", defaults={"ativo": True})
+    opex, _ = Caderno.objects.get_or_create(nome="OPEX", defaults={"ativo": True})
+    capex.clientes.add(cliente)
+    opex.clientes.add(cliente)
+
+
 def home(request):
     if request.user.is_authenticated:
         logout(request)
@@ -705,9 +714,9 @@ def aprovar_proposta(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    if not _has_tipo(request.user, "Contratante"):
-        return HttpResponseForbidden("Somente contratante pode aprovar.")
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    if proposta.cliente.usuario_id != request.user.id:
+        return HttpResponseForbidden("Somente o destinatario pode aprovar.")
     if proposta.status == Proposta.Status.PENDENTE:
         proposta.status = Proposta.Status.APROVADA
         proposta.decidido_em = timezone.now()
@@ -722,9 +731,9 @@ def reprovar_proposta(request, pk):
     if _user_role(request.user) == "FINANCEIRO":
         return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    if not _has_tipo(request.user, "Contratante"):
-        return HttpResponseForbidden("Somente contratante pode reprovar.")
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+    if proposta.cliente.usuario_id != request.user.id:
+        return HttpResponseForbidden("Somente o destinatario pode reprovar.")
     if proposta.status == Proposta.Status.PENDENTE:
         proposta.status = Proposta.Status.REPROVADA
         proposta.decidido_em = timezone.now()
@@ -805,6 +814,7 @@ def user_management(request):
                 )
                 if tipos:
                     cliente.tipos.set(tipos)
+                _ensure_default_cadernos(cliente)
                 return redirect("usuarios")
     else:
         form = UserCreateForm()
@@ -866,6 +876,7 @@ def usuarios_gerenciar_usuario(request, pk):
                     empresa=empresa,
                     sigla_cidade=sigla_cidade,
                 )
+                _ensure_default_cadernos(perfil)
             else:
                 if nome:
                     perfil.nome = nome
@@ -938,6 +949,7 @@ def meu_perfil(request):
                     empresa=empresa,
                     sigla_cidade=sigla_cidade,
                 )
+                _ensure_default_cadernos(perfil)
             else:
                 if nome:
                     perfil.nome = nome
