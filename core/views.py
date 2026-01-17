@@ -1165,6 +1165,11 @@ def financeiro_cadernos(request):
             caderno.ativo = not caderno.ativo
             caderno.save(update_fields=["ativo"])
             return redirect("financeiro_cadernos")
+        if action == "delete_caderno":
+            caderno_id = request.POST.get("caderno_id")
+            caderno = get_object_or_404(Caderno, pk=caderno_id, clientes=cliente)
+            caderno.delete()
+            return redirect("financeiro_cadernos")
 
     cadernos = Caderno.objects.filter(clientes=cliente).annotate(total=Sum("compras__valor")).order_by("nome")
     return render(

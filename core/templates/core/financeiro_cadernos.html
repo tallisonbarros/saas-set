@@ -58,6 +58,12 @@
                   {% if c.ativo %}Desativar{% else %}Ativar{% endif %}
                 </button>
               </form>
+              <form method="post" class="proposal-actions">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_caderno">
+                <input type="hidden" name="caderno_id" value="{{ c.id }}">
+                <button class="btn btn-outline" type="submit">Excluir</button>
+              </form>
             </div>
           {% endfor %}
         </div>
