@@ -24,6 +24,9 @@
         <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
       </div>
     </div>
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
     <form class="channel-form" method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="update_rack">
@@ -88,15 +91,16 @@
             {% endif %}
             <div class="proposal-head">
               <div>
-                <div class="proposal-title">Slot{{ slot.posicao|stringformat:"02d" }}</div>
                 {% if slot.modulo %}
                   {% if slot.modulo.nome %}
-                    <div class="proposal-meta">{{ slot.modulo.nome }}</div>
+                    <div class="proposal-title">{{ slot.modulo.nome }}</div>
                     <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
                   {% else %}
-                    <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
+                    <div class="proposal-title">{{ slot.modulo.modulo_modelo.nome }}</div>
                   {% endif %}
+                  <div class="proposal-meta">Slot{{ slot.posicao|stringformat:"02d" }}</div>
                 {% else %}
+                  <div class="proposal-title">Slot{{ slot.posicao|stringformat:"02d" }}</div>
                   <div class="proposal-meta">Slot livre</div>
                 {% endif %}
               </div>

@@ -102,6 +102,7 @@ def ios_list(request):
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
+    message = None
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_rack":
@@ -223,7 +224,27 @@ def ios_rack_detail(request, pk):
                 else:
                     slots_para_remover = rack.slots.filter(posicao__gt=slots_total).order_by("posicao")
                     if slots_para_remover.filter(modulo__isnull=False).exists():
-                        return redirect("ios_rack_detail", pk=rack.pk)
+                        message = "Nao foi possivel reduzir: existem slots ocupados acima do novo limite."
+                        slots = rack.slots.select_related("modulo", "modulo__modulo_modelo").order_by("posicao")
+                        modules = (
+                            ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True))
+                            .select_related("tipo_base")
+                            .order_by("nome")
+                        )
+                        ocupados = rack.slots.filter(modulo__isnull=False).count()
+                        slots_livres = max(rack.slots_total - ocupados, 0)
+                        return render(
+                            request,
+                            "core/ios_rack_detail.html",
+                            {
+                                "rack": rack,
+                                "slots": slots,
+                                "modules": modules,
+                                "ocupados": ocupados,
+                                "slots_livres": slots_livres,
+                                "message": message,
+                            },
+                        )
                     slots_para_remover.delete()
                 rack.slots_total = slots_total
             rack.save(update_fields=["nome", "descricao", "id_planta", "slots_total"])
@@ -339,6 +360,7 @@ def ios_rack_detail(request, pk):
             "modules": modules,
             "ocupados": ocupados,
             "slots_livres": slots_livres,
+            "message": message,
         },
     )
 
