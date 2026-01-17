@@ -106,26 +106,5 @@
       </div>
     </section>
 
-    <section class="io-card io-wide">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Classificacao de canais</h2>
-          <p class="muted">Padroes atuais para os tipos de I/O.</p>
-        </div>
-      </div>
-      <div class="channel-types">
-        {% for channel in channel_types %}
-          <span class="channel-pill">{{ channel.nome }}</span>
-        {% endfor %}
-        {% if can_manage %}
-          <form method="post" class="channel-type-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_channel_type">
-            <input type="text" name="nome" placeholder="NOVO TIPO" maxlength="20" required>
-            <button class="btn btn-outline" type="submit">Adicionar tipo</button>
-          </form>
-        {% endif %}
-      </div>
-    </section>
   </div>
 {% endblock %}

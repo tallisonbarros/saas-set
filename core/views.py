@@ -16,6 +16,7 @@ from .models import (
     CanalRackIO,
     CategoriaCompra,
     Caderno,
+    StatusProposta,
     CentroCusto,
     PerfilUsuario,
     Compra,
@@ -604,23 +605,39 @@ def proposta_list(request):
             propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
     elif cliente:
         propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
+    status_options = list(StatusProposta.objects.filter(ativo=True).order_by("ordem", "nome"))
+    status_codes = [status.codigo for status in status_options]
+    label_cases = [When(status=status.codigo, then=Value(status.nome)) for status in status_options]
     status = request.GET.get("status")
-    if status in Proposta.Status.values:
+    if status in status_codes:
         propostas = propostas.filter(status=status)
         if status == Proposta.Status.APROVADA:
             propostas = propostas.order_by("prioridade", "-criado_em")
     else:
-        propostas = propostas.exclude(status__in=[Proposta.Status.REPROVADA, Proposta.Status.FINALIZADO])
+        exclude_codes = [
+            code
+            for code in [Proposta.Status.REPROVADA, Proposta.Status.FINALIZADO]
+            if code in status_codes
+        ]
+        if exclude_codes:
+            propostas = propostas.exclude(status__in=exclude_codes)
+        order_cases = [When(status=status.codigo, then=Value(status.ordem)) for status in status_options]
         propostas = propostas.annotate(
             status_order=Case(
-                When(status=Proposta.Status.PENDENTE, then=Value(1)),
-                When(status=Proposta.Status.EXECUTANDO, then=Value(2)),
-                When(status=Proposta.Status.APROVADA, then=Value(3)),
-                When(status=Proposta.Status.LEVANTAMENTO, then=Value(4)),
-                default=Value(5),
+                *order_cases,
+                default=Value(999),
                 output_field=IntegerField(),
             )
         ).order_by("status_order", "-criado_em")
+    if label_cases:
+        propostas = propostas.annotate(
+            status_label=Case(
+                *label_cases,
+                default=Value(""),
+            )
+        )
+    else:
+        propostas = propostas.annotate(status_label=Value(""))
     return render(
         request,
         "core/proposta_list.html",
@@ -630,6 +647,7 @@ def proposta_list(request):
             "status_filter": status,
             "is_vendedor": _has_tipo(request.user, "Vendedor"),
             "current_user_id": request.user.id,
+            "status_options": status_options,
         },
     )
 
@@ -683,6 +701,11 @@ def proposta_detail(request, pk):
             else:
                 proposta.delete()
                 return redirect("propostas")
+    status_options = list(StatusProposta.objects.filter(ativo=True).order_by("ordem", "nome"))
+    status_label = (
+        StatusProposta.objects.filter(codigo=proposta.status).values_list("nome", flat=True).first()
+        or proposta.status
+    )
     return render(
         request,
         "core/proposta_detail.html",
@@ -691,6 +714,8 @@ def proposta_detail(request, pk):
             "proposta": proposta,
             "is_contratante": _has_tipo(request.user, "Contratante"),
             "message": message,
+            "status_options": status_options,
+            "status_label": status_label,
         },
     )
 
@@ -1321,5 +1346,95 @@ def admin_explorar(request):
             "cliente_sort": cliente_sort,
             "proposta_status": proposta_status,
             "proposta_sort": proposta_sort,
+        },
+    )
+
+
+@login_required
+def ajustes_sistema(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    locked_status = {Proposta.Status.PENDENTE, Proposta.Status.APROVADA, Proposta.Status.REPROVADA}
+    message = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_proposta_status":
+            codigo = request.POST.get("codigo", "").strip().upper()
+            nome = request.POST.get("nome", "").strip()
+            ordem_raw = request.POST.get("ordem", "").strip()
+            try:
+                ordem = int(ordem_raw) if ordem_raw else 10
+            except ValueError:
+                ordem = 10
+            if not codigo or not nome:
+                message = "Informe codigo e nome."
+            elif StatusProposta.objects.filter(codigo=codigo).exists():
+                message = "Codigo ja cadastrado."
+            else:
+                StatusProposta.objects.create(codigo=codigo, nome=nome, ativo=True, ordem=ordem)
+        if action == "create_channel_type":
+            nome = request.POST.get("nome", "").strip().upper()
+            if nome:
+                TipoCanalIO.objects.get_or_create(nome=nome, defaults={"ativo": True})
+        if action == "update_proposta_status":
+            status_id = request.POST.get("status_id")
+            status_obj = get_object_or_404(StatusProposta, pk=status_id)
+            if status_obj.codigo in locked_status:
+                message = "Este status e padrao e nao pode ser editado."
+                status_list = StatusProposta.objects.order_by("ordem", "nome")
+                channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+                return render(
+                    request,
+                    "core/ajustes.html",
+                    {
+                        "status_list": status_list,
+                        "message": message,
+                        "channel_types": channel_types,
+                        "locked_status": locked_status,
+                    },
+                )
+            nome = request.POST.get("nome", "").strip()
+            ordem_raw = request.POST.get("ordem", "").strip()
+            ativo = request.POST.get("ativo") == "on"
+            try:
+                ordem = int(ordem_raw) if ordem_raw else status_obj.ordem
+            except ValueError:
+                ordem = status_obj.ordem
+            if nome:
+                status_obj.nome = nome
+            status_obj.ordem = ordem
+            status_obj.ativo = ativo
+            status_obj.save(update_fields=["nome", "ordem", "ativo"])
+        if action == "delete_proposta_status":
+            status_id = request.POST.get("status_id")
+            status_obj = get_object_or_404(StatusProposta, pk=status_id)
+            if status_obj.codigo in locked_status:
+                message = "Este status e padrao e nao pode ser excluido."
+                status_list = StatusProposta.objects.order_by("ordem", "nome")
+                channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+                return render(
+                    request,
+                    "core/ajustes.html",
+                    {
+                        "status_list": status_list,
+                        "message": message,
+                        "channel_types": channel_types,
+                        "locked_status": locked_status,
+                    },
+                )
+            if Proposta.objects.filter(status=status_obj.codigo).exists():
+                message = "Nao e possivel excluir: ha propostas com este status."
+            else:
+                status_obj.delete()
+    status_list = StatusProposta.objects.order_by("ordem", "nome")
+    channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+    return render(
+        request,
+        "core/ajustes.html",
+        {
+            "status_list": status_list,
+            "message": message,
+            "channel_types": channel_types,
+            "locked_status": locked_status,
         },
     )

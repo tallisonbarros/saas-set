@@ -38,7 +38,7 @@
     <div class="stack">
       <div><strong>Codigo:</strong> {{ proposta.codigo }}</div>
       <div><strong>Prioridade:</strong> {{ proposta.prioridade }}</div>
-      <div><strong>Status:</strong> {{ proposta.get_status_display }}</div>
+      <div><strong>Status:</strong> {{ status_label }}</div>
       <div><strong>Valor:</strong> R$ {{ proposta.valor }}</div>
       <div><strong>Enviada para:</strong> {{ proposta.cliente.nome }} ({{ proposta.cliente.email }})</div>
       {% if proposta.criada_por %}
@@ -82,9 +82,9 @@
             <input type="hidden" name="action" value="update_status">
             <label>Status</label>
             <select name="status">
-              {% for status, label in proposta.Status.choices %}
-                <option value="{{ status }}" {% if status == proposta.status %}selected{% endif %}>
-                  {{ label }}
+              {% for status in status_options %}
+                <option value="{{ status.codigo }}" {% if status.codigo == proposta.status %}selected{% endif %}>
+                  {{ status.nome }}
                 </option>
               {% endfor %}
             </select>

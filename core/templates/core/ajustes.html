@@ -1,0 +1,116 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Ajustes do sistema{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
+  </div>
+
+  <section class="card stack">
+    <div>
+      <h1 style="margin: 0;">Ajustes do sistema</h1>
+      <p class="muted">Central de configuracoes gerais e cadastros base.</p>
+    </div>
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
+
+    <div class="panel-grid">
+      <a class="panel-card" href="{% url 'usuarios' %}">
+        <div class="panel-title">Usuarios e Perfis</div>
+        <div class="muted">Criar usuarios, tipos de perfil e IDs.</div>
+      </a>
+      <a class="panel-card" href="{% url 'ios_list' %}">
+        <div class="panel-title">Tipos de IO</div>
+        <div class="muted">Gerenciar classificacao de canais.</div>
+      </a>
+      <a class="panel-card" href="{% url 'financeiro_nova' %}">
+        <div class="panel-title">Status de compras</div>
+        <div class="muted">Cadastrar novos status financeiros.</div>
+      </a>
+      <a class="panel-card" href="{% url 'financeiro_cadernos' %}">
+        <div class="panel-title">Cadernos</div>
+        <div class="muted">Gerenciar cadernos e IDs financeiros.</div>
+      </a>
+      <a class="panel-card" href="/admin/">
+        <div class="panel-title">Admin Django</div>
+        <div class="muted">Opcoes avancadas do sistema.</div>
+      </a>
+    </div>
+
+    <div class="card compact-card">
+      <div class="panel-title">Status de propostas</div>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_proposta_status">
+        <label>Codigo</label>
+        <input type="text" name="codigo" placeholder="PENDENTE" required>
+        <label>Nome</label>
+        <input type="text" name="nome" placeholder="Pendente" required>
+        <label>Ordem</label>
+        <input type="number" name="ordem" min="1" max="999" value="10">
+        <button class="btn btn-primary" type="submit">Adicionar status</button>
+      </form>
+      <div class="tipo-list">
+        {% for status in status_list %}
+          <form method="post" class="tipo-row">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_proposta_status">
+            <input type="hidden" name="status_id" value="{{ status.id }}">
+            {% if status.codigo in locked_status %}
+              <input type="text" name="nome" value="{{ status.nome }}" readonly>
+              <input type="number" name="ordem" min="1" max="999" value="{{ status.ordem }}" readonly>
+              <label class="checkbox-item">
+                <input type="checkbox" name="ativo" {% if status.ativo %}checked{% endif %} disabled>
+                Ativo
+              </label>
+              <button class="btn btn-ghost" type="submit" disabled>Salvar</button>
+            {% else %}
+              <input type="text" name="nome" value="{{ status.nome }}">
+              <input type="number" name="ordem" min="1" max="999" value="{{ status.ordem }}">
+              <label class="checkbox-item">
+                <input type="checkbox" name="ativo" {% if status.ativo %}checked{% endif %}>
+                Ativo
+              </label>
+              <button class="btn btn-ghost" type="submit">Salvar</button>
+            {% endif %}
+          </form>
+          <form method="post" class="tipo-row">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_proposta_status">
+            <input type="hidden" name="status_id" value="{{ status.id }}">
+            <button class="btn btn-outline" type="submit" {% if status.codigo in locked_status %}disabled{% endif %}>
+              Excluir
+            </button>
+          </form>
+        {% empty %}
+          <p class="muted">Nenhum status cadastrado.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card compact-card">
+      <div class="panel-title">Classificacao de canais</div>
+      <div class="channel-types">
+        {% for channel in channel_types %}
+          <span class="channel-pill">{{ channel.nome }}</span>
+        {% endfor %}
+        <form method="post" class="channel-type-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_channel_type">
+          <input type="text" name="nome" placeholder="NOVO TIPO" maxlength="20" required>
+          <button class="btn btn-outline" type="submit">Adicionar tipo</button>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}

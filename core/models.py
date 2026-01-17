@@ -49,6 +49,19 @@ class Caderno(models.Model):
         return self.nome
 
 
+class StatusProposta(models.Model):
+    codigo = models.CharField(max_length=20, unique=True)
+    nome = models.CharField(max_length=60)
+    ativo = models.BooleanField(default=True)
+    ordem = models.PositiveSmallIntegerField(default=10)
+
+    class Meta:
+        ordering = ["ordem", "nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 class CategoriaCompra(models.Model):
     nome = models.CharField(max_length=80, unique=True)
 
@@ -120,7 +133,7 @@ class Proposta(models.Model):
         default=50,
         validators=[MinValueValidator(1), MaxValueValidator(99)],
     )
-    status = models.CharField(max_length=15, choices=Status.choices, default=Status.PENDENTE)
+    status = models.CharField(max_length=20, default=Status.PENDENTE)
     criado_em = models.DateTimeField(auto_now_add=True)
     decidido_em = models.DateTimeField(null=True, blank=True)
     aprovado_por = models.ForeignKey(

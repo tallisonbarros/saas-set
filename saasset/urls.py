@@ -36,6 +36,7 @@ urlpatterns = [
     path('propostas/<int:pk>/reprovar/', views.reprovar_proposta, name="reprovar_proposta"),
     path('propostas/<int:pk>/observacao/', views.salvar_observacao, name="salvar_observacao"),
     path('meu-perfil/', views.meu_perfil, name="meu_perfil"),
+    path('ajustes/', views.ajustes_sistema, name="ajustes_sistema"),
     path('usuarios/', views.user_management, name="usuarios"),
     path('usuarios/<int:pk>/', views.usuarios_gerenciar_usuario, name="usuarios_gerenciar_usuario"),
     path('financeiro/', views.financeiro_overview, name="financeiro"),
