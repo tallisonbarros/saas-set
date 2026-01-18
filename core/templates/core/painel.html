@@ -14,15 +14,20 @@
       </svg>
     </a>
   </div>
-  <section class="card">
-    <div class="page-hud">
+  <section class="card panel-shell">
+    <div class="page-hud panel-hud">
       <div class="hud-top">
-        <div class="hud-title">Painel principal</div>
+        <div class="hud-title">Command Center</div>
+        <div class="hud-pill">Online</div>
       </div>
-      <div class="page-hud-head">
+      <div class="page-hud-head panel-hero-head">
         <div>
+          <div class="page-kicker">Plataforma SET</div>
           <h1 class="page-title">Bem vindo {{ request.user.first_name|default:request.user.username }}</h1>
-          <p class="page-subtitle">Selecione um modulo para continuar.</p>
+          <p class="page-subtitle">
+            O SET centraliza operacoes industriais em um unico cockpit: propostas, financeiro, listas de IO e
+            rastreio tecnico com visao de status em tempo real.
+          </p>
         </div>
         <div class="page-actions">
           <form method="post" action="{% url 'logout' %}">
@@ -31,54 +36,136 @@
           </form>
         </div>
       </div>
+      <div class="panel-hero-grid">
+        <div class="panel-hero-card">
+          <div class="panel-hero-title">Missao ativa</div>
+          <div class="panel-hero-text">Converta propostas em execucao com workflow claro.</div>
+        </div>
+        <div class="panel-hero-card">
+          <div class="panel-hero-title">HUD tecnico</div>
+          <div class="panel-hero-text">Controle IOs, status e insumos sem perder contexto.</div>
+        </div>
+        <div class="panel-hero-card">
+          <div class="panel-hero-title">Base estrategica</div>
+          <div class="panel-hero-text">Central de dados para clientes, projetos e custos.</div>
+        </div>
+      </div>
     </div>
-    <div class="panel-grid panel-grid-spaced">
-      {% if is_cliente or role == "ADMIN" %}
-        <a class="panel-card" href="{% url 'propostas' %}">
-          <div class="panel-title">Propostas</div>
-          <div class="muted">Visualizar e aprovar propostas.</div>
-        </a>
-      {% endif %}
-      {% if is_financeiro %}
-        <a class="panel-card" href="{% url 'financeiro' %}">
-          <div class="panel-title">Financeiro</div>
-          <div class="muted">Registrar compras e gastos.</div>
-        </a>
-      {% endif %}
-      <div class="panel-card panel-disabled">
-        <div class="panel-title">Planta conectada</div>
-        <div class="muted">Acompanhe a automacao em tempo real.</div>
+
+    <div class="panel-section">
+      <div class="panel-section-head">
+        <div>
+          <div class="panel-section-title">Modulos de operacao</div>
+          <div class="panel-section-subtitle">Entre em um modulo para seguir a proxima etapa.</div>
+        </div>
       </div>
-      <a class="panel-card" href="{% url 'ios_list' %}">
-        <div class="panel-title">Listas de IOs</div>
-        <div class="muted">Crie e mantenha listas de IO sempre atualizadas.</div>
-      </a>
-      <div class="panel-card panel-disabled">
-        <div class="panel-title">Listas de IPs</div>
-        <div class="muted">Controle enderecos IP e acesso por projeto.</div>
+      <div class="panel-grid panel-grid-spaced">
+        {% if is_cliente or role == "ADMIN" %}
+          <a class="panel-card" href="{% url 'propostas' %}" style="--delay: 0.05s;">
+            <div class="panel-card-top">
+              <div class="panel-title">Propostas</div>
+              <span class="panel-tag active">Ativo</span>
+            </div>
+            <div class="muted">Pipeline de aprovacoes, envio e acompanhamento.</div>
+            <div class="panel-meta">Status, valores e decisoes em um fluxo unico.</div>
+          </a>
+        {% endif %}
+        {% if is_financeiro %}
+          <a class="panel-card" href="{% url 'financeiro' %}" style="--delay: 0.1s;">
+            <div class="panel-card-top">
+              <div class="panel-title">Financeiro</div>
+              <span class="panel-tag active">Ativo</span>
+            </div>
+            <div class="muted">Compras, gastos e filtros em tempo real.</div>
+            <div class="panel-meta">Consolide custos e orcamentos por projeto.</div>
+          </a>
+        {% endif %}
+        <div class="panel-card panel-disabled" style="--delay: 0.15s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Planta conectada</div>
+            <span class="panel-tag">Em breve</span>
+          </div>
+          <div class="muted">Monitoramento vivo de automacao e sensores.</div>
+          <div class="panel-meta">Alertas, telemetria e insights instantaneos.</div>
+        </div>
+        <a class="panel-card" href="{% url 'ios_list' %}" style="--delay: 0.2s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Listas de IOs</div>
+            <span class="panel-tag active">Ativo</span>
+          </div>
+          <div class="muted">Crie, revise e mantenha IOs atualizados.</div>
+          <div class="panel-meta">Estruture canais, racks e enderecos.</div>
+        </a>
+        <div class="panel-card panel-disabled" style="--delay: 0.25s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Listas de IPs</div>
+            <span class="panel-tag">Em breve</span>
+          </div>
+          <div class="muted">Controle de rede e acesso por projeto.</div>
+          <div class="panel-meta">Mapa de enderecos e permissoes.</div>
+        </div>
+        <div class="panel-card panel-disabled" style="--delay: 0.28s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Inventario da fabrica</div>
+            <span class="panel-tag">Em planejamento</span>
+          </div>
+          <div class="muted">Catalogo de motores, valvulas e equipamentos.</div>
+          <div class="panel-meta">Mapa de ativos com status e historico tecnico.</div>
+        </div>
+        <div class="panel-card panel-disabled" style="--delay: 0.3s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Nuvem de projetos</div>
+            <span class="panel-tag">Em breve</span>
+          </div>
+          <div class="muted">Arquivos tecnicos, historicos e revisoes.</div>
+          <div class="panel-meta">Tudo sincronizado por equipe e cliente.</div>
+        </div>
       </div>
-      <div class="panel-card panel-disabled">
-        <div class="panel-title">Nuvem de projetos</div>
-        <div class="muted">Armazene arquivos e historico tecnico em um so lugar.</div>
-      </div>
-      {% if role == "ADMIN" %}
-        <a class="panel-card" href="/admin/">
-          <div class="panel-title">Administracao</div>
-          <div class="muted">Gerenciar dados do sistema.</div>
-        </a>
-        <a class="panel-card" href="{% url 'ajustes_sistema' %}">
-          <div class="panel-title">Configuracoes do sistema</div>
-          <div class="muted">Configuracoes gerais e cadastros base.</div>
-        </a>
-        <a class="panel-card" href="/admin/explorar/">
-          <div class="panel-title">Explorar</div>
-          <div class="muted">Clientes e propostas por cliente.</div>
-        </a>
-        <a class="panel-card" href="{% url 'usuarios' %}">
-          <div class="panel-title">Usuarios</div>
-          <div class="muted">Criar e gerenciar usuarios.</div>
-        </a>
-      {% endif %}
     </div>
+
+    {% if role == "ADMIN" %}
+      <div class="panel-section">
+        <div class="panel-section-head">
+          <div>
+            <div class="panel-section-title">Modulo administrativo</div>
+            <div class="panel-section-subtitle">Ferramentas avancadas para governanca.</div>
+          </div>
+        </div>
+        <div class="panel-grid panel-grid-spaced">
+          <a class="panel-card" href="/admin/" style="--delay: 0.05s;">
+            <div class="panel-card-top">
+              <div class="panel-title">Administracao</div>
+              <span class="panel-tag active">Ativo</span>
+            </div>
+            <div class="muted">Gerencie dados nucleares do sistema.</div>
+            <div class="panel-meta">Acesso completo a cadastros.</div>
+          </a>
+          <a class="panel-card" href="{% url 'ajustes_sistema' %}" style="--delay: 0.1s;">
+            <div class="panel-card-top">
+              <div class="panel-title">Configuracoes do sistema</div>
+              <span class="panel-tag active">Ativo</span>
+            </div>
+            <div class="muted">Parametros gerais e cadastros base.</div>
+            <div class="panel-meta">Controle de perfis e permissoes.</div>
+          </a>
+          <a class="panel-card" href="/admin/explorar/" style="--delay: 0.15s;">
+            <div class="panel-card-top">
+              <div class="panel-title">Explorar</div>
+              <span class="panel-tag active">Ativo</span>
+            </div>
+            <div class="muted">Clientes e propostas por cliente.</div>
+            <div class="panel-meta">Visao ampla da operacao.</div>
+          </a>
+          <a class="panel-card" href="{% url 'usuarios' %}" style="--delay: 0.2s;">
+            <div class="panel-card-top">
+              <div class="panel-title">Usuarios</div>
+              <span class="panel-tag active">Ativo</span>
+            </div>
+            <div class="muted">Criacao e gestao de usuarios.</div>
+            <div class="panel-meta">Perfis, acessos e times.</div>
+          </a>
+        </div>
+      </div>
+    {% endif %}
   </section>
 {% endblock %}

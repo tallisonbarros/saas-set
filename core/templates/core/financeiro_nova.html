@@ -24,7 +24,7 @@
         <div>
           <div class="page-kicker">Financeiro</div>
           <h1 class="page-title">Nova compra</h1>
-          <p class="page-subtitle">Cadastre a compra antes dos itens.</p>
+          <p class="page-subtitle">Registre a compra e adicione itens iniciais se necessario.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
@@ -33,12 +33,12 @@
       <div class="hud-meta">Campos essenciais para registrar.</div>
     </div>
 
-    <div class="finance-grid">
+    <form method="post" class="finance-grid">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_compra">
       <div class="finance-card">
         <div class="panel-title">Registrar compra</div>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_compra">
+        <div class="stack">
           <div class="field">
             <label>Caderno</label>
             <select name="caderno">
@@ -61,8 +61,6 @@
               <label>Data</label>
               <input type="date" name="data">
             </div>
-          </div>
-          <div class="finance-form-grid">
             <div class="field">
               <label>Categoria</label>
               <select name="categoria">
@@ -85,8 +83,38 @@
             </div>
           </div>
           <button class="btn btn-primary" type="submit">Registrar</button>
-        </form>
+        </div>
       </div>
-    </div>
+      <div class="finance-card">
+        <div class="panel-title">Itens iniciais</div>
+        <div class="muted">Opcional: adicione ate 3 itens junto da compra.</div>
+        <div class="stack">
+          <div class="item-grid item-grid-head">
+            <span class="muted">Item</span>
+            <span class="muted">Qtd.</span>
+            <span class="muted">Valor</span>
+            <span class="muted">Tipo</span>
+            <span class="muted">Pago</span>
+          </div>
+          {% for i in "123" %}
+            <div class="item-grid">
+              <input type="text" name="item_nome_{{ forloop.counter }}" placeholder="Descricao do item">
+              <input type="number" name="item_quantidade_{{ forloop.counter }}" min="1" placeholder="1">
+              <input type="text" name="item_valor_{{ forloop.counter }}" placeholder="0,00">
+              <select name="item_tipo_{{ forloop.counter }}">
+                <option value="">Selecione</option>
+                {% for t in tipos %}
+                  <option value="{{ t.id }}">{{ t.nome }}</option>
+                {% endfor %}
+              </select>
+              <label class="checkbox-item">
+                <input type="checkbox" name="item_pago_{{ forloop.counter }}">
+                <span>Pago</span>
+              </label>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </form>
   </section>
 {% endblock %}

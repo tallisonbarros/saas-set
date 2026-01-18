@@ -676,12 +676,25 @@ def proposta_list(request):
             default=Value("Pendente"),
         )
     )
+    propostas_para_aprovar = Proposta.objects.none()
+    propostas_restantes = propostas
+    if not status:
+        propostas_para_aprovar = propostas.filter(
+            aprovada__isnull=True,
+            valor__gt=0,
+            cliente__usuario=request.user,
+        )
+        propostas_restantes = propostas.exclude(pk__in=propostas_para_aprovar.values("pk"))
+    pendencias_total = propostas_para_aprovar.count()
     return render(
         request,
         "core/proposta_list.html",
         {
             "cliente": cliente,
             "propostas": propostas,
+            "propostas_para_aprovar": propostas_para_aprovar,
+            "propostas_restantes": propostas_restantes,
+            "pendencias_total": pendencias_total,
             "status_filter": status,
             "is_vendedor": _has_tipo(request.user, "Vendedor"),
             "current_user_id": request.user.id,
@@ -1198,6 +1211,23 @@ def financeiro_nova(request):
             data_raw = request.POST.get("data", "").strip()
             categoria_id = request.POST.get("categoria")
             centro_id = request.POST.get("centro_custo")
+            itens_payload = []
+            for idx in range(1, 4):
+                item_nome = request.POST.get(f"item_nome_{idx}", "").strip()
+                item_valor = request.POST.get(f"item_valor_{idx}", "").replace(",", ".").strip()
+                item_quantidade = request.POST.get(f"item_quantidade_{idx}", "").strip()
+                item_tipo = request.POST.get(f"item_tipo_{idx}")
+                item_pago = request.POST.get(f"item_pago_{idx}") == "on"
+                if item_nome:
+                    itens_payload.append(
+                        {
+                            "nome": item_nome,
+                            "valor": item_valor,
+                            "quantidade": item_quantidade,
+                            "tipo_id": item_tipo,
+                            "pago": item_pago,
+                        }
+                    )
             try:
                 data = datetime.strptime(data_raw, "%Y-%m-%d").date()
             except ValueError:
@@ -1213,12 +1243,13 @@ def financeiro_nova(request):
                     data is not None,
                     categoria_id,
                     centro_id,
+                    itens_payload,
                 ]
             )
             if has_any:
                 if caderno_id and not allowed_cadernos.filter(id=caderno_id).exists():
                     return redirect("financeiro")
-                Compra.objects.create(
+                compra = Compra.objects.create(
                     caderno_id=caderno_id or None,
                     nome=nome,
                     descricao=descricao,
@@ -1226,6 +1257,27 @@ def financeiro_nova(request):
                     categoria_id=categoria_id or None,
                     centro_custo_id=centro_id or None,
                 )
+                for item in itens_payload:
+                    valor_raw = item["valor"]
+                    quantidade_raw = item["quantidade"]
+                    try:
+                        valor = Decimal(valor_raw) if valor_raw else None
+                    except (InvalidOperation, ValueError):
+                        valor = None
+                    try:
+                        quantidade = int(quantidade_raw) if quantidade_raw else 1
+                    except ValueError:
+                        quantidade = 1
+                    quantidade = max(1, quantidade)
+                    CompraItem.objects.create(
+                        compra=compra,
+                        nome=item["nome"],
+                        valor=valor,
+                        quantidade=quantidade,
+                        tipo_id=item["tipo_id"] or None,
+                        pago=item["pago"],
+                    )
+                return redirect("financeiro_compra_detail", pk=compra.pk)
             return redirect("financeiro")
 
     if cliente:
@@ -1234,6 +1286,7 @@ def financeiro_nova(request):
         cadernos = Caderno.objects.none()
     categorias = CategoriaCompra.objects.order_by("nome")
     centros = CentroCusto.objects.order_by("nome")
+    tipos = TipoCompra.objects.order_by("nome")
     selected_caderno_id = request.GET.get("caderno_id") or ""
 
     return render(
@@ -1244,6 +1297,7 @@ def financeiro_nova(request):
             "cadernos": cadernos,
             "categorias": categorias,
             "centros": centros,
+            "tipos": tipos,
             "selected_caderno_id": str(selected_caderno_id),
         },
     )
