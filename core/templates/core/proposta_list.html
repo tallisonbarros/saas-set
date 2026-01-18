@@ -18,13 +18,13 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel de propostas</div>
-        <div class="hud-pill">Carteira</div>
+        <div class="hud-pill">Carteira comercial</div>
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Propostas</div>
+          <div class="page-kicker">Operacao comercial</div>
           <h1 class="page-title">Visao geral</h1>
-          <p class="page-subtitle">Acompanhe propostas.</p>
+          <p class="page-subtitle">Acompanhe negociações, aprovacoes e andamento.</p>
         </div>
         <div class="page-actions">
           {% if is_vendedor %}
@@ -86,9 +86,6 @@
                       <span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span>
                     {% else %}
                       <span class="badge badge-finalizada">Finalizada</span>
-                    {% endif %}
-                    {% if proposta.status_label|lower == 'levantamento' %}
-                      <span class="proposal-standby-tag">Em levantamento</span>
                     {% endif %}
                   </div>
                     <div class="proposal-actions">
@@ -157,9 +154,6 @@
                     <span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span>
                   {% else %}
                     <span class="badge badge-finalizada">Finalizada</span>
-                  {% endif %}
-                  {% if proposta.status_label|lower == 'levantamento' %}
-                    <span class="proposal-standby-tag">Em levantamento</span>
                   {% endif %}
                 </div>
                 <div class="proposal-actions">

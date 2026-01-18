@@ -1,19 +1,18 @@
-@import url("https://fonts.googleapis.com/css2?family=Audiowide&family=Oxanium:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;500;600&display=swap");
 
 :root {
-  --bg: #e6f0ff;
-  --bg-alt: #d7e5ff;
+  --bg: #fff4ed;
+  --bg-alt: #ffe9dc;
   --surface: #ffffff;
-  --text: #0f1520;
-  --muted: #4b5a6b;
-  --accent: #00c2ff;
-  --accent-strong: #ff8c1a;
-  --accent-soft: #d9f6ff;
-  --border: #cfe0f7;
-  --shadow: 0 18px 36px rgba(18, 35, 58, 0.08);
-  --shadow-strong: 0 18px 30px rgba(18, 35, 58, 0.18);
+  --text: #1f1a15;
+  --muted: #7a6b60;
+  --accent: #ff6600;
+  --accent-soft: #ffe2d1;
+  --border: #f2d8c8;
+  --shadow: 0 20px 40px rgba(31, 26, 21, 0.08);
+  --shadow-strong: 0 18px 30px rgba(31, 26, 21, 0.18);
   --radius: 14px;
-  --title-font: "Oxanium", "Audiowide", sans-serif;
+  --title-font: "Audiowide", sans-serif;
 }
 
 * {
@@ -31,11 +30,9 @@ body {
 .bg {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 12% 18%, rgba(0, 194, 255, 0.18) 0%, transparent 40%),
-    radial-gradient(circle at 85% 12%, rgba(255, 140, 26, 0.15) 0%, transparent 38%),
-    radial-gradient(circle at 20% 80%, rgba(0, 194, 255, 0.12) 0%, transparent 45%),
-    repeating-linear-gradient(90deg, rgba(15, 21, 32, 0.04) 0 1px, transparent 1px 28px),
-    repeating-linear-gradient(0deg, rgba(15, 21, 32, 0.04) 0 1px, transparent 1px 28px),
+  background: radial-gradient(circle at 10% 10%, #fff8f4 0%, transparent 40%),
+    radial-gradient(circle at 85% 0%, #ffe2d1 0%, transparent 35%),
+    radial-gradient(circle at 20% 80%, #ffefe5 0%, transparent 45%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%);
   z-index: -1;
 }
@@ -175,7 +172,7 @@ body {
 }
 
 .btn-primary:hover {
-  background: #00a7dd;
+  background: #e65c00;
 }
 
 .btn-outline {
@@ -208,7 +205,7 @@ body {
 
 .card {
   background: var(--surface);
-  border: 1px solid rgba(0, 194, 255, 0.15);
+  border: 1px solid rgba(255, 102, 0, 0.12);
   border-radius: var(--radius);
   padding: 24px;
   box-shadow: var(--shadow);
@@ -354,8 +351,8 @@ body {
 }
 
 .proposal-card-action {
-  border-color: rgba(0, 194, 255, 0.5);
-  background: linear-gradient(140deg, #ffffff 0%, #e8f8ff 100%);
+  border-color: rgba(255, 102, 0, 0.5);
+  background: linear-gradient(140deg, #ffffff 0%, #ffe7d7 100%);
 }
 
 .proposal-card-standby {
@@ -597,9 +594,9 @@ body {
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 194, 255, 0.3);
-  background: rgba(0, 194, 255, 0.08);
-  color: var(--accent);
+  border: 1px solid rgba(255, 102, 0, 0.3);
+  background: rgba(255, 102, 0, 0.1);
+  color: #b84800;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -607,8 +604,8 @@ body {
 }
 
 .chip-alert {
-  border-color: rgba(255, 140, 26, 0.35);
-  background: rgba(255, 140, 26, 0.15);
+  border-color: rgba(255, 102, 0, 0.45);
+  background: rgba(255, 102, 0, 0.18);
   color: #b84b00;
 }
 
@@ -946,9 +943,9 @@ select {
   display: grid;
   gap: 6px;
   padding: 18px;
-  border: 1px solid rgba(0, 194, 255, 0.22);
+  border: 1px solid rgba(255, 102, 0, 0.18);
   border-radius: 14px;
-  background: linear-gradient(160deg, #ffffff 0%, #f2f7ff 100%);
+  background: linear-gradient(160deg, #ffffff 0%, #fff6ef 100%);
   text-decoration: none;
   color: inherit;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -970,7 +967,7 @@ select {
 .panel-disabled {
   opacity: 0.5;
   pointer-events: none;
-  background: linear-gradient(160deg, #f5f7fb 0%, #eef2f9 100%);
+  background: linear-gradient(160deg, #fff6ef 0%, #ffefe5 100%);
 }
 
 .panel-shell {
@@ -979,8 +976,8 @@ select {
 }
 
 .panel-hud {
-  border-color: rgba(0, 194, 255, 0.28);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(225, 242, 255, 0.95) 100%);
+  border-color: rgba(255, 102, 0, 0.28);
+  background: linear-gradient(135deg, #fff7f0 0%, #ffffff 60%);
 }
 
 .panel-hud::after {
@@ -988,8 +985,8 @@ select {
     180deg,
     transparent,
     transparent 12px,
-    rgba(0, 194, 255, 0.08) 12px,
-    rgba(0, 194, 255, 0.08) 13px
+    rgba(255, 102, 0, 0.06) 12px,
+    rgba(255, 102, 0, 0.06) 13px
   );
 }
 
@@ -1007,7 +1004,7 @@ select {
 }
 
 .panel-hero-card {
-  border: 1px solid rgba(0, 194, 255, 0.18);
+  border: 1px solid rgba(255, 102, 0, 0.18);
   border-radius: 12px;
   padding: 12px;
   background: rgba(255, 255, 255, 0.85);
@@ -1065,9 +1062,9 @@ select {
 .panel-tag {
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 194, 255, 0.3);
-  background: rgba(0, 194, 255, 0.08);
-  color: var(--accent);
+  border: 1px solid #ffd3b8;
+  background: #fff4ed;
+  color: #b84800;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;

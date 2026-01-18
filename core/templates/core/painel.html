@@ -17,16 +17,16 @@
   <section class="card panel-shell">
     <div class="page-hud panel-hud">
       <div class="hud-top">
-        <div class="hud-title">Command Center</div>
-        <div class="hud-pill">Online</div>
+        <div class="hud-title">Painel de Controle</div>
+        <div class="hud-pill">Visao geral</div>
       </div>
       <div class="page-hud-head panel-hero-head">
         <div>
           <div class="page-kicker">Plataforma SET</div>
           <h1 class="page-title">Bem vindo {{ request.user.first_name|default:request.user.username }}</h1>
           <p class="page-subtitle">
-            O SET centraliza operacoes industriais em um unico cockpit: propostas, financeiro, listas de IO e
-            rastreio tecnico com visao de status em tempo real.
+            Centralize proposta, engenharia e financeiro em um unico fluxo. Ganhe visibilidade de custos,
+            cronogramas e status tecnico com decisao rapida e segura.
           </p>
         </div>
         <div class="page-actions">
@@ -38,16 +38,16 @@
       </div>
       <div class="panel-hero-grid">
         <div class="panel-hero-card">
-          <div class="panel-hero-title">Missao ativa</div>
-          <div class="panel-hero-text">Converta propostas em execucao com workflow claro.</div>
+          <div class="panel-hero-title">Fluxo comercial</div>
+          <div class="panel-hero-text">Da proposta a aprovacao com rastreio completo.</div>
         </div>
         <div class="panel-hero-card">
-          <div class="panel-hero-title">HUD tecnico</div>
-          <div class="panel-hero-text">Controle IOs, status e insumos sem perder contexto.</div>
+          <div class="panel-hero-title">Engenharia conectada</div>
+          <div class="panel-hero-text">Listas de IO, modulos e status da planta em um mapa unico.</div>
         </div>
         <div class="panel-hero-card">
-          <div class="panel-hero-title">Base estrategica</div>
-          <div class="panel-hero-text">Central de dados para clientes, projetos e custos.</div>
+          <div class="panel-hero-title">Controle financeiro</div>
+          <div class="panel-hero-text">Compras, cadernos e custos amarrados ao projeto.</div>
         </div>
       </div>
     </div>
@@ -56,7 +56,7 @@
       <div class="panel-section-head">
         <div>
           <div class="panel-section-title">Modulos de operacao</div>
-          <div class="panel-section-subtitle">Entre em um modulo para seguir a proxima etapa.</div>
+          <div class="panel-section-subtitle">Escolha um modulo para iniciar sua rotina.</div>
         </div>
       </div>
       <div class="panel-grid panel-grid-spaced">
@@ -66,7 +66,7 @@
               <div class="panel-title">Propostas</div>
               <span class="panel-tag active">Ativo</span>
             </div>
-            <div class="muted">Pipeline de aprovacoes, envio e acompanhamento.</div>
+            <div class="muted">Pipeline de aprovacoes e acompanhamento.</div>
             <div class="panel-meta">Status, valores e decisoes em um fluxo unico.</div>
           </a>
         {% endif %}
@@ -76,7 +76,7 @@
               <div class="panel-title">Financeiro</div>
               <span class="panel-tag active">Ativo</span>
             </div>
-            <div class="muted">Compras, gastos e filtros em tempo real.</div>
+            <div class="muted">Compras, gastos e controle por periodo.</div>
             <div class="panel-meta">Consolide custos e orcamentos por projeto.</div>
           </a>
         {% endif %}
@@ -85,8 +85,8 @@
             <div class="panel-title">Planta conectada</div>
             <span class="panel-tag">Em breve</span>
           </div>
-          <div class="muted">Monitoramento vivo de automacao e sensores.</div>
-          <div class="panel-meta">Alertas, telemetria e insights instantaneos.</div>
+          <div class="muted">Monitoramento de automacao e sensores.</div>
+          <div class="panel-meta">Alertas, telemetria e indicadores operacionais.</div>
         </div>
         <a class="panel-card" href="{% url 'ios_list' %}" style="--delay: 0.2s;">
           <div class="panel-card-top">
