@@ -986,6 +986,18 @@ select {
   margin-bottom: 6px;
 }
 
+.home-actions {
+  width: 100%;
+  justify-content: center;
+}
+
+.home-primary {
+  padding: 14px 28px;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  box-shadow: 0 12px 24px rgba(255, 102, 0, 0.25);
+}
+
 .stat-grid {
   display: grid;
   gap: 12px;
