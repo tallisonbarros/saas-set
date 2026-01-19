@@ -879,7 +879,7 @@ select {
   margin-bottom: 16px;
 }
 
-.page-actions {
+.home-actions {
   display: flex;
   justify-content: center;
   margin-bottom: 16px;
@@ -1132,6 +1132,10 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   margin-top: 10px;
+}
+
+.panel-hero-grid.panel-hero-footer {
+  margin-top: 22px;
 }
 
 .panel-hero-card {
