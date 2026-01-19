@@ -1093,12 +1093,22 @@ select {
 
 .panel-title {
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title .icon {
+  width: 16px;
+  height: 16px;
 }
 
 .panel-disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   pointer-events: none;
   background: linear-gradient(160deg, #fff6ef 0%, #ffefe5 100%);
+  border-style: dashed;
+  filter: grayscale(0.6);
 }
 
 .panel-shell {

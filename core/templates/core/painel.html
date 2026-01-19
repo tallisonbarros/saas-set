@@ -27,78 +27,98 @@
         <div>
           <div class="page-kicker">Plataforma SET</div>
           <h1 class="page-title">Bem vindo {{ display_name }}</h1>
-          <p class="page-subtitle">
-            Centralize proposta, engenharia e financeiro em um unico fluxo. Ganhe visibilidade de custos,
-            cronogramas e status tecnico com decisao rapida e segura.
-          </p>
         </div>
         <div class="page-actions"></div>
       </div>
+      <div class="hud-meta">Acesso direto aos modulos principais da operacao.</div>
     </div>
 
     <div class="panel-section">
       <div class="panel-section-head">
         <div>
           <div class="panel-section-title">Modulos de operacao</div>
-          <div class="panel-section-subtitle">Escolha um modulo para iniciar sua rotina.</div>
         </div>
       </div>
       <div class="panel-grid panel-grid-spaced">
         <a class="panel-card" href="{% url 'propostas' %}" style="--delay: 0.05s;">
           <div class="panel-card-top">
-            <div class="panel-title">Propostas</div>
-            <span class="panel-tag active">Ativo</span>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 6h14v12H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+                <path d="M8 10h8M8 14h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+              </svg>
+              Propostas
+            </div>
           </div>
           <div class="muted">Pipeline de aprovacoes e acompanhamento.</div>
-          <div class="panel-meta">Status, valores e decisoes em um fluxo unico.</div>
         </a>
         <a class="panel-card" href="{% url 'financeiro' %}" style="--delay: 0.1s;">
           <div class="panel-card-top">
-            <div class="panel-title">Financeiro</div>
-            <span class="panel-tag active">Ativo</span>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16v10H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+                <path d="M8 12h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+              </svg>
+              Financeiro
+            </div>
           </div>
           <div class="muted">Compras, gastos e controle por periodo.</div>
-          <div class="panel-meta">Consolide custos e orcamentos por projeto.</div>
         </a>
         <a class="panel-card" href="{% url 'ios_list' %}" style="--delay: 0.15s;">
           <div class="panel-card-top">
-            <div class="panel-title">Listas de IOs</div>
-            <span class="panel-tag active">Ativo</span>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 6h10v4H7zM5 14h14v4H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+              </svg>
+              Listas de IOs
+            </div>
           </div>
           <div class="muted">Crie, revise e mantenha IOs atualizados.</div>
-          <div class="panel-meta">Estruture canais, racks e enderecos.</div>
         </a>
         <div class="panel-card panel-disabled" style="--delay: 0.2s;">
           <div class="panel-card-top">
-            <div class="panel-title">Listas de IPs</div>
-            <span class="panel-tag">Em breve</span>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 8h16v8H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+                <path d="M7 12h3M14 12h3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+              </svg>
+              Listas de IPs
+            </div>
           </div>
           <div class="muted">Controle de rede e acesso por projeto.</div>
-          <div class="panel-meta">Mapa de enderecos e permissoes.</div>
         </div>
         <a class="panel-card" href="{% url 'inventarios_list' %}" style="--delay: 0.25s;">
           <div class="panel-card-top">
-            <div class="panel-title">Inventario da fabrica</div>
-            <span class="panel-tag active">Ativo</span>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 5h12v4H6zM4 11h16v8H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+              </svg>
+              Inventario da fabrica
+            </div>
           </div>
           <div class="muted">Catalogo de motores, valvulas e equipamentos.</div>
-          <div class="panel-meta">Mapa de ativos com status e historico tecnico.</div>
         </a>
         <div class="panel-card panel-disabled" style="--delay: 0.3s;">
           <div class="panel-card-top">
-            <div class="panel-title">Nuvem de projetos</div>
-            <span class="panel-tag">Em breve</span>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 15h9a3 3 0 0 0 0-6 4.5 4.5 0 0 0-8.7-1.5A3.5 3.5 0 0 0 7 15z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+              </svg>
+              Nuvem de projetos
+            </div>
           </div>
           <div class="muted">Arquivos tecnicos, historicos e revisoes.</div>
-          <div class="panel-meta">Tudo sincronizado por equipe e cliente.</div>
         </div>
         <div class="panel-card panel-disabled" style="--delay: 0.35s;">
           <div class="panel-card-top">
-            <div class="panel-title">Planta conectada</div>
-            <span class="panel-tag">Em breve</span>
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+              Planta conectada
+            </div>
           </div>
           <div class="muted">Monitoramento de automacao e sensores.</div>
-          <div class="panel-meta">Alertas, telemetria e indicadores operacionais.</div>
         </div>
       </div>
     </div>
@@ -108,59 +128,59 @@
         <div class="panel-section-head">
           <div>
             <div class="panel-section-title">Modulo administrativo</div>
-            <div class="panel-section-subtitle">Ferramentas avancadas para governanca.</div>
           </div>
         </div>
         <div class="panel-grid panel-grid-spaced">
           <a class="panel-card" href="/admin/" style="--delay: 0.05s;">
             <div class="panel-card-top">
-              <div class="panel-title">Administracao</div>
-              <span class="panel-tag active">Ativo</span>
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 4l2.5 4 4.5 1-3 3 1 5-5-2-5 2 1-5-3-3 4.5-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+                </svg>
+                Administracao
+              </div>
             </div>
             <div class="muted">Gerencie dados nucleares do sistema.</div>
-            <div class="panel-meta">Acesso completo a cadastros.</div>
           </a>
           <a class="panel-card" href="{% url 'ajustes_sistema' %}" style="--delay: 0.1s;">
             <div class="panel-card-top">
-              <div class="panel-title">Configuracoes do sistema</div>
-              <span class="panel-tag active">Ativo</span>
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+                Configuracoes do sistema
+              </div>
             </div>
             <div class="muted">Parametros gerais e cadastros base.</div>
-            <div class="panel-meta">Controle de perfis e permissoes.</div>
           </a>
           <a class="panel-card" href="/admin/explorar/" style="--delay: 0.15s;">
             <div class="panel-card-top">
-              <div class="panel-title">Explorar</div>
-              <span class="panel-tag active">Ativo</span>
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 6h16M4 12h10M4 18h7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+                Explorar
+              </div>
             </div>
             <div class="muted">Clientes e propostas por cliente.</div>
-            <div class="panel-meta">Visao ampla da operacao.</div>
           </a>
           <a class="panel-card" href="{% url 'usuarios' %}" style="--delay: 0.2s;">
             <div class="panel-card-top">
-              <div class="panel-title">Usuarios</div>
-              <span class="panel-tag active">Ativo</span>
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="8" cy="9" r="3" fill="currentColor"></circle>
+                  <circle cx="16" cy="10" r="2.5" fill="currentColor"></circle>
+                  <path d="M4 19c0-2.2 1.8-4 4-4s4 1.8 4 4" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                  <path d="M12 19c.3-1.6 1.7-2.8 3.4-2.8 1.8 0 3.3 1.2 3.6 2.8" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                </svg>
+                Usuarios
+              </div>
             </div>
             <div class="muted">Criacao e gestao de usuarios.</div>
-            <div class="panel-meta">Perfis, acessos e times.</div>
           </a>
         </div>
       </div>
     {% endif %}
-
-    <div class="panel-hero-grid panel-hero-footer">
-      <div class="panel-hero-card">
-        <div class="panel-hero-title">Fluxo comercial</div>
-        <div class="panel-hero-text">Da proposta a aprovacao com rastreio completo.</div>
-      </div>
-      <div class="panel-hero-card">
-        <div class="panel-hero-title">Engenharia conectada</div>
-        <div class="panel-hero-text">Listas de IO, modulos e status da planta em um mapa unico.</div>
-      </div>
-      <div class="panel-hero-card">
-        <div class="panel-hero-title">Controle financeiro</div>
-        <div class="panel-hero-text">Compras, cadernos e custos amarrados ao projeto.</div>
-      </div>
-    </div>
   </section>
 {% endblock %}
