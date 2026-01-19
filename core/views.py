@@ -600,6 +600,7 @@ def inventario_detail(request, pk):
     else:
         inventario = get_object_or_404(Inventario, pk=pk)
     message = None
+    tipo_choices = Ativo.Tipo.choices
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_ativo":
@@ -609,16 +610,11 @@ def inventario_detail(request, pk):
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
             tag_set = request.POST.get("tag_set", "").strip()
-            pai_id = request.POST.get("pai_id")
             comissionado = request.POST.get("comissionado") == "on"
             em_manutencao = request.POST.get("em_manutencao") == "on"
-            pai = None
-            if pai_id:
-                pai = Ativo.objects.filter(pk=pai_id, inventario=inventario).first()
             if nome:
                 ativo = Ativo.objects.create(
                     inventario=inventario,
-                    pai=pai,
                     setor=setor,
                     nome=nome,
                     tipo=tipo,
@@ -672,13 +668,12 @@ def inventario_detail(request, pk):
             return redirect("inventario_detail", pk=inventario.pk)
 
     ativos = (
-        Ativo.objects.filter(inventario=inventario)
+        Ativo.objects.filter(inventario=inventario, pai__isnull=True)
         .select_related("pai", "comissionado_por", "manutencao_por")
         .annotate(subativos_total=Count("subativos"))
         .order_by("nome")
     )
-    total_ativos = ativos.count()
-    selected_parent_id = request.GET.get("parent") or ""
+    total_ativos = Ativo.objects.filter(inventario=inventario).count()
     return render(
         request,
         "core/inventario_detail.html",
@@ -686,8 +681,112 @@ def inventario_detail(request, pk):
             "inventario": inventario,
             "ativos": ativos,
             "total_ativos": total_ativos,
-            "selected_parent_id": str(selected_parent_id),
             "message": message,
+            "tipo_choices": tipo_choices,
+        },
+    )
+
+
+@login_required
+def inventario_ativo_detail(request, inventario_pk, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    if cliente:
+        inventario = get_object_or_404(
+            Inventario,
+            Q(pk=inventario_pk),
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all()),
+        )
+    else:
+        inventario = get_object_or_404(Inventario, pk=inventario_pk)
+    ativo = get_object_or_404(
+        Ativo.objects.select_related("inventario", "comissionado_por", "manutencao_por"),
+        pk=pk,
+        inventario=inventario,
+    )
+    tipo_choices = Ativo.Tipo.choices
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_subativo":
+            nome = request.POST.get("nome", "").strip()
+            setor = request.POST.get("setor", "").strip()
+            tipo = request.POST.get("tipo", "").strip()
+            identificacao = request.POST.get("identificacao", "").strip()
+            tag_interna = request.POST.get("tag_interna", "").strip()
+            tag_set = request.POST.get("tag_set", "").strip()
+            comissionado = request.POST.get("comissionado") == "on"
+            em_manutencao = request.POST.get("em_manutencao") == "on"
+            if nome:
+                subativo = Ativo.objects.create(
+                    inventario=inventario,
+                    pai=ativo,
+                    setor=setor,
+                    nome=nome,
+                    tipo=tipo,
+                    identificacao=identificacao,
+                    tag_interna=tag_interna,
+                    tag_set=tag_set,
+                    comissionado=comissionado,
+                    em_manutencao=em_manutencao,
+                )
+                if comissionado:
+                    subativo.comissionado_em = timezone.now()
+                    subativo.comissionado_por = request.user
+                if em_manutencao:
+                    subativo.manutencao_em = timezone.now()
+                    subativo.manutencao_por = request.user
+                if comissionado or em_manutencao:
+                    subativo.save(
+                        update_fields=[
+                            "comissionado_em",
+                            "comissionado_por",
+                            "manutencao_em",
+                            "manutencao_por",
+                        ]
+                    )
+            return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
+        if action == "toggle_comissionado":
+            ativo_id = request.POST.get("ativo_id")
+            alvo = get_object_or_404(Ativo, pk=ativo_id, inventario=inventario)
+            if alvo.comissionado:
+                alvo.comissionado = False
+                alvo.comissionado_em = None
+                alvo.comissionado_por = None
+            else:
+                alvo.comissionado = True
+                alvo.comissionado_em = timezone.now()
+                alvo.comissionado_por = request.user
+            alvo.save(update_fields=["comissionado", "comissionado_em", "comissionado_por"])
+            return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
+        if action == "toggle_manutencao":
+            ativo_id = request.POST.get("ativo_id")
+            alvo = get_object_or_404(Ativo, pk=ativo_id, inventario=inventario)
+            if alvo.em_manutencao:
+                alvo.em_manutencao = False
+                alvo.manutencao_em = None
+                alvo.manutencao_por = None
+            else:
+                alvo.em_manutencao = True
+                alvo.manutencao_em = timezone.now()
+                alvo.manutencao_por = request.user
+            alvo.save(update_fields=["em_manutencao", "manutencao_em", "manutencao_por"])
+            return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
+
+    subativos = (
+        Ativo.objects.filter(inventario=inventario, pai=ativo)
+        .select_related("comissionado_por", "manutencao_por")
+        .annotate(subativos_total=Count("subativos"))
+        .order_by("nome")
+    )
+    return render(
+        request,
+        "core/inventario_ativo_detail.html",
+        {
+            "inventario": inventario,
+            "ativo": ativo,
+            "subativos": subativos,
+            "tipo_choices": tipo_choices,
         },
     )
 

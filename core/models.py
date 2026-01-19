@@ -344,6 +344,17 @@ class RackIO(models.Model):
 
 
 class Ativo(models.Model):
+    class Tipo(models.TextChoices):
+        MOTOR = "MOTOR", "Motor"
+        VALVULA = "VALVULA", "Valvula"
+        EQUIPAMENTO = "EQUIPAMENTO", "Equipamento"
+        CONJUNTO = "CONJUNTO", "Conjunto"
+        TRANSMISSOR_ANALOGICO = "TRANSMISSOR_ANALOGICO", "Transmissor analogico"
+        TRANSMISSOR_DIGITAL = "TRANSMISSOR_DIGITAL", "Transmissor digital"
+        SONORO = "SONORO", "Sonoro"
+        VISUAL = "VISUAL", "Visual"
+        OUTRO = "OUTRO", "Outro"
+
     inventario = models.ForeignKey(Inventario, on_delete=models.CASCADE, related_name="ativos")
     pai = models.ForeignKey(
         "self",
@@ -354,7 +365,7 @@ class Ativo(models.Model):
     )
     setor = models.CharField(max_length=120, blank=True)
     nome = models.CharField(max_length=120)
-    tipo = models.CharField(max_length=80, blank=True)
+    tipo = models.CharField(max_length=80, blank=True, choices=Tipo.choices)
     identificacao = models.CharField(max_length=120, blank=True)
     tag_interna = models.CharField(max_length=120, blank=True)
     tag_set = models.CharField(max_length=120, blank=True)

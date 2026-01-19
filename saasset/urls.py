@@ -52,6 +52,7 @@ urlpatterns = [
     path('ios/racks/modulos/<int:pk>/', views.ios_rack_modulo_detail, name="ios_rack_modulo_detail"),
     path('inventarios/', views.inventarios_list, name="inventarios_list"),
     path('inventarios/<int:pk>/', views.inventario_detail, name="inventario_detail"),
+    path('inventarios/<int:inventario_pk>/ativos/<int:pk>/', views.inventario_ativo_detail, name="inventario_ativo_detail"),
 ]
 
 if settings.DEBUG:
