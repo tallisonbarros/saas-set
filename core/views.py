@@ -1238,7 +1238,13 @@ def financeiro_nova(request):
             categoria_id = request.POST.get("categoria")
             centro_id = request.POST.get("centro_custo")
             itens_payload = []
-            for idx in range(1, 4):
+            total_items_raw = request.POST.get("total_items", "1").strip()
+            try:
+                total_items = int(total_items_raw)
+            except ValueError:
+                total_items = 1
+            total_items = max(1, min(total_items, 200))
+            for idx in range(total_items):
                 item_nome = request.POST.get(f"item_nome_{idx}", "").strip()
                 item_valor = request.POST.get(f"item_valor_{idx}", "").replace(",", ".").strip()
                 item_quantidade = request.POST.get(f"item_quantidade_{idx}", "").strip()

@@ -82,12 +82,9 @@
               </select>
             </div>
           </div>
-          <button class="btn btn-primary" type="submit">Registrar</button>
         </div>
-      </div>
-      <div class="finance-card">
-        <div class="panel-title">Itens iniciais</div>
-        <div class="muted">Opcional: adicione ate 3 itens junto da compra.</div>
+        <div class="panel-title">Itens da compra</div>
+        <div class="muted">Adicione quantos itens precisar.</div>
         <div class="stack">
           <div class="item-grid item-grid-head">
             <span class="muted">Item</span>
@@ -95,26 +92,125 @@
             <span class="muted">Valor</span>
             <span class="muted">Tipo</span>
             <span class="muted">Pago</span>
+            <span class="muted">Acao</span>
           </div>
-          {% for i in "123" %}
+          <div id="item-list" class="stack">
             <div class="item-grid">
-              <input type="text" name="item_nome_{{ forloop.counter }}" placeholder="Descricao do item">
-              <input type="number" name="item_quantidade_{{ forloop.counter }}" min="1" placeholder="1">
-              <input type="text" name="item_valor_{{ forloop.counter }}" placeholder="0,00">
-              <select name="item_tipo_{{ forloop.counter }}">
+              <input type="text" name="item_nome_0" placeholder="Descricao do item">
+              <input type="number" name="item_quantidade_0" min="1" placeholder="1">
+              <input type="text" name="item_valor_0" placeholder="0,00">
+              <select name="item_tipo_0">
                 <option value="">Selecione</option>
                 {% for t in tipos %}
                   <option value="{{ t.id }}">{{ t.nome }}</option>
                 {% endfor %}
               </select>
               <label class="checkbox-item">
-                <input type="checkbox" name="item_pago_{{ forloop.counter }}">
+                <input type="checkbox" name="item_pago_0">
                 <span>Pago</span>
               </label>
+              <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
             </div>
-          {% endfor %}
+          </div>
+          <input type="hidden" id="total_items" name="total_items" value="1">
+          <button class="btn btn-ghost" type="button" id="add-item">Novo item</button>
         </div>
+        <button class="btn btn-primary" type="submit">Registrar</button>
       </div>
     </form>
   </section>
+  <script>
+    (function () {
+      var addButton = document.getElementById("add-item");
+      var list = document.getElementById("item-list");
+      var totalField = document.getElementById("total_items");
+      var form = document.querySelector("form.finance-grid");
+      if (!addButton || !list || !totalField) {
+        return;
+      }
+      function renumberRows() {
+        var rows = list.querySelectorAll(".item-grid");
+        rows.forEach(function (row, index) {
+          row.querySelector("input[name^='item_nome_']").name = "item_nome_" + index;
+          row.querySelector("input[name^='item_quantidade_']").name = "item_quantidade_" + index;
+          row.querySelector("input[name^='item_valor_']").name = "item_valor_" + index;
+          row.querySelector("select[name^='item_tipo_']").name = "item_tipo_" + index;
+          row.querySelector("input[name^='item_pago_']").name = "item_pago_" + index;
+        });
+        totalField.value = rows.length;
+      }
+      function bindRemoveButton(row) {
+        var removeBtn = row.querySelector(".item-remove");
+        if (!removeBtn) {
+          return;
+        }
+        removeBtn.addEventListener("click", function () {
+          row.remove();
+          if (!list.querySelector(".item-grid")) {
+            addButton.click();
+          } else {
+            renumberRows();
+          }
+        });
+      }
+      list.querySelectorAll(".item-grid").forEach(bindRemoveButton);
+      addButton.addEventListener("click", function () {
+        var index = list.querySelectorAll(".item-grid").length;
+        var row = document.createElement("div");
+        row.className = "item-grid";
+        row.innerHTML =
+          '<input type="text" name="item_nome_' + index + '" placeholder="Descricao do item">' +
+          '<input type="number" name="item_quantidade_' + index + '" min="1" placeholder="1">' +
+          '<input type="text" name="item_valor_' + index + '" placeholder="0,00">' +
+          '<select name="item_tipo_' + index + '">' +
+          '<option value="">Selecione</option>' +
+          '{% for t in tipos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}' +
+          '</select>' +
+          '<label class="checkbox-item">' +
+          '<input type="checkbox" name="item_pago_' + index + '">' +
+          '<span>Pago</span>' +
+          '</label>' +
+          '<button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>';
+        list.appendChild(row);
+        bindRemoveButton(row);
+        renumberRows();
+      });
+      if (form) {
+        form.addEventListener("submit", function (event) {
+          var rows = list.querySelectorAll(".item-grid");
+          for (var i = 0; i < rows.length; i += 1) {
+            var row = rows[i];
+            var nome = row.querySelector("input[name^='item_nome_']");
+            var quantidade = row.querySelector("input[name^='item_quantidade_']");
+            var valor = row.querySelector("input[name^='item_valor_']");
+            var tipo = row.querySelector("select[name^='item_tipo_']");
+            var pago = row.querySelector("input[name^='item_pago_']");
+            var hasAny =
+              (nome && nome.value.trim()) ||
+              (quantidade && quantidade.value.trim()) ||
+              (valor && valor.value.trim()) ||
+              (tipo && tipo.value) ||
+              (pago && pago.checked);
+            if (hasAny && nome && !nome.value.trim()) {
+              event.preventDefault();
+              nome.focus();
+              alert("Informe o nome do item.");
+              return;
+            }
+            if (hasAny && quantidade) {
+              var qty = parseInt(quantidade.value || "1", 10);
+              if (!qty || qty < 1) {
+                event.preventDefault();
+                quantidade.focus();
+                alert("Quantidade deve ser maior que zero.");
+                return;
+              }
+              quantidade.value = qty;
+            }
+          }
+          renumberRows();
+        });
+      }
+    })();
+  </script>
 {% endblock %}
