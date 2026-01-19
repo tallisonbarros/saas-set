@@ -26,6 +26,7 @@ from .models import (
     FinanceiroID,
     PlantaIO,
     Proposta,
+    PropostaAnexo,
     RackIO,
     RackSlotIO,
     TipoCompra,
@@ -776,6 +777,17 @@ def proposta_detail(request, pk):
                 proposta.andamento = "EXECUTANDO"
                 proposta.save(update_fields=["andamento"])
                 return redirect("proposta_detail", pk=proposta.pk)
+        if action == "add_anexo":
+            arquivo = request.FILES.get("arquivo")
+            tipo = request.POST.get("tipo") or PropostaAnexo.Tipo.OUTROS
+            if arquivo:
+                PropostaAnexo.objects.create(proposta=proposta, arquivo=arquivo, tipo=tipo)
+            return redirect("proposta_detail", pk=proposta.pk)
+        if action == "delete_anexo":
+            anexo_id = request.POST.get("anexo_id")
+            anexo = get_object_or_404(PropostaAnexo, pk=anexo_id, proposta=proposta)
+            anexo.delete()
+            return redirect("proposta_detail", pk=proposta.pk)
         if action == "delete_proposta":
             if proposta.criada_por_id != request.user.id:
                 return HttpResponseForbidden("Sem permissao.")

@@ -70,6 +70,45 @@
         </div>
       </div>
       <div class="user-card">
+        <div class="panel-title">Anexos da proposta</div>
+        <form method="post" enctype="multipart/form-data" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_anexo">
+          <label>Tipo de arquivo</label>
+          <select name="tipo">
+            {% for value, label in proposta.anexos.model.Tipo.choices %}
+              <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <label>Arquivo</label>
+          <input type="file" name="arquivo" required>
+          <button class="btn btn-ghost" type="submit">Enviar anexo</button>
+        </form>
+        {% if proposta.anexos.all %}
+          <div class="user-list">
+            {% for anexo in proposta.anexos.all %}
+              <div class="user-row">
+                <div>
+                  <div class="panel-title">{{ anexo.get_tipo_display }}</div>
+                  <div class="muted">{{ anexo.criado_em|date:"d/m/Y H:i" }}</div>
+                </div>
+                <div class="form-actions">
+                  <a class="btn btn-outline btn-compact" href="{{ anexo.arquivo.url }}" target="_blank" rel="noreferrer">Abrir</a>
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_anexo">
+                    <input type="hidden" name="anexo_id" value="{{ anexo.id }}">
+                    <button class="btn btn-ghost btn-compact" type="submit">Excluir</button>
+                  </form>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">Nenhum anexo enviado.</p>
+        {% endif %}
+      </div>
+      <div class="user-card">
         <div class="panel-title">Observacao e prioridade</div>
         <form method="post" action="{% url 'salvar_observacao' proposta.pk %}" class="stack">
           {% csrf_token %}

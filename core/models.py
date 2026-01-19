@@ -171,6 +171,28 @@ class Proposta(models.Model):
         super().save(*args, **kwargs)
 
 
+class PropostaAnexo(models.Model):
+    class Tipo(models.TextChoices):
+        NF = "NF", "NF"
+        CONTRATO = "CONTRATO", "Contrato"
+        PROPOSTA_FORMAL = "PROPOSTA_FORMAL", "Proposta formal"
+        QUEBRA_CONTRATO = "QUEBRA_CONTRATO", "Quebra de contrato"
+        PEDIDO_COMPRA = "PEDIDO_COMPRA", "Pedido de compra"
+        ORDEM_SERVICO = "ORDEM_SERVICO", "Ordem de servico"
+        OUTROS = "OUTROS", "Outros"
+
+    proposta = models.ForeignKey(Proposta, on_delete=models.CASCADE, related_name="anexos")
+    arquivo = models.FileField(upload_to="propostas/anexos/")
+    tipo = models.CharField(max_length=30, choices=Tipo.choices, default=Tipo.OUTROS)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+
+    def __str__(self):
+        return f"{self.proposta.codigo} - {self.get_tipo_display()}"
+
+
 class TipoCanalIO(models.Model):
     nome = models.CharField(max_length=20, unique=True)
     ativo = models.BooleanField(default=True)
