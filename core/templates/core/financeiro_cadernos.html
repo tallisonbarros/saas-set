@@ -31,7 +31,7 @@
       </div>
     </div>
     {% if message %}
-      <p class="muted">{{ message }}</p>
+      <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
     {% endif %}
 
     <div class="finance-card">
@@ -85,7 +85,7 @@
         <p class="muted">Nenhum caderno cadastrado.</p>
       {% endif %}
     </div>
-    <details class="finance-card" {% if open_cadastro %}open{% endif %}>
+    <details class="finance-card" {% if open_cadastro == 'categoria' or open_cadastro == 'centro' %}open{% endif %}>
       <summary class="io-discrete-summary">
         <span class="io-title">Novo cadastro</span>
         <span class="muted">Categoria ou centro de custo.</span>

@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from urllib.parse import urlencode
@@ -1529,7 +1529,8 @@ def financeiro_nova(request):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
     message = request.GET.get("msg", "").strip()
-    open_cadastro = request.GET.get("cadastro") == "1"
+    message_level = request.GET.get("level", "").strip() or "info"
+    open_cadastro = request.GET.get("cadastro", "").strip()
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_categoria":
@@ -1537,10 +1538,28 @@ def financeiro_nova(request):
             next_caderno_id = request.POST.get("next_caderno_id", "").strip()
             if not nome:
                 msg = "Informe um nome de categoria."
+                level = "error"
+                created = False
             else:
-                _, created = CategoriaCompra.objects.get_or_create(nome=nome)
-                msg = "Categoria criada." if created else "Categoria ja existe."
-            params = {"cadastro": "1", "msg": msg}
+                categoria, created = CategoriaCompra.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Categoria criada."
+                    level = "success"
+                else:
+                    msg = "Categoria ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": categoria.id if nome and "categoria" in locals() else None,
+                        "nome": categoria.nome if nome and "categoria" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "categoria", "msg": msg, "level": level}
             if next_caderno_id:
                 params["caderno_id"] = next_caderno_id
             return redirect(f"{reverse('financeiro_nova')}?{urlencode(params)}")
@@ -1549,10 +1568,28 @@ def financeiro_nova(request):
             next_caderno_id = request.POST.get("next_caderno_id", "").strip()
             if not nome:
                 msg = "Informe um nome de centro de custo."
+                level = "error"
+                created = False
             else:
-                _, created = CentroCusto.objects.get_or_create(nome=nome)
-                msg = "Centro de custo criado." if created else "Centro de custo ja existe."
-            params = {"cadastro": "1", "msg": msg}
+                centro, created = CentroCusto.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Centro de custo criado."
+                    level = "success"
+                else:
+                    msg = "Centro de custo ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": centro.id if nome and "centro" in locals() else None,
+                        "nome": centro.nome if nome and "centro" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "centro", "msg": msg, "level": level}
             if next_caderno_id:
                 params["caderno_id"] = next_caderno_id
             return redirect(f"{reverse('financeiro_nova')}?{urlencode(params)}")
@@ -1660,6 +1697,7 @@ def financeiro_nova(request):
             "tipos": tipos,
             "selected_caderno_id": str(selected_caderno_id),
             "message": message,
+            "message_level": message_level,
             "open_cadastro": open_cadastro,
         },
     )
@@ -1672,7 +1710,8 @@ def financeiro_cadernos(request):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
     message = request.GET.get("msg", "").strip()
-    open_cadastro = request.GET.get("cadastro") == "1"
+    message_level = request.GET.get("level", "").strip() or "info"
+    open_cadastro = request.GET.get("cadastro", "").strip()
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_caderno":
@@ -1707,19 +1746,55 @@ def financeiro_cadernos(request):
             nome = request.POST.get("categoria_nome", "").strip()
             if not nome:
                 msg = "Informe um nome de categoria."
+                level = "error"
+                created = False
             else:
-                _, created = CategoriaCompra.objects.get_or_create(nome=nome)
-                msg = "Categoria criada." if created else "Categoria ja existe."
-            params = {"cadastro": "1", "msg": msg}
+                categoria, created = CategoriaCompra.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Categoria criada."
+                    level = "success"
+                else:
+                    msg = "Categoria ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": categoria.id if nome and "categoria" in locals() else None,
+                        "nome": categoria.nome if nome and "categoria" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "categoria", "msg": msg, "level": level}
             return redirect(f"{reverse('financeiro_cadernos')}?{urlencode(params)}")
         if action == "create_centro":
             nome = request.POST.get("centro_nome", "").strip()
             if not nome:
                 msg = "Informe um nome de centro de custo."
+                level = "error"
+                created = False
             else:
-                _, created = CentroCusto.objects.get_or_create(nome=nome)
-                msg = "Centro de custo criado." if created else "Centro de custo ja existe."
-            params = {"cadastro": "1", "msg": msg}
+                centro, created = CentroCusto.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Centro de custo criado."
+                    level = "success"
+                else:
+                    msg = "Centro de custo ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": centro.id if nome and "centro" in locals() else None,
+                        "nome": centro.nome if nome and "centro" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "centro", "msg": msg, "level": level}
             return redirect(f"{reverse('financeiro_cadernos')}?{urlencode(params)}")
 
     total_expr = ExpressionWrapper(
@@ -1734,7 +1809,12 @@ def financeiro_cadernos(request):
     return render(
         request,
         "core/financeiro_cadernos.html",
-        {"cadernos": cadernos, "message": message, "open_cadastro": open_cadastro},
+        {
+            "cadernos": cadernos,
+            "message": message,
+            "message_level": message_level,
+            "open_cadastro": open_cadastro,
+        },
     )
 
 
@@ -1898,26 +1978,63 @@ def financeiro_compra_detail(request, pk):
         Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all()),
     )
     message = request.GET.get("msg", "").strip()
-    open_cadastro = request.GET.get("cadastro") == "1"
+    message_level = request.GET.get("level", "").strip() or "info"
+    open_cadastro = request.GET.get("cadastro", "").strip()
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_categoria":
             nome = request.POST.get("categoria_nome", "").strip()
             if not nome:
                 msg = "Informe um nome de categoria."
+                level = "error"
+                created = False
             else:
-                _, created = CategoriaCompra.objects.get_or_create(nome=nome)
-                msg = "Categoria criada." if created else "Categoria ja existe."
-            params = {"cadastro": "1", "msg": msg}
+                categoria, created = CategoriaCompra.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Categoria criada."
+                    level = "success"
+                else:
+                    msg = "Categoria ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": categoria.id if nome and "categoria" in locals() else None,
+                        "nome": categoria.nome if nome and "categoria" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "categoria", "msg": msg, "level": level}
             return redirect(f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}")
         if action == "create_centro":
             nome = request.POST.get("centro_nome", "").strip()
             if not nome:
                 msg = "Informe um nome de centro de custo."
+                level = "error"
+                created = False
             else:
-                _, created = CentroCusto.objects.get_or_create(nome=nome)
-                msg = "Centro de custo criado." if created else "Centro de custo ja existe."
-            params = {"cadastro": "1", "msg": msg}
+                centro, created = CentroCusto.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Centro de custo criado."
+                    level = "success"
+                else:
+                    msg = "Centro de custo ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": centro.id if nome and "centro" in locals() else None,
+                        "nome": centro.nome if nome and "centro" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "centro", "msg": msg, "level": level}
             return redirect(f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}")
         if action == "delete_compra":
             caderno_id = compra.caderno_id
@@ -2034,6 +2151,7 @@ def financeiro_compra_detail(request, pk):
             "centros": centros,
             "cadernos": cadernos,
             "message": message,
+            "message_level": message_level,
             "open_cadastro": open_cadastro,
         },
     )

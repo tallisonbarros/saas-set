@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block title %}Nova compra{% endblock %}
+{% block body_class %}page finance-wide{% endblock %}
 
 {% block content %}
   <div class="page-logo">
@@ -30,8 +31,9 @@
         </div>
       </div>
     </div>
+    <div id="cadastro-message" class="notice" style="display: none;"></div>
     {% if message %}
-      <p class="muted">{{ message }}</p>
+      <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
     {% endif %}
 
     <form method="post" class="finance-grid">
@@ -63,8 +65,18 @@
               <input type="date" name="data">
             </div>
             <div class="field">
-              <label>Categoria</label>
-              <select name="categoria">
+              <div class="field-row">
+                <label>Categoria</label>
+                <details class="inline-pop" id="categoria-pop" {% if open_cadastro == 'categoria' %}open{% endif %}>
+                  <summary>+ novo</summary>
+                  <div class="inline-pop-body">
+                    <label>Categoria</label>
+                    <input type="text" name="categoria_nome" form="create-categoria-form" placeholder="Nova categoria">
+                    <button class="btn btn-ghost btn-compact" type="submit" form="create-categoria-form">Adicionar</button>
+                  </div>
+                </details>
+              </div>
+              <select name="categoria" id="categoria-select">
                 <option value="">Selecione</option>
                 {% for c in categorias %}
                   <option value="{{ c.id }}">{{ c.nome }}</option>
@@ -74,8 +86,18 @@
           </div>
           <div class="finance-form-grid">
             <div class="field">
-              <label>Centro de custo</label>
-              <select name="centro_custo">
+              <div class="field-row">
+                <label>Centro de custo</label>
+                <details class="inline-pop" id="centro-pop" {% if open_cadastro == 'centro' %}open{% endif %}>
+                  <summary>+ novo</summary>
+                  <div class="inline-pop-body">
+                    <label>Centro de custo</label>
+                    <input type="text" name="centro_nome" form="create-centro-form" placeholder="Novo centro">
+                    <button class="btn btn-ghost btn-compact" type="submit" form="create-centro-form">Adicionar</button>
+                  </div>
+                </details>
+              </div>
+              <select name="centro_custo" id="centro-select">
                 <option value="">Selecione</option>
                 {% for c in centros %}
                   <option value="{{ c.id }}">{{ c.nome }}</option>
@@ -86,30 +108,32 @@
         </div>
         <div class="panel-title">Itens</div>
         <div class="stack">
-          <div class="item-grid item-grid-head">
-            <span class="muted">Item</span>
-            <span class="muted">Qtd.</span>
-            <span class="muted">Valor</span>
-            <span class="muted">Tipo</span>
-            <span class="muted">Pago</span>
-            <span class="muted">Acao</span>
-          </div>
-          <div id="item-list" class="stack">
-            <div class="item-grid">
-              <input type="text" name="item_nome_0" placeholder="Descricao do item">
-              <input type="number" name="item_quantidade_0" min="1" placeholder="1">
-              <input type="text" name="item_valor_0" placeholder="0,00">
-              <select name="item_tipo_0">
-                <option value="">Selecione</option>
-                {% for t in tipos %}
-                  <option value="{{ t.id }}">{{ t.nome }}</option>
-                {% endfor %}
-              </select>
-              <label class="checkbox-item">
-                <input type="checkbox" name="item_pago_0">
-                <span>Pago</span>
-              </label>
-              <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
+          <div class="item-grid-wrap">
+            <div class="item-grid item-grid-head">
+              <span class="muted">Item</span>
+              <span class="muted">Qtd.</span>
+              <span class="muted">Valor</span>
+              <span class="muted">Tipo</span>
+              <span class="muted">Pago</span>
+              <span class="muted">Acao</span>
+            </div>
+            <div id="item-list" class="stack">
+              <div class="item-grid">
+                <input type="text" name="item_nome_0" placeholder="Descricao do item">
+                <input type="number" name="item_quantidade_0" min="1" placeholder="1">
+                <input type="text" name="item_valor_0" placeholder="0,00">
+                <select name="item_tipo_0">
+                  <option value="">Selecione</option>
+                  {% for t in tipos %}
+                    <option value="{{ t.id }}">{{ t.nome }}</option>
+                  {% endfor %}
+                </select>
+                <label class="checkbox-item">
+                  <input type="checkbox" name="item_pago_0">
+                  <span>Pago</span>
+                </label>
+                <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
+              </div>
             </div>
           </div>
           <input type="hidden" id="total_items" name="total_items" value="1">
@@ -118,33 +142,94 @@
         <button class="btn btn-primary" type="submit">Registrar</button>
       </div>
     </form>
-    <details class="finance-card" {% if open_cadastro %}open{% endif %}>
-      <summary class="io-discrete-summary">
-        <span class="io-title">Novo cadastro</span>
-        <span class="muted">Categoria ou centro de custo.</span>
-      </summary>
-      <div class="io-discrete-body">
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_categoria">
-          <input type="hidden" name="next_caderno_id" value="{{ selected_caderno_id }}">
-          <label>Categoria</label>
-          <input type="text" name="categoria_nome" placeholder="Nova categoria">
-          <button class="btn btn-ghost" type="submit">Adicionar categoria</button>
-        </form>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_centro">
-          <input type="hidden" name="next_caderno_id" value="{{ selected_caderno_id }}">
-          <label>Centro de custo</label>
-          <input type="text" name="centro_nome" placeholder="Novo centro">
-          <button class="btn btn-ghost" type="submit">Adicionar centro</button>
-        </form>
-      </div>
-    </details>
+    <form id="create-categoria-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_categoria">
+      <input type="hidden" name="next_caderno_id" value="{{ selected_caderno_id }}">
+    </form>
+    <form id="create-centro-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_centro">
+      <input type="hidden" name="next_caderno_id" value="{{ selected_caderno_id }}">
+    </form>
   </section>
   <script>
     (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function setMessage(message, level) {
+        var box = document.getElementById("cadastro-message");
+        if (!box) {
+          return;
+        }
+        box.textContent = message;
+        box.className = "notice notice-" + (level || "info");
+        box.style.display = "block";
+      }
+      function bindCadastro(formId, inputSelector, selectId, detailsId) {
+        var formCadastro = document.getElementById(formId);
+        var input = document.querySelector(inputSelector);
+        var select = document.getElementById(selectId);
+        var details = document.getElementById(detailsId);
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          if (!data.get(input.name)) {
+            data.set(input.name, value);
+          }
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage(payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
       var addButton = document.getElementById("add-item");
       var list = document.getElementById("item-list");
       var totalField = document.getElementById("total_items");
@@ -235,6 +320,18 @@
           renumberRows();
         });
       }
+      bindCadastro(
+        "create-categoria-form",
+        "input[name='categoria_nome'][form='create-categoria-form']",
+        "categoria-select",
+        "categoria-pop"
+      );
+      bindCadastro(
+        "create-centro-form",
+        "input[name='centro_nome'][form='create-centro-form']",
+        "centro-select",
+        "centro-pop"
+      );
     })();
   </script>
 {% endblock %}

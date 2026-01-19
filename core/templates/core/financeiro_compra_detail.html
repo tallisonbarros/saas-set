@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block title %}Compra{% endblock %}
+{% block body_class %}page finance-wide{% endblock %}
 
 {% block content %}
   <div class="page-logo">
@@ -34,6 +35,8 @@
         </div>
       </div>
     </div>
+
+    <div id="cadastro-message" class="notice" style="display: none;"></div>
 
     <div class="finance-card">
       <div class="panel-title">Resumo</div>
@@ -153,30 +156,8 @@
       </form>
     </div>
     {% if message %}
-      <p class="muted">{{ message }}</p>
+      <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
     {% endif %}
-    <details class="finance-card" {% if open_cadastro %}open{% endif %}>
-      <summary class="io-discrete-summary">
-        <span class="io-title">Novo cadastro</span>
-        <span class="muted">Categoria ou centro de custo.</span>
-      </summary>
-      <div class="io-discrete-body">
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_categoria">
-          <label>Categoria</label>
-          <input type="text" name="categoria_nome" placeholder="Nova categoria">
-          <button class="btn btn-ghost" type="submit">Adicionar categoria</button>
-        </form>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_centro">
-          <label>Centro de custo</label>
-          <input type="text" name="centro_nome" placeholder="Novo centro">
-          <button class="btn btn-ghost" type="submit">Adicionar centro</button>
-        </form>
-      </div>
-    </details>
     <details class="finance-card">
       <summary class="io-discrete-summary">
         <span class="io-title">Editar compra</span>
@@ -199,14 +180,34 @@
               <option value="{{ c.id }}" {% if compra.caderno and compra.caderno.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
             {% endfor %}
           </select>
-          <label>Categoria</label>
+          <div class="field-row">
+            <label>Categoria</label>
+            <details class="inline-pop" id="categoria-pop" {% if open_cadastro == 'categoria' %}open{% endif %}>
+              <summary>+ novo</summary>
+              <div class="inline-pop-body">
+                <label>Categoria</label>
+                <input type="text" name="categoria_nome" form="create-categoria-form" placeholder="Nova categoria">
+                <button class="btn btn-ghost btn-compact" type="submit" form="create-categoria-form">Adicionar</button>
+              </div>
+            </details>
+          </div>
           <select name="categoria">
             <option value="">Selecione</option>
             {% for c in categorias %}
               <option value="{{ c.id }}" {% if compra.categoria and compra.categoria.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
             {% endfor %}
           </select>
-          <label>Centro de custo</label>
+          <div class="field-row">
+            <label>Centro de custo</label>
+            <details class="inline-pop" id="centro-pop" {% if open_cadastro == 'centro' %}open{% endif %}>
+              <summary>+ novo</summary>
+              <div class="inline-pop-body">
+                <label>Centro de custo</label>
+                <input type="text" name="centro_nome" form="create-centro-form" placeholder="Novo centro">
+                <button class="btn btn-ghost btn-compact" type="submit" form="create-centro-form">Adicionar</button>
+              </div>
+            </details>
+          </div>
           <select name="centro_custo">
             <option value="">Selecione</option>
             {% for c in centros %}
@@ -217,10 +218,109 @@
         </form>
       </div>
     </details>
+    <form id="create-categoria-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_categoria">
+    </form>
+    <form id="create-centro-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_centro">
+    </form>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="delete_compra">
       <button class="btn btn-outline" type="submit">Excluir compra</button>
     </form>
+  <script>
+    (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function setMessage(message, level) {
+        var box = document.getElementById("cadastro-message");
+        if (!box) {
+          return;
+        }
+        box.textContent = message;
+        box.className = "notice notice-" + (level || "info");
+        box.style.display = "block";
+      }
+      function bindCadastro(formId, inputSelector, selectSelector, detailsId) {
+        var formCadastro = document.getElementById(formId);
+        var input = document.querySelector(inputSelector);
+        var select = document.querySelector(selectSelector);
+        var details = document.getElementById(detailsId);
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          if (!data.get(input.name)) {
+            data.set(input.name, value);
+          }
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage(payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+      bindCadastro(
+        "create-categoria-form",
+        "input[name='categoria_nome'][form='create-categoria-form']",
+        "select[name='categoria']",
+        "categoria-pop"
+      );
+      bindCadastro(
+        "create-centro-form",
+        "input[name='centro_nome'][form='create-centro-form']",
+        "select[name='centro_custo']",
+        "centro-pop"
+      );
+    })();
+  </script>
   </section>
 {% endblock %}
