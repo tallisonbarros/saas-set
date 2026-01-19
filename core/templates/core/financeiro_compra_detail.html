@@ -22,9 +22,8 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Compra</div>
           <h1 class="page-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</h1>
-          <p class="page-subtitle">Resumo da compra e seus itens.</p>
+          <p class="page-subtitle">Itens e status.</p>
         </div>
         <div class="page-actions">
           {% if compra.caderno %}
@@ -34,7 +33,6 @@
           {% endif %}
         </div>
       </div>
-      <div class="hud-meta">Edite itens, status e classificacao.</div>
     </div>
 
     <div class="stack">
@@ -44,13 +42,12 @@
       <div><strong>Status:</strong> {{ compra.status_label }}</div>
       <div><strong>Caderno:</strong> {% if compra.caderno %}{{ compra.caderno.nome }}{% else %}-{% endif %}</div>
       <div><strong>Categoria:</strong> {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}-{% endif %}</div>
-      <div><strong>Centro de custo:</strong> {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}-{% endif %}</div>
+      <div><strong>Centro:</strong> {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}-{% endif %}</div>
     </div>
 
     <details class="io-card io-compact io-compact-card">
       <summary class="io-discrete-summary">
         <span class="io-title">Editar compra</span>
-        <span class="muted">Ajuste dados basicos da compra.</span>
       </summary>
       <div class="io-discrete-body">
         <form method="post" class="stack">
@@ -152,7 +149,7 @@
     </div>
 
     <div class="finance-card">
-      <div class="panel-title">Adicionar item</div>
+      <div class="panel-title">Novo item</div>
       <form method="post" class="stack">
         {% csrf_token %}
         <input type="hidden" name="action" value="add_item">

@@ -22,22 +22,20 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Financeiro</div>
           <h1 class="page-title">Nova compra</h1>
-          <p class="page-subtitle">Registre a compra e adicione itens iniciais se necessario.</p>
+          <p class="page-subtitle">Registre a compra.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
         </div>
       </div>
-      <div class="hud-meta">Campos essenciais para registrar.</div>
     </div>
 
     <form method="post" class="finance-grid">
       {% csrf_token %}
       <input type="hidden" name="action" value="create_compra">
       <div class="finance-card">
-        <div class="panel-title">Registrar compra</div>
+        <div class="panel-title">Dados</div>
         <div class="stack">
           <div class="field">
             <label>Caderno</label>
@@ -49,7 +47,7 @@
             </select>
           </div>
           <div class="field">
-            <label>Nome da compra</label>
+            <label>Nome</label>
             <input type="text" name="nome" placeholder="Compra de insumos">
           </div>
           <div class="field">
@@ -83,8 +81,7 @@
             </div>
           </div>
         </div>
-        <div class="panel-title">Itens da compra</div>
-        <div class="muted">Adicione quantos itens precisar.</div>
+        <div class="panel-title">Itens</div>
         <div class="stack">
           <div class="item-grid item-grid-head">
             <span class="muted">Item</span>

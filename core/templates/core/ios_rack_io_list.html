@@ -22,15 +22,13 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Rack</div>
           <h1 class="page-title">Lista de IOs</h1>
-          <p class="page-subtitle">{{ rack.nome }}{% if rack.descricao %} • {{ rack.descricao }}{% endif %}</p>
+          <p class="page-subtitle">{{ rack.nome }}{% if rack.descricao %} - {{ rack.descricao }}{% endif %}</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Voltar ao rack</a>
         </div>
       </div>
-      <div class="hud-meta">Leitura rapida por slot, modulo e canal.</div>
     </div>
   </section>
 
@@ -38,7 +36,7 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Mapa completo de IOs</h2>
-        <p class="muted">Leitura rapida por slot, modulo e canal.</p>
+        <p class="muted">Slots, modulos e canais.</p>
       </div>
     </div>
     <div class="table-wrap">

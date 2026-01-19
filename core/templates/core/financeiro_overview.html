@@ -17,7 +17,7 @@
   <section class="card stack">
     <div class="page-hud">
       <div class="hud-top">
-        <div class="hud-title">Painel financeiro</div>
+        <div class="hud-title">Financeiro</div>
       </div>
       <div class="page-hud-head">
         <div class="page-actions">
@@ -37,14 +37,13 @@
               <div class="proposal-head">
                 <div>
                   <div class="proposal-title">{{ c.nome }}</div>
-                  <div class="proposal-meta">Total do mes: R$ {{ c.total_mes|default:0 }}</div>
-                  <div class="proposal-meta">
-                    {% if c.id_financeiro %}ID_FINANCEIRO: {{ c.id_financeiro.codigo }}{% else %}Sem ID_FINANCEIRO{% endif %}
-                  </div>
+                  <div class="proposal-meta">Total: R$ {{ c.total_mes|default:0 }}</div>
+                  {% if c.id_financeiro %}
+                    <div class="proposal-meta">ID_FINANCEIRO: {{ c.id_financeiro.codigo }}</div>
+                  {% endif %}
                 </div>
                 <span class="badge">{{ c.ativo|yesno:"Ativo,Inativo" }}</span>
               </div>
-              <div class="proposal-meta">Criado em: {{ c.criado_em|date:"d/m/Y" }}</div>
             </div>
           {% endfor %}
         </div>

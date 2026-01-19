@@ -17,14 +17,13 @@
   <section class="card">
     <div class="page-hud">
       <div class="hud-top">
-        <div class="hud-title">Painel do modulos</div>
+        <div class="hud-title">Modelos de modulos</div>
         <div class="hud-pill">Modelos</div>
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">I/O</div>
           <h1 class="page-title">Modelos de modulos</h1>
-          <p class="page-subtitle">Modelos prontos para reutilizar.</p>
+          <p class="page-subtitle">Modelos prontos.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'ios_list' %}">Voltar</a>
@@ -33,7 +32,6 @@
           {% endif %}
         </div>
       </div>
-      <div class="hud-meta">Tipos de canal e modelos base.</div>
     </div>
   </section>
 
@@ -42,7 +40,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Criar novo modulo</h2>
-          <p class="muted">Defina o molde. Os nomes dos canais serao definidos no rack.</p>
+          <p class="muted">Defina o modelo.</p>
         </div>
       </div>
       {% if can_manage %}
@@ -89,7 +87,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Modulos cadastrados</h2>
-          <p class="muted">Clique em um card para editar o modelo do modulo.</p>
+          <p class="muted">Editar modelo.</p>
         </div>
       </div>
       <div class="proposal-grid">

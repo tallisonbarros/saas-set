@@ -26,13 +26,12 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Modulo</div>
           <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
         </div>
       </div>
-      <div class="hud-meta">
-        {% if rack.descricao %}{{ rack.descricao }}{% else %}Identifique o slot e ajuste os canais.{% endif %}
-      </div>
+      {% if rack.descricao %}
+        <div class="hud-meta">{{ rack.descricao }}</div>
+      {% endif %}
       <div class="rack-slot-head">
         <div class="rack-slot-title">{{ rack.nome }}</div>
         <div class="rack-slot-nav">
@@ -62,7 +61,7 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Nomes dos canais</h2>
-        <p class="muted">Ajuste o nome e a classificacao de cada canal.</p>
+        <p class="muted">Ajuste nome e tipo.</p>
       </div>
     </div>
     <form class="channel-form" method="post">
@@ -91,7 +90,7 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Gerenciar modulo</h2>
-        <p class="muted">Renomeie, mova para um slot vazio ou exclua.</p>
+        <p class="muted">Renomear, mover ou excluir.</p>
       </div>
     </div>
     <form class="channel-form" method="post">

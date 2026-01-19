@@ -22,22 +22,20 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Caderno</div>
           <h1 class="page-title">{{ caderno.nome }}</h1>
-          <p class="page-subtitle">Acompanhe pagamentos, pendencias e categorias.</p>
+          <p class="page-subtitle">Pagamentos e pendencias.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
-          <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
+          <a class="btn btn-primary" href="{% url 'financeiro_nova' %}-caderno_id={{ caderno.id }}">Criar compra</a>
         </div>
       </div>
-      <div class="hud-meta">Resumo do mes com filtros e totais.</div>
     </div>
 
     <details class="io-card io-discrete hud-filter" {% if status_filter or categoria_filter or centro_filter or search_query %}open{% endif %}>
       <summary class="io-discrete-summary">
         <span class="io-title">Filtros</span>
-        <span class="muted">Clique para abrir e filtrar.</span>
+        <span class="muted">Filtrar.</span>
       </summary>
       <div class="io-discrete-body">
         <form class="finance-filter" method="get">
@@ -76,7 +74,7 @@
             </select>
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Aplicar filtros</button>
+            <button class="btn btn-primary" type="submit">Aplicar</button>
             <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' caderno.id %}">Limpar</a>
           </div>
         </form>
@@ -87,22 +85,18 @@
       <div class="summary-card hud-card">
         <div class="summary-label">Total do mes</div>
         <div class="summary-value">R$ {{ resumo.total_mes|floatformat:2 }}</div>
-        <div class="summary-meta">Ticket medio: R$ {{ resumo.ticket_medio|floatformat:2 }}</div>
       </div>
       <div class="summary-card hud-card">
         <div class="summary-label">Pago</div>
         <div class="summary-value">R$ {{ resumo.total_pago|floatformat:2 }}</div>
-        <div class="summary-meta">Compras pagas: {{ resumo.total_pagas }}</div>
       </div>
       <div class="summary-card hud-card">
         <div class="summary-label">Pendente</div>
         <div class="summary-value">R$ {{ resumo.total_pendente|floatformat:2 }}</div>
-        <div class="summary-meta">Compras pendentes: {{ resumo.total_pendentes }}</div>
       </div>
       <div class="summary-card hud-card">
         <div class="summary-label">Total de compras</div>
         <div class="summary-value">{{ resumo.total_compras }}</div>
-        <div class="summary-meta">Ritmo mensal do caderno.</div>
       </div>
     </div>
 
@@ -117,12 +111,12 @@
                 <div>
                   <div class="proposal-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</div>
                   <div class="proposal-meta">
-                    {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} • Itens: {{ compra.itens_count }}
+                    {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} - Itens: {{ compra.itens_count }}
                   </div>
                 </div>
                 <span class="badge badge-{{ compra.status_label|lower }}">{{ compra.status_label }}</span>
               </div>
-              <div class="proposal-meta">Total: R$ {{ compra.total_itens|floatformat:2 }} • Pago: R$ {{ compra.total_pago|floatformat:2 }}</div>
+              <div class="proposal-meta">Total: R$ {{ compra.total_itens|floatformat:2 }} - Pago: R$ {{ compra.total_pago|floatformat:2 }}</div>
               <div class="proposal-meta">
                 {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}Sem categoria{% endif %} -
                 {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}Sem centro{% endif %}
@@ -145,11 +139,11 @@
               <div class="proposal-head">
                 <div>
                   <div class="proposal-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</div>
-                  <div class="proposal-meta">Sem data • Itens: {{ compra.itens_count }}</div>
+                  <div class="proposal-meta">Sem data - Itens: {{ compra.itens_count }}</div>
                 </div>
                 <span class="badge badge-{{ compra.status_label|lower }}">{{ compra.status_label }}</span>
               </div>
-              <div class="proposal-meta">Total: R$ {{ compra.total_itens|floatformat:2 }} • Pago: R$ {{ compra.total_pago|floatformat:2 }}</div>
+              <div class="proposal-meta">Total: R$ {{ compra.total_itens|floatformat:2 }} - Pago: R$ {{ compra.total_pago|floatformat:2 }}</div>
               <div class="proposal-meta">
                 {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}Sem categoria{% endif %} -
                 {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}Sem centro{% endif %}

@@ -22,22 +22,20 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Propostas</div>
           <h1 class="page-title">Criar proposta</h1>
-          <p class="page-subtitle">Preencha os dados para enviar.</p>
+          <p class="page-subtitle">Preencha os dados e envie.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-outline" href="{% url 'propostas' %}">Voltar</a>
         </div>
       </div>
-      <div class="hud-meta">Revise antes de enviar.</div>
     </div>
     {% if message %}
       <div class="alert alert-warning">{{ message }}</div>
     {% endif %}
     <form class="stack" method="post">
       {% csrf_token %}
-      <label for="id_email">Email do destinatario</label>
+      <label for="id_email">Destinatario</label>
       <input id="id_email" type="email" name="email" value="{{ form_data.email }}" required>
 
       <label for="id_nome">Nome</label>
@@ -49,7 +47,7 @@
       <label for="id_valor">Valor</label>
       <input id="id_valor" type="text" name="valor" value="{{ form_data.valor }}" required>
 
-      <label for="id_prioridade">Prioridade (1 a 99)</label>
+      <label for="id_prioridade">Prioridade</label>
       <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ form_data.prioridade }}">
 
       <div class="form-actions">

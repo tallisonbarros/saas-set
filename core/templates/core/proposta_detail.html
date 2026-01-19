@@ -22,12 +22,11 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Visao do cliente</div>
           <h1 class="page-title">{{ proposta.nome }}</h1>
           <p class="page-subtitle">{{ proposta.descricao|linebreaksbr }}</p>
         </div>
         <div class="page-actions">
-          <a class="btn btn-outline" href="{% url 'propostas' %}">&lt; PROPOSTAS</a>
+          <a class="btn btn-outline" href="{% url 'propostas' %}">Voltar</a>
         </div>
       </div>
       <div class="hud-meta">
@@ -48,33 +47,31 @@
     {% endif %}
     <div class="detail-actions">
       <div class="user-card proposal-details-card">
-        <div class="panel-title">Detalhes da proposta</div>
+        <div class="panel-title">Resumo</div>
         <div class="stack proposal-details-list">
           <div><strong>Codigo:</strong> {{ proposta.codigo }}</div>
-          <div><strong>Prioridade:</strong> {{ proposta.prioridade }}</div>
           <div><strong>Status:</strong> {{ status_label }}</div>
-          <div><strong>Aprovada:</strong> {% if proposta.aprovada == True %}Sim{% elif proposta.aprovada == False %}Nao{% else %}Pendente{% endif %}</div>
-          <div><strong>Finalizada:</strong> {{ proposta.finalizada|yesno:"Sim,Nao" }}</div>
+          <div><strong>Aprovacao:</strong> {% if proposta.aprovada == True %}Sim{% elif proposta.aprovada == False %}Nao{% else %}Pendente{% endif %}</div>
           <div><strong>Valor:</strong> R$ {{ proposta.valor }}</div>
-          <div><strong>Enviada para:</strong> {{ proposta.cliente.nome }} ({{ proposta.cliente.email }})</div>
+          <div><strong>Para:</strong> {{ proposta.cliente.nome }} ({{ proposta.cliente.email }})</div>
           {% if proposta.criada_por %}
-            <div><strong>Criada por:</strong> {{ proposta.criada_por.username }}</div>
+            <div><strong>De:</strong> {{ proposta.criada_por.username }}</div>
           {% endif %}
-          <div><strong>Criado em:</strong> {{ proposta.criado_em }}</div>
+          <div><strong>Criada em:</strong> {{ proposta.criado_em }}</div>
           {% if proposta.decidido_em %}
-            <div><strong>Decidido em:</strong> {{ proposta.decidido_em }}</div>
+            <div><strong>Decidida em:</strong> {{ proposta.decidido_em }}</div>
           {% endif %}
           {% if proposta.aprovado_por %}
-            <div><strong>Decidido por:</strong> {{ proposta.aprovado_por.username }}</div>
+            <div><strong>Decidida por:</strong> {{ proposta.aprovado_por.username }}</div>
           {% endif %}
         </div>
       </div>
       <div class="user-card">
-        <div class="panel-title">Anexos da proposta</div>
+        <div class="panel-title">Anexos</div>
         <form method="post" enctype="multipart/form-data" class="stack">
           {% csrf_token %}
           <input type="hidden" name="action" value="add_anexo">
-          <label>Tipo de arquivo</label>
+          <label>Tipo</label>
           <select name="tipo">
             {% for value, label in proposta.anexos.model.Tipo.choices %}
               <option value="{{ value }}">{{ label }}</option>
@@ -82,7 +79,7 @@
           </select>
           <label>Arquivo</label>
           <input type="file" name="arquivo" required>
-          <button class="btn btn-ghost" type="submit">Enviar anexo</button>
+          <button class="btn btn-ghost" type="submit">Enviar</button>
         </form>
         {% if proposta.anexos.all %}
           <div class="user-list">
@@ -109,38 +106,38 @@
         {% endif %}
       </div>
       <div class="user-card">
-        <div class="panel-title">Observacao e prioridade</div>
+        <div class="panel-title">Observacao</div>
         <form method="post" action="{% url 'salvar_observacao' proposta.pk %}" class="stack">
           {% csrf_token %}
-          <label for="id_prioridade">Prioridade (1 a 99)</label>
+          <label for="id_prioridade">Prioridade</label>
           <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ proposta.prioridade }}">
           <label for="id_observacao">Observacao</label>
           <textarea id="id_observacao" name="observacao">{{ proposta.observacao_cliente }}</textarea>
-          <button class="btn btn-ghost" type="submit">Salvar ajustes</button>
+          <button class="btn btn-ghost" type="submit">Salvar</button>
         </form>
       </div>
       {% if proposta.criada_por_id == request.user.id %}
         <div class="user-card">
-          <div class="panel-title">Editar detalhes</div>
+          <div class="panel-title">Editar</div>
           <form method="post" class="stack">
             {% csrf_token %}
             <input type="hidden" name="action" value="update_details">
-            <label>Nome da proposta</label>
+            <label>Nome</label>
             <input type="text" name="nome" value="{{ proposta.nome }}">
             <label>Descricao</label>
             <textarea name="descricao" rows="4">{{ proposta.descricao }}</textarea>
             <label>Codigo</label>
             <input type="text" name="codigo" value="{{ proposta.codigo }}">
-            <button class="btn btn-primary" type="submit">Atualizar detalhes</button>
+            <button class="btn btn-primary" type="submit">Atualizar</button>
           </form>
         </div>
         <div class="user-card">
-          <div class="panel-title">Gerenciar proposta</div>
+          <div class="panel-title">Acoes</div>
           {% if proposta.aprovada == None %}
             <form method="post" class="stack">
               {% csrf_token %}
               <input type="hidden" name="action" value="update_value">
-              <label>Valor (alteravel antes da aprovacao)</label>
+              <label>Valor</label>
               <input type="text" name="valor" value="{{ proposta.valor }}">
               <button class="btn btn-primary" type="submit">Atualizar valor</button>
             </form>
@@ -148,7 +145,6 @@
           <form method="post" class="stack">
             {% csrf_token %}
             <input type="hidden" name="action" value="set_finalizada">
-            <label>Finalizar proposta</label>
             <button class="btn btn-outline" type="submit" {% if proposta.finalizada %}disabled{% endif %}>
               {% if proposta.finalizada %}Ja finalizada{% else %}Marcar como finalizada{% endif %}
             </button>
@@ -157,7 +153,6 @@
             <form method="post" class="stack">
               {% csrf_token %}
               <input type="hidden" name="action" value="set_executando">
-              <label>Status</label>
               <button class="btn btn-outline" type="submit">Marcar como Executando</button>
             </form>
           {% endif %}

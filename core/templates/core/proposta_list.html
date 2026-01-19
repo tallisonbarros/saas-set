@@ -22,9 +22,8 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Operacao comercial</div>
           <h1 class="page-title">Visao geral</h1>
-          <p class="page-subtitle">Acompanhe negociações, aprovacoes e andamento.</p>
+          <p class="page-subtitle">Acompanhe aprovacoes e andamento das propostas.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
@@ -48,11 +47,11 @@
       {% else %}
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
-        <a href="{% url 'propostas' %}-status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>
-        <a href="{% url 'propostas' %}-status=levantamento" class="filter-pill {% if status_filter == 'levantamento' %}active{% endif %}">Levantamento</a>
-        <a href="{% url 'propostas' %}-status=aprovada" class="filter-pill {% if status_filter == 'aprovada' %}active{% endif %}">Aprovadas</a>
-        <a href="{% url 'propostas' %}-status=reprovada" class="filter-pill {% if status_filter == 'reprovada' %}active{% endif %}">Reprovadas</a>
-        <a href="{% url 'propostas' %}-status=finalizada" class="filter-pill {% if status_filter == 'finalizada' %}active{% endif %}">Finalizadas</a>
+        <a href="{% url 'propostas' %}?status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>
+        <a href="{% url 'propostas' %}?status=levantamento" class="filter-pill {% if status_filter == 'levantamento' %}active{% endif %}">Levantamento</a>
+        <a href="{% url 'propostas' %}?status=aprovada" class="filter-pill {% if status_filter == 'aprovada' %}active{% endif %}">Aprovadas</a>
+        <a href="{% url 'propostas' %}?status=reprovada" class="filter-pill {% if status_filter == 'reprovada' %}active{% endif %}">Reprovadas</a>
+        <a href="{% url 'propostas' %}?status=finalizada" class="filter-pill {% if status_filter == 'finalizada' %}active{% endif %}">Finalizadas</a>
       </div>
       {% if propostas %}
         {% if not status_filter %}
@@ -60,7 +59,6 @@
             <div class="proposal-section-head">
               <div>
                 <div class="proposal-section-title">Propostas para aprovar</div>
-                <div class="proposal-section-subtitle">Prioridade para decisoes pendentes.</div>
               </div>
             </div>
             <div class="proposal-grid">
@@ -78,7 +76,7 @@
                         </div>
                         <div class="proposal-title">{{ proposta.nome }}</div>
                         <div class="proposal-meta">R$ {{ proposta.valor }}</div>
-                        <div class="proposal-meta">Enviada por: {{ proposta.criada_por.username|default:"Sistema" }}</div>
+                        <div class="proposal-meta">De: {{ proposta.criada_por.username|default:"Sistema" }}</div>
                       </div>
                     {% if not proposta.finalizada %}
                       <span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span>
@@ -102,7 +100,7 @@
               {% else %}
                 <div class="proposal-card proposal-card-empty">
                   <div class="proposal-title">Sem pendencias</div>
-                  <div class="proposal-meta">Nenhuma proposta aguardando sua aprovacao.</div>
+                  <div class="proposal-meta">Nenhuma proposta aguardando aprovacao.</div>
                 </div>
               {% endif %}
             </div>
@@ -113,7 +111,6 @@
           <div class="proposal-section-head">
             <div>
               <div class="proposal-section-title">Todas as propostas</div>
-              <div class="proposal-section-subtitle">Acompanhe o restante da carteira.</div>
             </div>
           </div>
           <div class="proposal-grid">
@@ -139,13 +136,12 @@
                     {% endif %}
                     <div class="proposal-title">{{ proposta.nome }}</div>
                     <div class="proposal-meta">R$ {{ proposta.valor }}</div>
-                    <div class="proposal-meta">Enviada para: {{ proposta.cliente.nome }}</div>
                     {% if proposta.criada_por_id == current_user_id %}
-                      <div class="proposal-meta">Enviada por voce</div>
+                      <div class="proposal-meta">Para: {{ proposta.cliente.nome }}</div>
                     {% elif proposta.criada_por %}
-                      <div class="proposal-meta">Recebida de: {{ proposta.criada_por.username }}</div>
+                      <div class="proposal-meta">De: {{ proposta.criada_por.username }}</div>
                     {% else %}
-                      <div class="proposal-meta">Recebida</div>
+                      <div class="proposal-meta">Origem: Sistema</div>
                     {% endif %}
                   </div>
                   {% if not proposta.finalizada %}

@@ -22,15 +22,13 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Financeiro</div>
           <h1 class="page-title">Cadernos</h1>
-          <p class="page-subtitle">Crie, ative e organize cadernos.</p>
+          <p class="page-subtitle">Crie e organize cadernos.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
         </div>
       </div>
-      <div class="hud-meta">IDs financeiros e status dos cadernos.</div>
     </div>
 
     <div class="finance-card">
@@ -60,10 +58,6 @@
                   {% if c.id_financeiro %}
                     <div class="proposal-meta">ID_FINANCEIRO: {{ c.id_financeiro.codigo }}</div>
                   {% endif %}
-                  {% if c.criador %}
-                    <div class="proposal-meta">Criado por: {{ c.criador.nome }}</div>
-                  {% endif %}
-                  <div class="proposal-meta">Criado em: {{ c.criado_em|date:"d/m/Y" }}</div>
                 </div>
                 <span class="badge">{{ c.ativo|yesno:"Ativo,Inativo" }}</span>
               </div>

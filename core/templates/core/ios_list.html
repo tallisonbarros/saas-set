@@ -21,8 +21,8 @@
         <div class="hud-pill">Listas de IOs</div>
       </div>
       <div class="page-hud-head">
-        <div>                  
-          <p class="page-subtitle">Gerencie racks, modulos e canais.</p>
+        <div>
+          <p class="page-subtitle">Racks, modulos e canais.</p>
         </div>
         <div class="page-actions">
           <a class="btn btn-outline btn-compact" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
@@ -32,7 +32,7 @@
         </div>
       </div>
       <div class="hud-meta">
-        <a class="hud-link" href="#pesquisa-io">Busca rapida por rack, modulo ou canal.</a>
+        <a class="hud-link" href="#pesquisa-io">Busca rapida.</a>
       </div>
     </div>
   </section>
@@ -42,7 +42,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Seus Racks</h2>
-          <p class="muted">Escolha um rack para adicionar modulos e ajustar os slots.</p>
+          <p class="muted">Selecione um rack.</p>
         </div>
       </div>
       <div class="proposal-grid">
@@ -55,9 +55,6 @@
                 <div class="proposal-meta">{{ rack.descricao }}</div>
               </div>
               <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
-            </div>
-            <div class="proposal-meta">
-              Total: {{ rack.slots_total }} slots - Modulos: {{ rack.ocupados }}
             </div>
             {% if rack.id_planta %}
               <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
@@ -72,7 +69,7 @@
     <details class="io-card io-discrete" id="novo-rack">
       <summary class="io-discrete-summary">
         <span class="io-title">Novo rack</span>
-        <span class="muted">Clique para cadastrar um rack.</span>
+        <span class="muted">Cadastrar rack.</span>
       </summary>
       <div class="io-discrete-body">
         {% if can_manage %}
@@ -111,7 +108,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Pesquisa de I/Os</h2>
-          <p class="muted">Busque por rack, modulo ou canal e localize o slot e o canal.</p>
+          <p class="muted">Busque por rack, modulo ou canal.</p>
         </div>
       </div>
       <form class="io-search-form" method="get">
@@ -131,7 +128,6 @@
       {% if search_term %}
         <div class="io-search-meta">
           <span class="slot-badge">{{ search_count }} resultado{{ search_count|pluralize }}</span>
-          <span class="muted">Mostrando ate 200 correspondencias.</span>
         </div>
         {% if search_results %}
           <div class="table-wrap">
