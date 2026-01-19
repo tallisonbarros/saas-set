@@ -49,42 +49,6 @@
     </div>
 
     <div class="finance-card">
-      <div class="panel-title">Editar compra</div>
-      <form method="post" class="stack">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="update_compra">
-        <label>Nome</label>
-        <input type="text" name="nome" value="{{ compra.nome }}">
-        <label>Descricao</label>
-        <textarea name="descricao" rows="3">{{ compra.descricao }}</textarea>
-        <label>Data</label>
-        <input type="date" name="data" value="{% if compra.data %}{{ compra.data|date:'Y-m-d' }}{% endif %}">
-        <label>Caderno</label>
-        <select name="caderno">
-          <option value="">Selecione</option>
-          {% for c in cadernos %}
-            <option value="{{ c.id }}" {% if compra.caderno and compra.caderno.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
-          {% endfor %}
-        </select>
-        <label>Categoria</label>
-        <select name="categoria">
-          <option value="">Selecione</option>
-          {% for c in categorias %}
-            <option value="{{ c.id }}" {% if compra.categoria and compra.categoria.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
-          {% endfor %}
-        </select>
-        <label>Centro de custo</label>
-        <select name="centro_custo">
-          <option value="">Selecione</option>
-          {% for c in centros %}
-            <option value="{{ c.id }}" {% if compra.centro_custo and compra.centro_custo.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
-          {% endfor %}
-        </select>
-        <button class="btn btn-ghost" type="submit">Salvar</button>
-      </form>
-    </div>
-
-    <div class="finance-card">
       <div class="panel-title">Itens da compra</div>
       {% if itens %}
         <div class="table-wrap">
@@ -188,6 +152,71 @@
         <button class="btn btn-primary" type="submit">Adicionar item</button>
       </form>
     </div>
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
+    <details class="finance-card" {% if open_cadastro %}open{% endif %}>
+      <summary class="io-discrete-summary">
+        <span class="io-title">Novo cadastro</span>
+        <span class="muted">Categoria ou centro de custo.</span>
+      </summary>
+      <div class="io-discrete-body">
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_categoria">
+          <label>Categoria</label>
+          <input type="text" name="categoria_nome" placeholder="Nova categoria">
+          <button class="btn btn-ghost" type="submit">Adicionar categoria</button>
+        </form>
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_centro">
+          <label>Centro de custo</label>
+          <input type="text" name="centro_nome" placeholder="Novo centro">
+          <button class="btn btn-ghost" type="submit">Adicionar centro</button>
+        </form>
+      </div>
+    </details>
+    <details class="finance-card">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Editar compra</span>
+        <span class="muted">Ajuste dados basicos.</span>
+      </summary>
+      <div class="io-discrete-body">
+        <form method="post" class="stack">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_compra">
+          <label>Nome</label>
+          <input type="text" name="nome" value="{{ compra.nome }}">
+          <label>Descricao</label>
+          <textarea name="descricao" rows="3">{{ compra.descricao }}</textarea>
+          <label>Data</label>
+          <input type="date" name="data" value="{% if compra.data %}{{ compra.data|date:'Y-m-d' }}{% endif %}">
+          <label>Caderno</label>
+          <select name="caderno">
+            <option value="">Selecione</option>
+            {% for c in cadernos %}
+              <option value="{{ c.id }}" {% if compra.caderno and compra.caderno.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+          <label>Categoria</label>
+          <select name="categoria">
+            <option value="">Selecione</option>
+            {% for c in categorias %}
+              <option value="{{ c.id }}" {% if compra.categoria and compra.categoria.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+          <label>Centro de custo</label>
+          <select name="centro_custo">
+            <option value="">Selecione</option>
+            {% for c in centros %}
+              <option value="{{ c.id }}" {% if compra.centro_custo and compra.centro_custo.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-ghost" type="submit">Salvar</button>
+        </form>
+      </div>
+    </details>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="delete_compra">

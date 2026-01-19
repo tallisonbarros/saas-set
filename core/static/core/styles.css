@@ -724,16 +724,23 @@ body {
   gap: 10px;
   grid-template-columns: minmax(160px, 1.2fr) minmax(70px, 0.4fr) minmax(90px, 0.6fr) minmax(120px, 0.8fr) minmax(90px, 0.5fr) minmax(90px, 0.5fr);
   align-items: center;
+  max-width: 100%;
 }
 
 .item-grid-head {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 1px;
+  color: var(--muted);
 }
 
 .item-remove {
   justify-self: flex-end;
+}
+
+.item-grid,
+.item-grid-head {
+  overflow-x: auto;
 }
 
 .config-grid {

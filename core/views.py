@@ -5,6 +5,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from urllib.parse import urlencode
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -1526,8 +1528,34 @@ def financeiro_nova(request):
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
+    message = request.GET.get("msg", "").strip()
+    open_cadastro = request.GET.get("cadastro") == "1"
     if request.method == "POST":
         action = request.POST.get("action")
+        if action == "create_categoria":
+            nome = request.POST.get("categoria_nome", "").strip()
+            next_caderno_id = request.POST.get("next_caderno_id", "").strip()
+            if not nome:
+                msg = "Informe um nome de categoria."
+            else:
+                _, created = CategoriaCompra.objects.get_or_create(nome=nome)
+                msg = "Categoria criada." if created else "Categoria ja existe."
+            params = {"cadastro": "1", "msg": msg}
+            if next_caderno_id:
+                params["caderno_id"] = next_caderno_id
+            return redirect(f"{reverse('financeiro_nova')}?{urlencode(params)}")
+        if action == "create_centro":
+            nome = request.POST.get("centro_nome", "").strip()
+            next_caderno_id = request.POST.get("next_caderno_id", "").strip()
+            if not nome:
+                msg = "Informe um nome de centro de custo."
+            else:
+                _, created = CentroCusto.objects.get_or_create(nome=nome)
+                msg = "Centro de custo criado." if created else "Centro de custo ja existe."
+            params = {"cadastro": "1", "msg": msg}
+            if next_caderno_id:
+                params["caderno_id"] = next_caderno_id
+            return redirect(f"{reverse('financeiro_nova')}?{urlencode(params)}")
         if action == "create_compra":
             if not cliente:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -1631,6 +1659,8 @@ def financeiro_nova(request):
             "centros": centros,
             "tipos": tipos,
             "selected_caderno_id": str(selected_caderno_id),
+            "message": message,
+            "open_cadastro": open_cadastro,
         },
     )
 
@@ -1641,6 +1671,8 @@ def financeiro_cadernos(request):
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
+    message = request.GET.get("msg", "").strip()
+    open_cadastro = request.GET.get("cadastro") == "1"
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_caderno":
@@ -1671,6 +1703,24 @@ def financeiro_cadernos(request):
             )
             caderno.delete()
             return redirect("financeiro_cadernos")
+        if action == "create_categoria":
+            nome = request.POST.get("categoria_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de categoria."
+            else:
+                _, created = CategoriaCompra.objects.get_or_create(nome=nome)
+                msg = "Categoria criada." if created else "Categoria ja existe."
+            params = {"cadastro": "1", "msg": msg}
+            return redirect(f"{reverse('financeiro_cadernos')}?{urlencode(params)}")
+        if action == "create_centro":
+            nome = request.POST.get("centro_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de centro de custo."
+            else:
+                _, created = CentroCusto.objects.get_or_create(nome=nome)
+                msg = "Centro de custo criado." if created else "Centro de custo ja existe."
+            params = {"cadastro": "1", "msg": msg}
+            return redirect(f"{reverse('financeiro_cadernos')}?{urlencode(params)}")
 
     total_expr = ExpressionWrapper(
         F("compras__itens__valor") * F("compras__itens__quantidade"),
@@ -1684,7 +1734,7 @@ def financeiro_cadernos(request):
     return render(
         request,
         "core/financeiro_cadernos.html",
-        {"cadernos": cadernos},
+        {"cadernos": cadernos, "message": message, "open_cadastro": open_cadastro},
     )
 
 
@@ -1847,8 +1897,28 @@ def financeiro_compra_detail(request, pk):
         Q(pk=pk),
         Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all()),
     )
+    message = request.GET.get("msg", "").strip()
+    open_cadastro = request.GET.get("cadastro") == "1"
     if request.method == "POST":
         action = request.POST.get("action")
+        if action == "create_categoria":
+            nome = request.POST.get("categoria_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de categoria."
+            else:
+                _, created = CategoriaCompra.objects.get_or_create(nome=nome)
+                msg = "Categoria criada." if created else "Categoria ja existe."
+            params = {"cadastro": "1", "msg": msg}
+            return redirect(f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}")
+        if action == "create_centro":
+            nome = request.POST.get("centro_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de centro de custo."
+            else:
+                _, created = CentroCusto.objects.get_or_create(nome=nome)
+                msg = "Centro de custo criado." if created else "Centro de custo ja existe."
+            params = {"cadastro": "1", "msg": msg}
+            return redirect(f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}")
         if action == "delete_compra":
             caderno_id = compra.caderno_id
             compra.delete()
@@ -1963,6 +2033,8 @@ def financeiro_compra_detail(request, pk):
             "categorias": categorias,
             "centros": centros,
             "cadernos": cadernos,
+            "message": message,
+            "open_cadastro": open_cadastro,
         },
     )
 
