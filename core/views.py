@@ -1857,20 +1857,31 @@ def financeiro_compra_detail(request, pk):
             return redirect("financeiro")
         if action == "update_compra":
             nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
             categoria_id = request.POST.get("categoria")
             centro_id = request.POST.get("centro_custo")
             caderno_id = request.POST.get("caderno")
+            data_raw = request.POST.get("data", "").strip()
             allowed_cadernos = Caderno.objects.filter(
                 Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())
             )
             if caderno_id and not allowed_cadernos.filter(id=caderno_id).exists():
                 return redirect("financeiro_compra_detail", pk=compra.pk)
+            if data_raw:
+                try:
+                    data = datetime.strptime(data_raw, "%Y-%m-%d").date()
+                except ValueError:
+                    data = None
+            else:
+                data = None
             compra.nome = nome
+            compra.descricao = descricao
             compra.categoria_id = categoria_id or None
             compra.centro_custo_id = centro_id or None
+            compra.data = data
             if caderno_id:
                 compra.caderno_id = caderno_id
-            compra.save(update_fields=["nome", "categoria", "centro_custo", "caderno"])
+            compra.save(update_fields=["nome", "descricao", "categoria", "centro_custo", "caderno", "data"])
             return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "add_item":
             nome = request.POST.get("nome", "").strip()
