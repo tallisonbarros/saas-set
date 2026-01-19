@@ -739,6 +739,25 @@ def proposta_detail(request, pk):
                     proposta.valor = valor
                     proposta.save(update_fields=["valor"])
                     return redirect("proposta_detail", pk=proposta.pk)
+        if action == "update_details":
+            if proposta.criada_por_id != request.user.id:
+                return HttpResponseForbidden("Sem permissao.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            codigo = request.POST.get("codigo", "").strip()
+            update_fields = []
+            if nome:
+                proposta.nome = nome
+                update_fields.append("nome")
+            if descricao:
+                proposta.descricao = descricao
+                update_fields.append("descricao")
+            if codigo:
+                proposta.codigo = codigo
+                update_fields.append("codigo")
+            if update_fields:
+                proposta.save(update_fields=update_fields)
+            return redirect("proposta_detail", pk=proposta.pk)
         if action == "set_finalizada":
             if proposta.criada_por_id != request.user.id:
                 return HttpResponseForbidden("Sem permissao.")
