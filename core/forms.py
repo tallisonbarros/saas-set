@@ -13,7 +13,18 @@ class PerfilUsuarioAdminForm(forms.ModelForm):
 
     class Meta:
         model = PerfilUsuario
-        fields = ["nome", "empresa", "sigla_cidade", "email", "logo", "ativo", "tipos", "plantas", "financeiros"]
+        fields = [
+            "nome",
+            "empresa",
+            "sigla_cidade",
+            "email",
+            "logo",
+            "ativo",
+            "tipos",
+            "plantas",
+            "financeiros",
+            "inventarios",
+        ]
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()

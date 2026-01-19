@@ -14,6 +14,7 @@ class PerfilUsuario(models.Model):
     tipos = models.ManyToManyField("TipoPerfil", blank=True, related_name="clientes")
     plantas = models.ManyToManyField("PlantaIO", blank=True, related_name="usuarios")
     financeiros = models.ManyToManyField("FinanceiroID", blank=True, related_name="usuarios")
+    inventarios = models.ManyToManyField("InventarioID", blank=True, related_name="usuarios")
 
     def __str__(self):
         return self.nome
@@ -224,6 +225,47 @@ class FinanceiroID(models.Model):
         return self.codigo
 
 
+class InventarioID(models.Model):
+    codigo = models.CharField(max_length=40, unique=True)
+
+    class Meta:
+        ordering = ["codigo"]
+
+    def __str__(self):
+        return self.codigo
+
+
+class Inventario(models.Model):
+    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="inventarios_cliente")
+    id_inventario = models.ForeignKey(
+        InventarioID,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inventarios",
+    )
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    responsavel = models.CharField(max_length=120, blank=True)
+    cidade = models.CharField(max_length=80, blank=True)
+    estado = models.CharField(max_length=80, blank=True)
+    pais = models.CharField(max_length=80, blank=True)
+    criador = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inventarios_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 class ModuloIO(models.Model):
     cliente = models.ForeignKey(
         "PerfilUsuario",
@@ -291,6 +333,48 @@ class RackIO(models.Model):
     descricao = models.TextField(blank=True)
     slots_total = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(60)],
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class Ativo(models.Model):
+    inventario = models.ForeignKey(Inventario, on_delete=models.CASCADE, related_name="ativos")
+    pai = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="subativos",
+    )
+    setor = models.CharField(max_length=120, blank=True)
+    nome = models.CharField(max_length=120)
+    tipo = models.CharField(max_length=80, blank=True)
+    identificacao = models.CharField(max_length=120, blank=True)
+    tag_interna = models.CharField(max_length=120, blank=True)
+    tag_set = models.CharField(max_length=120, blank=True)
+    comissionado = models.BooleanField(default=False)
+    comissionado_em = models.DateTimeField(null=True, blank=True)
+    comissionado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ativos_comissionados",
+    )
+    em_manutencao = models.BooleanField(default=False)
+    manutencao_em = models.DateTimeField(null=True, blank=True)
+    manutencao_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ativos_manutencao",
     )
     criado_em = models.DateTimeField(auto_now_add=True)
 

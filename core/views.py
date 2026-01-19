@@ -24,6 +24,8 @@ from .models import (
     ModuloIO,
     ModuloRackIO,
     FinanceiroID,
+    Inventario,
+    InventarioID,
     PlantaIO,
     Proposta,
     PropostaAnexo,
@@ -32,6 +34,7 @@ from .models import (
     TipoCompra,
     TipoCanalIO,
     TipoPerfil,
+    Ativo,
 )
 
 
@@ -528,6 +531,163 @@ def ios_modulo_modelo_detail(request, pk):
         {
             "module": module,
             "channel_types": channel_types,
+        },
+    )
+
+
+@login_required
+def inventarios_list(request):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_inventario":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            responsavel = request.POST.get("responsavel", "").strip()
+            cidade = request.POST.get("cidade", "").strip()
+            estado = request.POST.get("estado", "").strip()
+            pais = request.POST.get("pais", "").strip()
+            id_inventario_raw = request.POST.get("id_inventario", "").strip()
+            id_inventario = None
+            if id_inventario_raw:
+                id_inventario, _ = InventarioID.objects.get_or_create(codigo=id_inventario_raw.upper())
+            if nome:
+                Inventario.objects.create(
+                    cliente=cliente,
+                    nome=nome,
+                    descricao=descricao,
+                    responsavel=responsavel,
+                    cidade=cidade,
+                    estado=estado,
+                    pais=pais,
+                    id_inventario=id_inventario,
+                    criador=request.user,
+                )
+            return redirect("inventarios_list")
+
+    if request.user.is_staff and not cliente:
+        inventarios = Inventario.objects.all()
+    else:
+        inventarios = Inventario.objects.filter(
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
+        )
+    inventarios = inventarios.annotate(total_ativos=Count("ativos"))
+    return render(
+        request,
+        "core/inventarios_list.html",
+        {
+            "inventarios": inventarios,
+            "can_manage": bool(cliente),
+        },
+    )
+
+
+@login_required
+def inventario_detail(request, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    if cliente:
+        inventario = get_object_or_404(
+            Inventario,
+            Q(pk=pk),
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all()),
+        )
+    else:
+        inventario = get_object_or_404(Inventario, pk=pk)
+    message = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_ativo":
+            nome = request.POST.get("nome", "").strip()
+            setor = request.POST.get("setor", "").strip()
+            tipo = request.POST.get("tipo", "").strip()
+            identificacao = request.POST.get("identificacao", "").strip()
+            tag_interna = request.POST.get("tag_interna", "").strip()
+            tag_set = request.POST.get("tag_set", "").strip()
+            pai_id = request.POST.get("pai_id")
+            comissionado = request.POST.get("comissionado") == "on"
+            em_manutencao = request.POST.get("em_manutencao") == "on"
+            pai = None
+            if pai_id:
+                pai = Ativo.objects.filter(pk=pai_id, inventario=inventario).first()
+            if nome:
+                ativo = Ativo.objects.create(
+                    inventario=inventario,
+                    pai=pai,
+                    setor=setor,
+                    nome=nome,
+                    tipo=tipo,
+                    identificacao=identificacao,
+                    tag_interna=tag_interna,
+                    tag_set=tag_set,
+                    comissionado=comissionado,
+                    em_manutencao=em_manutencao,
+                )
+                if comissionado:
+                    ativo.comissionado_em = timezone.now()
+                    ativo.comissionado_por = request.user
+                if em_manutencao:
+                    ativo.manutencao_em = timezone.now()
+                    ativo.manutencao_por = request.user
+                if comissionado or em_manutencao:
+                    ativo.save(
+                        update_fields=[
+                            "comissionado_em",
+                            "comissionado_por",
+                            "manutencao_em",
+                            "manutencao_por",
+                        ]
+                    )
+            return redirect("inventario_detail", pk=inventario.pk)
+        if action == "toggle_comissionado":
+            ativo_id = request.POST.get("ativo_id")
+            ativo = get_object_or_404(Ativo, pk=ativo_id, inventario=inventario)
+            if ativo.comissionado:
+                ativo.comissionado = False
+                ativo.comissionado_em = None
+                ativo.comissionado_por = None
+            else:
+                ativo.comissionado = True
+                ativo.comissionado_em = timezone.now()
+                ativo.comissionado_por = request.user
+            ativo.save(update_fields=["comissionado", "comissionado_em", "comissionado_por"])
+            return redirect("inventario_detail", pk=inventario.pk)
+        if action == "toggle_manutencao":
+            ativo_id = request.POST.get("ativo_id")
+            ativo = get_object_or_404(Ativo, pk=ativo_id, inventario=inventario)
+            if ativo.em_manutencao:
+                ativo.em_manutencao = False
+                ativo.manutencao_em = None
+                ativo.manutencao_por = None
+            else:
+                ativo.em_manutencao = True
+                ativo.manutencao_em = timezone.now()
+                ativo.manutencao_por = request.user
+            ativo.save(update_fields=["em_manutencao", "manutencao_em", "manutencao_por"])
+            return redirect("inventario_detail", pk=inventario.pk)
+
+    ativos = (
+        Ativo.objects.filter(inventario=inventario)
+        .select_related("pai", "comissionado_por", "manutencao_por")
+        .annotate(subativos_total=Count("subativos"))
+        .order_by("nome")
+    )
+    total_ativos = ativos.count()
+    selected_parent_id = request.GET.get("parent") or ""
+    return render(
+        request,
+        "core/inventario_detail.html",
+        {
+            "inventario": inventario,
+            "ativos": ativos,
+            "total_ativos": total_ativos,
+            "selected_parent_id": str(selected_parent_id),
+            "message": message,
         },
     )
 
@@ -1039,6 +1199,7 @@ def usuarios_gerenciar_usuario(request, pk):
             tipo_ids = request.POST.getlist("tipos")
             plantas_raw = request.POST.get("plantas", "")
             financeiros_raw = request.POST.get("financeiros", "")
+            inventarios_raw = request.POST.get("inventarios", "")
             if not perfil:
                 perfil = PerfilUsuario.objects.create(
                     nome=nome or user.username.split("@")[0],
@@ -1069,6 +1230,12 @@ def usuarios_gerenciar_usuario(request, pk):
             fin_codes = [code.strip().upper() for code in cleaned_fin.split(",") if code.strip()]
             financeiros = [FinanceiroID.objects.get_or_create(codigo=code)[0] for code in fin_codes]
             perfil.financeiros.set(financeiros)
+            cleaned_inv = inventarios_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned_inv = cleaned_inv.replace(sep, ",")
+            inv_codes = [code.strip().upper() for code in cleaned_inv.split(",") if code.strip()]
+            inventarios = [InventarioID.objects.get_or_create(codigo=code)[0] for code in inv_codes]
+            perfil.inventarios.set(inventarios)
             return redirect("usuarios_gerenciar_usuario", pk=user.pk)
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()
@@ -1119,6 +1286,7 @@ def meu_perfil(request):
             sigla_cidade = request.POST.get("sigla_cidade", "").strip()
             plantas_raw = request.POST.get("plantas", "")
             financeiros_raw = request.POST.get("financeiros", "")
+            inventarios_raw = request.POST.get("inventarios", "")
             if not perfil:
                 perfil = PerfilUsuario.objects.create(
                     nome=nome or (user.username.split("@")[0] if user.username else "Usuario"),
@@ -1147,6 +1315,12 @@ def meu_perfil(request):
             fin_codes = [code.strip().upper() for code in cleaned_fin.split(",") if code.strip()]
             financeiros = [FinanceiroID.objects.get_or_create(codigo=code)[0] for code in fin_codes]
             perfil.financeiros.set(financeiros)
+            cleaned_inv = inventarios_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned_inv = cleaned_inv.replace(sep, ",")
+            inv_codes = [code.strip().upper() for code in cleaned_inv.split(",") if code.strip()]
+            inventarios = [InventarioID.objects.get_or_create(codigo=code)[0] for code in inv_codes]
+            perfil.inventarios.set(inventarios)
             return redirect("meu_perfil")
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()

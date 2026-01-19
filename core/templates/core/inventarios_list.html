@@ -1,0 +1,126 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Inventarios{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
+  </div>
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Inventario da fabrica</div>
+        <div class="hud-pill">Ativos</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <p class="page-subtitle">Gerencie ativos, locais e status tecnicos.</p>
+        </div>
+        <div class="page-actions">
+          {% if can_manage %}
+            <a class="btn btn-ghost btn-compact" href="#novo-inventario">Novo inventario</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="hud-meta">Organize por local, responsavel e tags.</div>
+    </div>
+  </section>
+
+  <div class="io-layout">
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Inventarios</h2>
+          <p class="muted">Escolha um inventario para gerenciar ativos e itens internos.</p>
+        </div>
+      </div>
+      <div class="proposal-grid">
+        {% for inventario in inventarios %}
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'inventario_detail' inventario.id %}" aria-label="Abrir inventario"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ inventario.nome }}</div>
+                <div class="proposal-meta">{{ inventario.descricao|default:"Inventario sem descricao." }}</div>
+              </div>
+              <span class="slot-badge">{{ inventario.total_ativos }} ativos</span>
+            </div>
+            <div class="proposal-meta">
+              {% if inventario.cidade or inventario.estado or inventario.pais %}
+                {{ inventario.cidade }}{% if inventario.estado %} - {{ inventario.estado }}{% endif %}{% if inventario.pais %} • {{ inventario.pais }}{% endif %}
+              {% else %}
+                Local nao informado.
+              {% endif %}
+            </div>
+            {% if inventario.id_inventario %}
+              <div class="proposal-meta">ID_INVENTARIO: {{ inventario.id_inventario.codigo }}</div>
+            {% endif %}
+            {% if inventario.responsavel %}
+              <div class="proposal-meta">Responsavel: {{ inventario.responsavel }}</div>
+            {% endif %}
+          </article>
+        {% empty %}
+          <div class="muted">Nenhum inventario cadastrado ainda.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <details class="io-card io-discrete" id="novo-inventario">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Novo inventario</span>
+        <span class="muted">Clique para cadastrar um inventario.</span>
+      </summary>
+      <div class="io-discrete-body">
+        {% if can_manage %}
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_inventario">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome do inventario</span>
+                <input type="text" name="nome" placeholder="Inventario principal" required>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" placeholder="Linha 01 - Producao, bloco A">
+              </label>
+              <label class="field">
+                <span>Responsavel</span>
+                <input type="text" name="responsavel" placeholder="Equipe manutencao">
+              </label>
+              <label class="field">
+                <span>Cidade</span>
+                <input type="text" name="cidade" placeholder="Campinas">
+              </label>
+              <label class="field">
+                <span>Estado</span>
+                <input type="text" name="estado" placeholder="SP">
+              </label>
+              <label class="field">
+                <span>Pais</span>
+                <input type="text" name="pais" placeholder="Brasil">
+              </label>
+              <label class="field">
+                <span>ID_INVENTARIO</span>
+                <input type="text" name="id_inventario" placeholder="INV-001">
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Salvar inventario</button>
+            </div>
+          </form>
+        {% else %}
+          <div class="muted">Apenas clientes cadastrados podem criar inventarios.</div>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+{% endblock %}
