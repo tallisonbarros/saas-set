@@ -27,9 +27,7 @@
           <p class="page-subtitle">Acompanhe negociações, aprovacoes e andamento.</p>
         </div>
         <div class="page-actions">
-          {% if is_vendedor %}
-            <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
-          {% endif %}
+          <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
         </div>
       </div>
       {% if pendencias_total and not status_filter %}
@@ -42,7 +40,7 @@
         {% if pendencias_total and not status_filter %}
           <span class="chip chip-alert">{{ pendencias_total }} para aprovar</span>
         {% endif %}
-        <strong>{{ cliente.nome }}</strong>{% if cliente.empresa %} · {{ cliente.empresa }}{% endif %} · {{ cliente.email }}
+        <strong>{{ cliente.nome }}</strong>{% if cliente.empresa %} - {{ cliente.empresa }}{% endif %} - {{ cliente.email }}
       </div>
     </div>
       {% if not cliente %}
@@ -50,11 +48,11 @@
       {% else %}
       <div class="filters">
         <a href="{% url 'propostas' %}" class="filter-pill {% if not status_filter %}active{% endif %}">Todas</a>
-        <a href="{% url 'propostas' %}?status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>
-        <a href="{% url 'propostas' %}?status=levantamento" class="filter-pill {% if status_filter == 'levantamento' %}active{% endif %}">Levantamento</a>
-        <a href="{% url 'propostas' %}?status=aprovada" class="filter-pill {% if status_filter == 'aprovada' %}active{% endif %}">Aprovadas</a>
-        <a href="{% url 'propostas' %}?status=reprovada" class="filter-pill {% if status_filter == 'reprovada' %}active{% endif %}">Reprovadas</a>
-        <a href="{% url 'propostas' %}?status=finalizada" class="filter-pill {% if status_filter == 'finalizada' %}active{% endif %}">Finalizadas</a>
+        <a href="{% url 'propostas' %}-status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>
+        <a href="{% url 'propostas' %}-status=levantamento" class="filter-pill {% if status_filter == 'levantamento' %}active{% endif %}">Levantamento</a>
+        <a href="{% url 'propostas' %}-status=aprovada" class="filter-pill {% if status_filter == 'aprovada' %}active{% endif %}">Aprovadas</a>
+        <a href="{% url 'propostas' %}-status=reprovada" class="filter-pill {% if status_filter == 'reprovada' %}active{% endif %}">Reprovadas</a>
+        <a href="{% url 'propostas' %}-status=finalizada" class="filter-pill {% if status_filter == 'finalizada' %}active{% endif %}">Finalizadas</a>
       </div>
       {% if propostas %}
         {% if not status_filter %}

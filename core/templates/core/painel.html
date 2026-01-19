@@ -58,26 +58,22 @@
         </div>
       </div>
       <div class="panel-grid panel-grid-spaced">
-        {% if is_cliente or role == "ADMIN" %}
-          <a class="panel-card" href="{% url 'propostas' %}" style="--delay: 0.05s;">
-            <div class="panel-card-top">
-              <div class="panel-title">Propostas</div>
-              <span class="panel-tag active">Ativo</span>
-            </div>
-            <div class="muted">Pipeline de aprovacoes e acompanhamento.</div>
-            <div class="panel-meta">Status, valores e decisoes em um fluxo unico.</div>
-          </a>
-        {% endif %}
-        {% if is_financeiro %}
-          <a class="panel-card" href="{% url 'financeiro' %}" style="--delay: 0.1s;">
-            <div class="panel-card-top">
-              <div class="panel-title">Financeiro</div>
-              <span class="panel-tag active">Ativo</span>
-            </div>
-            <div class="muted">Compras, gastos e controle por periodo.</div>
-            <div class="panel-meta">Consolide custos e orcamentos por projeto.</div>
-          </a>
-        {% endif %}
+        <a class="panel-card" href="{% url 'propostas' %}" style="--delay: 0.05s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Propostas</div>
+            <span class="panel-tag active">Ativo</span>
+          </div>
+          <div class="muted">Pipeline de aprovacoes e acompanhamento.</div>
+          <div class="panel-meta">Status, valores e decisoes em um fluxo unico.</div>
+        </a>
+        <a class="panel-card" href="{% url 'financeiro' %}" style="--delay: 0.1s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Financeiro</div>
+            <span class="panel-tag active">Ativo</span>
+          </div>
+          <div class="muted">Compras, gastos e controle por periodo.</div>
+          <div class="panel-meta">Consolide custos e orcamentos por projeto.</div>
+        </a>
         <a class="panel-card" href="{% url 'ios_list' %}" style="--delay: 0.15s;">
           <div class="panel-card-top">
             <div class="panel-title">Listas de IOs</div>

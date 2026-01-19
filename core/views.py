@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
-from django.contrib.auth import logout
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
 from django.db.models.expressions import ExpressionWrapper
 
-from .forms import TipoPerfilCreateForm, UserCreateForm
+from .forms import RegisterForm, TipoPerfilCreateForm, UserCreateForm
 from .models import (
     CanalRackIO,
     CategoriaCompra,
@@ -120,9 +120,44 @@ def painel(request):
         {
             "display_name": display_name,
             "role": _user_role(request.user),
-            "is_financeiro": _has_tipo(request.user, "Financeiro") or request.user.is_staff,
-            "is_cliente": _has_tipo_any(request.user, ["Contratante", "Cliente"]),
-            "is_vendedor": _has_tipo(request.user, "Vendedor"),
+            "is_financeiro": True,
+            "is_cliente": True,
+            "is_vendedor": True,
+        },
+    )
+
+
+def register(request):
+    if request.user.is_authenticated:
+        return redirect("painel")
+    message = None
+    form = RegisterForm()
+    if request.method == "POST":
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            nome = form.cleaned_data["nome"].strip()
+            empresa = form.cleaned_data.get("empresa", "").strip()
+            perfil = PerfilUsuario.objects.create(
+                nome=nome,
+                email=user.email,
+                usuario=user,
+                ativo=True,
+                empresa=empresa,
+            )
+            _ensure_default_cadernos(perfil)
+            authenticated = authenticate(request, username=user.username, password=form.cleaned_data["senha"])
+            if authenticated:
+                login(request, authenticated)
+                return redirect("painel")
+            return redirect("login")
+        message = "Revise os campos e tente novamente."
+    return render(
+        request,
+        "core/register.html",
+        {
+            "form": form,
+            "message": message,
         },
     )
 
@@ -895,21 +930,16 @@ def ios_rack_modulo_detail(request, pk):
 
 @login_required
 def proposta_list(request):
-    if _user_role(request.user) == "FINANCEIRO":
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     propostas = Proposta.objects.none()
-    if _has_tipo(request.user, "Vendedor"):
-        if cliente:
-            propostas = (
-                Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
-                .distinct()
-                .order_by("-criado_em")
-            )
-        else:
-            propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
-    elif cliente:
-        propostas = Proposta.objects.filter(cliente=cliente).order_by("-criado_em")
+    if cliente:
+        propostas = (
+            Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
+            .distinct()
+            .order_by("-criado_em")
+        )
+    else:
+        propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
     status = request.GET.get("status")
     if status == "pendente":
         propostas = propostas.filter(aprovada__isnull=True).exclude(valor=0)
@@ -963,7 +993,7 @@ def proposta_list(request):
             "propostas_restantes": propostas_restantes,
             "pendencias_total": pendencias_total,
             "status_filter": status,
-            "is_vendedor": _has_tipo(request.user, "Vendedor"),
+            "is_vendedor": True,
             "current_user_id": request.user.id,
         },
     )
@@ -971,14 +1001,12 @@ def proposta_list(request):
 
 @login_required
 def proposta_detail(request, pk):
-    if _user_role(request.user) == "FINANCEIRO":
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    if _has_tipo(request.user, "Vendedor") and cliente:
+    if cliente:
         proposta_qs = Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
         proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
-        proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+        proposta = get_object_or_404(Proposta, pk=pk, criada_por=request.user)
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
@@ -1073,7 +1101,6 @@ def proposta_detail(request, pk):
         {
             "cliente": cliente,
             "proposta": proposta,
-            "is_contratante": _has_tipo(request.user, "Contratante"),
             "message": message,
             "status_label": status_label,
         },
@@ -1082,8 +1109,6 @@ def proposta_detail(request, pk):
 
 @login_required
 def proposta_nova_vendedor(request):
-    if not (_has_tipo(request.user, "Vendedor") or request.user.is_staff):
-        return HttpResponseForbidden("Sem permissao.")
     message = None
     form_data = {"email": "", "nome": "", "descricao": "", "valor": "", "prioridade": "50"}
     if request.method == "POST":
@@ -1139,8 +1164,6 @@ def proposta_nova_vendedor(request):
 @login_required
 @require_POST
 def aprovar_proposta(request, pk):
-    if _user_role(request.user) == "FINANCEIRO":
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
@@ -1158,8 +1181,6 @@ def aprovar_proposta(request, pk):
 @login_required
 @require_POST
 def reprovar_proposta(request, pk):
-    if _user_role(request.user) == "FINANCEIRO":
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
@@ -1175,14 +1196,12 @@ def reprovar_proposta(request, pk):
 @login_required
 @require_POST
 def salvar_observacao(request, pk):
-    if _user_role(request.user) == "FINANCEIRO":
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
-    if _has_tipo(request.user, "Vendedor") and cliente:
+    if cliente:
         proposta_qs = Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
         proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
-        proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
+        proposta = get_object_or_404(Proposta, pk=pk, criada_por=request.user)
     observacao = request.POST.get("observacao", "").strip()
     prioridade_raw = request.POST.get("prioridade", "").strip()
     proposta.observacao_cliente = observacao
@@ -1441,8 +1460,6 @@ def meu_perfil(request):
 
 @login_required
 def financeiro_overview(request):
-    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -1505,8 +1522,6 @@ def financeiro_overview(request):
 
 @login_required
 def financeiro_nova(request):
-    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -1622,8 +1637,6 @@ def financeiro_nova(request):
 
 @login_required
 def financeiro_cadernos(request):
-    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -1677,8 +1690,6 @@ def financeiro_cadernos(request):
 
 @login_required
 def financeiro_caderno_detail(request, pk):
-    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -1828,8 +1839,6 @@ def financeiro_caderno_detail(request, pk):
 
 @login_required
 def financeiro_compra_detail(request, pk):
-    if not (request.user.is_staff or _has_tipo(request.user, "Financeiro")):
-        return HttpResponseForbidden("Sem permissao.")
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")

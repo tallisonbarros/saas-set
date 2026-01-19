@@ -95,3 +95,35 @@ class TipoPerfilCreateForm(forms.Form):
     def save(self):
         nome = self.cleaned_data["nome"].strip()
         return TipoPerfil.objects.create(nome=nome)
+
+
+class RegisterForm(forms.Form):
+    nome = forms.CharField(label="Nome", max_length=120)
+    email = forms.EmailField(label="Email")
+    empresa = forms.CharField(label="Empresa", max_length=120, required=False)
+    senha = forms.CharField(label="Senha", widget=forms.PasswordInput)
+    senha_confirmacao = forms.CharField(label="Confirmar senha", widget=forms.PasswordInput)
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if User.objects.filter(username=email).exists():
+            raise forms.ValidationError("Email ja cadastrado.")
+        return email
+
+    def clean(self):
+        cleaned = super().clean()
+        senha = cleaned.get("senha")
+        senha_confirmacao = cleaned.get("senha_confirmacao")
+        if senha and senha_confirmacao and senha != senha_confirmacao:
+            self.add_error("senha_confirmacao", "As senhas nao conferem.")
+        return cleaned
+
+    def save(self):
+        email = self.cleaned_data["email"].strip().lower()
+        senha = self.cleaned_data["senha"]
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=senha,
+        )
+        return user
