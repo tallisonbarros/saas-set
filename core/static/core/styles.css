@@ -1784,6 +1784,13 @@ select {
   margin: 8px auto 0;
 }
 
+.rack-slot-head {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 .rack-slot-label {
   font-weight: 700;
   letter-spacing: 1px;

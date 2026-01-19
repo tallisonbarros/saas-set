@@ -18,7 +18,10 @@
     <div class="page-hud panel-hud">
       <div class="hud-top">
         <div class="hud-title">Painel de Controle</div>
-        <div class="hud-pill">Visao geral</div>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button class="btn btn-ghost btn-compact" type="submit">Sair</button>
+        </form>
       </div>
       <div class="page-hud-head panel-hero-head">
         <div>
@@ -29,12 +32,7 @@
             cronogramas e status tecnico com decisao rapida e segura.
           </p>
         </div>
-        <div class="page-actions">
-          <form method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button class="btn btn-ghost" type="submit">Sair</button>
-          </form>
-        </div>
+        <div class="page-actions"></div>
       </div>
       <div class="panel-hero-grid">
         <div class="panel-hero-card">
@@ -80,15 +78,7 @@
             <div class="panel-meta">Consolide custos e orcamentos por projeto.</div>
           </a>
         {% endif %}
-        <div class="panel-card panel-disabled" style="--delay: 0.15s;">
-          <div class="panel-card-top">
-            <div class="panel-title">Planta conectada</div>
-            <span class="panel-tag">Em breve</span>
-          </div>
-          <div class="muted">Monitoramento de automacao e sensores.</div>
-          <div class="panel-meta">Alertas, telemetria e indicadores operacionais.</div>
-        </div>
-        <a class="panel-card" href="{% url 'ios_list' %}" style="--delay: 0.2s;">
+        <a class="panel-card" href="{% url 'ios_list' %}" style="--delay: 0.15s;">
           <div class="panel-card-top">
             <div class="panel-title">Listas de IOs</div>
             <span class="panel-tag active">Ativo</span>
@@ -96,7 +86,7 @@
           <div class="muted">Crie, revise e mantenha IOs atualizados.</div>
           <div class="panel-meta">Estruture canais, racks e enderecos.</div>
         </a>
-        <div class="panel-card panel-disabled" style="--delay: 0.25s;">
+        <div class="panel-card panel-disabled" style="--delay: 0.2s;">
           <div class="panel-card-top">
             <div class="panel-title">Listas de IPs</div>
             <span class="panel-tag">Em breve</span>
@@ -104,10 +94,10 @@
           <div class="muted">Controle de rede e acesso por projeto.</div>
           <div class="panel-meta">Mapa de enderecos e permissoes.</div>
         </div>
-        <div class="panel-card panel-disabled" style="--delay: 0.28s;">
+        <div class="panel-card panel-disabled" style="--delay: 0.25s;">
           <div class="panel-card-top">
             <div class="panel-title">Inventario da fabrica</div>
-            <span class="panel-tag">Em planejamento</span>
+            <span class="panel-tag">Em breve</span>
           </div>
           <div class="muted">Catalogo de motores, valvulas e equipamentos.</div>
           <div class="panel-meta">Mapa de ativos com status e historico tecnico.</div>
@@ -119,6 +109,14 @@
           </div>
           <div class="muted">Arquivos tecnicos, historicos e revisoes.</div>
           <div class="panel-meta">Tudo sincronizado por equipe e cliente.</div>
+        </div>
+        <div class="panel-card panel-disabled" style="--delay: 0.35s;">
+          <div class="panel-card-top">
+            <div class="panel-title">Planta conectada</div>
+            <span class="panel-tag">Em breve</span>
+          </div>
+          <div class="muted">Monitoramento de automacao e sensores.</div>
+          <div class="panel-meta">Alertas, telemetria e indicadores operacionais.</div>
         </div>
       </div>
     </div>
