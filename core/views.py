@@ -104,10 +104,17 @@ def home(request):
 
 @login_required
 def painel(request):
+    cliente = _get_cliente(request.user)
+    display_name = None
+    if cliente and cliente.nome:
+        display_name = cliente.nome
+    else:
+        display_name = request.user.first_name or request.user.username
     return render(
         request,
         "core/painel.html",
         {
+            "display_name": display_name,
             "role": _user_role(request.user),
             "is_financeiro": _has_tipo(request.user, "Financeiro") or request.user.is_staff,
             "is_cliente": _has_tipo_any(request.user, ["Contratante", "Cliente"]),
