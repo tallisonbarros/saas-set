@@ -25,10 +25,10 @@
           <h1 class="page-title">{{ caderno.nome }}</h1>
           <p class="page-subtitle">Pagamentos e pendencias.</p>
           <form id="mes-navegacao-form" class="month-nav-form" method="get">
-            <div class="month-nav">
-              <a class="btn btn-ghost icon-only" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
+            <div class="month-nav month-nav-pill">
+              <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
               <input class="month-nav-input" type="month" name="mes" value="{{ selected_month }}">
-              <a class="btn btn-ghost icon-only" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
+              <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
             </div>
             {% if status_filter %}
               <input type="hidden" name="status" value="{{ status_filter }}">

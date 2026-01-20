@@ -698,8 +698,43 @@ body {
 }
 
 .month-nav-input {
-  width: 200px;
+  width: 220px;
   text-align: center;
+}
+
+.month-nav-pill {
+  border: 1px solid var(--border);
+  background: #fff1e7;
+  border-radius: 999px;
+  padding: 6px 12px;
+  gap: 8px;
+  box-shadow: 0 10px 20px rgba(31, 26, 21, 0.08);
+}
+
+.month-nav-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 16px;
+  border-color: transparent;
+  background: #fff;
+}
+
+.month-nav-btn:hover {
+  background: #ffe7d8;
+}
+
+.month-nav-input {
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.month-nav-input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .hud-filter {
