@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -100,6 +101,15 @@ def _compra_status_label(compra):
     if itens and all(item.pago for item in itens):
         return "Pago"
     return "Pendente"
+
+
+def _add_months(base_date, months):
+    month_index = (base_date.month - 1) + months
+    year = base_date.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    last_day = calendar.monthrange(year, month)[1]
+    day = min(base_date.day, last_day)
+    return date(year, month, day)
 
 
 def home(request):
@@ -2070,6 +2080,83 @@ def financeiro_compra_detail(request, pk):
                 compra.caderno_id = caderno_id
             compra.save(update_fields=["nome", "descricao", "categoria", "centro_custo", "caderno", "data"])
             return redirect("financeiro_compra_detail", pk=compra.pk)
+        if action == "copy_next_months":
+            meses_raw = request.POST.get("meses", "").strip()
+            try:
+                meses = int(meses_raw)
+            except (TypeError, ValueError):
+                meses = 0
+            meses = max(0, min(24, meses))
+            if meses <= 0:
+                msg = "Informe a quantidade de meses para copiar."
+                params = {"msg": msg, "level": "error"}
+                return redirect(
+                    f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
+                )
+            if not compra.data:
+                msg = "Defina uma data para copiar para os proximos meses."
+                params = {"msg": msg, "level": "error"}
+                return redirect(
+                    f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
+                )
+            itens_origem = list(compra.itens.all())
+            for offset in range(1, meses + 1):
+                target_date = _add_months(compra.data, offset)
+                existing = Compra.objects.filter(
+                    caderno_id=compra.caderno_id,
+                    nome=compra.nome,
+                    categoria_id=compra.categoria_id,
+                    centro_custo_id=compra.centro_custo_id,
+                    valor=compra.valor,
+                    data=target_date,
+                ).first()
+                if existing:
+                    existing.descricao = compra.descricao
+                    existing.valor = compra.valor
+                    existing.caderno_id = compra.caderno_id
+                    existing.categoria_id = compra.categoria_id
+                    existing.centro_custo_id = compra.centro_custo_id
+                    existing.data = target_date
+                    existing.save(
+                        update_fields=[
+                            "descricao",
+                            "valor",
+                            "caderno",
+                            "categoria",
+                            "centro_custo",
+                            "data",
+                        ]
+                    )
+                    existing.itens.all().delete()
+                    alvo = existing
+                else:
+                    alvo = Compra.objects.create(
+                        caderno_id=compra.caderno_id,
+                        nome=compra.nome,
+                        descricao=compra.descricao,
+                        valor=compra.valor,
+                        data=target_date,
+                        categoria_id=compra.categoria_id,
+                        centro_custo_id=compra.centro_custo_id,
+                    )
+                itens_novos = [
+                    CompraItem(
+                        compra=alvo,
+                        nome=item.nome,
+                        valor=item.valor,
+                        quantidade=item.quantidade,
+                        tipo_id=item.tipo_id,
+                        pago=item.pago,
+                    )
+                    for item in itens_origem
+                ]
+                if itens_novos:
+                    CompraItem.objects.bulk_create(itens_novos)
+            msg = "Compra copiada para os proximos meses."
+            params = {"msg": msg, "level": "success"}
+            return redirect(
+                f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
+            )
         if action == "add_item":
             nome = request.POST.get("nome", "").strip()
             valor_raw = request.POST.get("valor", "").replace(",", ".").strip()

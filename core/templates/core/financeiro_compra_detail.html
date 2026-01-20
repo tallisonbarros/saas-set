@@ -27,8 +27,9 @@
           <p class="page-subtitle">Detalhes da compra.</p>
         </div>
         <div class="page-actions">
+          <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
           {% if compra.caderno %}
-            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Caderno</a>
+            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">{{ compra.caderno.nome }}</a>
           {% else %}
             <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
           {% endif %}
@@ -158,6 +159,17 @@
     {% if message %}
       <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
     {% endif %}
+    <div class="finance-card">
+      <div class="panel-title">Copiar para proximos meses</div>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="copy_next_months">
+        <label>Quantidade de meses</label>
+        <input type="number" name="meses" min="1" max="24" value="3">
+        <p class="muted">Se ja existir a mesma compra no mes destino, ela sera atualizada.</p>
+        <button class="btn btn-primary" type="submit">Copiar compra</button>
+      </form>
+    </div>
     <details class="finance-card">
       <summary class="io-discrete-summary">
         <span class="io-title">Editar compra</span>
