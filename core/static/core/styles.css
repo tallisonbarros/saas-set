@@ -653,6 +653,13 @@ body {
   flex-wrap: wrap;
 }
 
+.page-hud-main {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
 .page-kicker {
   font-size: 12px;
   text-transform: uppercase;
@@ -677,6 +684,22 @@ body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.month-nav-form {
+  display: flex;
+  justify-content: center;
+}
+
+.month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.month-nav-input {
+  width: 200px;
+  text-align: center;
 }
 
 .hud-filter {

@@ -21,14 +21,14 @@
         <div class="hud-pill">Mes: {{ mes_referencia|date:"F Y" }}</div>
       </div>
       <div class="page-hud-head">
-        <div>
+        <div class="page-hud-main">
           <h1 class="page-title">{{ caderno.nome }}</h1>
           <p class="page-subtitle">Pagamentos e pendencias.</p>
-          <form id="mes-navegacao-form" class="field" method="get">
-            <div class="page-actions">
-              <a class="btn btn-ghost" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
-              <input type="month" name="mes" value="{{ selected_month }}">
-              <a class="btn btn-ghost" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
+          <form id="mes-navegacao-form" class="month-nav-form" method="get">
+            <div class="month-nav">
+              <a class="btn btn-ghost icon-only" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
+              <input class="month-nav-input" type="month" name="mes" value="{{ selected_month }}">
+              <a class="btn btn-ghost icon-only" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
             </div>
             {% if status_filter %}
               <input type="hidden" name="status" value="{{ status_filter }}">
