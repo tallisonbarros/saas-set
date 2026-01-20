@@ -32,6 +32,39 @@
       </div>
     </div>
 
+    <div class="finance-card">
+      <div class="panel-title">Navegacao do mes</div>
+      <form class="stack" method="get">
+        <div class="finance-form-grid">
+          <div class="field">
+            <label>Mes</label>
+            <input type="month" name="mes" value="{{ selected_month }}">
+          </div>
+          <div class="field">
+            <label>Acoes rapidas</label>
+            <div class="page-actions">
+              <a class="btn btn-ghost" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}">Mes anterior</a>
+              <a class="btn btn-ghost" href="?mes={{ current_month }}{% if month_query %}&{{ month_query }}{% endif %}">Mes atual</a>
+              <a class="btn btn-ghost" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}">Proximo mes</a>
+            </div>
+          </div>
+        </div>
+        {% if status_filter %}
+          <input type="hidden" name="status" value="{{ status_filter }}">
+        {% endif %}
+        {% if categoria_filter %}
+          <input type="hidden" name="categoria" value="{{ categoria_filter }}">
+        {% endif %}
+        {% if centro_filter %}
+          <input type="hidden" name="centro" value="{{ centro_filter }}">
+        {% endif %}
+        {% if search_query %}
+          <input type="hidden" name="q" value="{{ search_query }}">
+        {% endif %}
+        <button class="btn btn-primary" type="submit">Ir</button>
+      </form>
+    </div>
+
     <details class="io-card io-discrete hud-filter" {% if status_filter or categoria_filter or centro_filter or search_query %}open{% endif %}>
       <summary class="io-discrete-summary">
         <span class="io-title">Filtros</span>
@@ -39,10 +72,7 @@
       </summary>
       <div class="io-discrete-body">
         <form class="finance-filter" method="get">
-          <div class="field">
-            <label>Mes</label>
-            <input type="month" name="mes" value="{{ selected_month }}">
-          </div>
+          <input type="hidden" name="mes" value="{{ selected_month }}">
           <div class="field">
             <label>Busca</label>
             <input type="search" name="q" value="{{ search_query }}" placeholder="Nome ou descricao">

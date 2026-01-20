@@ -1849,6 +1849,17 @@ def financeiro_caderno_detail(request, pk):
     else:
         selected_dt = datetime(today.year, today.month, 1)
         selected_month = selected_dt.strftime("%Y-%m")
+    if selected_dt.month == 1:
+        prev_dt = datetime(selected_dt.year - 1, 12, 1)
+    else:
+        prev_dt = datetime(selected_dt.year, selected_dt.month - 1, 1)
+    if selected_dt.month == 12:
+        next_dt = datetime(selected_dt.year + 1, 1, 1)
+    else:
+        next_dt = datetime(selected_dt.year, selected_dt.month + 1, 1)
+    prev_month = prev_dt.strftime("%Y-%m")
+    next_month = next_dt.strftime("%Y-%m")
+    current_month = today.strftime("%Y-%m")
     start_date = date(selected_dt.year, selected_dt.month, 1)
     if selected_dt.month == 12:
         end_date = date(selected_dt.year + 1, 1, 1)
@@ -1858,6 +1869,17 @@ def financeiro_caderno_detail(request, pk):
     status_filter = request.GET.get("status", "").strip().lower()
     categoria_filter = request.GET.get("categoria", "").strip()
     centro_filter = request.GET.get("centro", "").strip()
+    search_query = request.GET.get("q", "").strip()
+    query_params = {}
+    if status_filter:
+        query_params["status"] = status_filter
+    if categoria_filter:
+        query_params["categoria"] = categoria_filter
+    if centro_filter:
+        query_params["centro"] = centro_filter
+    if search_query:
+        query_params["q"] = search_query
+    month_query = urlencode(query_params)
 
     compras_base_qs = (
         Compra.objects.filter(caderno=caderno)
@@ -1927,7 +1949,6 @@ def financeiro_caderno_detail(request, pk):
 
     categorias = CategoriaCompra.objects.order_by("nome")
     centros = CentroCusto.objects.order_by("nome")
-    search_query = request.GET.get("q", "").strip()
     if search_query:
         compras = [
             compra
@@ -1958,6 +1979,10 @@ def financeiro_caderno_detail(request, pk):
             "compras_sem_data": compras_sem_data,
             "selected_month": selected_month,
             "mes_referencia": start_date,
+            "prev_month": prev_month,
+            "next_month": next_month,
+            "current_month": current_month,
+            "month_query": month_query,
             "status_filter": status_filter,
             "categoria_filter": categoria_filter,
             "centro_filter": centro_filter,
@@ -2146,7 +2171,7 @@ def financeiro_compra_detail(request, pk):
                         valor=item.valor,
                         quantidade=item.quantidade,
                         tipo_id=item.tipo_id,
-                        pago=item.pago,
+                        pago=False,
                     )
                     for item in itens_origem
                 ]
