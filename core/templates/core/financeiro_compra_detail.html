@@ -62,6 +62,7 @@
                 <th>Nome</th>
                 <th>Quantidade</th>
                 <th>Valor</th>
+                <th>Parcela</th>
                 <th>Total</th>
                 <th>Tipo</th>
                 <th>Pago</th>
@@ -83,6 +84,9 @@
                   </td>
                   <td>
                       <input type="text" name="valor" value="{{ item.valor|default_if_none:'' }}">
+                  </td>
+                  <td>
+                      <input type="text" name="parcela" value="{{ item.parcela|default:'1/1' }}">
                   </td>
                   <td>R$ {{ item.total_valor|default:"0,00" }}</td>
                   <td>
@@ -138,6 +142,10 @@
           <div class="field">
             <label>Valor</label>
             <input type="text" name="valor" placeholder="0,00">
+          </div>
+          <div class="field">
+            <label>Parcela</label>
+            <input type="text" name="parcela" placeholder="1/1" value="1/1">
           </div>
           <div class="field">
             <label>Tipo</label>

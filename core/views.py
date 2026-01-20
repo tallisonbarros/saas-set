@@ -1,4 +1,5 @@
 import calendar
+import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -110,6 +111,63 @@ def _add_months(base_date, months):
     last_day = calendar.monthrange(year, month)[1]
     day = min(base_date.day, last_day)
     return date(year, month, day)
+
+
+def _parse_parcela(value):
+    value = (value or "").strip()
+    if not value:
+        return None
+    if value == "1/-":
+        return ("recorrente", None, None)
+    if not re.match(r"^\d{1,5}/\d{1,5}$", value):
+        return None
+    num_str, den_str = value.split("/")
+    try:
+        num = int(num_str)
+        den = int(den_str)
+    except ValueError:
+        return None
+    if num < 1 or den < 1:
+        return None
+    return ("parcelado", num, den)
+
+
+def _format_parcela(num, den):
+    num_str = f"{num:02d}" if num < 100 else str(num)
+    den_str = f"{den:02d}" if den < 100 else str(den)
+    return f"{num_str}/{den_str}"
+
+
+def _parcela_for_copy(value, offset):
+    parsed = _parse_parcela(value)
+    if not parsed:
+        return value
+    kind, num, den = parsed
+    if kind == "recorrente":
+        return "1/-"
+    if num == 1 and den == 1:
+        return None
+    new_num = num + offset
+    if new_num > den:
+        return None
+    return _format_parcela(new_num, den)
+
+
+def _normalize_parcela(value, fallback):
+    parsed = _parse_parcela(value)
+    if not parsed:
+        return fallback
+    kind, num, den = parsed
+    if kind == "recorrente":
+        return "1/-"
+    return _format_parcela(num, den)
+
+
+def _is_parcela_valid(value):
+    value = (value or "").strip()
+    if not value:
+        return True
+    return bool(_parse_parcela(value))
 
 
 def home(request):
@@ -2125,8 +2183,27 @@ def financeiro_compra_detail(request, pk):
                     f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
                 )
             itens_origem = list(compra.itens.all())
+            copied_months = 0
+            skipped_months = 0
             for offset in range(1, meses + 1):
                 target_date = _add_months(compra.data, offset)
+                itens_payload = []
+                for item in itens_origem:
+                    parcela = _parcela_for_copy(item.parcela, offset)
+                    if not parcela:
+                        continue
+                    itens_payload.append(
+                        {
+                            "nome": item.nome,
+                            "valor": item.valor,
+                            "quantidade": item.quantidade,
+                            "tipo_id": item.tipo_id,
+                            "parcela": parcela,
+                        }
+                    )
+                if not itens_payload:
+                    skipped_months += 1
+                    continue
                 existing = Compra.objects.filter(
                     caderno_id=compra.caderno_id,
                     nome=compra.nome,
@@ -2167,18 +2244,26 @@ def financeiro_compra_detail(request, pk):
                 itens_novos = [
                     CompraItem(
                         compra=alvo,
-                        nome=item.nome,
-                        valor=item.valor,
-                        quantidade=item.quantidade,
-                        tipo_id=item.tipo_id,
+                        nome=payload["nome"],
+                        valor=payload["valor"],
+                        quantidade=payload["quantidade"],
+                        tipo_id=payload["tipo_id"],
+                        parcela=payload["parcela"],
                         pago=False,
                     )
-                    for item in itens_origem
+                    for payload in itens_payload
                 ]
-                if itens_novos:
-                    CompraItem.objects.bulk_create(itens_novos)
-            msg = "Compra copiada para os proximos meses."
-            params = {"msg": msg, "level": "success"}
+                CompraItem.objects.bulk_create(itens_novos)
+                copied_months += 1
+            if copied_months == 0:
+                msg = "Nenhuma compra copiada: itens com parcela 1/1 ou parcelas finalizadas."
+                params = {"msg": msg, "level": "warning"}
+            elif skipped_months:
+                msg = f"Compras copiadas. {skipped_months} mes(es) sem itens para copiar."
+                params = {"msg": msg, "level": "warning"}
+            else:
+                msg = "Compra copiada para os proximos meses."
+                params = {"msg": msg, "level": "success"}
             return redirect(
                 f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
             )
@@ -2186,6 +2271,7 @@ def financeiro_compra_detail(request, pk):
             nome = request.POST.get("nome", "").strip()
             valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
             quantidade_raw = request.POST.get("quantidade", "").strip()
+            parcela_raw = request.POST.get("parcela", "")
             tipo_id = request.POST.get("tipo")
             pago = request.POST.get("pago") == "on"
             try:
@@ -2197,12 +2283,20 @@ def financeiro_compra_detail(request, pk):
             except ValueError:
                 quantidade = 1
             quantidade = max(1, quantidade)
+            if parcela_raw and not _is_parcela_valid(parcela_raw):
+                msg = "Parcela invalida. Use 01/36 ou 1/-."
+                params = {"msg": msg, "level": "error"}
+                return redirect(
+                    f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
+                )
             if nome:
+                parcela = _normalize_parcela(parcela_raw, "1/1")
                 CompraItem.objects.create(
                     compra=compra,
                     nome=nome,
                     valor=valor,
                     quantidade=quantidade,
+                    parcela=parcela,
                     tipo_id=tipo_id or None,
                     pago=pago,
                 )
@@ -2219,6 +2313,7 @@ def financeiro_compra_detail(request, pk):
             nome = request.POST.get("nome", "").strip()
             valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
             quantidade_raw = request.POST.get("quantidade", "").strip()
+            parcela_raw = request.POST.get("parcela", "")
             tipo_id = request.POST.get("tipo")
             pago = request.POST.get("pago") == "on"
             try:
@@ -2230,13 +2325,20 @@ def financeiro_compra_detail(request, pk):
             except ValueError:
                 quantidade = item.quantidade
             quantidade = max(1, quantidade)
+            if parcela_raw and not _is_parcela_valid(parcela_raw):
+                msg = "Parcela invalida. Use 01/36 ou 1/-."
+                params = {"msg": msg, "level": "error"}
+                return redirect(
+                    f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
+                )
             if nome:
                 item.nome = nome
             item.valor = valor
             item.quantidade = quantidade
+            item.parcela = _normalize_parcela(parcela_raw, item.parcela)
             item.tipo_id = tipo_id or None
             item.pago = pago
-            item.save(update_fields=["nome", "valor", "quantidade", "tipo", "pago"])
+            item.save(update_fields=["nome", "valor", "quantidade", "parcela", "tipo", "pago"])
             return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "delete_item":
             item_id = request.POST.get("item_id")

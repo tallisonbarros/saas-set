@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.utils import timezone
 
 class PerfilUsuario(models.Model):
@@ -99,6 +99,16 @@ class CompraItem(models.Model):
     nome = models.CharField(max_length=120)
     valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     quantidade = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    parcela = models.CharField(
+        max_length=15,
+        default="1/1",
+        validators=[
+            RegexValidator(
+                regex=r"^\d{1,5}/\d{1,5}$|^1/-$",
+                message="Parcela deve estar no formato 01/36 ou 1/-.",
+            )
+        ],
+    )
     tipo = models.ForeignKey(TipoCompra, on_delete=models.PROTECT, null=True, blank=True)
     pago = models.BooleanField(default=False)
 
