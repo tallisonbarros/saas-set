@@ -24,43 +24,31 @@
         <div>
           <h1 class="page-title">{{ caderno.nome }}</h1>
           <p class="page-subtitle">Pagamentos e pendencias.</p>
-          <div class="field">
-            <input type="month" name="mes" value="{{ selected_month }}" form="mes-navegacao-form">
-          </div>
+          <form id="mes-navegacao-form" class="field" method="get">
+            <div class="page-actions">
+              <a class="btn btn-ghost" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
+              <input type="month" name="mes" value="{{ selected_month }}">
+              <a class="btn btn-ghost" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
+            </div>
+            {% if status_filter %}
+              <input type="hidden" name="status" value="{{ status_filter }}">
+            {% endif %}
+            {% if categoria_filter %}
+              <input type="hidden" name="categoria" value="{{ categoria_filter }}">
+            {% endif %}
+            {% if centro_filter %}
+              <input type="hidden" name="centro" value="{{ centro_filter }}">
+            {% endif %}
+            {% if search_query %}
+              <input type="hidden" name="q" value="{{ search_query }}">
+            {% endif %}
+          </form>
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
           <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
         </div>
       </div>
-    </div>
-
-    <div class="finance-card">
-      <div class="panel-title">Navegacao do mes</div>
-      <form id="mes-navegacao-form" class="stack" method="get">
-        <div class="finance-form-grid">
-          <div class="field">
-            <label>Navegacao</label>
-            <div class="page-actions">
-              <a class="btn btn-ghost" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
-              <span class="muted">Mes atual</span>
-              <a class="btn btn-ghost" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
-            </div>
-          </div>
-        </div>
-        {% if status_filter %}
-          <input type="hidden" name="status" value="{{ status_filter }}">
-        {% endif %}
-        {% if categoria_filter %}
-          <input type="hidden" name="categoria" value="{{ categoria_filter }}">
-        {% endif %}
-        {% if centro_filter %}
-          <input type="hidden" name="centro" value="{{ centro_filter }}">
-        {% endif %}
-        {% if search_query %}
-          <input type="hidden" name="q" value="{{ search_query }}">
-        {% endif %}
-      </form>
     </div>
 
     <details class="io-card io-discrete hud-filter" {% if status_filter or categoria_filter or centro_filter or search_query %}open{% endif %}>
