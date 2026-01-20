@@ -46,31 +46,28 @@
       </div>
     </div>
 
-    <div class="finance-card month-nav-card">
-      <div class="panel-title">Navegacao do mes</div>
-      <form id="mes-navegacao-form" class="month-nav-form" method="get">
-        <div class="month-nav month-nav-pill">
-          <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
-          <div class="month-nav-label" aria-live="polite">
-            <span class="month-nav-month">{{ mes_referencia|date:"F" }}</span>
-            <span class="month-nav-year">{{ mes_referencia|date:"Y" }}</span>
-          </div>
-          <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
+    <form id="mes-navegacao-form" class="month-nav-form" method="get">
+      <div class="month-nav month-nav-pill">
+        <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
+        <div class="month-nav-label" aria-live="polite">
+          <span class="month-nav-month">{{ mes_referencia|date:"F" }}</span>
+          <span class="month-nav-year">{{ mes_referencia|date:"Y" }}</span>
         </div>
-        {% if status_filter %}
-          <input type="hidden" name="status" value="{{ status_filter }}">
-        {% endif %}
-        {% if categoria_filter %}
-          <input type="hidden" name="categoria" value="{{ categoria_filter }}">
-        {% endif %}
-        {% if centro_filter %}
-          <input type="hidden" name="centro" value="{{ centro_filter }}">
-        {% endif %}
-        {% if search_query %}
-          <input type="hidden" name="q" value="{{ search_query }}">
-        {% endif %}
-      </form>
-    </div>
+        <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
+      </div>
+      {% if status_filter %}
+        <input type="hidden" name="status" value="{{ status_filter }}">
+      {% endif %}
+      {% if categoria_filter %}
+        <input type="hidden" name="categoria" value="{{ categoria_filter }}">
+      {% endif %}
+      {% if centro_filter %}
+        <input type="hidden" name="centro" value="{{ centro_filter }}">
+      {% endif %}
+      {% if search_query %}
+        <input type="hidden" name="q" value="{{ search_query }}">
+      {% endif %}
+    </form>
 
     <details class="io-card io-discrete hud-filter" {% if status_filter or categoria_filter or centro_filter or search_query %}open{% endif %}>
       <summary class="io-discrete-summary">

@@ -689,11 +689,7 @@ body {
 .month-nav-form {
   display: flex;
   justify-content: center;
-}
-
-.month-nav-card {
-  padding: 10px 16px;
-  margin-top: 6px;
+  margin: 6px 0 4px;
 }
 
 .hud-month-form {
@@ -713,12 +709,12 @@ body {
 }
 
 .month-nav-pill {
-  border: 1px solid var(--border);
-  background: #fff1e7;
+  border: none;
+  background: #fff6ef;
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 4px 10px;
   gap: 8px;
-  box-shadow: 0 10px 20px rgba(31, 26, 21, 0.08);
+  box-shadow: none;
 }
 
 .month-nav-btn {
