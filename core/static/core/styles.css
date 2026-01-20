@@ -697,11 +697,6 @@ body {
   gap: 10px;
 }
 
-.month-nav-input {
-  width: 220px;
-  text-align: center;
-}
-
 .month-nav-pill {
   border: 1px solid var(--border);
   background: #fff1e7;
@@ -724,17 +719,33 @@ body {
   background: #ffe7d8;
 }
 
-.month-nav-input {
-  border: none;
-  background: transparent;
-  padding: 6px 10px;
-  font-weight: 600;
+.month-nav-label {
+  display: grid;
+  justify-items: center;
+  line-height: 1.05;
+  min-width: 140px;
+}
+
+.month-nav-month {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.month-nav-year {
+  font-size: 12px;
+  color: var(--muted);
   letter-spacing: 0.4px;
 }
 
-.month-nav-input:focus {
-  outline: none;
-  box-shadow: none;
+.month-nav-picker {
+  width: 140px;
+  margin: 6px auto 0;
+  text-align: center;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
 }
 
 .hud-filter {

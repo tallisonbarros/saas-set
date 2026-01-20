@@ -27,9 +27,13 @@
           <form id="mes-navegacao-form" class="month-nav-form" method="get">
             <div class="month-nav month-nav-pill">
               <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
-              <input class="month-nav-input" type="month" name="mes" value="{{ selected_month }}">
+              <div class="month-nav-label" aria-live="polite">
+                <span class="month-nav-month">{{ mes_referencia|date:"F" }}</span>
+                <span class="month-nav-year">{{ mes_referencia|date:"Y" }}</span>
+              </div>
               <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
             </div>
+            <input class="month-nav-picker" type="month" name="mes" value="{{ selected_month }}" aria-label="Selecionar mes">
             {% if status_filter %}
               <input type="hidden" name="status" value="{{ status_filter }}">
             {% endif %}
