@@ -691,6 +691,21 @@ body {
   justify-content: center;
 }
 
+.month-nav-card {
+  padding: 10px 16px;
+  margin-top: 6px;
+}
+
+.hud-month-form {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.hud-month-form .month-nav-picker {
+  margin: 0;
+}
+
 .month-nav {
   display: inline-flex;
   align-items: center;
