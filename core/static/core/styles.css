@@ -2148,14 +2148,23 @@ select {
 
 .rack-channel-row {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) 140px;
-  gap: 10px;
+  grid-template-columns: minmax(46px, max-content) minmax(0, 1fr) minmax(60px, max-content);
+  gap: 8px;
   align-items: center;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 10px;
   background: #fff6ef;
   border: 1px solid rgba(255, 102, 0, 0.12);
-  font-size: 12px;
+  font-size: 11px;
+}
+
+.rack-channel-row span {
+  min-width: 0;
+}
+
+.rack-channel-row span:first-child,
+.rack-channel-row span:last-child {
+  white-space: nowrap;
 }
 
 .rack-channel-head {
@@ -2753,7 +2762,10 @@ select {
   }
 
   .rack-channel-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(36px, max-content) minmax(0, 1fr) minmax(50px, max-content);
+    gap: 6px;
+    padding: 6px;
+    font-size: 10px;
   }
 
   .rack-channel-head {
