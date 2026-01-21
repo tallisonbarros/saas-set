@@ -28,6 +28,12 @@
       </div>
       <div class="page-hud-head centered">
         <div>
+          {% if rack.inventario %}
+            <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
+          {% endif %}
+          {% if rack.local %}
+            <div class="page-kicker">Local: {{ rack.local }}</div>
+          {% endif %}
           <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
         </div>
       </div>

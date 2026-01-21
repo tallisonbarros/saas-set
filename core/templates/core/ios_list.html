@@ -65,6 +65,19 @@
                     <div>
                       <div class="proposal-title">{{ rack.nome }}</div>
                       <div class="proposal-meta">{{ rack.descricao }}</div>
+                      {% if rack.local %}
+                        <div class="proposal-meta">Local: {{ rack.local }}</div>
+                      {% endif %}
+                      {% if rack.inventario or rack.local %}
+                        <div class="proposal-badges">
+                          {% if rack.inventario %}
+                            <span class="badge badge-tagset">Inventario: {{ rack.inventario.nome }}</span>
+                          {% endif %}
+                          {% if rack.local %}
+                            <span class="badge badge-tagset">Local: {{ rack.local }}</span>
+                          {% endif %}
+                        </div>
+                      {% endif %}
                     </div>
                     <div class="module-meta">
                       <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
@@ -113,6 +126,10 @@
                     <option value="{{ inv.id }}">{{ inv.nome }}</option>
                   {% endfor %}
                 </select>
+              </label>
+              <label class="field">
+                <span>Local</span>
+                <input type="text" name="local" placeholder="Linha 01 - Esteira">
               </label>
               <label class="field">
                 <span>ID_PLANTA</span>

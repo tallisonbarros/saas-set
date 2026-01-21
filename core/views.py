@@ -366,6 +366,7 @@ def ios_list(request):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
+            local = request.POST.get("local", "").strip()
             id_planta_raw = request.POST.get("id_planta", "").strip()
             inventario_id = request.POST.get("inventario")
             slots_raw = request.POST.get("slots_total", "").strip()
@@ -386,6 +387,7 @@ def ios_list(request):
                     cliente=cliente,
                     nome=nome,
                     descricao=descricao,
+                    local=local,
                     id_planta=planta,
                     inventario=inventario,
                     slots_total=slots_total,
@@ -493,6 +495,7 @@ def ios_rack_detail(request, pk):
                 return HttpResponseForbidden("Sem permissao.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
+            local = request.POST.get("local", "").strip()
             id_planta_raw = request.POST.get("id_planta", "").strip()
             inventario_id = request.POST.get("inventario")
             slots_raw = request.POST.get("slots_total", "").strip()
@@ -505,6 +508,7 @@ def ios_rack_detail(request, pk):
             if nome:
                 rack.nome = nome
             rack.descricao = descricao
+            rack.local = local
             if id_planta_raw:
                 planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
                 rack.id_planta = planta
@@ -547,7 +551,7 @@ def ios_rack_detail(request, pk):
                         )
                     slots_para_remover.delete()
                 rack.slots_total = slots_total
-            rack.save(update_fields=["nome", "descricao", "id_planta", "slots_total", "inventario"])
+            rack.save(update_fields=["nome", "descricao", "local", "id_planta", "slots_total", "inventario"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "delete_rack":
             if not request.user.is_staff and rack.cliente != cliente:

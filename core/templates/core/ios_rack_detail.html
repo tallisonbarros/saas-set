@@ -25,6 +25,12 @@
       </div>
       <div class="page-hud-head">
         <div>
+          {% if rack.inventario %}
+            <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
+          {% endif %}
+          {% if rack.local %}
+            <div class="page-kicker">Local: {{ rack.local }}</div>
+          {% endif %}
           <h1 class="page-title">{{ rack.nome }}</h1>
           <p class="page-subtitle">{{ rack.descricao }}</p>
         </div>
@@ -69,51 +75,6 @@
     <div class="hud-bottom-actions">
       <a class="btn btn-outline btn-compact" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
     </div>
-    {% if message %}
-      <p class="muted">{{ message }}</p>
-    {% endif %}
-    <details class="io-card io-discrete">
-      <summary class="io-discrete-summary compact">
-        <span class="io-title">Editar rack</span>
-      </summary>
-      <div class="io-discrete-body">
-        <form class="channel-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_rack">
-          <div class="channel-row">
-            <div class="channel-index">Nome</div>
-            <input type="text" name="nome" value="{{ rack.nome }}" required>
-          </div>
-          <div class="channel-row">
-            <div class="channel-index">Descricao</div>
-            <input type="text" name="descricao" value="{{ rack.descricao }}">
-          </div>
-          <div class="channel-row">
-            <div class="channel-index">Slots totais</div>
-            <input type="number" name="slots_total" min="1" max="60" value="{{ rack.slots_total }}" required>
-          </div>
-          <div class="channel-row">
-            <div class="channel-index">Inventario</div>
-            <select name="inventario">
-              <option value="">Sem inventario</option>
-              {% for inv in inventarios %}
-                <option value="{{ inv.id }}" {% if rack.inventario_id == inv.id %}selected{% endif %}>{{ inv.nome }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="channel-row">
-            <div class="channel-index">ID_PLANTA</div>
-            <input type="text" name="id_planta" value="{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% endif %}">
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Salvar rack</button>
-            <button class="btn btn-outline" type="submit" name="action" value="delete_rack" data-confirm="1">
-              Excluir rack
-            </button>
-          </div>
-        </form>
-      </div>
-    </details>
   </section>
 
   <section class="io-card">
@@ -180,5 +141,55 @@
       </div>
     </form>
   </section>
+
+  {% if message %}
+    <p class="muted">{{ message }}</p>
+  {% endif %}
+  <details class="io-card io-discrete" style="margin-top: 18px;">
+    <summary class="io-discrete-summary compact">
+      <span class="io-title">Editar rack</span>
+    </summary>
+    <div class="io-discrete-body">
+      <form class="channel-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_rack">
+        <div class="channel-row">
+          <div class="channel-index">Nome</div>
+          <input type="text" name="nome" value="{{ rack.nome }}" required>
+        </div>
+        <div class="channel-row">
+          <div class="channel-index">Descricao</div>
+          <input type="text" name="descricao" value="{{ rack.descricao }}">
+        </div>
+        <div class="channel-row">
+          <div class="channel-index">Slots totais</div>
+          <input type="number" name="slots_total" min="1" max="60" value="{{ rack.slots_total }}" required>
+        </div>
+        <div class="channel-row">
+          <div class="channel-index">Inventario</div>
+          <select name="inventario">
+            <option value="">Sem inventario</option>
+            {% for inv in inventarios %}
+              <option value="{{ inv.id }}" {% if rack.inventario_id == inv.id %}selected{% endif %}>{{ inv.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="channel-row">
+          <div class="channel-index">Local</div>
+          <input type="text" name="local" value="{{ rack.local }}">
+        </div>
+        <div class="channel-row">
+          <div class="channel-index">ID_PLANTA</div>
+          <input type="text" name="id_planta" value="{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% endif %}">
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Salvar rack</button>
+          <button class="btn btn-outline" type="submit" name="action" value="delete_rack" data-confirm="1">
+            Excluir rack
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
 
 {% endblock %}

@@ -377,6 +377,7 @@ class RackIO(models.Model):
         blank=True,
         related_name="racks_io",
     )
+    local = models.CharField(max_length=120, blank=True)
     id_planta = models.ForeignKey(
         PlantaIO,
         on_delete=models.SET_NULL,
