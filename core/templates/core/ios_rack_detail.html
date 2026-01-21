@@ -157,7 +157,7 @@
         </div>
       </div>
       <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Salvar</button>
+        <button class="btn btn-primary is-hidden" type="submit" id="rack-save-btn">Salvar</button>
       </div>
     </form>
   </section>
@@ -344,6 +344,15 @@
       const rowsContainer = document.getElementById("rack-channel-rows");
       const panelLink = document.getElementById("rack-module-panel-link");
       const channelMap = channelMapNode ? JSON.parse(channelMapNode.textContent) : {};
+      const saveBtn = document.getElementById("rack-save-btn");
+      const slotSelects = document.querySelectorAll(".slot-form select");
+      const updateSaveVisibility = () => {
+        if (!saveBtn) {
+          return;
+        }
+        const hasValue = Array.from(slotSelects).some((select) => select.value);
+        saveBtn.classList.toggle("is-hidden", !hasValue);
+      };
 
       if (track && buttons.length) {
         buttons.forEach((btn) => {
@@ -412,6 +421,14 @@
           document.getElementById("rack-module-panel").scrollIntoView({ behavior: "smooth", block: "start" });
         });
       });
+      if (saveBtn && slotSelects.length) {
+        slotSelects.forEach((select) => {
+          select.addEventListener("change", () => {
+            updateSaveVisibility();
+          });
+        });
+        updateSaveVisibility();
+      }
       bindCadastro();
     })();
   </script>
