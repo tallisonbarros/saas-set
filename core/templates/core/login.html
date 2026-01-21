@@ -14,11 +14,14 @@
 {% endblock %}
 
 {% block content %}
-  <div class="page-logo">
-    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  <div class="page-version">
+    <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
   </div>
   <div class="page-center">
     <div class="card" style="max-width: 380px; width: 100%;">
+      <div class="page-logo">
+        <img class="logo logo-small login-logo" src="{% static 'core/logoset.png' %}" alt="Logo">
+      </div>
       <div class="page-hud">
         <div class="hud-top">
           <div class="hud-title">Painel de acesso</div>

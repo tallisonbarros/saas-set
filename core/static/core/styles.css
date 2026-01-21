@@ -54,6 +54,14 @@ body {
   text-align: center;
 }
 
+.nav-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -128,6 +136,7 @@ body {
 }
 
 .login-logo {
+  height: 32px;
   margin: 0 auto;
 }
 
@@ -146,12 +155,6 @@ body {
 
 .nav-centered {
   justify-content: center;
-}
-
-.nav-row {
-  width: 100%;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .nav-link {
@@ -204,6 +207,12 @@ body {
   letter-spacing: 0.7px;
   color: var(--muted);
   margin: 4px 0 16px;
+}
+
+.page-version {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
 }
 
 .page-crumbs a {
@@ -790,6 +799,10 @@ body {
 
 .page-actions-top {
   align-self: flex-start;
+}
+
+.logout-btn {
+  gap: 6px;
 }
 
 .month-nav-form {
@@ -2489,7 +2502,7 @@ select {
     align-items: center;
   }
 
-  .nav-row {
+  .nav-top {
     justify-content: center;
   }
 
@@ -2500,6 +2513,14 @@ select {
 }
 
 @media (max-width: 700px) {
+  .user-actions-bar .nav-user {
+    display: none;
+  }
+
+  .logout-btn .logout-text {
+    display: none;
+  }
+
   .client-meta {
     flex-direction: column;
     align-items: flex-start;
