@@ -1,0 +1,134 @@
+﻿Documento — Mapa Completo da Aplicacao SAAS-SET
+
+Visao geral
+A SAAS-SET e uma plataforma de gestao industrial que integra Comercial, Engenharia (I/O) e Financeiro em um unico painel, com controle por perfis de usuario e cadastros vinculados a IDs de planta, financeiro e inventario. O foco e centralizar propostas, listas de I/Os e inventarios de ativos, alem de estruturar compras e custos por cadernos (CAPEX/OPEX).
+
+Modulos principais
+1) Comercial — Propostas
+Objetivo: organizar o funil comercial, aprovacoes e andamento das propostas.
+Principais funcionalidades:
+- Criar proposta (vendedor): envio com destinatario, nome, descricao, valor e prioridade.
+- Listagem de propostas com filtros: pendentes, levantamento, aprovadas, reprovadas e finalizadas.
+- Aprovacao ou reprovacao por cliente (quando aplicavel).
+- Detalhe da proposta: codigo automatico, valor, status, historico, anexos e observacoes.
+- Anexos por tipo: NF, Contrato, Proposta formal, Quebra de contrato, Pedido de compra, Ordem de servico, Outros.
+- Marcacao de execucao e finalizacao.
+- Observacoes e prioridade registradas pelo cliente.
+- Painel administrativo “Explorar”: visao por cliente e filtros por status/valor/prioridade.
+
+Dicas de uso:
+- Use prioridade (1–99) para ordenar urgencia de analise.
+- Anexe documentos criticos (contratos, NFs) diretamente na proposta para evitar dispersao de arquivos.
+- Use o codigo automatico para padronizar referencias internas e facilita rastreio.
+
+Exemplos:
+- “Criar proposta de automacao do setor X com valor R$ 250.000, prioridade 80, anexar contrato e proposta formal.”
+- “Cliente aprova proposta e registra observacao sobre prazo.”
+
+2) Engenharia — Listas de I/O (Racks, Modulos e Canais)
+Objetivo: mapear e manter o desenho fisico dos racks e seus canais.
+Principais funcionalidades:
+- Cadastro de racks com ID_PLANTA, descricao e quantidade de slots.
+- Visualizacao do mapa do rack com slots ocupados/livres.
+- Instalacao de modulos nos slots, com criacao automatica dos canais.
+- Atualizacao de nome e tipo de cada canal.
+- Pesquisa rapida por rack, modulo ou canal.
+- Lista completa de I/Os por rack (visualizacao tabular).
+- Catalogo de modelos de modulos com quantidade de canais e tipo base.
+- Classificacao de tipos de canais (ex: DI, DO, AI, AO).
+
+Dicas de uso:
+- Padronize o nome de racks e modulos para facilitar busca.
+- Use o tipo base do canal para manter coerencia no cadastro.
+- O mapa completo de I/Os ajuda na revisao antes de instalacao fisica.
+
+Exemplos:
+- “Criar rack ‘Rack Principal’ com 20 slots e ID_PLANTA PLANTA-001.”
+- “Criar modelo de modulo DI-16, 16 canais, tipo base DI.”
+- “No rack, alocar modulo DI-16 no Slot 05 e nomear canais.”
+
+3) Inventario — Ativos da Fabrica
+Objetivo: catalogar ativos e itens internos com status tecnico.
+Principais funcionalidades:
+- Criar inventarios por planta/linha (com ID_INVENTARIO).
+- Definir padrao de TAGSET (sequencial por tipo, setorizado, inventario+tipo).
+- Cadastro de ativos (motores, valvulas, transmissores, equipamentos etc.).
+- Cadastro de itens internos vinculados ao ativo.
+- Geracao automatica de TagSET para ativos e itens.
+- Status de comissionamento e manutencao por ativo e item.
+- Detalhamento por ativo e por item.
+
+Dicas de uso:
+- Use TAGSET padronizado para evitar duplicidades.
+- Registre setor e identificacao para facilitar manutencao.
+- Utilize status de manutencao para priorizar intervencoes.
+
+Exemplos:
+- “Criar inventario ‘Linha 01 – Producao’, ID_INV: INV-001, padrao setorizado.”
+- “Cadastrar ativo ‘Motor Principal’ tipo MOTOR, setor Linha 01, tag interna MTR-01.”
+- “Adicionar item ‘Conjunto de acionamento’ e marcar manutencao.”
+
+4) Financeiro — Compras e Cadernos
+Objetivo: controlar compras, custos e pagamentos por periodo e categoria.
+Principais funcionalidades:
+- Cadernos (CAPEX/OPEX) automaticos e criacao de novos.
+- Compras com data, categoria, centro de custo e itens detalhados.
+- Controle de pagamento por item (pago/pendente).
+- Visualizacao mensal com filtros por status, categoria, centro e busca.
+- Resumo financeiro: total do mes, pago, pendente, ticket medio.
+- Copiar compras para proximos meses (recorrencia/parcelas).
+- Cadastro rapido de categorias e centros de custo via popup.
+
+Dicas de uso:
+- Use cadernos para separar CAPEX e OPEX.
+- Marque “pago” por item para refletir status real da compra.
+- Utilize a funcao de “copiar para proximos meses” em custos recorrentes.
+
+Exemplos:
+- “Registrar compra de manutencao eletrica em OPEX, com 3 itens e parcela 01/12.”
+- “Copiar a compra recorrente para os proximos 6 meses.”
+
+Gestao de usuarios e perfis
+Objetivo: controlar acesso e permissoes por tipo de perfil.
+Perfis comuns:
+- ADMIN: acesso total + configuracoes e admin.
+- CLIENTE/CONTRATANTE: aprova propostas e gerencia inventarios.
+- FINANCEIRO: acesso a compras e cadernos.
+- VENDEDOR: cria propostas.
+
+Funcionalidades:
+- Criacao e gerenciamento de usuarios.
+- Tipos de perfil customizaveis.
+- Vinculo a IDs (PLANTA, FINANCEIRO, INVENTARIO) por usuario.
+- Atualizacao de senha e ativacao/desativacao.
+
+Dicas de uso:
+- Defina perfis por area para evitar permissoes indevidas.
+- Vincule IDs para limitar acesso a projetos especificos.
+
+Fluxos principais (resumo)
+1) Comercial
+Cadastro -> Criacao de proposta -> Envio -> Aprovacao/Reprovacao -> Execucao -> Finalizacao -> Anexos/documentos.
+
+2) Engenharia (I/O)
+Cadastro de tipos de canais -> Criacao de modelos de modulos -> Criacao de racks -> Alocacao de modulos -> Nomeacao de canais -> Consulta e pesquisa.
+
+3) Inventario
+Criar inventario -> Cadastrar ativos -> Cadastrar itens -> Atualizar status (comissionado/manutencao).
+
+4) Financeiro
+Criar cadernos -> Registrar compras -> Adicionar itens -> Marcar pagamento -> Visualizar resumo mensal -> Copiar recorrencias.
+
+Pontos fortes para material comercial
+- Plataforma unica para Comercial + Engenharia + Financeiro.
+- Controle de processos industriais com rastreabilidade.
+- Automatizacao de codigos e TAGSET.
+- Visao gerencial consolidada por cliente e por area.
+- Workflows prontos para equipes internas e clientes.
+- Interface limpa com acoes rapidas e filtros inteligentes.
+
+Sugestoes de narrativa comercial
+- “Da proposta a execucao: tudo no mesmo painel.”
+- “Controle de ativos e I/Os com rastreabilidade total.”
+- “Financeiro integrado ao chao de fabrica.”
+- “Mais velocidade para equipes industriais: dados, documentos e aprovacoes em minutos.”

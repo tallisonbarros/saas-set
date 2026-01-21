@@ -48,9 +48,13 @@ def _clean_tag_prefix(value):
     return value[:3] if value else ""
 
 
-def _tipo_prefix(tipo):
+def _tipo_prefix(tipo, fallback=None):
     cleaned = _clean_tag_prefix(tipo)
-    return cleaned if cleaned else "ATV"
+    if cleaned:
+        return cleaned
+    if fallback:
+        return fallback
+    return "ATV"
 
 
 def _inventario_prefix(inventario):
@@ -98,9 +102,10 @@ def _next_tagset_for_itens(inventario, prefix):
     return f"{prefix}{last_num + 1:04d}"
 
 
-def _generate_tagset(inventario, tipo, setor, target):
+def _generate_tagset(inventario, tipo, setor, target, fallback_tipo=None):
     pattern = inventario.tagset_pattern or Inventario.TagsetPattern.TIPO_SEQ
-    tipo_prefix = _tipo_prefix(tipo)
+    fallback_prefix = _tipo_prefix(fallback_tipo) if fallback_tipo else None
+    tipo_prefix = _tipo_prefix(tipo, fallback=fallback_prefix)
     if pattern == Inventario.TagsetPattern.SETORIZADO:
         setor_prefix = _clean_tag_prefix(setor) or _inventario_prefix(inventario)
         base = f"{setor_prefix}{tipo_prefix}"
@@ -841,7 +846,7 @@ def inventario_detail(request, pk):
                     item_em_manutencao = request.POST.get(f"item_em_manutencao_{index}") == "on"
                     if not item_nome:
                         continue
-                    item_tag_base = _generate_tagset(inventario, item_tipo, ativo.setor, "item")
+                    item_tag_base = _generate_tagset(inventario, item_tipo, ativo.setor, "item", fallback_tipo=ativo.tipo)
                     item_tag_set = f"{ativo.tag_set}-{item_tag_base}" if ativo.tag_set else item_tag_base
                     itens_para_criar.append(
                         AtivoItem(
@@ -986,7 +991,7 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                 if not ativo.tag_set:
                     ativo.tag_set = _generate_tagset(inventario, ativo.tipo, ativo.setor, "ativo")
                     ativo.save(update_fields=["tag_set"])
-                item_tag_base = _generate_tagset(inventario, tipo, ativo.setor, "item")
+                item_tag_base = _generate_tagset(inventario, tipo, ativo.setor, "item", fallback_tipo=ativo.tipo)
                 AtivoItem.objects.create(
                     ativo=ativo,
                     nome=nome,
