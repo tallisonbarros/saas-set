@@ -1003,6 +1003,8 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             comissionado = request.POST.get("comissionado") == "on"
             em_manutencao = request.POST.get("em_manutencao") == "on"
             if nome:
+                if em_manutencao:
+                    comissionado = False
                 if not ativo.tag_set:
                     ativo.tag_set = _generate_tagset(inventario, ativo.tipo, ativo.setor, "ativo")
                     ativo.save(update_fields=["tag_set"])
@@ -1038,10 +1040,23 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                 alvo.comissionado_em = None
                 alvo.comissionado_por = None
             else:
+                if alvo.em_manutencao:
+                    alvo.em_manutencao = False
+                    alvo.manutencao_em = None
+                    alvo.manutencao_por = None
                 alvo.comissionado = True
                 alvo.comissionado_em = timezone.now()
                 alvo.comissionado_por = request.user
-            alvo.save(update_fields=["comissionado", "comissionado_em", "comissionado_por"])
+            alvo.save(
+                update_fields=[
+                    "comissionado",
+                    "comissionado_em",
+                    "comissionado_por",
+                    "em_manutencao",
+                    "manutencao_em",
+                    "manutencao_por",
+                ]
+            )
             _sync_ativo_status(ativo)
             return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
         if action == "toggle_item_manutencao":
@@ -1052,10 +1067,23 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                 alvo.manutencao_em = None
                 alvo.manutencao_por = None
             else:
+                if alvo.comissionado:
+                    alvo.comissionado = False
+                    alvo.comissionado_em = None
+                    alvo.comissionado_por = None
                 alvo.em_manutencao = True
                 alvo.manutencao_em = timezone.now()
                 alvo.manutencao_por = request.user
-            alvo.save(update_fields=["em_manutencao", "manutencao_em", "manutencao_por"])
+            alvo.save(
+                update_fields=[
+                    "comissionado",
+                    "comissionado_em",
+                    "comissionado_por",
+                    "em_manutencao",
+                    "manutencao_em",
+                    "manutencao_por",
+                ]
+            )
             _sync_ativo_status(ativo)
             return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
         if action == "update_ativo":
@@ -1132,6 +1160,8 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
             tag_interna = request.POST.get("tag_interna", "").strip()
             comissionado = request.POST.get("comissionado") == "on"
             em_manutencao = request.POST.get("em_manutencao") == "on"
+            if em_manutencao:
+                comissionado = False
             if nome:
                 item.nome = nome
             item.tipo = tipo

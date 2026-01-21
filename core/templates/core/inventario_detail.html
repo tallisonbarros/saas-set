@@ -155,10 +155,20 @@
                 <span class="badge badge-tagint">Tag interna: {{ ativo.tag_interna }}</span>
               {% endif %}
               {% if ativo.comissionado %}
-                <span class="badge badge-comissionado">Comissionado</span>
+                <span class="badge badge-comissionado">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12l4 4 10-10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                  Comissionado
+                </span>
               {% endif %}
               {% if ativo.em_manutencao %}
-                <span class="badge badge-manutencao">Em manutencao</span>
+                <span class="badge badge-manutencao">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 7.5a5 5 0 0 1-6.8 4.7l-6.7 6.7a1.6 1.6 0 0 1-2.3 0l-.6-.6a1.6 1.6 0 0 1 0-2.3l6.7-6.7A5 5 0 0 1 16.5 3l-2.4 2.4 2.5 2.5L19 5.5A5 5 0 0 1 21 7.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+                  </svg>
+                  Em manutencao
+                </span>
               {% endif %}
             </div>
           </article>
