@@ -42,6 +42,8 @@
           <p class="page-subtitle">Pagamentos e pendencias.</p>
         </div>
         <div class="page-actions">
+          <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
+          <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
           <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
         </div>
       </div>

@@ -28,9 +28,10 @@
         </div>
         <div class="page-actions">
           {% if compra.caderno %}
-            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Voltar ao caderno</a>
+            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
+            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Caderno</a>
           {% else %}
-            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar ao financeiro</a>
+            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
           {% endif %}
         </div>
       </div>

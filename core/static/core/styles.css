@@ -62,6 +62,15 @@ body {
   gap: 12px;
 }
 
+.panel-icon-row {
+  display: flex;
+  justify-content: center;
+}
+
+.panel-icon-btn {
+  border-radius: 12px;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -2524,6 +2533,10 @@ select {
 
   .logout-btn .logout-text {
     display: none;
+  }
+
+  .user-actions-bar {
+    padding: 4px 6px;
   }
 
   .client-meta {

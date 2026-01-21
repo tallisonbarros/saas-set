@@ -44,23 +44,16 @@
             <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
           </a>
           {% if request.user.is_authenticated %}
-            <nav class="nav nav-centered" aria-label="Navegacao principal">
-              <a class="nav-link {% if request.resolver_match.url_name == 'painel' %}is-active{% endif %}" href="{% url 'painel' %}">Painel</a>
-              <a class="nav-link {% if request.resolver_match.url_name == 'propostas' or request.resolver_match.url_name == 'proposta_detail' or request.resolver_match.url_name == 'proposta_nova_vendedor' %}is-active{% endif %}" href="{% url 'propostas' %}">Propostas</a>
-              <a class="nav-link {% if request.resolver_match.url_name == 'financeiro' or request.resolver_match.url_name == 'financeiro_nova' or request.resolver_match.url_name == 'financeiro_cadernos' or request.resolver_match.url_name == 'financeiro_caderno_detail' or request.resolver_match.url_name == 'financeiro_compra_detail' %}is-active{% endif %}" href="{% url 'financeiro' %}">Financeiro</a>
-              <a class="nav-link {% if request.resolver_match.url_name == 'ios_list' or request.resolver_match.url_name == 'ios_rack_detail' or request.resolver_match.url_name == 'ios_rack_io_list' or request.resolver_match.url_name == 'ios_modulos' or request.resolver_match.url_name == 'ios_modulo_modelo_detail' or request.resolver_match.url_name == 'ios_rack_modulo_detail' %}is-active{% endif %}" href="{% url 'ios_list' %}">IOs</a>
-              <a class="nav-link {% if request.resolver_match.url_name == 'inventarios_list' or request.resolver_match.url_name == 'inventario_detail' or request.resolver_match.url_name == 'inventario_ativo_detail' or request.resolver_match.url_name == 'inventario_item_detail' %}is-active{% endif %}" href="{% url 'inventarios_list' %}">Inventarios</a>
-              {% if request.user.is_staff %}
-                <a class="nav-link {% if request.resolver_match.url_name == 'usuarios' or request.resolver_match.url_name == 'usuarios_gerenciar_usuario' %}is-active{% endif %}" href="{% url 'usuarios' %}">Usuarios</a>
-                <a class="nav-link {% if request.resolver_match.url_name == 'ajustes_sistema' %}is-active{% endif %}" href="{% url 'ajustes_sistema' %}">Ajustes</a>
-              {% endif %}
-            </nav>
+            {% if request.resolver_match.url_name != 'painel' and request.resolver_match.url_name != 'home' and request.resolver_match.url_name != 'login' %}
+              <div class="panel-icon-row">
+                <a class="btn btn-ghost icon-only panel-icon-btn" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+                  </svg>
+                </a>
+              </div>
+            {% endif %}
           {% else %}
-            <nav class="nav nav-centered" aria-label="Navegacao principal">
-              <a class="nav-link {% if request.resolver_match.url_name == 'home' %}is-active{% endif %}" href="{% url 'home' %}">Inicio</a>
-              <a class="nav-link {% if request.resolver_match.url_name == 'login' %}is-active{% endif %}" href="{% url 'login' %}">Entrar</a>
-              <a class="nav-link {% if request.resolver_match.url_name == 'register' %}is-active{% endif %}" href="{% url 'register' %}">Cadastre-se</a>
-            </nav>
           {% endif %}
         </div>
       </header>

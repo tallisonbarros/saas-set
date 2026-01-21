@@ -28,7 +28,8 @@
           <p class="page-subtitle">{{ rack.nome }}{% if rack.descricao %} - {{ rack.descricao }}{% endif %}</p>
         </div>
         <div class="page-actions">
-          <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Voltar ao rack</a>
+          <a class="btn btn-ghost" href="{% url 'ios_list' %}">IOs</a>
+          <a class="btn btn-ghost" href="{% url 'ios_rack_detail' rack.id %}">Rack</a>
         </div>
       </div>
     </div>
