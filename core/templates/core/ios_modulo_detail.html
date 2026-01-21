@@ -27,39 +27,36 @@
         </div>
       </div>
       <div class="page-hud-head centered">
-        <div>
-          {% if rack.inventario %}
-            <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
+        <div class="page-hud-main">
+          {% if rack.descricao %}
+            <div class="hud-meta centered">{{ rack.descricao }}</div>
           {% endif %}
           {% if rack.local %}
             <div class="page-kicker">Local: {{ rack.local.nome }}</div>
           {% endif %}
-          <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
-        </div>
-      </div>
-      {% if rack.descricao %}
-        <div class="hud-meta centered">{{ rack.descricao }}</div>
-      {% endif %}
-      <div class="rack-slot-head">
-        <div class="rack-slot-title">{{ rack.nome }}</div>
-        <div class="rack-slot-nav">
-          {% if prev_slot %}
-            <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}" aria-label="Slot anterior">&lt;</a>
-          {% else %}
-            <span class="rack-slot-arrow disabled">&lt;</span>
-          {% endif %}
-          <span class="rack-slot-label">
-            {% if slot %}
-              SLOT{{ slot.posicao|stringformat:"02d" }}
-            {% else %}
-              SLOT--
-            {% endif %}
-          </span>
-          {% if next_slot %}
-            <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}" aria-label="Proximo slot">&gt;</a>
-          {% else %}
-            <span class="rack-slot-arrow disabled">&gt;</span>
-          {% endif %}
+          <h1 class="page-title">{{ rack.nome }}</h1>
+          <div class="rack-slot-head">
+            <div class="rack-slot-nav">
+              {% if prev_slot %}
+                <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' prev_slot.modulo.id %}" aria-label="Slot anterior">&lt;</a>
+              {% else %}
+                <span class="rack-slot-arrow disabled">&lt;</span>
+              {% endif %}
+              <span class="rack-slot-label">
+                {% if slot %}
+                  SLOT{{ slot.posicao|stringformat:"02d" }}
+                {% else %}
+                  SLOT--
+                {% endif %}
+              </span>
+              {% if next_slot %}
+                <a class="rack-slot-arrow" href="{% url 'ios_rack_modulo_detail' next_slot.modulo.id %}" aria-label="Proximo slot">&gt;</a>
+              {% else %}
+                <span class="rack-slot-arrow disabled">&gt;</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="page-subtitle">{{ module.nome|default:module.modulo_modelo.nome }}</div>
         </div>
       </div>
     </div>
