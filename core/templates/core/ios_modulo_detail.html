@@ -32,7 +32,7 @@
             <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
           {% endif %}
           {% if rack.local %}
-            <div class="page-kicker">Local: {{ rack.local }}</div>
+            <div class="page-kicker">Local: {{ rack.local.nome }}</div>
           {% endif %}
           <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
         </div>

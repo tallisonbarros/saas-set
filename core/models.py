@@ -286,6 +286,16 @@ class Inventario(models.Model):
         return self.nome
 
 
+class LocalRackIO(models.Model):
+    nome = models.CharField(max_length=120, unique=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 class TipoAtivo(models.Model):
     nome = models.CharField(max_length=80, unique=True)
     codigo = models.CharField(max_length=10, unique=True)
@@ -377,7 +387,13 @@ class RackIO(models.Model):
         blank=True,
         related_name="racks_io",
     )
-    local = models.CharField(max_length=120, blank=True)
+    local = models.ForeignKey(
+        "LocalRackIO",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="racks",
+    )
     id_planta = models.ForeignKey(
         PlantaIO,
         on_delete=models.SET_NULL,

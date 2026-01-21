@@ -49,10 +49,10 @@
             <div class="io-card-head">
               <div>
                 <h3 class="io-title">
-                  {% if group.inventario %}
-                    {{ group.inventario.nome }}
+                  {% if group.local %}
+                    {{ group.local.nome }}
                   {% else %}
-                    Sem inventario
+                    Sem local
                   {% endif %}
                 </h3>
               </div>
@@ -66,7 +66,7 @@
                       <div class="proposal-title">{{ rack.nome }}</div>
                       <div class="proposal-meta">{{ rack.descricao }}</div>
                       {% if rack.local %}
-                        <div class="proposal-meta">Local: {{ rack.local }}</div>
+                        <div class="proposal-meta">Local: {{ rack.local.nome }}</div>
                       {% endif %}
                       {% if rack.inventario or rack.local %}
                         <div class="proposal-badges">
@@ -74,7 +74,7 @@
                             <span class="badge badge-tagset">Inventario: {{ rack.inventario.nome }}</span>
                           {% endif %}
                           {% if rack.local %}
-                            <span class="badge badge-tagset">Local: {{ rack.local }}</span>
+                            <span class="badge badge-tagset">Local: {{ rack.local.nome }}</span>
                           {% endif %}
                         </div>
                       {% endif %}
@@ -128,8 +128,23 @@
                 </select>
               </label>
               <label class="field">
-                <span>Local</span>
-                <input type="text" name="local" placeholder="Linha 01 - Esteira">
+                <div class="field-row">
+                  <span>Local</span>
+                  <details class="inline-pop" id="local-pop">
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Local</label>
+                      <input type="text" name="local_nome" form="create-local-form" placeholder="Novo local">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-local-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="local" id="local-select">
+                  <option value="">Sem local</option>
+                  {% for local in locais %}
+                    <option value="{{ local.id }}">{{ local.nome }}</option>
+                  {% endfor %}
+                </select>
               </label>
               <label class="field">
                 <span>ID_PLANTA</span>
@@ -143,6 +158,11 @@
             <div class="form-actions">
               <button class="btn btn-primary" type="submit">Salvar rack</button>
             </div>
+            <div id="local-message" class="notice" style="display: none;"></div>
+          </form>
+          <form id="create-local-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_local">
           </form>
         {% else %}
           <div class="muted">Apenas clientes cadastrados podem criar racks.</div>
@@ -223,4 +243,82 @@
       {% endif %}
     </section>
   </div>
+  <script>
+    (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function setMessage(message, level) {
+        var box = document.getElementById("local-message");
+        if (!box) {
+          return;
+        }
+        box.textContent = message;
+        box.className = "notice notice-" + (level || "info");
+        box.style.display = "block";
+      }
+      function bindCadastro() {
+        var formCadastro = document.getElementById("create-local-form");
+        var input = document.querySelector("input[name='local_nome'][form='create-local-form']");
+        var select = document.getElementById("local-select");
+        var details = document.getElementById("local-pop");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage(payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+      bindCadastro();
+    })();
+  </script>
 {% endblock %}

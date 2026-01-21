@@ -2010,6 +2010,43 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
+.rack-carousel {
+  position: relative;
+}
+
+.rack-carousel-track {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
+  grid-template-columns: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 8px;
+}
+
+.rack-carousel-track::-webkit-scrollbar {
+  height: 8px;
+}
+
+.rack-carousel-track::-webkit-scrollbar-thumb {
+  background: rgba(255, 102, 0, 0.25);
+  border-radius: 999px;
+}
+
+.rack-carousel-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.rack-slot-shell {
+  scroll-snap-align: start;
+}
+
+.slot-card.slot-selected {
+  border-color: rgba(255, 102, 0, 0.55);
+  box-shadow: var(--shadow-strong);
+}
+
 .rack-slot-shell {
   display: grid;
   gap: 6px;
@@ -2071,6 +2108,73 @@ select {
 
 .slot-card.slot-filled {
   border-color: rgba(255, 102, 0, 0.28);
+}
+
+.slot-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slot-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--muted);
+  background: #fff;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.slot-menu-btn:hover {
+  background: #fff1e7;
+  color: var(--text);
+}
+
+.rack-module-panel {
+  margin-top: 16px;
+}
+
+.rack-channel-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.rack-channel-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) 140px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff6ef;
+  border: 1px solid rgba(255, 102, 0, 0.12);
+  font-size: 12px;
+}
+
+.rack-channel-head {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+}
+
+.rack-module-empty {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.is-hidden {
+  display: none;
 }
 
 .channel-types {
@@ -2645,6 +2749,14 @@ select {
   }
 
   .rack-slot-shell::after {
+    display: none;
+  }
+
+  .rack-channel-row {
+    grid-template-columns: 1fr;
+  }
+
+  .rack-channel-head {
     display: none;
   }
 }

@@ -29,7 +29,7 @@
             <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
           {% endif %}
           {% if rack.local %}
-            <div class="page-kicker">Local: {{ rack.local }}</div>
+            <div class="page-kicker">Local: {{ rack.local.nome }}</div>
           {% endif %}
           <h1 class="page-title">{{ rack.nome }}</h1>
           <p class="page-subtitle">{{ rack.descricao }}</p>
@@ -83,18 +83,32 @@
           <h2 class="io-title">Layout do rack</h2>
           <p class="muted">Slots e modulos.</p>
         </div>
+        <div class="rack-carousel-actions">
+          <button class="btn btn-ghost btn-compact rack-carousel-btn" type="button" data-dir="-1" aria-label="Voltar slots">
+            &lt;
+          </button>
+          <button class="btn btn-ghost btn-compact rack-carousel-btn" type="button" data-dir="1" aria-label="Avancar slots">
+            &gt;
+          </button>
+        </div>
       </div>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="assign_modules">
-      <div class="proposal-grid rack-grid">
+      <div class="rack-carousel">
+        <div class="proposal-grid rack-grid rack-carousel-track" id="rack-carousel-track">
         {% for slot in slots %}
           <div class="rack-slot-shell">
             <div class="rack-slot-label-out">Slot {{ slot.posicao|stringformat:"02d" }}</div>
-            <article class="proposal-card slot-card {% if slot.modulo %}slot-filled{% else %}slot-empty{% endif %}">
+            <article class="proposal-card slot-card {% if slot.modulo %}slot-filled js-rack-module-card{% else %}slot-empty{% endif %}"
               {% if slot.modulo %}
-                <a class="proposal-link" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}" aria-label="Editar canais"></a>
+                data-module-id="{{ slot.modulo.id }}"
+                data-module-title="{% if slot.modulo.nome %}{{ slot.modulo.nome }}{% else %}{{ slot.modulo.modulo_modelo.nome }}{% endif %}"
+                data-module-subtitle="{{ slot.modulo.modulo_modelo.nome }}"
+                data-module-type="{{ slot.modulo.modulo_modelo.tipo_base.nome }}"
+                data-module-details-url="{% url 'ios_rack_modulo_detail' slot.modulo.id %}"
               {% endif %}
+            >
               <div class="proposal-head">
                 <div>
                   {% if slot.modulo %}
@@ -109,18 +123,23 @@
                   {% endif %}
                 </div>
                 {% if slot.modulo %}
-                  <div class="module-meta">
-                    <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
-                    <span class="mini-badge {% if slot.modulo.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
-                      {% if slot.modulo.all_canais_comissionados %}V{% else %}X{% endif %}
-                    </span>
+                  <div class="slot-card-actions">
+                    <div class="module-meta">
+                      <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
+                      <span class="mini-badge {% if slot.modulo.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
+                        {% if slot.modulo.all_canais_comissionados %}V{% else %}X{% endif %}
+                      </span>
+                    </div>
+                    <a class="slot-menu-btn" href="{% url 'ios_rack_modulo_detail' slot.modulo.id %}" aria-label="Abrir detalhes do modulo">
+                      ...
+                    </a>
                   </div>
                 {% endif %}
               </div>
               {% if slot.modulo %}
                 <div class="proposal-meta">{{ slot.modulo.modulo_modelo.marca }} - {{ slot.modulo.modulo_modelo.modelo }}</div>
                 <div class="slot-actions">
-                  <span class="slot-hint">...</span>
+                  <span class="slot-hint">Selecione para ver canais.</span>
                 </div>
               {% else %}
                 <div class="slot-form">
@@ -135,11 +154,33 @@
             </article>
           </div>
         {% endfor %}
+        </div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Salvar</button>
       </div>
     </form>
+  </section>
+
+  <section class="io-card rack-module-panel" id="rack-module-panel">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Canais do modulo</h2>
+        <p class="muted">Clique em um modulo do carrossel para ver os canais.</p>
+      </div>
+      <a class="btn btn-ghost btn-compact rack-module-panel-link is-hidden" href="#" id="rack-module-panel-link">
+        Abrir detalhes
+      </a>
+    </div>
+    <div class="rack-module-empty" id="rack-module-empty">Nenhum modulo selecionado.</div>
+    <div class="rack-channel-list is-hidden" id="rack-channel-list">
+      <div class="rack-channel-row rack-channel-head">
+        <span>Canal</span>
+        <span>Nome</span>
+        <span>Tipo</span>
+      </div>
+      <div id="rack-channel-rows"></div>
+    </div>
   </section>
 
   {% if message %}
@@ -176,7 +217,12 @@
         </div>
         <div class="channel-row">
           <div class="channel-index">Local</div>
-          <input type="text" name="local" value="{{ rack.local }}">
+          <select name="local">
+            <option value="">Sem local</option>
+            {% for local in locais %}
+              <option value="{{ local.id }}" {% if rack.local_id == local.id %}selected{% endif %}>{{ local.nome }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="channel-row">
           <div class="channel-index">ID_PLANTA</div>
@@ -192,4 +238,90 @@
     </div>
   </details>
 
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  {{ module_channels|json_script:"rack-module-channels" }}
+  <script>
+    (function () {
+      const track = document.getElementById("rack-carousel-track");
+      const buttons = document.querySelectorAll(".rack-carousel-btn");
+      const moduleCards = document.querySelectorAll(".js-rack-module-card");
+      const channelMapNode = document.getElementById("rack-module-channels");
+      const emptyState = document.getElementById("rack-module-empty");
+      const listWrap = document.getElementById("rack-channel-list");
+      const rowsContainer = document.getElementById("rack-channel-rows");
+      const panelLink = document.getElementById("rack-module-panel-link");
+      const channelMap = channelMapNode ? JSON.parse(channelMapNode.textContent) : {};
+
+      if (track && buttons.length) {
+        buttons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const dir = Number(btn.dataset.dir) || 1;
+            const scrollAmount = Math.max(220, track.clientWidth * 0.7);
+            track.scrollBy({ left: dir * scrollAmount, behavior: "smooth" });
+          });
+        });
+      }
+
+      const setRows = (moduleId) => {
+        const rows = channelMap[moduleId] || [];
+        rowsContainer.innerHTML = "";
+        if (!rows.length) {
+          emptyState.textContent = "Sem canais cadastrados neste modulo.";
+          emptyState.classList.remove("is-hidden");
+          listWrap.classList.add("is-hidden");
+          panelLink.classList.add("is-hidden");
+          return;
+        }
+        rows.forEach((row) => {
+          const rowEl = document.createElement("div");
+          rowEl.className = "rack-channel-row";
+          rowEl.innerHTML = "<span>" + row.canal + "</span><span>" + row.nome + "</span><span>" + row.tipo + "</span>";
+          rowsContainer.appendChild(rowEl);
+        });
+        emptyState.classList.add("is-hidden");
+        listWrap.classList.remove("is-hidden");
+      };
+
+      const setPanel = (card) => {
+        const moduleId = card.dataset.moduleId;
+        const title = card.dataset.moduleTitle || "Modulo";
+        const subtitle = card.dataset.moduleSubtitle || "";
+        const type = card.dataset.moduleType || "";
+        const detailsUrl = card.dataset.moduleDetailsUrl || "#";
+        const panelTitle = document.querySelector("#rack-module-panel .io-title");
+        const panelSubtitle = document.querySelector("#rack-module-panel .muted");
+        if (panelTitle) {
+          panelTitle.textContent = title;
+        }
+        if (panelSubtitle) {
+          const meta = [subtitle, type].filter(Boolean).join(" - ");
+          panelSubtitle.textContent = meta ? meta : "Canais do modulo.";
+        }
+        if (panelLink) {
+          panelLink.href = detailsUrl;
+          panelLink.classList.remove("is-hidden");
+        }
+        setRows(moduleId);
+        card.classList.add("slot-selected");
+      };
+
+      const clearSelected = () => {
+        moduleCards.forEach((card) => card.classList.remove("slot-selected"));
+      };
+
+      moduleCards.forEach((card) => {
+        card.addEventListener("click", (event) => {
+          if (event.target.closest(".slot-menu-btn")) {
+            return;
+          }
+          clearSelected();
+          setPanel(card);
+          document.getElementById("rack-module-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    })();
+  </script>
 {% endblock %}
