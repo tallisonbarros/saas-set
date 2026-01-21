@@ -88,7 +88,7 @@
           </label>
           <label class="field">
             <span>TagSET</span>
-            <input type="text" name="tag_set" value="{{ item.tag_set|default:'' }}" readonly>
+            <input type="text" name="tag_set" value="{{ item.tag_set|default:'' }}" readonly disabled>
           </label>
           <label class="checkbox-item">
             <input type="checkbox" name="comissionado" {% if item.comissionado %}checked{% endif %}>

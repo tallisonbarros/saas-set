@@ -213,15 +213,7 @@
           </label>
           <label class="field">
             <span>TagSET</span>
-            <input type="text" name="tag_set" value="{{ ativo.tag_set|default:'' }}" readonly>
-          </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="comissionado" {% if ativo.comissionado %}checked{% endif %}>
-            Comissionado
-          </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="em_manutencao" {% if ativo.em_manutencao %}checked{% endif %}>
-            Em manutencao
+            <input type="text" name="tag_set" value="{{ ativo.tag_set|default:'' }}" readonly disabled>
           </label>
         </div>
         <div class="form-actions">
