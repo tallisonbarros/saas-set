@@ -25,6 +25,7 @@ from .models import (
     PerfilUsuario,
     Compra,
     CompraItem,
+    GrupoRackIO,
     LocalRackIO,
     ModuloIO,
     ModuloRackIO,
@@ -360,6 +361,8 @@ def ios_list(request):
             Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
         )
     locais = LocalRackIO.objects.order_by("nome")
+    grupos = GrupoRackIO.objects.order_by("nome")
+    grupos = GrupoRackIO.objects.order_by("nome")
     locais = LocalRackIO.objects.order_by("nome")
     locais = LocalRackIO.objects.order_by("nome")
     message = None
@@ -371,6 +374,7 @@ def ios_list(request):
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             local_id = request.POST.get("local")
+            grupo_id = request.POST.get("grupo")
             id_planta_raw = request.POST.get("id_planta", "").strip()
             inventario_id = request.POST.get("inventario")
             slots_raw = request.POST.get("slots_total", "").strip()
@@ -390,11 +394,15 @@ def ios_list(request):
                 local = None
                 if local_id and LocalRackIO.objects.filter(pk=local_id).exists():
                     local = LocalRackIO.objects.filter(pk=local_id).first()
+                grupo = None
+                if grupo_id and GrupoRackIO.objects.filter(pk=grupo_id).exists():
+                    grupo = GrupoRackIO.objects.filter(pk=grupo_id).first()
                 rack = RackIO.objects.create(
                     cliente=cliente,
                     nome=nome,
                     descricao=descricao,
                     local=local,
+                    grupo=grupo,
                     id_planta=planta,
                     inventario=inventario,
                     slots_total=slots_total,
@@ -428,6 +436,32 @@ def ios_list(request):
                     }
                 )
             return redirect("ios_list")
+        if action == "create_grupo":
+            nome = request.POST.get("grupo_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de grupo."
+                level = "error"
+                created = False
+            else:
+                grupo, created = GrupoRackIO.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Grupo criado."
+                    level = "success"
+                else:
+                    msg = "Grupo ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": grupo.id if nome and "grupo" in locals() else None,
+                        "nome": grupo.nome if nome and "grupo" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            return redirect("ios_list")
         if action == "create_channel_type":
             nome = request.POST.get("nome", "").strip().upper()
             if nome:
@@ -438,7 +472,7 @@ def ios_list(request):
         racks = RackIO.objects.all()
     else:
         racks = RackIO.objects.filter(Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()))
-    racks = racks.select_related("inventario", "local").annotate(
+    racks = racks.select_related("inventario", "local", "grupo").annotate(
         ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)),
         canais_total=Count("slots__modulo__canais", distinct=True),
         canais_comissionados=Count(
@@ -447,25 +481,38 @@ def ios_list(request):
             distinct=True,
         ),
     )
-    racks_ordered = racks.order_by("local__nome", "inventario__nome", "nome")
+    racks_ordered = racks.order_by("local__nome", "grupo__nome", "inventario__nome", "nome")
     rack_groups = []
     grouped = {}
     for rack in racks_ordered:
         rack.all_canais_comissionados = bool(rack.canais_total) and rack.canais_total == rack.canais_comissionados
-        key = rack.local_id or 0
-        grouped.setdefault(key, []).append(rack)
-    for key, items in grouped.items():
+        local_key = rack.local_id or 0
+        grupo_key = rack.grupo_id or 0
+        grouped.setdefault(local_key, {}).setdefault(grupo_key, []).append(rack)
+    for local_key, groups in grouped.items():
         local = None
-        if key:
-            local = items[0].local
+        if local_key:
+            local = next(iter(groups.values()))[0].local
+        group_rows = []
+        for grupo_key, items in groups.items():
+            grupo = None
+            if grupo_key:
+                grupo = items[0].grupo
+            group_rows.append(
+                {
+                    "grupo": grupo,
+                    "racks": items,
+                }
+            )
         rack_groups.append(
             {
                 "local": local,
-                "racks": items,
+                "groups": group_rows,
             }
         )
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     locais = LocalRackIO.objects.order_by("nome")
+    grupos = GrupoRackIO.objects.order_by("nome")
     search_term = request.GET.get("q", "").strip()
     search_results = []
     search_count = 0
@@ -499,6 +546,7 @@ def ios_list(request):
             "search_count": search_count,
             "inventarios": inventarios_qs.order_by("nome"),
             "locais": locais,
+            "grupos": grupos,
         },
     )
 
@@ -552,12 +600,39 @@ def ios_rack_detail(request, pk):
                     }
                 )
             return redirect("ios_rack_detail", pk=rack.pk)
+        if action == "create_grupo":
+            nome = request.POST.get("grupo_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de grupo."
+                level = "error"
+                created = False
+            else:
+                grupo, created = GrupoRackIO.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Grupo criado."
+                    level = "success"
+                else:
+                    msg = "Grupo ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": grupo.id if nome and "grupo" in locals() else None,
+                        "nome": grupo.nome if nome and "grupo" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            return redirect("ios_rack_detail", pk=rack.pk)
         if action == "update_rack":
             if not request.user.is_staff and rack.cliente != cliente:
                 return HttpResponseForbidden("Sem permissao.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             local_id = request.POST.get("local")
+            grupo_id = request.POST.get("grupo")
             id_planta_raw = request.POST.get("id_planta", "").strip()
             inventario_id = request.POST.get("inventario")
             slots_raw = request.POST.get("slots_total", "").strip()
@@ -574,6 +649,10 @@ def ios_rack_detail(request, pk):
                 rack.local = LocalRackIO.objects.filter(pk=local_id).first()
             else:
                 rack.local = None
+            if grupo_id and GrupoRackIO.objects.filter(pk=grupo_id).exists():
+                rack.grupo = GrupoRackIO.objects.filter(pk=grupo_id).first()
+            else:
+                rack.grupo = None
             if id_planta_raw:
                 planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
                 rack.id_planta = planta
@@ -631,11 +710,12 @@ def ios_rack_detail(request, pk):
                                 "message": message,
                                 "inventarios": inventarios_qs.order_by("nome"),
                                 "locais": locais,
+                                "grupos": grupos,
                             },
                         )
                     slots_para_remover.delete()
                 rack.slots_total = slots_total
-            rack.save(update_fields=["nome", "descricao", "local", "id_planta", "slots_total", "inventario"])
+            rack.save(update_fields=["nome", "descricao", "local", "grupo", "id_planta", "slots_total", "inventario"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "delete_rack":
             if not request.user.is_staff and rack.cliente != cliente:
@@ -800,6 +880,7 @@ def ios_rack_detail(request, pk):
             "message": message,
             "inventarios": inventarios_qs.order_by("nome"),
             "locais": locais,
+            "grupos": grupos,
         },
     )
 

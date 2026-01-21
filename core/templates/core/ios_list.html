@@ -57,41 +57,50 @@
                 </h3>
               </div>
             </div>
-            <div class="proposal-grid">
-              {% for rack in group.racks %}
-                <article class="proposal-card io-proposal-card">
-                  <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
-                  <div class="proposal-head">
-                    <div>
-                      <div class="proposal-title">{{ rack.nome }}</div>
-                      <div class="proposal-meta">{{ rack.descricao }}</div>
-                      {% if rack.local %}
-                        <div class="proposal-meta">Local: {{ rack.local.nome }}</div>
-                      {% endif %}
-                      {% if rack.inventario or rack.local %}
-                        <div class="proposal-badges">
-                          {% if rack.inventario %}
-                            <span class="badge badge-tagset">Inventario: {{ rack.inventario.nome }}</span>
-                          {% endif %}
-                          {% if rack.local %}
-                            <span class="badge badge-tagset">Local: {{ rack.local.nome }}</span>
-                          {% endif %}
-                        </div>
-                      {% endif %}
+            {% for subgroup in group.groups %}
+              <div class="proposal-section-subtitle">
+                {% if subgroup.grupo %}
+                  Grupo: {{ subgroup.grupo.nome }}
+                {% else %}
+                  Sem grupo
+                {% endif %}
+              </div>
+              <div class="proposal-grid">
+                {% for rack in subgroup.racks %}
+                  <article class="proposal-card io-proposal-card">
+                    <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
+                    <div class="proposal-head">
+                      <div>
+                        <div class="proposal-title">{{ rack.nome }}</div>
+                        <div class="proposal-meta">{{ rack.descricao }}</div>
+                        {% if rack.inventario or rack.local or rack.grupo %}
+                          <div class="proposal-badges">
+                            {% if rack.inventario %}
+                              <span class="badge badge-tagset">Inventario: {{ rack.inventario.nome }}</span>
+                            {% endif %}
+                            {% if rack.local %}
+                              <span class="badge badge-tagset">{{ rack.local.nome }}</span>
+                            {% endif %}
+                            {% if rack.grupo %}
+                              <span class="badge badge-tagset">{{ rack.grupo.nome }}</span>
+                            {% endif %}
+                          </div>
+                        {% endif %}
+                      </div>
+                      <div class="module-meta">
+                        <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
+                        <span class="mini-badge {% if rack.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
+                          {% if rack.all_canais_comissionados %}V{% else %}X{% endif %}
+                        </span>
+                      </div>
                     </div>
-                    <div class="module-meta">
-                      <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
-                      <span class="mini-badge {% if rack.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
-                        {% if rack.all_canais_comissionados %}V{% else %}X{% endif %}
-                      </span>
-                    </div>
-                  </div>
-                  {% if rack.id_planta %}
-                    <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
-                  {% endif %}
-                </article>
-              {% endfor %}
-            </div>
+                    {% if rack.id_planta %}
+                      <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
+                    {% endif %}
+                  </article>
+                {% endfor %}
+              </div>
+            {% endfor %}
           </div>
         {% endfor %}
       {% else %}
@@ -147,6 +156,25 @@
                 </select>
               </label>
               <label class="field">
+                <div class="field-row">
+                  <span>Grupo</span>
+                  <details class="inline-pop inline-pop-centered" id="grupo-pop">
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Grupo</label>
+                      <input type="text" name="grupo_nome" form="create-grupo-form" placeholder="Novo grupo">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-grupo-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="grupo" id="grupo-select">
+                  <option value="">Sem grupo</option>
+                  {% for grupo in grupos %}
+                    <option value="{{ grupo.id }}">{{ grupo.nome }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
                 <span>ID_PLANTA</span>
                 <input type="text" name="id_planta" placeholder="PLANTA-001">
               </label>
@@ -159,10 +187,15 @@
               <button class="btn btn-primary" type="submit">Salvar rack</button>
             </div>
             <div id="local-message" class="notice" style="display: none;"></div>
+            <div id="grupo-message" class="notice" style="display: none;"></div>
           </form>
           <form id="create-local-form" method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="create_local">
+          </form>
+          <form id="create-grupo-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_grupo">
           </form>
         {% else %}
           <div class="muted">Apenas clientes cadastrados podem criar racks.</div>
@@ -253,8 +286,8 @@
         }
         return "";
       }
-      function setMessage(message, level) {
-        var box = document.getElementById("local-message");
+      function setMessage(boxId, message, level) {
+        var box = document.getElementById(boxId);
         if (!box) {
           return;
         }
@@ -274,7 +307,7 @@
           event.preventDefault();
           var value = input.value.trim();
           if (!value) {
-            setMessage("Informe um nome valido.", "error");
+            setMessage("local-message", "Informe um nome valido.", "error");
             details.open = true;
             return;
           }
@@ -303,7 +336,7 @@
                 select.value = String(payload.id);
               }
               if (payload && payload.message) {
-                setMessage(payload.message, payload.level);
+                setMessage("local-message", payload.message, payload.level);
               }
               if (payload && payload.ok) {
                 input.value = "";
@@ -313,12 +346,69 @@
               }
             })
             .catch(function () {
-              setMessage("Nao foi possivel salvar agora.", "error");
+              setMessage("local-message", "Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+      function bindGrupo() {
+        var formCadastro = document.getElementById("create-grupo-form");
+        var input = document.querySelector("input[name='grupo_nome'][form='create-grupo-form']");
+        var select = document.getElementById("grupo-select");
+        var details = document.getElementById("grupo-pop");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("grupo-message", "Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage("grupo-message", payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("grupo-message", "Nao foi possivel salvar agora.", "error");
               details.open = true;
             });
         });
       }
       bindCadastro();
+      bindGrupo();
     })();
   </script>
 {% endblock %}

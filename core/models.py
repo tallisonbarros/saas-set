@@ -296,6 +296,16 @@ class LocalRackIO(models.Model):
         return self.nome
 
 
+class GrupoRackIO(models.Model):
+    nome = models.CharField(max_length=120, unique=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 class TipoAtivo(models.Model):
     nome = models.CharField(max_length=80, unique=True)
     codigo = models.CharField(max_length=10, unique=True)
@@ -389,6 +399,13 @@ class RackIO(models.Model):
     )
     local = models.ForeignKey(
         "LocalRackIO",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="racks",
+    )
+    grupo = models.ForeignKey(
+        "GrupoRackIO",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

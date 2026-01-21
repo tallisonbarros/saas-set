@@ -1131,6 +1131,13 @@ body {
   gap: 8px;
 }
 
+.hud-tagset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .tagset-inline {
   display: flex;
   align-items: center;

@@ -22,14 +22,21 @@
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
         </div>
+        {% if rack.local or rack.grupo %}
+          <div class="hud-tagset">
+            {% if rack.local %}
+              <span class="hud-pill">{{ rack.local.nome }}</span>
+            {% endif %}
+            {% if rack.grupo %}
+              <span class="hud-pill">{{ rack.grupo.nome }}</span>
+            {% endif %}
+          </div>
+        {% endif %}
       </div>
       <div class="page-hud-head">
         <div>
           {% if rack.inventario %}
             <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
-          {% endif %}
-          {% if rack.local %}
-            <div class="page-kicker">Local: {{ rack.local.nome }}</div>
           {% endif %}
           <h1 class="page-title">{{ rack.nome }}</h1>
           <p class="page-subtitle">{{ rack.descricao }}</p>
@@ -236,6 +243,25 @@
             </select>
           </div>
           <div class="rack-edit-field">
+            <div class="rack-edit-label-row">
+              <label for="grupo-select-rack">Grupo</label>
+              <details class="inline-pop inline-pop-centered" id="grupo-pop-rack">
+                <summary>+ novo</summary>
+                <div class="inline-pop-body">
+                  <label>Grupo</label>
+                  <input type="text" name="grupo_nome" form="create-grupo-form-rack" placeholder="Novo grupo">
+                  <button class="btn btn-ghost btn-compact" type="submit" form="create-grupo-form-rack">Adicionar</button>
+                </div>
+              </details>
+            </div>
+            <select name="grupo" id="grupo-select-rack">
+              <option value="">Sem grupo</option>
+              {% for grupo in grupos %}
+                <option value="{{ grupo.id }}" {% if rack.grupo_id == grupo.id %}selected{% endif %}>{{ grupo.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="rack-edit-field">
             <label for="rack-planta">ID_PLANTA</label>
             <input id="rack-planta" type="text" name="id_planta" value="{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% endif %}">
           </div>
@@ -247,10 +273,15 @@
           </button>
         </div>
         <div id="local-message-rack" class="notice" style="display: none;"></div>
+        <div id="grupo-message-rack" class="notice" style="display: none;"></div>
       </form>
       <form id="create-local-form-rack" method="post">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_local">
+      </form>
+      <form id="create-grupo-form-rack" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_grupo">
       </form>
     </div>
   </details>
@@ -270,8 +301,8 @@
         }
         return "";
       }
-      function setMessage(message, level) {
-        var box = document.getElementById("local-message-rack");
+      function setMessage(boxId, message, level) {
+        var box = document.getElementById(boxId);
         if (!box) {
           return;
         }
@@ -291,7 +322,7 @@
           event.preventDefault();
           var value = input.value.trim();
           if (!value) {
-            setMessage("Informe um nome valido.", "error");
+            setMessage("local-message-rack", "Informe um nome valido.", "error");
             details.open = true;
             return;
           }
@@ -320,7 +351,7 @@
                 select.value = String(payload.id);
               }
               if (payload && payload.message) {
-                setMessage(payload.message, payload.level);
+                setMessage("local-message-rack", payload.message, payload.level);
               }
               if (payload && payload.ok) {
                 input.value = "";
@@ -330,7 +361,63 @@
               }
             })
             .catch(function () {
-              setMessage("Nao foi possivel salvar agora.", "error");
+              setMessage("local-message-rack", "Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+      function bindGrupo() {
+        var formCadastro = document.getElementById("create-grupo-form-rack");
+        var input = document.querySelector("input[name='grupo_nome'][form='create-grupo-form-rack']");
+        var select = document.getElementById("grupo-select-rack");
+        var details = document.getElementById("grupo-pop-rack");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("grupo-message-rack", "Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage("grupo-message-rack", payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("grupo-message-rack", "Nao foi possivel salvar agora.", "error");
               details.open = true;
             });
         });
@@ -430,6 +517,7 @@
         updateSaveVisibility();
       }
       bindCadastro();
+      bindGrupo();
     })();
   </script>
 {% endblock %}
