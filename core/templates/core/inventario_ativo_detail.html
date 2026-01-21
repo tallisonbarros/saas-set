@@ -128,8 +128,13 @@
             <div class="proposal-meta">
               ID: {{ item.identificacao|default:"-" }}
             </div>
-            <div class="proposal-meta">
-              Tag interna: {{ item.tag_interna|default:"-" }} - TagSET: {{ item.tag_set|default:"-" }}
+            <div class="proposal-badges">
+              {% if item.tag_set %}
+                <span class="badge badge-tagset">TagSET: {{ item.tag_set }}</span>
+              {% endif %}
+              {% if item.tag_interna %}
+                <span class="badge badge-tagint">Tag interna: {{ item.tag_interna }}</span>
+              {% endif %}
             </div>
             <div class="proposal-meta">
               {% if item.comissionado %}
