@@ -2274,6 +2274,62 @@ select {
   padding: 16px 20px 20px;
 }
 
+.rack-edit-card {
+  border-color: rgba(255, 102, 0, 0.28);
+  background: linear-gradient(135deg, #fff7f0 0%, #ffffff 70%);
+  box-shadow: var(--shadow);
+}
+
+.rack-edit-form {
+  display: grid;
+  gap: 16px;
+}
+
+.rack-edit-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rack-edit-field {
+  display: grid;
+  gap: 6px;
+}
+
+.rack-edit-field label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.rack-edit-field input,
+.rack-edit-field select {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-family: inherit;
+}
+
+.rack-edit-wide {
+  grid-column: 1 / -1;
+}
+
+.rack-edit-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rack-edit-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .io-actions {
   display: flex;
   gap: 10px;
@@ -2769,6 +2825,18 @@ select {
 
   .rack-slot-shell::after {
     display: none;
+  }
+
+  .rack-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rack-edit-actions {
+    justify-content: stretch;
+  }
+
+  .rack-edit-actions .btn {
+    width: 100%;
   }
 
   .rack-channel-row {
