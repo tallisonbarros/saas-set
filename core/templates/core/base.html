@@ -15,7 +15,6 @@
         <div class="nav-shell">
           <a class="brand" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
             <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
-            <span class="brand-name">SET</span>
           </a>
           <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
           {% if request.user.is_authenticated %}
