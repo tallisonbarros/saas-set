@@ -22,13 +22,13 @@
         <div>
           <p class="page-subtitle">Gerencie ativos, locais e status tecnicos.</p>
         </div>
-        <div class="page-actions">
-          {% if can_manage %}
-            <a class="btn btn-ghost btn-compact" href="#novo-inventario">Novo inventario</a>
-          {% endif %}
-        </div>
       </div>
       <div class="hud-meta">Organize por local, responsavel e tags.</div>
+    </div>
+    <div class="hud-bottom-actions">
+      {% if can_manage %}
+        <a class="btn btn-ghost btn-compact" href="#novo-inventario">Novo inventario</a>
+      {% endif %}
     </div>
   </section>
 

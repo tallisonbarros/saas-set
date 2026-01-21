@@ -28,9 +28,6 @@
           <h1 class="page-title">{{ rack.nome }}</h1>
           <p class="page-subtitle">{{ rack.descricao }}</p>
         </div>
-        <div class="page-actions">
-          <a class="btn btn-outline" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
-        </div>
       </div>
       <div class="hud-info">
         <div class="rack-status">
@@ -68,6 +65,9 @@
           {% endif %}
         </div>
       </div>
+    </div>
+    <div class="hud-bottom-actions">
+      <a class="btn btn-outline" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>

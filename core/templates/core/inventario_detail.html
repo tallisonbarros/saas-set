@@ -30,9 +30,6 @@
             {{ inventario.descricao|default:"Mapa completo de ativos e itens internos." }}
           </p>
         </div>
-        <div class="page-actions">
-          <a class="btn btn-outline btn-compact" href="#novo-ativo">Novo ativo</a>
-        </div>
       </div>
       <div class="rack-status">
         <div>
@@ -63,6 +60,9 @@
       {% if message %}
         <p class="muted">{{ message }}</p>
       {% endif %}
+    </div>
+    <div class="hud-bottom-actions">
+      <a class="btn btn-outline btn-compact" href="#novo-ativo">Novo ativo</a>
     </div>
   </section>
 

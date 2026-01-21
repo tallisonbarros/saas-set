@@ -23,9 +23,6 @@
           <h1 class="page-title">Visao geral</h1>
           <p class="page-subtitle">Acompanhe aprovacoes e andamento das propostas.</p>
         </div>
-        <div class="page-actions">
-          <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
-        </div>
       </div>
       {% if pendencias_total and not status_filter %}
         <div class="hud-alert">
@@ -39,6 +36,9 @@
         {% endif %}
         <strong>{{ cliente.nome }}</strong>{% if cliente.empresa %} - {{ cliente.empresa }}{% endif %} - {{ cliente.email }}
       </div>
+    </div>
+    <div class="hud-bottom-actions">
+      <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
     </div>
       {% if not cliente %}
         <p>Usuario sem cliente associado. Fale com o administrador.</p>

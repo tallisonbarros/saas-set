@@ -20,19 +20,19 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel do modulo</div>
-        <div class="hud-pill">Modulo no rack</div>
+        <div class="hud-pill">Mapa do modulo</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
           <a class="hud-menu-pill" href="{% url 'ios_rack_detail' rack.id %}">Voltar</a>
         </div>
       </div>
-      <div class="page-hud-head">
+      <div class="page-hud-head centered">
         <div>
           <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
         </div>
       </div>
       {% if rack.descricao %}
-        <div class="hud-meta">{{ rack.descricao }}</div>
+        <div class="hud-meta centered">{{ rack.descricao }}</div>
       {% endif %}
       <div class="rack-slot-head">
         <div class="rack-slot-title">{{ rack.nome }}</div>

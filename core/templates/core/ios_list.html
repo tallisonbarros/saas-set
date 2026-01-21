@@ -22,16 +22,16 @@
         <div>
           <p class="page-subtitle">Racks, modulos e canais.</p>
         </div>
-        <div class="page-actions">
-          <a class="btn btn-outline btn-compact" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
-          {% if can_manage %}
-            <a class="btn btn-ghost btn-compact" href="#novo-rack">Novo rack</a>
-          {% endif %}
-        </div>
       </div>
       <div class="hud-meta">
         <a class="hud-link" href="#pesquisa-io">Busca rapida.</a>
       </div>
+    </div>
+    <div class="hud-bottom-actions">
+      <a class="btn btn-outline btn-compact" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
+      {% if can_manage %}
+        <a class="btn btn-ghost btn-compact" href="#novo-rack">Novo rack</a>
+      {% endif %}
     </div>
   </section>
 

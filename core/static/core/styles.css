@@ -673,6 +673,14 @@ body {
   gap: 8px;
 }
 
+.hud-bottom-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
 .hud-menu {
   margin-left: auto;
   display: inline-flex;
@@ -727,6 +735,10 @@ body {
   z-index: 1;
   font-size: 12px;
   color: var(--muted);
+}
+
+.hud-meta.centered {
+  text-align: center;
 }
 
 .hud-alert {
@@ -802,6 +814,11 @@ body {
   justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+.page-hud-head.centered {
+  justify-content: center;
+  text-align: center;
 }
 
 .page-hud-main {
