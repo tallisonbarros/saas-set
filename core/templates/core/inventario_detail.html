@@ -102,7 +102,10 @@
             </label>
             <label class="field">
               <span>TagSET</span>
-              <input type="text" name="tag_set" placeholder="Automatico" readonly>
+              <div class="field-row">
+                <input type="text" name="tag_set" placeholder="Automatico" readonly>
+                <button class="btn btn-ghost btn-compact tagset-preview-btn" type="button" data-target="ativo">Gerar</button>
+              </div>
             </label>
           </div>
           <h3 class="io-title" style="margin-top: 18px;">Itens do ativo</h3>
@@ -142,8 +145,8 @@
             <a class="proposal-link" href="{% url 'inventario_ativo_detail' inventario.id ativo.id %}" aria-label="Abrir ativo {{ ativo.nome }}"></a>
             <div class="proposal-head">
               <div>
-                <div class="proposal-title">{{ ativo.nome }}</div>
-                <div class="proposal-meta">{% if ativo.tipo %}{{ ativo.tipo.nome }}{% else %}Tipo nao informado{% endif %}</div>
+                <div class="proposal-title">{% if ativo.tipo %}{{ ativo.tipo.nome }}{% else %}Tipo nao informado{% endif %}</div>
+                <div class="proposal-meta">{{ ativo.nome }}</div>
               </div>
               <span class="slot-badge">{{ ativo.itens_total }} itens</span>
             </div>
@@ -246,6 +249,50 @@
       if (!addButton || !list || !totalField || !itemWrap) {
         return;
       }
+      function previewTagset(button) {
+        var target = button.dataset.target;
+        var formEl = button.closest("form");
+        if (!formEl) {
+          return;
+        }
+        var url = formEl.dataset.tagsetUrl;
+        if (!url) {
+          return;
+        }
+        var setorInput = formEl.querySelector("input[name='setor']");
+        var tipoSelect = formEl.querySelector("select[name='tipo']");
+        var params = new URLSearchParams();
+        params.set("target", target);
+        if (setorInput && setorInput.value) {
+          params.set("setor", setorInput.value);
+        }
+        if (tipoSelect && tipoSelect.value) {
+          params.set("tipo_id", tipoSelect.value);
+        }
+        if (target === "item") {
+          var fallbackTipo = tipoSelect && tipoSelect.value ? tipoSelect.value : "";
+          if (fallbackTipo) {
+            params.set("fallback_tipo_id", fallbackTipo);
+          }
+          var ativoTagInput = formEl.querySelector("input[name='tag_set']");
+          if (ativoTagInput && ativoTagInput.value) {
+            params.set("ativo_tagset", ativoTagInput.value);
+          }
+        }
+        fetch(url + "?" + params.toString())
+          .then(function (resp) { return resp.json(); })
+          .then(function (payload) {
+            if (!payload || !payload.tag_set) {
+              return;
+            }
+            var input = button.dataset.target === "item"
+              ? button.closest(".item-grid").querySelector("input[name^='item_tag_set_']")
+              : formEl.querySelector("input[name='tag_set']");
+            if (input) {
+              input.value = payload.tag_set;
+            }
+          });
+      }
       function bindUppercase(input) {
         if (!input) {
           return;
@@ -255,6 +302,11 @@
         });
       }
       document.querySelectorAll("[data-uppercase]").forEach(bindUppercase);
+      document.querySelectorAll(".tagset-preview-btn").forEach(function (button) {
+        button.addEventListener("click", function () {
+          previewTagset(button);
+        });
+      });
       function renumberRows() {
         var rows = list.querySelectorAll(".item-grid");
         rows.forEach(function (row, index) {
@@ -295,13 +347,21 @@
           '</select>' +
           '<input type="text" name="item_identificacao_' + index + '" placeholder="ID-01" data-uppercase>' +
           '<input type="text" name="item_tag_interna_' + index + '" placeholder="TAG-INT-01" data-uppercase>' +
+          '<div class="tagset-inline">' +
           '<input type="text" name="item_tag_set_' + index + '" placeholder="Automatico" readonly>' +
+          '<button class="btn btn-ghost btn-compact tagset-preview-btn" type="button" data-target="item">Gerar</button>' +
+          '</div>' +
           '<label class="checkbox-item"><input type="checkbox" name="item_comissionado_' + index + '" aria-label="Comissionado"></label>' +
           '<label class="checkbox-item"><input type="checkbox" name="item_em_manutencao_' + index + '" aria-label="Em manutencao"></label>' +
           '<button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>';
         list.appendChild(row);
         bindUppercase(row.querySelector("input[name^='item_identificacao_']"));
         bindUppercase(row.querySelector("input[name^='item_tag_interna_']"));
+        row.querySelectorAll(".tagset-preview-btn").forEach(function (button) {
+          button.addEventListener("click", function () {
+            previewTagset(button);
+          });
+        });
         bindRemoveButton(row);
         renumberRows();
       }
@@ -313,6 +373,7 @@
         addRow();
       });
       if (form) {
+        form.dataset.tagsetUrl = "{% url 'inventario_tagset_preview' inventario.id %}";
         form.addEventListener("submit", function (event) {
           var rows = list.querySelectorAll(".item-grid");
           for (var i = 0; i < rows.length; i += 1) {

@@ -13,12 +13,11 @@
     {% block header %}
       <header class="site-header">
         <div class="nav-shell">
-          <a class="brand" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
+          <a class="brand brand-centered" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
             <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
           </a>
-          <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
           {% if request.user.is_authenticated %}
-            <nav class="nav" aria-label="Navegacao principal">
+            <nav class="nav nav-centered" aria-label="Navegacao principal">
               <a class="nav-link {% if request.resolver_match.url_name == 'painel' %}is-active{% endif %}" href="{% url 'painel' %}">Painel</a>
               <a class="nav-link {% if request.resolver_match.url_name == 'propostas' or request.resolver_match.url_name == 'proposta_detail' or request.resolver_match.url_name == 'proposta_nova_vendedor' %}is-active{% endif %}" href="{% url 'propostas' %}">Propostas</a>
               <a class="nav-link {% if request.resolver_match.url_name == 'financeiro' or request.resolver_match.url_name == 'financeiro_nova' or request.resolver_match.url_name == 'financeiro_cadernos' or request.resolver_match.url_name == 'financeiro_caderno_detail' or request.resolver_match.url_name == 'financeiro_compra_detail' %}is-active{% endif %}" href="{% url 'financeiro' %}">Financeiro</a>
@@ -29,25 +28,29 @@
                 <a class="nav-link {% if request.resolver_match.url_name == 'ajustes_sistema' %}is-active{% endif %}" href="{% url 'ajustes_sistema' %}">Ajustes</a>
               {% endif %}
             </nav>
-            <div class="nav-actions">
-              <a class="profile-icon-btn" href="{% url 'meu_perfil' %}" title="Meu Perfil" aria-label="Meu Perfil">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
-                  <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-                </svg>
-              </a>
-              <span class="nav-user">Logado: {{ request.user.username }}</span>
-              <form method="post" action="{% url 'logout' %}">
-                {% csrf_token %}
-                <button class="btn btn-ghost btn-compact" type="submit">Sair</button>
-              </form>
+            <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
+            <div class="nav-row">
+              <div class="nav-actions user-actions-bar">
+                <a class="profile-icon-btn" href="{% url 'meu_perfil' %}" title="Meu Perfil" aria-label="Meu Perfil">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                    <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                  </svg>
+                </a>
+                <span class="nav-user">Logado: {{ request.user.get_full_name|default:request.user.username }}</span>
+                <form method="post" action="{% url 'logout' %}">
+                  {% csrf_token %}
+                  <button class="btn btn-ghost btn-compact" type="submit">Sair</button>
+                </form>
+              </div>
             </div>
           {% else %}
-            <nav class="nav" aria-label="Navegacao principal">
+            <nav class="nav nav-centered" aria-label="Navegacao principal">
               <a class="nav-link {% if request.resolver_match.url_name == 'home' %}is-active{% endif %}" href="{% url 'home' %}">Inicio</a>
               <a class="nav-link {% if request.resolver_match.url_name == 'login' %}is-active{% endif %}" href="{% url 'login' %}">Entrar</a>
               <a class="nav-link {% if request.resolver_match.url_name == 'register' %}is-active{% endif %}" href="{% url 'register' %}">Cadastre-se</a>
             </nav>
+            <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
           {% endif %}
         </div>
       </header>

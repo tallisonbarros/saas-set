@@ -92,7 +92,10 @@
             </label>
             <label class="field">
               <span>TagSET</span>
-              <input type="text" name="tag_set" placeholder="Automatico" readonly>
+              <div class="field-row">
+                <input type="text" name="tag_set" placeholder="Automatico" readonly>
+                <button class="btn btn-ghost btn-compact tagset-preview-btn" type="button" data-target="item">Gerar</button>
+              </div>
             </label>
             <label class="checkbox-item">
               <input type="checkbox" name="comissionado">
@@ -123,8 +126,8 @@
             <a class="proposal-link" href="{% url 'inventario_item_detail' inventario.id ativo.id item.id %}" aria-label="Abrir item {{ item.nome }}"></a>
             <div class="proposal-head">
               <div>
-                <div class="proposal-title">{{ item.nome }}</div>
-                <div class="proposal-meta">{% if item.tipo %}{{ item.tipo.nome }}{% else %}Tipo nao informado{% endif %}</div>
+                <div class="proposal-title">{% if item.tipo %}{{ item.tipo.nome }}{% else %}Tipo nao informado{% endif %}</div>
+                <div class="proposal-meta">{{ item.nome }}</div>
               </div>
             </div>
             <div class="proposal-meta">
@@ -247,6 +250,39 @@
         input.addEventListener("input", function () {
           input.value = input.value.toUpperCase();
         });
+      });
+      var form = document.querySelector("details#novo-item form.io-form");
+      var button = document.querySelector("details#novo-item .tagset-preview-btn");
+      if (!form || !button) {
+        return;
+      }
+      form.dataset.tagsetUrl = "{% url 'inventario_tagset_preview' inventario.id %}";
+      button.addEventListener("click", function () {
+        var url = form.dataset.tagsetUrl;
+        var params = new URLSearchParams();
+        params.set("target", "item");
+        params.set("ativo_id", "{{ ativo.id }}");
+        if ("{{ ativo.setor|default:'' }}") {
+          params.set("setor", "{{ ativo.setor|default:'' }}");
+        }
+        var tipoSelect = form.querySelector("select[name='tipo']");
+        if (tipoSelect && tipoSelect.value) {
+          params.set("tipo_id", tipoSelect.value);
+        }
+        if ("{{ ativo.tipo_id|default:'' }}") {
+          params.set("fallback_tipo_id", "{{ ativo.tipo_id|default:'' }}");
+        }
+        fetch(url + "?" + params.toString())
+          .then(function (resp) { return resp.json(); })
+          .then(function (payload) {
+            if (!payload || !payload.tag_set) {
+              return;
+            }
+            var input = form.querySelector("input[name='tag_set']");
+            if (input) {
+              input.value = payload.tag_set;
+            }
+          });
       });
     })();
   </script>

@@ -75,22 +75,31 @@
             <input type="checkbox" name="comissionado_{{ channel.id }}" {% if channel.comissionado %}checked{% endif %}>
             <span>Comissionado</span>
           </label>
-          <input type="text" name="nome_{{ channel.id }}" value="{{ channel.nome }}">
-          <select name="tipo_{{ channel.id }}">
+          <label class="field channel-field">
+            <span>Descricao</span>
+            <input type="text" name="nome_{{ channel.id }}" value="{{ channel.nome }}">
+          </label>
+          <label class="field channel-field">
+            <span>Tipo</span>
+            <select name="tipo_{{ channel.id }}" class="channel-type-select">
             {% for channel_type in channel_types %}
               <option value="{{ channel_type.id }}" {% if channel_type.id == channel.tipo.id %}selected{% endif %}>
                 {{ channel_type.nome }}
               </option>
             {% endfor %}
-          </select>
-          <input
-            type="text"
-            name="vinculo_{{ channel.id }}"
-            list="vinculos-list"
-            placeholder="Vincular a ativo ou item"
-            class="channel-link-input"
-            value="{% if channel.ativo_id %}{{ channel.ativo.tag_set }}{% elif channel.ativo_item_id %}{{ channel.ativo_item.tag_set }}{% endif %}"
-          >
+            </select>
+          </label>
+          <label class="field channel-field">
+            <span>Vinculo</span>
+            <input
+              type="text"
+              name="vinculo_{{ channel.id }}"
+              list="vinculos-list"
+              placeholder="Vincular a ativo ou item"
+              class="channel-link-input"
+              value="{% if channel.ativo_id %}{{ channel.ativo.tag_set }}{% elif channel.ativo_item_id %}{{ channel.ativo_item.tag_set }}{% endif %}"
+            >
+          </label>
         </div>
       {% endfor %}
       <datalist id="vinculos-list">

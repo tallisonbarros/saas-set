@@ -1055,6 +1055,50 @@ def inventario_detail(request, pk):
 
 
 @login_required
+def inventario_tagset_preview(request, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    if cliente:
+        inventario = get_object_or_404(
+            Inventario,
+            Q(pk=pk),
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all()),
+        )
+    else:
+        inventario = get_object_or_404(Inventario, pk=pk)
+    target = (request.GET.get("target") or "").strip().lower()
+    setor = request.GET.get("setor", "").strip()
+    tipo_id = request.GET.get("tipo_id")
+    fallback_id = request.GET.get("fallback_tipo_id")
+    ativo_id = request.GET.get("ativo_id")
+    ativo_tagset = request.GET.get("ativo_tagset", "").strip()
+
+    tipo = TipoAtivo.objects.filter(pk=tipo_id).first() if tipo_id else None
+    fallback_tipo = TipoAtivo.objects.filter(pk=fallback_id).first() if fallback_id else None
+    ativo = Ativo.objects.filter(pk=ativo_id, inventario=inventario).first() if ativo_id else None
+
+    if target == "item":
+        item_tag_base = _generate_tagset(
+            inventario,
+            tipo,
+            setor or (ativo.setor if ativo else ""),
+            "item",
+            fallback_tipo=fallback_tipo or (ativo.tipo if ativo else None),
+            ativo=ativo,
+        )
+        if ativo and ativo.tag_set:
+            tag_set = f"{ativo.tag_set}-{item_tag_base}"
+        elif ativo_tagset:
+            tag_set = f"{ativo_tagset}-{item_tag_base}"
+        else:
+            tag_set = item_tag_base
+    else:
+        tag_set = _generate_tagset(inventario, tipo, setor, "ativo")
+    return JsonResponse({"tag_set": tag_set})
+
+
+@login_required
 def inventario_ativo_detail(request, inventario_pk, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
