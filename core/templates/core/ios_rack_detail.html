@@ -146,7 +146,12 @@
                   {% endif %}
                 </div>
                 {% if slot.modulo %}
-                  <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
+                  <div class="module-meta">
+                    <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
+                    <span class="mini-badge {% if slot.modulo.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
+                      {% if slot.modulo.all_canais_comissionados %}V{% else %}X{% endif %}
+                    </span>
+                  </div>
                 {% endif %}
               </div>
               {% if slot.modulo %}

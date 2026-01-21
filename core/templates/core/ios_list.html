@@ -47,31 +47,40 @@
       </div>
       {% if rack_groups %}
         {% for group in rack_groups %}
-          <div class="proposal-toolbar" style="margin-top: 12px;">
-            <div class="proposal-title">
-              {% if group.inventario %}
-                {{ group.inventario.nome }}
-              {% else %}
-                Sem inventario
-              {% endif %}
+          <div class="io-card" style="margin-top: 12px;">
+            <div class="io-card-head">
+              <div>
+                <h3 class="io-title">
+                  {% if group.inventario %}
+                    {{ group.inventario.nome }}
+                  {% else %}
+                    Sem inventario
+                  {% endif %}
+                </h3>
+              </div>
             </div>
-          </div>
-          <div class="proposal-grid">
-            {% for rack in group.racks %}
-              <article class="proposal-card io-proposal-card">
-                <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
-                <div class="proposal-head">
-                  <div>
-                    <div class="proposal-title">{{ rack.nome }}</div>
-                    <div class="proposal-meta">{{ rack.descricao }}</div>
+            <div class="proposal-grid">
+              {% for rack in group.racks %}
+                <article class="proposal-card io-proposal-card">
+                  <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
+                  <div class="proposal-head">
+                    <div>
+                      <div class="proposal-title">{{ rack.nome }}</div>
+                      <div class="proposal-meta">{{ rack.descricao }}</div>
+                    </div>
+                    <div class="module-meta">
+                      <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
+                      <span class="mini-badge {% if rack.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
+                        {% if rack.all_canais_comissionados %}V{% else %}X{% endif %}
+                      </span>
+                    </div>
                   </div>
-                  <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
-                </div>
-                {% if rack.id_planta %}
-                  <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
-                {% endif %}
-              </article>
-            {% endfor %}
+                  {% if rack.id_planta %}
+                    <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
           </div>
         {% endfor %}
       {% else %}

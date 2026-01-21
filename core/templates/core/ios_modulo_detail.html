@@ -70,9 +70,9 @@
       {% for channel in channels %}
         <div class="channel-row">
           <div class="channel-index">Canal {{ channel.indice }}</div>
-          <label class="checkbox-item">
+          <label class="toggle-chip">
             <input type="checkbox" name="comissionado_{{ channel.id }}" {% if channel.comissionado %}checked{% endif %}>
-            Comissionado
+            <span>Comissionado</span>
           </label>
           <input type="text" name="nome_{{ channel.id }}" value="{{ channel.nome }}">
           <select name="tipo_{{ channel.id }}">
@@ -87,16 +87,21 @@
             name="vinculo_{{ channel.id }}"
             list="vinculos-list"
             placeholder="Vincular a ativo ou item"
-            value="{% if channel.ativo_id %}A:{{ channel.ativo_id }} - {{ channel.ativo.nome }}{% elif channel.ativo_item_id %}I:{{ channel.ativo_item_id }} - {{ channel.ativo_item.ativo.nome }} / {{ channel.ativo_item.nome }}{% endif %}"
+            class="channel-link-input"
+            value="{% if channel.ativo_id %}{{ channel.ativo.tag_set }}{% elif channel.ativo_item_id %}{{ channel.ativo_item.tag_set }}{% endif %}"
           >
         </div>
       {% endfor %}
       <datalist id="vinculos-list">
         {% for ativo in ativos %}
-          <option value="A:{{ ativo.id }} - {{ ativo.nome }}"></option>
+          {% if ativo.tag_set %}
+            <option value="{{ ativo.tag_set }}"></option>
+          {% endif %}
         {% endfor %}
         {% for item in itens %}
-          <option value="I:{{ item.id }} - {{ item.ativo.nome }} / {{ item.nome }}"></option>
+          {% if item.tag_set %}
+            <option value="{{ item.tag_set }}"></option>
+          {% endif %}
         {% endfor %}
       </datalist>
       <div class="form-actions">

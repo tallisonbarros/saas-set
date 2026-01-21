@@ -404,12 +404,19 @@ def ios_list(request):
     else:
         racks = RackIO.objects.filter(Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()))
     racks = racks.select_related("inventario").annotate(
-        ocupados=Count("slots", filter=Q(slots__modulo__isnull=False))
+        ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)),
+        canais_total=Count("slots__modulo__canais", distinct=True),
+        canais_comissionados=Count(
+            "slots__modulo__canais",
+            filter=Q(slots__modulo__canais__comissionado=True),
+            distinct=True,
+        ),
     )
     racks_ordered = racks.order_by("inventario__nome", "nome")
     rack_groups = []
     grouped = {}
     for rack in racks_ordered:
+        rack.all_canais_comissionados = bool(rack.canais_total) and rack.canais_total == rack.canais_comissionados
         key = rack.inventario_id or 0
         grouped.setdefault(key, []).append(rack)
     for key, items in grouped.items():
@@ -637,6 +644,24 @@ def ios_rack_detail(request, pk):
             return redirect("ios_rack_detail", pk=rack.pk)
 
     slots = rack.slots.select_related("modulo", "modulo__modulo_modelo").order_by("posicao")
+    modulo_ids = [slot.modulo_id for slot in slots if slot.modulo_id]
+    modulo_status = {}
+    if modulo_ids:
+        channel_counts = (
+            CanalRackIO.objects.filter(modulo_id__in=modulo_ids)
+            .values("modulo_id")
+            .annotate(
+                total=Count("id"),
+                comissionados=Count("id", filter=Q(comissionado=True)),
+            )
+        )
+        modulo_status = {
+            row["modulo_id"]: (row["total"] > 0 and row["total"] == row["comissionados"])
+            for row in channel_counts
+        }
+    for slot in slots:
+        if slot.modulo_id:
+            slot.modulo.all_canais_comissionados = modulo_status.get(slot.modulo_id, False)
     modules = (
         ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True))
         .select_related("tipo_base")
@@ -1363,13 +1388,14 @@ def ios_rack_modulo_detail(request, pk):
                 channel.comissionado = comissionado
                 channel.ativo_id = None
                 channel.ativo_item_id = None
-                match = re.match(r"^(A|I):(\d+)", vinculo_raw)
-                if match:
-                    tipo_ref, ref_id = match.groups()
-                    if tipo_ref == "A":
-                        channel.ativo_id = int(ref_id)
-                    elif tipo_ref == "I":
-                        channel.ativo_item_id = int(ref_id)
+                if vinculo_raw:
+                    ativo_match = Ativo.objects.filter(tag_set__iexact=vinculo_raw).first()
+                    item_match = AtivoItem.objects.filter(tag_set__iexact=vinculo_raw).first()
+                    if item_match:
+                        channel.ativo_item_id = item_match.id
+                        channel.ativo_id = item_match.ativo_id
+                    elif ativo_match:
+                        channel.ativo_id = ativo_match.id
                 channel.save(update_fields=["nome", "tipo_id", "comissionado", "ativo_id", "ativo_item_id"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
     channels = module.canais.select_related("tipo", "ativo", "ativo_item").order_by("indice")
