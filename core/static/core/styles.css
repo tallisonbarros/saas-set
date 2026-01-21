@@ -992,6 +992,18 @@ body {
   color: #2b5c84;
 }
 
+.status-toggle.is-active {
+  background: #e7f5ec;
+  border-color: #c7e6d3;
+  color: #2c6f4f;
+}
+
+.status-toggle-maint.is-active {
+  background: #ffe9d6;
+  border-color: #ffd1b3;
+  color: #a84200;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -2089,7 +2101,10 @@ select {
 }
 
 .slot-form select {
-  min-width: 160px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .rack-slot {

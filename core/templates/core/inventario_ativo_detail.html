@@ -156,7 +156,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_item_comissionado">
                 <input type="hidden" name="item_id" value="{{ item.id }}">
-                <button class="btn btn-outline btn-compact" type="submit" aria-label="{% if item.comissionado %}Descomissionar{% else %}Comissionar{% endif %}">
+                <button class="btn btn-outline btn-compact status-toggle {% if item.comissionado %}is-active{% endif %}" type="submit" aria-label="{% if item.comissionado %}Descomissionar{% else %}Comissionar{% endif %}">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M5 12l4 4 10-10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                   </svg>
@@ -166,10 +166,9 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_item_manutencao">
                 <input type="hidden" name="item_id" value="{{ item.id }}">
-                <button class="btn btn-outline btn-compact" type="submit" aria-label="{% if item.em_manutencao %}Encerrar manutencao{% else %}Marcar manutencao{% endif %}">
+                <button class="btn btn-outline btn-compact status-toggle status-toggle-maint {% if item.em_manutencao %}is-active{% endif %}" type="submit" aria-label="{% if item.em_manutencao %}Encerrar manutencao{% else %}Marcar manutencao{% endif %}">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M14.7 6.3l3 3-8.7 8.7H6v-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
-                    <path d="M13 8l3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                    <path d="M21 7.5a5 5 0 0 1-6.8 4.7l-6.7 6.7a1.6 1.6 0 0 1-2.3 0l-.6-.6a1.6 1.6 0 0 1 0-2.3l6.7-6.7A5 5 0 0 1 16.5 3l-2.4 2.4 2.5 2.5L19 5.5A5 5 0 0 1 21 7.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
                   </svg>
                 </button>
               </form>

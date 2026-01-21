@@ -69,9 +69,12 @@ def _inventario_prefix(inventario):
     return "INV"
 
 
-def _next_tagset_for_ativos(inventario, prefix):
+def _next_tagset_for_ativos(inventario, prefix, tipo=None):
     last_num = 0
-    tags = Ativo.objects.filter(inventario=inventario, tag_set__startswith=prefix).values_list("tag_set", flat=True)
+    ativos = Ativo.objects.filter(inventario=inventario, tag_set__startswith=prefix)
+    if tipo:
+        ativos = ativos.filter(tipo=tipo)
+    tags = ativos.values_list("tag_set", flat=True)
     pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$")
     for tag in tags:
         match = pattern.match(tag or "")
@@ -84,12 +87,14 @@ def _next_tagset_for_ativos(inventario, prefix):
     return f"{prefix}{last_num + 1:04d}"
 
 
-def _next_tagset_for_itens(inventario, prefix):
+def _next_tagset_for_itens(ativo, prefix, tipo=None):
+    if not ativo:
+        return f"{prefix}0001"
     last_num = 0
-    tags = (
-        AtivoItem.objects.filter(ativo__inventario=inventario, tag_set__contains=prefix)
-        .values_list("tag_set", flat=True)
-    )
+    itens = AtivoItem.objects.filter(ativo=ativo, tag_set__contains=prefix)
+    if tipo:
+        itens = itens.filter(tipo=tipo)
+    tags = itens.values_list("tag_set", flat=True)
     pattern = re.compile(rf"(?:^|-)({re.escape(prefix)})(\d+)$")
     for tag in tags:
         match = pattern.search(tag or "")
@@ -102,10 +107,11 @@ def _next_tagset_for_itens(inventario, prefix):
     return f"{prefix}{last_num + 1:04d}"
 
 
-def _generate_tagset(inventario, tipo, setor, target, fallback_tipo=None):
+def _generate_tagset(inventario, tipo, setor, target, fallback_tipo=None, ativo=None):
     pattern = inventario.tagset_pattern or Inventario.TagsetPattern.TIPO_SEQ
     fallback_prefix = _tipo_prefix(fallback_tipo) if fallback_tipo else None
     tipo_prefix = _tipo_prefix(tipo, fallback=fallback_prefix)
+    tipo_for_count = tipo or fallback_tipo
     if pattern == Inventario.TagsetPattern.SETORIZADO:
         setor_prefix = _clean_tag_prefix(setor) or _inventario_prefix(inventario)
         base = f"{setor_prefix}{tipo_prefix}"
@@ -114,8 +120,10 @@ def _generate_tagset(inventario, tipo, setor, target, fallback_tipo=None):
     else:
         base = tipo_prefix
     if target == "ativo":
-        return _next_tagset_for_ativos(inventario, base)
-    return _next_tagset_for_itens(inventario, base)
+        return _next_tagset_for_ativos(inventario, base, tipo=tipo_for_count)
+    if not ativo:
+        return _next_tagset_for_itens(None, base, tipo=tipo_for_count)
+    return _next_tagset_for_itens(ativo, base, tipo=tipo_for_count)
 
 
 def _sync_ativo_status(ativo):
@@ -846,7 +854,14 @@ def inventario_detail(request, pk):
                     item_em_manutencao = request.POST.get(f"item_em_manutencao_{index}") == "on"
                     if not item_nome:
                         continue
-                    item_tag_base = _generate_tagset(inventario, item_tipo, ativo.setor, "item", fallback_tipo=ativo.tipo)
+                    item_tag_base = _generate_tagset(
+                        inventario,
+                        item_tipo,
+                        ativo.setor,
+                        "item",
+                        fallback_tipo=ativo.tipo,
+                        ativo=ativo,
+                    )
                     item_tag_set = f"{ativo.tag_set}-{item_tag_base}" if ativo.tag_set else item_tag_base
                     itens_para_criar.append(
                         AtivoItem(
@@ -991,7 +1006,14 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                 if not ativo.tag_set:
                     ativo.tag_set = _generate_tagset(inventario, ativo.tipo, ativo.setor, "ativo")
                     ativo.save(update_fields=["tag_set"])
-                item_tag_base = _generate_tagset(inventario, tipo, ativo.setor, "item", fallback_tipo=ativo.tipo)
+                item_tag_base = _generate_tagset(
+                    inventario,
+                    tipo,
+                    ativo.setor,
+                    "item",
+                    fallback_tipo=ativo.tipo,
+                    ativo=ativo,
+                )
                 AtivoItem.objects.create(
                     ativo=ativo,
                     nome=nome,
