@@ -361,6 +361,7 @@ def ios_list(request):
         )
     locais = LocalRackIO.objects.order_by("nome")
     locais = LocalRackIO.objects.order_by("nome")
+    locais = LocalRackIO.objects.order_by("nome")
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
