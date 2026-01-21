@@ -20,44 +20,36 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel mensal</div>
-        <form class="hud-month-form" method="get">
-          <input class="month-nav-picker" type="month" name="mes" value="{{ selected_month }}" aria-label="Selecionar mes">
-          {% if status_filter %}
-            <input type="hidden" name="status" value="{{ status_filter }}">
-          {% endif %}
-          {% if categoria_filter %}
-            <input type="hidden" name="categoria" value="{{ categoria_filter }}">
-          {% endif %}
-          {% if centro_filter %}
-            <input type="hidden" name="centro" value="{{ centro_filter }}">
-          {% endif %}
-          {% if search_query %}
-            <input type="hidden" name="q" value="{{ search_query }}">
-          {% endif %}
-        </form>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'financeiro' %}">Inicio do modulo</a>
           <a class="hud-menu-pill" href="{% url 'financeiro_cadernos' %}">Voltar</a>
         </div>
       </div>
-      <div class="page-hud-head">
-        <div class="page-hud-main">
-          <h1 class="page-title">{{ caderno.nome }}</h1>
-          <p class="page-subtitle">Pagamentos e pendencias.</p>
-        </div>
+    <div class="page-hud-head">
+      <div class="page-hud-main">
+        <h1 class="page-title">{{ caderno.nome }}</h1>
+        <p class="page-subtitle">Pagamentos e pendencias.</p>
       </div>
     </div>
-    <div class="hud-bottom-actions">
-      <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
-    </div>
-
+  </div>
+  <div class="hud-bottom-actions">
+    <a class="btn btn-outline btn-compact" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
+  </div>
     <form id="mes-navegacao-form" class="month-nav-form" method="get">
+      <input
+        id="month-nav-input"
+        class="month-nav-picker is-hidden"
+        type="month"
+        name="mes"
+        value="{{ selected_month }}"
+        aria-label="Selecionar mes"
+      >
       <div class="month-nav month-nav-pill">
         <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
-        <div class="month-nav-label" aria-live="polite">
+        <label class="month-nav-label month-nav-label-click" for="month-nav-input" aria-live="polite">
           <span class="month-nav-month">{{ mes_referencia|date:"F" }}</span>
           <span class="month-nav-year">{{ mes_referencia|date:"Y" }}</span>
-        </div>
+        </label>
         <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
       </div>
       {% if status_filter %}
@@ -73,6 +65,22 @@
         <input type="hidden" name="q" value="{{ search_query }}">
       {% endif %}
     </form>
+    <script>
+      (function () {
+        var input = document.getElementById("month-nav-input");
+        var form = document.getElementById("mes-navegacao-form");
+        if (!input || !form) {
+          return;
+        }
+        var lastValue = input.value;
+        input.addEventListener("change", function () {
+          if (input.value && input.value !== lastValue) {
+            lastValue = input.value;
+            form.submit();
+          }
+        });
+      })();
+    </script>
 
     <details class="io-card io-discrete hud-filter" {% if status_filter or categoria_filter or centro_filter or search_query %}open{% endif %}>
       <summary class="io-discrete-summary">

@@ -935,6 +935,18 @@ body {
   font-size: 12px;
 }
 
+.month-nav-picker.is-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
+.month-nav-label-click {
+  cursor: pointer;
+}
+
 .hud-filter {
   border: 1px solid rgba(255, 102, 0, 0.12);
   border-radius: 14px;
