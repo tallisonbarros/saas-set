@@ -406,6 +406,40 @@ class Ativo(models.Model):
         return self.nome
 
 
+class AtivoItem(models.Model):
+    ativo = models.ForeignKey(Ativo, on_delete=models.CASCADE, related_name="itens")
+    nome = models.CharField(max_length=120)
+    tipo = models.CharField(max_length=80, blank=True, choices=Ativo.Tipo.choices)
+    identificacao = models.CharField(max_length=120, blank=True)
+    tag_interna = models.CharField(max_length=120, blank=True)
+    tag_set = models.CharField(max_length=120, blank=True)
+    comissionado = models.BooleanField(default=False)
+    comissionado_em = models.DateTimeField(null=True, blank=True)
+    comissionado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ativo_itens_comissionados",
+    )
+    em_manutencao = models.BooleanField(default=False)
+    manutencao_em = models.DateTimeField(null=True, blank=True)
+    manutencao_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ativo_itens_manutencao",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 
 
 class RackSlotIO(models.Model):

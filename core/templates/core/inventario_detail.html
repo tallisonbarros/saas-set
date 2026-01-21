@@ -113,6 +113,43 @@
               Em manutencao
             </label>
           </div>
+          <h3 class="io-title" style="margin-top: 18px;">Itens do ativo</h3>
+          <p class="muted">Adicione um ou mais itens junto com o ativo.</p>
+          <div class="item-grid-wrap">
+            <div class="item-grid item-grid-head">
+              <span class="muted">Nome</span>
+              <span class="muted">Tipo</span>
+              <span class="muted">ID</span>
+              <span class="muted">Tag interna</span>
+              <span class="muted">TagSET</span>
+              <span class="muted">Comissionado</span>
+              <span class="muted">Manutencao</span>
+              <span class="muted">Acao</span>
+            </div>
+            <div id="item-list" class="stack">
+              <div class="item-grid">
+                <input type="text" name="item_nome_0" placeholder="Item interno">
+                <select name="item_tipo_0">
+                  <option value="">Selecione</option>
+                  {% for value, label in tipo_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <input type="text" name="item_identificacao_0" placeholder="ID-01">
+                <input type="text" name="item_tag_interna_0" placeholder="TAG-INT-01">
+                <input type="text" name="item_tag_set_0" placeholder="SET-0001">
+                <label class="checkbox-item">
+                  <input type="checkbox" name="item_comissionado_0" aria-label="Comissionado">
+                </label>
+                <label class="checkbox-item">
+                  <input type="checkbox" name="item_em_manutencao_0" aria-label="Em manutencao">
+                </label>
+                <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="total_items" name="total_items" value="1">
+          <button class="btn btn-ghost" type="button" id="add-item">Novo item</button>
           <div class="form-actions">
             <button class="btn btn-primary" type="submit">Salvar ativo</button>
           </div>
@@ -124,7 +161,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Ativos cadastrados</h2>
-          <p class="muted">Abra um ativo para cadastrar sub-ativos.</p>
+          <p class="muted">Abra um ativo para cadastrar itens.</p>
         </div>
       </div>
       <div class="proposal-grid">
@@ -135,7 +172,7 @@
                 <div class="proposal-title">{{ ativo.nome }}</div>
                 <div class="proposal-meta">{{ ativo.get_tipo_display|default:"Tipo nao informado" }}</div>
               </div>
-              <span class="slot-badge">{{ ativo.subativos_total }} itens</span>
+              <span class="slot-badge">{{ ativo.itens_total }} itens</span>
             </div>
             <div class="proposal-meta">
               Setor: {{ ativo.setor|default:"-" }} - ID: {{ ativo.identificacao|default:"-" }}
@@ -189,4 +226,93 @@
       </div>
     </section>
   </div>
+  <script>
+    (function () {
+      var addButton = document.getElementById("add-item");
+      var list = document.getElementById("item-list");
+      var totalField = document.getElementById("total_items");
+      var form = document.querySelector("form.io-form");
+      if (!addButton || !list || !totalField) {
+        return;
+      }
+      function renumberRows() {
+        var rows = list.querySelectorAll(".item-grid");
+        rows.forEach(function (row, index) {
+          row.querySelector("input[name^='item_nome_']").name = "item_nome_" + index;
+          row.querySelector("select[name^='item_tipo_']").name = "item_tipo_" + index;
+          row.querySelector("input[name^='item_identificacao_']").name = "item_identificacao_" + index;
+          row.querySelector("input[name^='item_tag_interna_']").name = "item_tag_interna_" + index;
+          row.querySelector("input[name^='item_tag_set_']").name = "item_tag_set_" + index;
+          row.querySelector("input[name^='item_comissionado_']").name = "item_comissionado_" + index;
+          row.querySelector("input[name^='item_em_manutencao_']").name = "item_em_manutencao_" + index;
+        });
+        totalField.value = rows.length;
+      }
+      function bindRemoveButton(row) {
+        var removeBtn = row.querySelector(".item-remove");
+        if (!removeBtn) {
+          return;
+        }
+        removeBtn.addEventListener("click", function () {
+          row.remove();
+          if (!list.querySelector(".item-grid")) {
+            addButton.click();
+          } else {
+            renumberRows();
+          }
+        });
+      }
+      list.querySelectorAll(".item-grid").forEach(bindRemoveButton);
+      addButton.addEventListener("click", function () {
+        var index = list.querySelectorAll(".item-grid").length;
+        var row = document.createElement("div");
+        row.className = "item-grid";
+        row.innerHTML =
+          '<input type="text" name="item_nome_' + index + '" placeholder="Item interno">' +
+          '<select name="item_tipo_' + index + '">' +
+          '<option value="">Selecione</option>' +
+          '{% for value, label in tipo_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}' +
+          '</select>' +
+          '<input type="text" name="item_identificacao_' + index + '" placeholder="ID-01">' +
+          '<input type="text" name="item_tag_interna_' + index + '" placeholder="TAG-INT-01">' +
+          '<input type="text" name="item_tag_set_' + index + '" placeholder="SET-0001">' +
+          '<label class="checkbox-item"><input type="checkbox" name="item_comissionado_' + index + '" aria-label="Comissionado"></label>' +
+          '<label class="checkbox-item"><input type="checkbox" name="item_em_manutencao_' + index + '" aria-label="Em manutencao"></label>' +
+          '<button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>';
+        list.appendChild(row);
+        bindRemoveButton(row);
+        renumberRows();
+      });
+      if (form) {
+        form.addEventListener("submit", function (event) {
+          var rows = list.querySelectorAll(".item-grid");
+          for (var i = 0; i < rows.length; i += 1) {
+            var row = rows[i];
+            var nome = row.querySelector("input[name^='item_nome_']");
+            var tipo = row.querySelector("select[name^='item_tipo_']");
+            var identificacao = row.querySelector("input[name^='item_identificacao_']");
+            var tagInterna = row.querySelector("input[name^='item_tag_interna_']");
+            var tagSet = row.querySelector("input[name^='item_tag_set_']");
+            var comissionado = row.querySelector("input[name^='item_comissionado_']");
+            var manutencao = row.querySelector("input[name^='item_em_manutencao_']");
+            var hasAny =
+              (nome && nome.value.trim()) ||
+              (tipo && tipo.value) ||
+              (identificacao && identificacao.value.trim()) ||
+              (tagInterna && tagInterna.value.trim()) ||
+              (tagSet && tagSet.value.trim()) ||
+              (comissionado && comissionado.checked) ||
+              (manutencao && manutencao.checked);
+            if (hasAny && nome && !nome.value.trim()) {
+              event.preventDefault();
+              nome.focus();
+              alert("Informe o nome do item.");
+              return;
+            }
+          }
+          renumberRows();
+        });
+      }
+    })();
+  </script>
 {% endblock %}

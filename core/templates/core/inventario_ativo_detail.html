@@ -18,7 +18,7 @@
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Ativo</div>
-        <div class="hud-pill">Sub-ativos</div>
+        <div class="hud-pill">Itens</div>
       </div>
       <div class="page-hud-head">
         <div>
@@ -29,7 +29,7 @@
         </div>
         <div class="page-actions">
           <a class="btn btn-ghost btn-compact" href="{% url 'inventario_detail' inventario.id %}">Voltar ao inventario</a>
-          <a class="btn btn-outline btn-compact" href="#novo-subativo">Novo sub-ativo</a>
+          <a class="btn btn-outline btn-compact" href="#novo-item">Novo item</a>
         </div>
       </div>
       <div class="rack-status">
@@ -57,23 +57,19 @@
   </section>
 
   <div class="io-layout">
-    <details class="io-card io-discrete" id="novo-subativo">
+    <details class="io-card io-discrete" id="novo-item">
       <summary class="io-discrete-summary">
-        <span class="io-title">Novo sub-ativo</span>
+        <span class="io-title">Novo item</span>
         <span class="muted">Cadastre itens internos deste ativo.</span>
       </summary>
       <div class="io-discrete-body">
         <form class="io-form" method="post">
           {% csrf_token %}
-          <input type="hidden" name="action" value="create_subativo">
+          <input type="hidden" name="action" value="create_item">
           <div class="io-form-grid">
             <label class="field">
               <span>Nome</span>
               <input type="text" name="nome" placeholder="Conjunto de acionamento" required>
-            </label>
-            <label class="field">
-              <span>Setor</span>
-              <input type="text" name="setor" placeholder="Linha 01, Utilidades">
             </label>
             <label class="field">
               <span>Tipo</span>
@@ -106,7 +102,7 @@
             </label>
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Salvar sub-ativo</button>
+            <button class="btn btn-primary" type="submit">Salvar item</button>
           </div>
         </form>
       </div>
@@ -115,68 +111,66 @@
     <section class="io-card">
       <div class="io-card-head">
         <div>
-          <h2 class="io-title">Sub-ativos cadastrados</h2>
-          <p class="muted">Clique em um sub-ativo para continuar a hierarquia.</p>
+          <h2 class="io-title">Itens cadastrados</h2>
+          <p class="muted">Itens internos associados ao ativo.</p>
         </div>
       </div>
       <div class="proposal-grid">
-        {% for sub in subativos %}
+        {% for item in itens %}
           <article class="proposal-card io-proposal-card">
             <div class="proposal-head">
               <div>
-                <div class="proposal-title">{{ sub.nome }}</div>
-                <div class="proposal-meta">{{ sub.get_tipo_display|default:"Tipo nao informado" }}</div>
+                <div class="proposal-title">{{ item.nome }}</div>
+                <div class="proposal-meta">{{ item.get_tipo_display|default:"Tipo nao informado" }}</div>
               </div>
-              <span class="slot-badge">{{ sub.subativos_total }} itens</span>
             </div>
             <div class="proposal-meta">
-              Setor: {{ sub.setor|default:"-" }} - ID: {{ sub.identificacao|default:"-" }}
+              ID: {{ item.identificacao|default:"-" }}
             </div>
             <div class="proposal-meta">
-              Tag interna: {{ sub.tag_interna|default:"-" }} - TagSET: {{ sub.tag_set|default:"-" }}
+              Tag interna: {{ item.tag_interna|default:"-" }} - TagSET: {{ item.tag_set|default:"-" }}
             </div>
             <div class="proposal-meta">
-              {% if sub.comissionado %}
-                Comissionado em {{ sub.comissionado_em|date:"d/m/Y H:i" }}
-                {% if sub.comissionado_por %}
-                  por {{ sub.comissionado_por.get_full_name|default:sub.comissionado_por.username }}
+              {% if item.comissionado %}
+                Comissionado em {{ item.comissionado_em|date:"d/m/Y H:i" }}
+                {% if item.comissionado_por %}
+                  por {{ item.comissionado_por.get_full_name|default:item.comissionado_por.username }}
                 {% endif %}
               {% else %}
                 Nao comissionado
               {% endif %}
             </div>
             <div class="proposal-meta">
-              {% if sub.em_manutencao %}
-                Em manutencao desde {{ sub.manutencao_em|date:"d/m/Y H:i" }}
-                {% if sub.manutencao_por %}
-                  por {{ sub.manutencao_por.get_full_name|default:sub.manutencao_por.username }}
+              {% if item.em_manutencao %}
+                Em manutencao desde {{ item.manutencao_em|date:"d/m/Y H:i" }}
+                {% if item.manutencao_por %}
+                  por {{ item.manutencao_por.get_full_name|default:item.manutencao_por.username }}
                 {% endif %}
               {% else %}
                 Fora de manutencao
               {% endif %}
             </div>
             <div class="form-actions" style="margin-top: 14px;">
-              <a class="btn btn-ghost btn-compact" href="{% url 'inventario_ativo_detail' inventario.id sub.id %}">Abrir ativo</a>
               <form method="post">
                 {% csrf_token %}
-                <input type="hidden" name="action" value="toggle_comissionado">
-                <input type="hidden" name="ativo_id" value="{{ sub.id }}">
+                <input type="hidden" name="action" value="toggle_item_comissionado">
+                <input type="hidden" name="item_id" value="{{ item.id }}">
                 <button class="btn btn-outline btn-compact" type="submit">
-                  {% if sub.comissionado %}Descomissionar{% else %}Comissionar{% endif %}
+                  {% if item.comissionado %}Descomissionar{% else %}Comissionar{% endif %}
                 </button>
               </form>
               <form method="post">
                 {% csrf_token %}
-                <input type="hidden" name="action" value="toggle_manutencao">
-                <input type="hidden" name="ativo_id" value="{{ sub.id }}">
+                <input type="hidden" name="action" value="toggle_item_manutencao">
+                <input type="hidden" name="item_id" value="{{ item.id }}">
                 <button class="btn btn-outline btn-compact" type="submit">
-                  {% if sub.em_manutencao %}Encerrar manutencao{% else %}Marcar manutencao{% endif %}
+                  {% if item.em_manutencao %}Encerrar manutencao{% else %}Marcar manutencao{% endif %}
                 </button>
               </form>
             </div>
           </article>
         {% empty %}
-          <div class="muted">Nenhum sub-ativo cadastrado ainda.</div>
+          <div class="muted">Nenhum item cadastrado ainda.</div>
         {% endfor %}
       </div>
     </section>

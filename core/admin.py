@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from .forms import PerfilUsuarioAdminForm
 from .models import (
     Ativo,
+    AtivoItem,
     CategoriaCompra,
     Caderno,
     CentroCusto,
@@ -113,6 +114,12 @@ class InventarioAdmin(admin.ModelAdmin):
 class AtivoAdmin(admin.ModelAdmin):
     list_display = ("nome", "inventario", "tipo", "setor", "comissionado", "em_manutencao")
     search_fields = ("nome", "inventario__nome", "identificacao", "tag_interna", "tag_set")
+
+
+@admin.register(AtivoItem)
+class AtivoItemAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ativo", "tipo", "comissionado", "em_manutencao")
+    search_fields = ("nome", "ativo__nome", "identificacao", "tag_interna", "tag_set")
 
 
 @admin.register(FinanceiroID)
