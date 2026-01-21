@@ -20,19 +20,25 @@
       <div class="hud-top">
         <div class="hud-title">Painel da compra</div>
         <div class="hud-pill">Resumo</div>
+        <div class="hud-actions">
+          <a class="btn btn-ghost icon-only hud-action-btn" href="{% url 'financeiro' %}" title="Inicio do modulo" aria-label="Inicio do modulo">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+            </svg>
+          </a>
+          {% if compra.caderno %}
+            <a class="btn btn-ghost icon-only hud-action-btn" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}" title="Voltar" aria-label="Voltar">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </a>
+          {% endif %}
+        </div>
       </div>
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</h1>
           <p class="page-subtitle">Detalhes da compra.</p>
-        </div>
-        <div class="page-actions">
-          {% if compra.caderno %}
-            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
-            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Caderno</a>
-          {% else %}
-            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
-          {% endif %}
         </div>
       </div>
     </div>

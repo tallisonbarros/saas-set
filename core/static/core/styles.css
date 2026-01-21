@@ -95,20 +95,9 @@ body {
 }
 
 .user-actions-bar {
-  max-width: 320px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #fffaf6;
-  justify-content: flex-end;
+  gap: 8px;
 }
 
-.user-actions-bar .nav-user {
-  margin: 0 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .user-banner {
   font-size: 12px;
@@ -675,6 +664,20 @@ body {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.hud-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-action-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
 }
 
 .hud-title {

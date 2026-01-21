@@ -35,6 +35,18 @@
             <input type="hidden" name="q" value="{{ search_query }}">
           {% endif %}
         </form>
+        <div class="hud-actions">
+          <a class="btn btn-ghost icon-only hud-action-btn" href="{% url 'financeiro' %}" title="Inicio do modulo" aria-label="Inicio do modulo">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+            </svg>
+          </a>
+          <a class="btn btn-ghost icon-only hud-action-btn" href="{% url 'financeiro_cadernos' %}" title="Voltar" aria-label="Voltar">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </a>
+        </div>
       </div>
       <div class="page-hud-head">
         <div class="page-hud-main">
@@ -42,8 +54,6 @@
           <p class="page-subtitle">Pagamentos e pendencias.</p>
         </div>
         <div class="page-actions">
-          <a class="btn btn-ghost" href="{% url 'financeiro' %}">Financeiro</a>
-          <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
           <a class="btn btn-primary" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
         </div>
       </div>
