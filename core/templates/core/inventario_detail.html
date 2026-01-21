@@ -94,15 +94,15 @@
             </label>
             <label class="field">
               <span>Identificacao</span>
-              <input type="text" name="identificacao" placeholder="MTR-01">
+              <input type="text" name="identificacao" placeholder="MTR-01" data-uppercase>
             </label>
             <label class="field">
               <span>Tag interna</span>
-              <input type="text" name="tag_interna" placeholder="TAG-INT-01">
+              <input type="text" name="tag_interna" placeholder="TAG-INT-01" data-uppercase>
             </label>
             <label class="field">
               <span>TagSET</span>
-              <input type="text" name="tag_set" placeholder="SET-0001">
+              <input type="text" name="tag_set" placeholder="Automatico" readonly>
             </label>
             <label class="checkbox-item">
               <input type="checkbox" name="comissionado">
@@ -115,7 +115,7 @@
           </div>
           <h3 class="io-title" style="margin-top: 18px;">Itens do ativo</h3>
           <p class="muted">Adicione um ou mais itens junto com o ativo.</p>
-          <div class="item-grid-wrap">
+          <div class="item-grid-wrap" id="item-wrap" style="display: none;">
             <div class="item-grid item-grid-head">
               <span class="muted">Nome</span>
               <span class="muted">Tipo</span>
@@ -126,30 +126,10 @@
               <span class="muted">Manutencao</span>
               <span class="muted">Acao</span>
             </div>
-            <div id="item-list" class="stack">
-              <div class="item-grid">
-                <input type="text" name="item_nome_0" placeholder="Item interno">
-                <select name="item_tipo_0">
-                  <option value="">Selecione</option>
-                  {% for value, label in tipo_choices %}
-                    <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
-                <input type="text" name="item_identificacao_0" placeholder="ID-01">
-                <input type="text" name="item_tag_interna_0" placeholder="TAG-INT-01">
-                <input type="text" name="item_tag_set_0" placeholder="SET-0001">
-                <label class="checkbox-item">
-                  <input type="checkbox" name="item_comissionado_0" aria-label="Comissionado">
-                </label>
-                <label class="checkbox-item">
-                  <input type="checkbox" name="item_em_manutencao_0" aria-label="Em manutencao">
-                </label>
-                <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
-              </div>
-            </div>
+            <div id="item-list" class="stack"></div>
           </div>
-          <input type="hidden" id="total_items" name="total_items" value="1">
-          <button class="btn btn-ghost" type="button" id="add-item">Novo item</button>
+          <input type="hidden" id="total_items" name="total_items" value="0">
+          <button class="btn btn-ghost" type="button" id="add-item">Adicionar item</button>
           <div class="form-actions">
             <button class="btn btn-primary" type="submit">Salvar ativo</button>
           </div>
@@ -196,15 +176,70 @@
       </div>
     </section>
   </div>
+  <details class="io-card io-discrete" style="margin-top: 18px;">
+    <summary class="io-discrete-summary">
+      <span class="io-title">Editar inventario</span>
+      <span class="muted">Ajuste os dados gerais do inventario.</span>
+    </summary>
+    <div class="io-discrete-body">
+      <form class="io-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_inventario">
+        <div class="io-form-grid">
+          <label class="field">
+            <span>Nome</span>
+            <input type="text" name="nome" value="{{ inventario.nome }}" required>
+          </label>
+          <label class="field">
+            <span>ID Inventario</span>
+            <input type="text" name="id_inventario" value="{% if inventario.id_inventario %}{{ inventario.id_inventario.codigo }}{% endif %}">
+          </label>
+          <label class="field">
+            <span>Responsavel</span>
+            <input type="text" name="responsavel" value="{{ inventario.responsavel|default:'' }}">
+          </label>
+          <label class="field">
+            <span>Cidade</span>
+            <input type="text" name="cidade" value="{{ inventario.cidade|default:'' }}">
+          </label>
+          <label class="field">
+            <span>Estado</span>
+            <input type="text" name="estado" value="{{ inventario.estado|default:'' }}">
+          </label>
+          <label class="field">
+            <span>Pais</span>
+            <input type="text" name="pais" value="{{ inventario.pais|default:'' }}">
+          </label>
+          <label class="field" style="grid-column: 1 / -1;">
+            <span>Descricao</span>
+            <textarea name="descricao" rows="3">{{ inventario.descricao|default:'' }}</textarea>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+        </div>
+      </form>
+    </div>
+  </details>
   <script>
     (function () {
       var addButton = document.getElementById("add-item");
       var list = document.getElementById("item-list");
       var totalField = document.getElementById("total_items");
+      var itemWrap = document.getElementById("item-wrap");
       var form = document.querySelector("form.io-form");
-      if (!addButton || !list || !totalField) {
+      if (!addButton || !list || !totalField || !itemWrap) {
         return;
       }
+      function bindUppercase(input) {
+        if (!input) {
+          return;
+        }
+        input.addEventListener("input", function () {
+          input.value = input.value.toUpperCase();
+        });
+      }
+      document.querySelectorAll("[data-uppercase]").forEach(bindUppercase);
       function renumberRows() {
         var rows = list.querySelectorAll(".item-grid");
         rows.forEach(function (row, index) {
@@ -226,14 +261,14 @@
         removeBtn.addEventListener("click", function () {
           row.remove();
           if (!list.querySelector(".item-grid")) {
-            addButton.click();
+            totalField.value = "0";
+            itemWrap.style.display = "none";
           } else {
             renumberRows();
           }
         });
       }
-      list.querySelectorAll(".item-grid").forEach(bindRemoveButton);
-      addButton.addEventListener("click", function () {
+      function addRow() {
         var index = list.querySelectorAll(".item-grid").length;
         var row = document.createElement("div");
         row.className = "item-grid";
@@ -243,15 +278,24 @@
           '<option value="">Selecione</option>' +
           '{% for value, label in tipo_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}' +
           '</select>' +
-          '<input type="text" name="item_identificacao_' + index + '" placeholder="ID-01">' +
-          '<input type="text" name="item_tag_interna_' + index + '" placeholder="TAG-INT-01">' +
-          '<input type="text" name="item_tag_set_' + index + '" placeholder="SET-0001">' +
+          '<input type="text" name="item_identificacao_' + index + '" placeholder="ID-01" data-uppercase>' +
+          '<input type="text" name="item_tag_interna_' + index + '" placeholder="TAG-INT-01" data-uppercase>' +
+          '<input type="text" name="item_tag_set_' + index + '" placeholder="Automatico" readonly>' +
           '<label class="checkbox-item"><input type="checkbox" name="item_comissionado_' + index + '" aria-label="Comissionado"></label>' +
           '<label class="checkbox-item"><input type="checkbox" name="item_em_manutencao_' + index + '" aria-label="Em manutencao"></label>' +
           '<button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>';
         list.appendChild(row);
+        bindUppercase(row.querySelector("input[name^='item_identificacao_']"));
+        bindUppercase(row.querySelector("input[name^='item_tag_interna_']"));
         bindRemoveButton(row);
         renumberRows();
+      }
+      list.querySelectorAll(".item-grid").forEach(bindRemoveButton);
+      addButton.addEventListener("click", function () {
+        if (itemWrap.style.display === "none") {
+          itemWrap.style.display = "";
+        }
+        addRow();
       });
       if (form) {
         form.addEventListener("submit", function (event) {

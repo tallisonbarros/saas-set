@@ -82,15 +82,15 @@
             </label>
             <label class="field">
               <span>Identificacao</span>
-              <input type="text" name="identificacao" placeholder="CJ-01">
+              <input type="text" name="identificacao" placeholder="CJ-01" data-uppercase>
             </label>
             <label class="field">
               <span>Tag interna</span>
-              <input type="text" name="tag_interna" placeholder="TAG-INT-02">
+              <input type="text" name="tag_interna" placeholder="TAG-INT-02" data-uppercase>
             </label>
             <label class="field">
               <span>TagSET</span>
-              <input type="text" name="tag_set" placeholder="SET-0002">
+              <input type="text" name="tag_set" placeholder="Automatico" readonly>
             </label>
             <label class="checkbox-item">
               <input type="checkbox" name="comissionado">
@@ -175,4 +175,68 @@
       </div>
     </section>
   </div>
+  <details class="io-card io-discrete" style="margin-top: 18px;">
+    <summary class="io-discrete-summary">
+      <span class="io-title">Editar ativo</span>
+      <span class="muted">Atualize os dados principais do ativo.</span>
+    </summary>
+    <div class="io-discrete-body">
+      <form class="io-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_ativo">
+        <div class="io-form-grid">
+          <label class="field">
+            <span>Nome</span>
+            <input type="text" name="nome" value="{{ ativo.nome }}" required>
+          </label>
+          <label class="field">
+            <span>Setor</span>
+            <input type="text" name="setor" value="{{ ativo.setor|default:'' }}">
+          </label>
+          <label class="field">
+            <span>Tipo</span>
+            <select name="tipo">
+              <option value="">Selecione</option>
+              {% for value, label in tipo_choices %}
+                <option value="{{ value }}" {% if ativo.tipo == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Identificacao</span>
+            <input type="text" name="identificacao" value="{{ ativo.identificacao|default:'' }}" data-uppercase>
+          </label>
+          <label class="field">
+            <span>Tag interna</span>
+            <input type="text" name="tag_interna" value="{{ ativo.tag_interna|default:'' }}" data-uppercase>
+          </label>
+          <label class="field">
+            <span>TagSET</span>
+            <input type="text" name="tag_set" value="{{ ativo.tag_set|default:'' }}" readonly>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" name="comissionado" {% if ativo.comissionado %}checked{% endif %}>
+            Comissionado
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" name="em_manutencao" {% if ativo.em_manutencao %}checked{% endif %}>
+            Em manutencao
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+        </div>
+      </form>
+    </div>
+  </details>
+  <script>
+    (function () {
+      var fields = document.querySelectorAll("[data-uppercase]");
+      fields.forEach(function (input) {
+        input.addEventListener("input", function () {
+          input.value = input.value.toUpperCase();
+        });
+      });
+    })();
+  </script>
 {% endblock %}

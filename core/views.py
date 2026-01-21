@@ -807,6 +807,39 @@ def inventario_detail(request, pk):
                 ativo.manutencao_por = request.user
             ativo.save(update_fields=["em_manutencao", "manutencao_em", "manutencao_por"])
             return redirect("inventario_detail", pk=inventario.pk)
+        if action == "update_inventario":
+            if not cliente and not request.user.is_staff:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            responsavel = request.POST.get("responsavel", "").strip()
+            cidade = request.POST.get("cidade", "").strip()
+            estado = request.POST.get("estado", "").strip()
+            pais = request.POST.get("pais", "").strip()
+            id_inventario_raw = request.POST.get("id_inventario", "").strip()
+            id_inventario = None
+            if id_inventario_raw:
+                id_inventario, _ = InventarioID.objects.get_or_create(codigo=id_inventario_raw.upper())
+            if nome:
+                inventario.nome = nome
+            inventario.descricao = descricao
+            inventario.responsavel = responsavel
+            inventario.cidade = cidade
+            inventario.estado = estado
+            inventario.pais = pais
+            inventario.id_inventario = id_inventario
+            inventario.save(
+                update_fields=[
+                    "nome",
+                    "descricao",
+                    "responsavel",
+                    "cidade",
+                    "estado",
+                    "pais",
+                    "id_inventario",
+                ]
+            )
+            return redirect("inventario_detail", pk=inventario.pk)
 
     ativos = (
         Ativo.objects.filter(inventario=inventario, pai__isnull=True)
@@ -898,6 +931,55 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                 alvo.manutencao_em = timezone.now()
                 alvo.manutencao_por = request.user
             alvo.save(update_fields=["em_manutencao", "manutencao_em", "manutencao_por"])
+            return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
+        if action == "update_ativo":
+            if not cliente and not request.user.is_staff:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            setor = request.POST.get("setor", "").strip()
+            tipo = request.POST.get("tipo", "").strip()
+            identificacao = request.POST.get("identificacao", "").strip()
+            tag_interna = request.POST.get("tag_interna", "").strip()
+            tag_set = request.POST.get("tag_set", "").strip()
+            comissionado = request.POST.get("comissionado") == "on"
+            em_manutencao = request.POST.get("em_manutencao") == "on"
+            if nome:
+                ativo.nome = nome
+            ativo.setor = setor
+            ativo.tipo = tipo
+            ativo.identificacao = identificacao
+            ativo.tag_interna = tag_interna
+            ativo.tag_set = tag_set
+            if comissionado and not ativo.comissionado:
+                ativo.comissionado_em = timezone.now()
+                ativo.comissionado_por = request.user
+            if not comissionado:
+                ativo.comissionado_em = None
+                ativo.comissionado_por = None
+            if em_manutencao and not ativo.em_manutencao:
+                ativo.manutencao_em = timezone.now()
+                ativo.manutencao_por = request.user
+            if not em_manutencao:
+                ativo.manutencao_em = None
+                ativo.manutencao_por = None
+            ativo.comissionado = comissionado
+            ativo.em_manutencao = em_manutencao
+            ativo.save(
+                update_fields=[
+                    "nome",
+                    "setor",
+                    "tipo",
+                    "identificacao",
+                    "tag_interna",
+                    "tag_set",
+                    "comissionado",
+                    "comissionado_em",
+                    "comissionado_por",
+                    "em_manutencao",
+                    "manutencao_em",
+                    "manutencao_por",
+                ]
+            )
             return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
 
     itens = (
