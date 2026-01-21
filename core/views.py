@@ -514,6 +514,7 @@ def ios_rack_detail(request, pk):
         inventarios_qs = Inventario.objects.filter(
             Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
         )
+    locais = LocalRackIO.objects.order_by("nome")
     if cliente:
         rack = get_object_or_404(
             RackIO,
