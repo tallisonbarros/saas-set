@@ -526,6 +526,32 @@ def ios_rack_detail(request, pk):
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
+        if action == "create_local":
+            nome = request.POST.get("local_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de local."
+                level = "error"
+                created = False
+            else:
+                local, created = LocalRackIO.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Local criado."
+                    level = "success"
+                else:
+                    msg = "Local ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": local.id if nome and "local" in locals() else None,
+                        "nome": local.nome if nome and "local" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            return redirect("ios_rack_detail", pk=rack.pk)
         if action == "update_rack":
             if not request.user.is_staff and rack.cliente != cliente:
                 return HttpResponseForbidden("Sem permissao.")

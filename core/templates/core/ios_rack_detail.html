@@ -216,8 +216,20 @@
           </select>
         </div>
         <div class="channel-row">
-          <div class="channel-index">Local</div>
-          <select name="local">
+          <div class="channel-index">
+            <div class="field-row">
+              <span>Local</span>
+              <details class="inline-pop" id="local-pop-rack">
+                <summary>+ novo</summary>
+                <div class="inline-pop-body">
+                  <label>Local</label>
+                  <input type="text" name="local_nome" form="create-local-form-rack" placeholder="Novo local">
+                  <button class="btn btn-ghost btn-compact" type="submit" form="create-local-form-rack">Adicionar</button>
+                </div>
+              </details>
+            </div>
+          </div>
+          <select name="local" id="local-select-rack">
             <option value="">Sem local</option>
             {% for local in locais %}
               <option value="{{ local.id }}" {% if rack.local_id == local.id %}selected{% endif %}>{{ local.nome }}</option>
@@ -234,6 +246,11 @@
             Excluir rack
           </button>
         </div>
+        <div id="local-message-rack" class="notice" style="display: none;"></div>
+      </form>
+      <form id="create-local-form-rack" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_local">
       </form>
     </div>
   </details>
@@ -245,6 +262,79 @@
   {{ module_channels|json_script:"rack-module-channels" }}
   <script>
     (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function setMessage(message, level) {
+        var box = document.getElementById("local-message-rack");
+        if (!box) {
+          return;
+        }
+        box.textContent = message;
+        box.className = "notice notice-" + (level || "info");
+        box.style.display = "block";
+      }
+      function bindCadastro() {
+        var formCadastro = document.getElementById("create-local-form-rack");
+        var input = document.querySelector("input[name='local_nome'][form='create-local-form-rack']");
+        var select = document.getElementById("local-select-rack");
+        var details = document.getElementById("local-pop-rack");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage(payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
       const track = document.getElementById("rack-carousel-track");
       const buttons = document.querySelectorAll(".rack-carousel-btn");
       const moduleCards = document.querySelectorAll(".js-rack-module-card");
@@ -322,6 +412,7 @@
           document.getElementById("rack-module-panel").scrollIntoView({ behavior: "smooth", block: "start" });
         });
       });
+      bindCadastro();
     })();
   </script>
 {% endblock %}
