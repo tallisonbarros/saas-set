@@ -762,6 +762,10 @@ body {
   flex-wrap: wrap;
 }
 
+.page-actions-top {
+  align-self: flex-start;
+}
+
 .month-nav-form {
   display: flex;
   justify-content: center;

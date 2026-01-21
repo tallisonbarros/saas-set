@@ -27,11 +27,10 @@
           <p class="page-subtitle">Detalhes da compra.</p>
         </div>
         <div class="page-actions">
-          <a class="btn btn-ghost" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
           {% if compra.caderno %}
-            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">{{ compra.caderno.nome }}</a>
+            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Voltar ao caderno</a>
           {% else %}
-            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar</a>
+            <a class="btn btn-ghost" href="{% url 'financeiro' %}">Voltar ao financeiro</a>
           {% endif %}
         </div>
       </div>

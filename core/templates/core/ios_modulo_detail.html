@@ -16,10 +16,6 @@
 {% endblock %}
 
 {% block content %}
-  <div class="page-actions">
-    <a class="btn btn-ghost" href="{% url 'ios_list' %}">Painel de I/O</a>
-    <a class="btn btn-outline" href="{% url 'ios_rack_detail' rack.id %}">Rack</a>
-  </div>
   <section class="card io-compact">
     <div class="page-hud">
       <div class="hud-top">
@@ -29,6 +25,9 @@
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">{{ module.nome|default:module.modulo_modelo.nome }}</h1>
+        </div>
+        <div class="page-actions page-actions-top">
+          <a class="btn btn-outline" href="{% url 'ios_rack_detail' rack.id %}">Rack</a>
         </div>
       </div>
       {% if rack.descricao %}
