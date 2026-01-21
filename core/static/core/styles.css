@@ -433,6 +433,12 @@ body {
   color: var(--muted);
 }
 
+.proposal-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .proposal-actions {
   display: flex;
   gap: 8px;
@@ -964,6 +970,26 @@ body {
 .badge-finalizada {
   background: #e7f5ec;
   color: #2c6f4f;
+}
+
+.badge-tagset {
+  background: #ffe4cc;
+  color: #b84800;
+}
+
+.badge-tagint {
+  background: #eef2f6;
+  color: #5a6a7b;
+}
+
+.badge-comissionado {
+  background: #e7f5ec;
+  color: #2c6f4f;
+}
+
+.badge-manutencao {
+  background: #e3f2ff;
+  color: #2b5c84;
 }
 
 .filters {

@@ -167,6 +167,7 @@
       <div class="proposal-grid">
         {% for ativo in ativos %}
           <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'inventario_ativo_detail' inventario.id ativo.id %}" aria-label="Abrir ativo {{ ativo.nome }}"></a>
             <div class="proposal-head">
               <div>
                 <div class="proposal-title">{{ ativo.nome }}</div>
@@ -174,50 +175,19 @@
               </div>
               <span class="slot-badge">{{ ativo.itens_total }} itens</span>
             </div>
-            <div class="proposal-meta">
-              Setor: {{ ativo.setor|default:"-" }} - ID: {{ ativo.identificacao|default:"-" }}
-            </div>
-            <div class="proposal-meta">
-              Tag interna: {{ ativo.tag_interna|default:"-" }} - TagSET: {{ ativo.tag_set|default:"-" }}
-            </div>
-            <div class="proposal-meta">
+            <div class="proposal-badges">
+              {% if ativo.tag_set %}
+                <span class="badge badge-tagset">TagSET: {{ ativo.tag_set }}</span>
+              {% endif %}
+              {% if ativo.tag_interna %}
+                <span class="badge badge-tagint">Tag interna: {{ ativo.tag_interna }}</span>
+              {% endif %}
               {% if ativo.comissionado %}
-                Comissionado em {{ ativo.comissionado_em|date:"d/m/Y H:i" }}
-                {% if ativo.comissionado_por %}
-                  por {{ ativo.comissionado_por.get_full_name|default:ativo.comissionado_por.username }}
-                {% endif %}
-              {% else %}
-                Nao comissionado
+                <span class="badge badge-comissionado">Comissionado</span>
               {% endif %}
-            </div>
-            <div class="proposal-meta">
               {% if ativo.em_manutencao %}
-                Em manutencao desde {{ ativo.manutencao_em|date:"d/m/Y H:i" }}
-                {% if ativo.manutencao_por %}
-                  por {{ ativo.manutencao_por.get_full_name|default:ativo.manutencao_por.username }}
-                {% endif %}
-              {% else %}
-                Fora de manutencao
+                <span class="badge badge-manutencao">Em manutencao</span>
               {% endif %}
-            </div>
-            <div class="form-actions" style="margin-top: 14px;">
-              <a class="btn btn-ghost btn-compact" href="{% url 'inventario_ativo_detail' inventario.id ativo.id %}">Abrir ativo</a>
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="toggle_comissionado">
-                <input type="hidden" name="ativo_id" value="{{ ativo.id }}">
-                <button class="btn btn-outline btn-compact" type="submit">
-                  {% if ativo.comissionado %}Descomissionar{% else %}Comissionar{% endif %}
-                </button>
-              </form>
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="toggle_manutencao">
-                <input type="hidden" name="ativo_id" value="{{ ativo.id }}">
-                <button class="btn btn-outline btn-compact" type="submit">
-                  {% if ativo.em_manutencao %}Encerrar manutencao{% else %}Marcar manutencao{% endif %}
-                </button>
-              </form>
             </div>
           </article>
         {% empty %}
