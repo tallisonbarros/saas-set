@@ -12,20 +12,49 @@
     <div class="bg"></div>
     {% block header %}
       <header class="site-header">
-        {% if request.user.is_authenticated %}
-          <div class="user-banner">
-            <a class="profile-icon-btn" href="{% url 'meu_perfil' %}" title="Meu Perfil" aria-label="Meu Perfil">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
-                <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-              </svg>
-            </a>
-            <span>Logado: {{ request.user.username }}</span>
-          </div>
-        {% endif %}
+        <div class="nav-shell">
+          <a class="brand" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
+            <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+            <span class="brand-name">SET</span>
+          </a>
+          <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
+          {% if request.user.is_authenticated %}
+            <nav class="nav" aria-label="Navegacao principal">
+              <a class="nav-link {% if request.resolver_match.url_name == 'painel' %}is-active{% endif %}" href="{% url 'painel' %}">Painel</a>
+              <a class="nav-link {% if request.resolver_match.url_name == 'propostas' or request.resolver_match.url_name == 'proposta_detail' or request.resolver_match.url_name == 'proposta_nova_vendedor' %}is-active{% endif %}" href="{% url 'propostas' %}">Propostas</a>
+              <a class="nav-link {% if request.resolver_match.url_name == 'financeiro' or request.resolver_match.url_name == 'financeiro_nova' or request.resolver_match.url_name == 'financeiro_cadernos' or request.resolver_match.url_name == 'financeiro_caderno_detail' or request.resolver_match.url_name == 'financeiro_compra_detail' %}is-active{% endif %}" href="{% url 'financeiro' %}">Financeiro</a>
+              <a class="nav-link {% if request.resolver_match.url_name == 'ios_list' or request.resolver_match.url_name == 'ios_rack_detail' or request.resolver_match.url_name == 'ios_rack_io_list' or request.resolver_match.url_name == 'ios_modulos' or request.resolver_match.url_name == 'ios_modulo_modelo_detail' or request.resolver_match.url_name == 'ios_rack_modulo_detail' %}is-active{% endif %}" href="{% url 'ios_list' %}">IOs</a>
+              <a class="nav-link {% if request.resolver_match.url_name == 'inventarios_list' or request.resolver_match.url_name == 'inventario_detail' or request.resolver_match.url_name == 'inventario_ativo_detail' or request.resolver_match.url_name == 'inventario_item_detail' %}is-active{% endif %}" href="{% url 'inventarios_list' %}">Inventarios</a>
+              {% if request.user.is_staff %}
+                <a class="nav-link {% if request.resolver_match.url_name == 'usuarios' or request.resolver_match.url_name == 'usuarios_gerenciar_usuario' %}is-active{% endif %}" href="{% url 'usuarios' %}">Usuarios</a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'ajustes_sistema' %}is-active{% endif %}" href="{% url 'ajustes_sistema' %}">Ajustes</a>
+              {% endif %}
+            </nav>
+            <div class="nav-actions">
+              <a class="profile-icon-btn" href="{% url 'meu_perfil' %}" title="Meu Perfil" aria-label="Meu Perfil">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                  <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+              </a>
+              <span class="nav-user">Logado: {{ request.user.username }}</span>
+              <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="btn btn-ghost btn-compact" type="submit">Sair</button>
+              </form>
+            </div>
+          {% else %}
+            <nav class="nav" aria-label="Navegacao principal">
+              <a class="nav-link {% if request.resolver_match.url_name == 'home' %}is-active{% endif %}" href="{% url 'home' %}">Inicio</a>
+              <a class="nav-link {% if request.resolver_match.url_name == 'login' %}is-active{% endif %}" href="{% url 'login' %}">Entrar</a>
+              <a class="nav-link {% if request.resolver_match.url_name == 'register' %}is-active{% endif %}" href="{% url 'register' %}">Cadastre-se</a>
+            </nav>
+          {% endif %}
+        </div>
       </header>
     {% endblock %}
     <main class="main">
+      {% block breadcrumbs %}{% endblock %}
       {% block content %}{% endblock %}
     </main>
     {% block footer %}

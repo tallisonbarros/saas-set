@@ -3,17 +3,21 @@
 
 {% block title %}{{ item.nome }}{% endblock %}
 
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'inventarios_list' %}">Inventarios</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'inventario_detail' inventario.id %}">{{ inventario.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'inventario_ativo_detail' inventario.id ativo.id %}">{{ ativo.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ item.nome }}</span>
+  </nav>
+{% endblock %}
+
 {% block content %}
-  <div class="page-logo">
-    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
-  </div>
-  <div class="page-panel-link">
-    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
-      </svg>
-    </a>
-  </div>
   <section class="card">
     <div class="page-hud">
       <div class="hud-top">

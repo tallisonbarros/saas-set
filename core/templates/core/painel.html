@@ -3,25 +3,17 @@
 
 {% block title %}Painel{% endblock %}
 
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <span>Painel</span>
+  </nav>
+{% endblock %}
+
 {% block content %}
-  <div class="page-logo">
-    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
-  </div>
-  <div class="page-panel-link">
-    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
-      </svg>
-    </a>
-  </div>
   <section class="card panel-shell">
     <div class="page-hud panel-hud">
       <div class="hud-top">
         <div class="hud-title">Painel de Controle</div>
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button class="btn btn-ghost btn-compact" type="submit">Sair</button>
-        </form>
       </div>
       <div class="page-hud-head panel-hero-head">
         <div>
