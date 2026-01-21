@@ -1114,6 +1114,16 @@ body {
   box-shadow: var(--shadow-strong);
 }
 
+.inline-pop-centered .inline-pop-body {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+.field-row .inline-pop-centered {
+  margin-left: auto;
+}
+
 .field-row {
   display: flex;
   align-items: center;
