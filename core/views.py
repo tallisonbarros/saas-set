@@ -43,6 +43,76 @@ from .models import (
 )
 
 
+def _clean_tag_prefix(value):
+    value = re.sub(r"[^0-9A-Za-z]", "", (value or "").strip().upper())
+    return value[:3] if value else ""
+
+
+def _tipo_prefix(tipo):
+    cleaned = _clean_tag_prefix(tipo)
+    return cleaned if cleaned else "ATV"
+
+
+def _inventario_prefix(inventario):
+    if inventario.nome:
+        base = _clean_tag_prefix(inventario.nome)
+        if base:
+            return base
+    if inventario.id_inventario:
+        base = _clean_tag_prefix(inventario.id_inventario.codigo)
+        if base:
+            return base
+    return "INV"
+
+
+def _next_tagset_for_ativos(inventario, prefix):
+    last_num = 0
+    tags = Ativo.objects.filter(inventario=inventario, tag_set__startswith=prefix).values_list("tag_set", flat=True)
+    pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$")
+    for tag in tags:
+        match = pattern.match(tag or "")
+        if not match:
+            continue
+        try:
+            last_num = max(last_num, int(match.group(1)))
+        except ValueError:
+            continue
+    return f"{prefix}{last_num + 1:04d}"
+
+
+def _next_tagset_for_itens(inventario, prefix):
+    last_num = 0
+    tags = (
+        AtivoItem.objects.filter(ativo__inventario=inventario, tag_set__contains=prefix)
+        .values_list("tag_set", flat=True)
+    )
+    pattern = re.compile(rf"(?:^|-)({re.escape(prefix)})(\d+)$")
+    for tag in tags:
+        match = pattern.search(tag or "")
+        if not match:
+            continue
+        try:
+            last_num = max(last_num, int(match.group(2)))
+        except ValueError:
+            continue
+    return f"{prefix}{last_num + 1:04d}"
+
+
+def _generate_tagset(inventario, tipo, setor, target):
+    pattern = inventario.tagset_pattern or Inventario.TagsetPattern.TIPO_SEQ
+    tipo_prefix = _tipo_prefix(tipo)
+    if pattern == Inventario.TagsetPattern.SETORIZADO:
+        setor_prefix = _clean_tag_prefix(setor) or _inventario_prefix(inventario)
+        base = f"{setor_prefix}{tipo_prefix}"
+    elif pattern == Inventario.TagsetPattern.INVENTARIO:
+        base = f"{_inventario_prefix(inventario)}{tipo_prefix}"
+    else:
+        base = tipo_prefix
+    if target == "ativo":
+        return _next_tagset_for_ativos(inventario, base)
+    return _next_tagset_for_itens(inventario, base)
+
+
 def _get_cliente(user):
     try:
         return user.perfilusuario
@@ -658,6 +728,9 @@ def inventarios_list(request):
             estado = request.POST.get("estado", "").strip()
             pais = request.POST.get("pais", "").strip()
             id_inventario_raw = request.POST.get("id_inventario", "").strip()
+            tagset_pattern = request.POST.get("tagset_pattern", "").strip()
+            if tagset_pattern not in dict(Inventario.TagsetPattern.choices):
+                tagset_pattern = Inventario.TagsetPattern.TIPO_SEQ
             id_inventario = None
             if id_inventario_raw:
                 id_inventario, _ = InventarioID.objects.get_or_create(codigo=id_inventario_raw.upper())
@@ -671,6 +744,7 @@ def inventarios_list(request):
                     estado=estado,
                     pais=pais,
                     id_inventario=id_inventario,
+                    tagset_pattern=tagset_pattern,
                     criador=request.user,
                 )
             return redirect("inventarios_list")
@@ -688,6 +762,7 @@ def inventarios_list(request):
         {
             "inventarios": inventarios,
             "can_manage": bool(cliente),
+            "tagset_choices": Inventario.TagsetPattern.choices,
         },
     )
 
@@ -715,7 +790,6 @@ def inventario_detail(request, pk):
             tipo = request.POST.get("tipo", "").strip()
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
-            tag_set = request.POST.get("tag_set", "").strip()
             comissionado = request.POST.get("comissionado") == "on"
             em_manutencao = request.POST.get("em_manutencao") == "on"
             if nome:
@@ -726,10 +800,11 @@ def inventario_detail(request, pk):
                     tipo=tipo,
                     identificacao=identificacao,
                     tag_interna=tag_interna,
-                    tag_set=tag_set,
                     comissionado=comissionado,
                     em_manutencao=em_manutencao,
                 )
+                ativo.tag_set = _generate_tagset(inventario, tipo, setor, "ativo")
+                ativo.save(update_fields=["tag_set"])
                 if comissionado:
                     ativo.comissionado_em = timezone.now()
                     ativo.comissionado_por = request.user
@@ -757,11 +832,12 @@ def inventario_detail(request, pk):
                     item_tipo = request.POST.get(f"item_tipo_{index}", "").strip()
                     item_identificacao = request.POST.get(f"item_identificacao_{index}", "").strip()
                     item_tag_interna = request.POST.get(f"item_tag_interna_{index}", "").strip()
-                    item_tag_set = request.POST.get(f"item_tag_set_{index}", "").strip()
                     item_comissionado = request.POST.get(f"item_comissionado_{index}") == "on"
                     item_em_manutencao = request.POST.get(f"item_em_manutencao_{index}") == "on"
                     if not item_nome:
                         continue
+                    item_tag_base = _generate_tagset(inventario, item_tipo, ativo.setor, "item")
+                    item_tag_set = f"{ativo.tag_set}-{item_tag_base}" if ativo.tag_set else item_tag_base
                     itens_para_criar.append(
                         AtivoItem(
                             ativo=ativo,
@@ -817,6 +893,9 @@ def inventario_detail(request, pk):
             estado = request.POST.get("estado", "").strip()
             pais = request.POST.get("pais", "").strip()
             id_inventario_raw = request.POST.get("id_inventario", "").strip()
+            tagset_pattern = request.POST.get("tagset_pattern", "").strip()
+            if tagset_pattern not in dict(Inventario.TagsetPattern.choices):
+                tagset_pattern = Inventario.TagsetPattern.TIPO_SEQ
             id_inventario = None
             if id_inventario_raw:
                 id_inventario, _ = InventarioID.objects.get_or_create(codigo=id_inventario_raw.upper())
@@ -828,6 +907,7 @@ def inventario_detail(request, pk):
             inventario.estado = estado
             inventario.pais = pais
             inventario.id_inventario = id_inventario
+            inventario.tagset_pattern = tagset_pattern
             inventario.save(
                 update_fields=[
                     "nome",
@@ -837,9 +917,15 @@ def inventario_detail(request, pk):
                     "estado",
                     "pais",
                     "id_inventario",
+                    "tagset_pattern",
                 ]
             )
             return redirect("inventario_detail", pk=inventario.pk)
+        if action == "delete_inventario":
+            if not cliente and not request.user.is_staff:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            inventario.delete()
+            return redirect("inventarios_list")
 
     ativos = (
         Ativo.objects.filter(inventario=inventario, pai__isnull=True)
@@ -857,6 +943,7 @@ def inventario_detail(request, pk):
             "total_ativos": total_ativos,
             "message": message,
             "tipo_choices": tipo_choices,
+            "tagset_choices": Inventario.TagsetPattern.choices,
         },
     )
 
@@ -887,17 +974,20 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             tipo = request.POST.get("tipo", "").strip()
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
-            tag_set = request.POST.get("tag_set", "").strip()
             comissionado = request.POST.get("comissionado") == "on"
             em_manutencao = request.POST.get("em_manutencao") == "on"
             if nome:
+                if not ativo.tag_set:
+                    ativo.tag_set = _generate_tagset(inventario, ativo.tipo, ativo.setor, "ativo")
+                    ativo.save(update_fields=["tag_set"])
+                item_tag_base = _generate_tagset(inventario, tipo, ativo.setor, "item")
                 AtivoItem.objects.create(
                     ativo=ativo,
                     nome=nome,
                     tipo=tipo,
                     identificacao=identificacao,
                     tag_interna=tag_interna,
-                    tag_set=tag_set,
+                    tag_set=f"{ativo.tag_set}-{item_tag_base}" if ativo.tag_set else item_tag_base,
                     comissionado=comissionado,
                     em_manutencao=em_manutencao,
                     comissionado_em=timezone.now() if comissionado else None,
@@ -940,7 +1030,6 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             tipo = request.POST.get("tipo", "").strip()
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
-            tag_set = request.POST.get("tag_set", "").strip()
             comissionado = request.POST.get("comissionado") == "on"
             em_manutencao = request.POST.get("em_manutencao") == "on"
             if nome:
@@ -949,7 +1038,6 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             ativo.tipo = tipo
             ativo.identificacao = identificacao
             ativo.tag_interna = tag_interna
-            ativo.tag_set = tag_set
             if comissionado and not ativo.comissionado:
                 ativo.comissionado_em = timezone.now()
                 ativo.comissionado_por = request.user
@@ -971,7 +1059,6 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                     "tipo",
                     "identificacao",
                     "tag_interna",
-                    "tag_set",
                     "comissionado",
                     "comissionado_em",
                     "comissionado_por",
@@ -981,6 +1068,11 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                 ]
             )
             return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
+        if action == "delete_ativo":
+            if not cliente and not request.user.is_staff:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            ativo.delete()
+            return redirect("inventario_detail", pk=inventario.pk)
 
     itens = (
         AtivoItem.objects.filter(ativo=ativo)
@@ -994,6 +1086,89 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             "inventario": inventario,
             "ativo": ativo,
             "itens": itens,
+            "tipo_choices": tipo_choices,
+        },
+    )
+
+
+@login_required
+def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    if cliente:
+        inventario = get_object_or_404(
+            Inventario,
+            Q(pk=inventario_pk),
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all()),
+        )
+    else:
+        inventario = get_object_or_404(Inventario, pk=inventario_pk)
+    ativo = get_object_or_404(Ativo, pk=ativo_pk, inventario=inventario)
+    item = get_object_or_404(AtivoItem, pk=pk, ativo=ativo)
+    tipo_choices = Ativo.Tipo.choices
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_item":
+            if not cliente and not request.user.is_staff:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            tipo = request.POST.get("tipo", "").strip()
+            identificacao = request.POST.get("identificacao", "").strip()
+            tag_interna = request.POST.get("tag_interna", "").strip()
+            comissionado = request.POST.get("comissionado") == "on"
+            em_manutencao = request.POST.get("em_manutencao") == "on"
+            if nome:
+                item.nome = nome
+            item.tipo = tipo
+            item.identificacao = identificacao
+            item.tag_interna = tag_interna
+            if comissionado and not item.comissionado:
+                item.comissionado_em = timezone.now()
+                item.comissionado_por = request.user
+            if not comissionado:
+                item.comissionado_em = None
+                item.comissionado_por = None
+            if em_manutencao and not item.em_manutencao:
+                item.manutencao_em = timezone.now()
+                item.manutencao_por = request.user
+            if not em_manutencao:
+                item.manutencao_em = None
+                item.manutencao_por = None
+            item.comissionado = comissionado
+            item.em_manutencao = em_manutencao
+            item.save(
+                update_fields=[
+                    "nome",
+                    "tipo",
+                    "identificacao",
+                    "tag_interna",
+                    "comissionado",
+                    "comissionado_em",
+                    "comissionado_por",
+                    "em_manutencao",
+                    "manutencao_em",
+                    "manutencao_por",
+                ]
+            )
+            return redirect(
+                "inventario_item_detail",
+                inventario_pk=inventario.pk,
+                ativo_pk=ativo.pk,
+                pk=item.pk,
+            )
+        if action == "delete_item":
+            if not cliente and not request.user.is_staff:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            item.delete()
+            return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
+    return render(
+        request,
+        "core/inventario_item_detail.html",
+        {
+            "inventario": inventario,
+            "ativo": ativo,
+            "item": item,
             "tipo_choices": tipo_choices,
         },
     )

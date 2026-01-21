@@ -54,6 +54,11 @@ urlpatterns = [
     path('inventarios/', views.inventarios_list, name="inventarios_list"),
     path('inventarios/<int:pk>/', views.inventario_detail, name="inventario_detail"),
     path('inventarios/<int:inventario_pk>/ativos/<int:pk>/', views.inventario_ativo_detail, name="inventario_ativo_detail"),
+    path(
+        'inventarios/<int:inventario_pk>/ativos/<int:ativo_pk>/itens/<int:pk>/',
+        views.inventario_item_detail,
+        name="inventario_item_detail",
+    ),
 ]
 
 if settings.DEBUG:

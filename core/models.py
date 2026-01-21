@@ -246,6 +246,11 @@ class InventarioID(models.Model):
 
 
 class Inventario(models.Model):
+    class TagsetPattern(models.TextChoices):
+        TIPO_SEQ = "TIPO_SEQ", "Sequencial por tipo"
+        SETORIZADO = "SETORIZADO", "Setorizado"
+        INVENTARIO = "INVENTARIO", "Inventario + tipo"
+
     cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="inventarios_cliente")
     id_inventario = models.ForeignKey(
         InventarioID,
@@ -253,6 +258,11 @@ class Inventario(models.Model):
         null=True,
         blank=True,
         related_name="inventarios",
+    )
+    tagset_pattern = models.CharField(
+        max_length=20,
+        choices=TagsetPattern.choices,
+        default=TagsetPattern.TIPO_SEQ,
     )
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)

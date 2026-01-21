@@ -195,6 +195,14 @@
             <input type="text" name="id_inventario" value="{% if inventario.id_inventario %}{{ inventario.id_inventario.codigo }}{% endif %}">
           </label>
           <label class="field">
+            <span>Padrao de TAGSET</span>
+            <select name="tagset_pattern">
+              {% for value, label in tagset_choices %}
+                <option value="{{ value }}" {% if inventario.tagset_pattern == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
             <span>Responsavel</span>
             <input type="text" name="responsavel" value="{{ inventario.responsavel|default:'' }}">
           </label>
@@ -217,6 +225,13 @@
         </div>
         <div class="form-actions">
           <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+        </div>
+      </form>
+      <form method="post" onsubmit="return confirm('Excluir inventario? Esta acao nao pode ser desfeita.');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_inventario">
+        <div class="form-actions">
+          <button class="btn btn-outline" type="submit">Excluir inventario</button>
         </div>
       </form>
     </div>

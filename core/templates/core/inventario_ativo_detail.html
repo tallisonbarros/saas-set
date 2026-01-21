@@ -118,6 +118,7 @@
       <div class="proposal-grid">
         {% for item in itens %}
           <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'inventario_item_detail' inventario.id ativo.id item.id %}" aria-label="Abrir item {{ item.nome }}"></a>
             <div class="proposal-head">
               <div>
                 <div class="proposal-title">{{ item.nome }}</div>
@@ -225,6 +226,13 @@
         </div>
         <div class="form-actions">
           <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+        </div>
+      </form>
+      <form method="post" onsubmit="return confirm('Excluir ativo? Esta acao nao pode ser desfeita.');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_ativo">
+        <div class="form-actions">
+          <button class="btn btn-outline" type="submit">Excluir ativo</button>
         </div>
       </form>
     </div>

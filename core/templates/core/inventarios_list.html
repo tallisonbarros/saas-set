@@ -112,6 +112,14 @@
                 <span>ID_INVENTARIO</span>
                 <input type="text" name="id_inventario" placeholder="INV-001">
               </label>
+              <label class="field">
+                <span>Padrao de TAGSET</span>
+                <select name="tagset_pattern">
+                  {% for value, label in tagset_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
             </div>
             <div class="form-actions">
               <button class="btn btn-primary" type="submit">Salvar inventario</button>

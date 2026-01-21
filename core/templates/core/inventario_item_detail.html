@@ -1,0 +1,125 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ item.nome }}{% endblock %}
+
+{% block content %}
+  <div class="page-logo">
+    <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
+  </div>
+  <div class="page-panel-link">
+    <a class="btn btn-ghost icon-only" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.5L12 4l8 7.5v7.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+      </svg>
+    </a>
+  </div>
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Item</div>
+        <div class="hud-pill">Ativo</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">{{ item.nome }}</h1>
+          <p class="page-subtitle">
+            {{ item.get_tipo_display|default:"Tipo nao informado" }}
+          </p>
+        </div>
+        <div class="page-actions">
+          <a class="btn btn-ghost btn-compact" href="{% url 'inventario_ativo_detail' inventario.id ativo.id %}">Voltar ao ativo</a>
+        </div>
+      </div>
+      <div class="rack-status">
+        <div>
+          <div class="meta-label">Identificacao</div>
+          <div class="meta-value">{{ item.identificacao|default:"-" }}</div>
+        </div>
+        <div>
+          <div class="meta-label">Tag interna</div>
+          <div class="meta-value">{{ item.tag_interna|default:"-" }}</div>
+        </div>
+        <div>
+          <div class="meta-label">TagSET</div>
+          <div class="meta-value">{{ item.tag_set|default:"-" }}</div>
+        </div>
+        <div>
+          <div class="meta-label">Status</div>
+          <div class="meta-value">
+            {% if item.comissionado %}Comissionado{% else %}Nao comissionado{% endif %}
+            {% if item.em_manutencao %} - Em manutencao{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <details class="io-card io-discrete" style="margin-top: 18px;">
+    <summary class="io-discrete-summary">
+      <span class="io-title">Editar item</span>
+      <span class="muted">Atualize os dados do item.</span>
+    </summary>
+    <div class="io-discrete-body">
+      <form class="io-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_item">
+        <div class="io-form-grid">
+          <label class="field">
+            <span>Nome</span>
+            <input type="text" name="nome" value="{{ item.nome }}" required>
+          </label>
+          <label class="field">
+            <span>Tipo</span>
+            <select name="tipo">
+              <option value="">Selecione</option>
+              {% for value, label in tipo_choices %}
+                <option value="{{ value }}" {% if item.tipo == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Identificacao</span>
+            <input type="text" name="identificacao" value="{{ item.identificacao|default:'' }}" data-uppercase>
+          </label>
+          <label class="field">
+            <span>Tag interna</span>
+            <input type="text" name="tag_interna" value="{{ item.tag_interna|default:'' }}" data-uppercase>
+          </label>
+          <label class="field">
+            <span>TagSET</span>
+            <input type="text" name="tag_set" value="{{ item.tag_set|default:'' }}" readonly>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" name="comissionado" {% if item.comissionado %}checked{% endif %}>
+            Comissionado
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" name="em_manutencao" {% if item.em_manutencao %}checked{% endif %}>
+            Em manutencao
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+        </div>
+      </form>
+      <form method="post" onsubmit="return confirm('Excluir item? Esta acao nao pode ser desfeita.');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_item">
+        <div class="form-actions">
+          <button class="btn btn-outline" type="submit">Excluir item</button>
+        </div>
+      </form>
+    </div>
+  </details>
+  <script>
+    (function () {
+      var fields = document.querySelectorAll("[data-uppercase]");
+      fields.forEach(function (input) {
+        input.addEventListener("input", function () {
+          input.value = input.value.toUpperCase();
+        });
+      });
+    })();
+  </script>
+{% endblock %}
