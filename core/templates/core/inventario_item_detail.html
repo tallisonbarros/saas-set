@@ -24,7 +24,7 @@
         <div>
           <h1 class="page-title">{{ item.nome }}</h1>
           <p class="page-subtitle">
-            {{ item.get_tipo_display|default:"Tipo nao informado" }}
+            {% if item.tipo %}{{ item.tipo.nome }}{% else %}Tipo nao informado{% endif %}
           </p>
         </div>
         <div class="page-actions">
@@ -73,8 +73,8 @@
             <span>Tipo</span>
             <select name="tipo">
               <option value="">Selecione</option>
-              {% for value, label in tipo_choices %}
-                <option value="{{ value }}" {% if item.tipo == value %}selected{% endif %}>{{ label }}</option>
+              {% for tipo in tipos_ativos %}
+                <option value="{{ tipo.id }}" {% if item.tipo_id == tipo.id %}selected{% endif %}>{{ tipo.nome }}</option>
               {% endfor %}
             </select>
           </label>

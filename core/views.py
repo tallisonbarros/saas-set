@@ -40,6 +40,7 @@ from .models import (
     TipoPerfil,
     Ativo,
     AtivoItem,
+    TipoAtivo,
 )
 
 
@@ -49,7 +50,12 @@ def _clean_tag_prefix(value):
 
 
 def _tipo_prefix(tipo, fallback=None):
-    cleaned = _clean_tag_prefix(tipo)
+    if hasattr(tipo, "codigo") and tipo.codigo:
+        cleaned = _clean_tag_prefix(tipo.codigo)
+    elif hasattr(tipo, "nome") and tipo.nome:
+        cleaned = _clean_tag_prefix(tipo.nome)
+    else:
+        cleaned = _clean_tag_prefix(tipo)
     if cleaned:
         return cleaned
     if fallback:
@@ -84,12 +90,12 @@ def _next_tagset_for_ativos(inventario, prefix, tipo=None):
             last_num = max(last_num, int(match.group(1)))
         except ValueError:
             continue
-    return f"{prefix}{last_num + 1:04d}"
+    return f"{prefix}{last_num + 1:02d}"
 
 
 def _next_tagset_for_itens(ativo, prefix, tipo=None):
     if not ativo:
-        return f"{prefix}0001"
+        return f"{prefix}01"
     last_num = 0
     itens = AtivoItem.objects.filter(ativo=ativo, tag_set__contains=prefix)
     if tipo:
@@ -104,7 +110,7 @@ def _next_tagset_for_itens(ativo, prefix, tipo=None):
             last_num = max(last_num, int(match.group(2)))
         except ValueError:
             continue
-    return f"{prefix}{last_num + 1:04d}"
+    return f"{prefix}{last_num + 1:02d}"
 
 
 def _generate_tagset(inventario, tipo, setor, target, fallback_tipo=None, ativo=None):
@@ -346,6 +352,12 @@ def ios_list(request):
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
+    if request.user.is_staff and not cliente:
+        inventarios_qs = Inventario.objects.all()
+    else:
+        inventarios_qs = Inventario.objects.filter(
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
+        )
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
@@ -355,6 +367,7 @@ def ios_list(request):
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             id_planta_raw = request.POST.get("id_planta", "").strip()
+            inventario_id = request.POST.get("inventario")
             slots_raw = request.POST.get("slots_total", "").strip()
             try:
                 slots_total = int(slots_raw)
@@ -366,11 +379,15 @@ def ios_list(request):
                 planta = None
                 if id_planta_raw:
                     planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
+                inventario = None
+                if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
+                    inventario = inventarios_qs.filter(pk=inventario_id).first()
                 rack = RackIO.objects.create(
                     cliente=cliente,
                     nome=nome,
                     descricao=descricao,
                     id_planta=planta,
+                    inventario=inventario,
                     slots_total=slots_total,
                 )
                 slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
@@ -386,7 +403,25 @@ def ios_list(request):
         racks = RackIO.objects.all()
     else:
         racks = RackIO.objects.filter(Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()))
-    racks = racks.annotate(ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)))
+    racks = racks.select_related("inventario").annotate(
+        ocupados=Count("slots", filter=Q(slots__modulo__isnull=False))
+    )
+    racks_ordered = racks.order_by("inventario__nome", "nome")
+    rack_groups = []
+    grouped = {}
+    for rack in racks_ordered:
+        key = rack.inventario_id or 0
+        grouped.setdefault(key, []).append(rack)
+    for key, items in grouped.items():
+        inventario = None
+        if key:
+            inventario = items[0].inventario
+        rack_groups.append(
+            {
+                "inventario": inventario,
+                "racks": items,
+            }
+        )
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     search_term = request.GET.get("q", "").strip()
     search_results = []
@@ -413,11 +448,13 @@ def ios_list(request):
         "core/ios_list.html",
         {
             "racks": racks,
+            "rack_groups": rack_groups,
             "channel_types": channel_types,
             "can_manage": bool(cliente),
             "search_term": search_term,
             "search_results": search_results,
             "search_count": search_count,
+            "inventarios": inventarios_qs.order_by("nome"),
         },
     )
 
@@ -427,6 +464,12 @@ def ios_rack_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
+    if request.user.is_staff and not cliente:
+        inventarios_qs = Inventario.objects.all()
+    else:
+        inventarios_qs = Inventario.objects.filter(
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
+        )
     if cliente:
         rack = get_object_or_404(
             RackIO,
@@ -444,6 +487,7 @@ def ios_rack_detail(request, pk):
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             id_planta_raw = request.POST.get("id_planta", "").strip()
+            inventario_id = request.POST.get("inventario")
             slots_raw = request.POST.get("slots_total", "").strip()
             try:
                 slots_total = int(slots_raw)
@@ -459,6 +503,10 @@ def ios_rack_detail(request, pk):
                 rack.id_planta = planta
             else:
                 rack.id_planta = None
+            if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
+                rack.inventario = inventarios_qs.filter(pk=inventario_id).first()
+            else:
+                rack.inventario = None
             if slots_total is not None and slots_total != rack.slots_total:
                 if slots_total > rack.slots_total:
                     novos = [
@@ -492,7 +540,7 @@ def ios_rack_detail(request, pk):
                         )
                     slots_para_remover.delete()
                 rack.slots_total = slots_total
-            rack.save(update_fields=["nome", "descricao", "id_planta", "slots_total"])
+            rack.save(update_fields=["nome", "descricao", "id_planta", "slots_total", "inventario"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "delete_rack":
             if not request.user.is_staff and rack.cliente != cliente:
@@ -523,7 +571,7 @@ def ios_rack_detail(request, pk):
                     CanalRackIO(
                         modulo=modulo,
                         indice=index,
-                        nome=f"Canal {index:02d}",
+                        nome="",
                         tipo=module_modelo.tipo_base,
                     )
                     for index in range(1, module_modelo.quantidade_canais + 1)
@@ -560,7 +608,7 @@ def ios_rack_detail(request, pk):
                     CanalRackIO(
                         modulo=modulo,
                         indice=index,
-                        nome=f"Canal {index:02d}",
+                        nome="",
                         tipo=module_modelo.tipo_base,
                     )
                     for index in range(1, module_modelo.quantidade_canais + 1)
@@ -617,6 +665,7 @@ def ios_rack_detail(request, pk):
             "slots_livres": slots_livres,
             "canais_disponiveis": canais_disponiveis,
             "message": message,
+            "inventarios": inventarios_qs.order_by("nome"),
         },
     )
 
@@ -818,16 +867,19 @@ def inventario_detail(request, pk):
     else:
         inventario = get_object_or_404(Inventario, pk=pk)
     message = None
-    tipo_choices = Ativo.Tipo.choices
+    tipos_ativos = TipoAtivo.objects.filter(ativo=True).order_by("nome")
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_ativo":
             nome = request.POST.get("nome", "").strip()
             setor = request.POST.get("setor", "").strip()
-            tipo = request.POST.get("tipo", "").strip()
+            tipo_id = request.POST.get("tipo", "").strip()
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
             if nome:
+                tipo = None
+                if tipo_id:
+                    tipo = TipoAtivo.objects.filter(pk=tipo_id, ativo=True).first()
                 ativo = Ativo.objects.create(
                     inventario=inventario,
                     setor=setor,
@@ -847,13 +899,16 @@ def inventario_detail(request, pk):
                 itens_para_criar = []
                 for index in range(total_items):
                     item_nome = request.POST.get(f"item_nome_{index}", "").strip()
-                    item_tipo = request.POST.get(f"item_tipo_{index}", "").strip()
+                    item_tipo_id = request.POST.get(f"item_tipo_{index}", "").strip()
                     item_identificacao = request.POST.get(f"item_identificacao_{index}", "").strip()
                     item_tag_interna = request.POST.get(f"item_tag_interna_{index}", "").strip()
                     item_comissionado = request.POST.get(f"item_comissionado_{index}") == "on"
                     item_em_manutencao = request.POST.get(f"item_em_manutencao_{index}") == "on"
                     if not item_nome:
                         continue
+                    item_tipo = None
+                    if item_tipo_id:
+                        item_tipo = TipoAtivo.objects.filter(pk=item_tipo_id, ativo=True).first()
                     item_tag_base = _generate_tagset(
                         inventario,
                         item_tipo,
@@ -968,7 +1023,7 @@ def inventario_detail(request, pk):
             "ativos": ativos,
             "total_ativos": total_ativos,
             "message": message,
-            "tipo_choices": tipo_choices,
+            "tipos_ativos": tipos_ativos,
             "tagset_choices": Inventario.TagsetPattern.choices,
         },
     )
@@ -992,12 +1047,12 @@ def inventario_ativo_detail(request, inventario_pk, pk):
         pk=pk,
         inventario=inventario,
     )
-    tipo_choices = Ativo.Tipo.choices
+    tipos_ativos = TipoAtivo.objects.filter(ativo=True).order_by("nome")
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_item":
             nome = request.POST.get("nome", "").strip()
-            tipo = request.POST.get("tipo", "").strip()
+            tipo_id = request.POST.get("tipo", "").strip()
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
             comissionado = request.POST.get("comissionado") == "on"
@@ -1005,6 +1060,9 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             if nome:
                 if em_manutencao:
                     comissionado = False
+                tipo = None
+                if tipo_id:
+                    tipo = TipoAtivo.objects.filter(pk=tipo_id, ativo=True).first()
                 if not ativo.tag_set:
                     ativo.tag_set = _generate_tagset(inventario, ativo.tipo, ativo.setor, "ativo")
                     ativo.save(update_fields=["tag_set"])
@@ -1091,13 +1149,13 @@ def inventario_ativo_detail(request, inventario_pk, pk):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             nome = request.POST.get("nome", "").strip()
             setor = request.POST.get("setor", "").strip()
-            tipo = request.POST.get("tipo", "").strip()
+            tipo_id = request.POST.get("tipo", "").strip()
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
             if nome:
                 ativo.nome = nome
             ativo.setor = setor
-            ativo.tipo = tipo
+            ativo.tipo = TipoAtivo.objects.filter(pk=tipo_id).first() if tipo_id else None
             ativo.identificacao = identificacao
             ativo.tag_interna = tag_interna
             ativo.save(
@@ -1128,7 +1186,7 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             "inventario": inventario,
             "ativo": ativo,
             "itens": itens,
-            "tipo_choices": tipo_choices,
+            "tipos_ativos": tipos_ativos,
         },
     )
 
@@ -1148,14 +1206,14 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
         inventario = get_object_or_404(Inventario, pk=inventario_pk)
     ativo = get_object_or_404(Ativo, pk=ativo_pk, inventario=inventario)
     item = get_object_or_404(AtivoItem, pk=pk, ativo=ativo)
-    tipo_choices = Ativo.Tipo.choices
+    tipos_ativos = TipoAtivo.objects.filter(ativo=True).order_by("nome")
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_item":
             if not cliente and not request.user.is_staff:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             nome = request.POST.get("nome", "").strip()
-            tipo = request.POST.get("tipo", "").strip()
+            tipo_id = request.POST.get("tipo", "").strip()
             identificacao = request.POST.get("identificacao", "").strip()
             tag_interna = request.POST.get("tag_interna", "").strip()
             comissionado = request.POST.get("comissionado") == "on"
@@ -1164,7 +1222,7 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
                 comissionado = False
             if nome:
                 item.nome = nome
-            item.tipo = tipo
+            item.tipo = TipoAtivo.objects.filter(pk=tipo_id).first() if tipo_id else None
             item.identificacao = identificacao
             item.tag_interna = tag_interna
             if comissionado and not item.comissionado:
@@ -1215,7 +1273,7 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
             "inventario": inventario,
             "ativo": ativo,
             "item": item,
-            "tipo_choices": tipo_choices,
+            "tipos_ativos": tipos_ativos,
         },
     )
 
@@ -1295,15 +1353,39 @@ def ios_rack_modulo_detail(request, pk):
             for channel in module.canais.all():
                 nome_raw = request.POST.get(f"nome_{channel.id}")
                 tipo_id = request.POST.get(f"tipo_{channel.id}")
+                comissionado = request.POST.get(f"comissionado_{channel.id}") == "on"
+                vinculo_raw = request.POST.get(f"vinculo_{channel.id}", "").strip()
                 if nome_raw is None:
                     continue
                 channel.nome = nome_raw.strip()
                 if tipo_id:
                     channel.tipo_id = tipo_id
-                channel.save(update_fields=["nome", "tipo_id"])
+                channel.comissionado = comissionado
+                channel.ativo_id = None
+                channel.ativo_item_id = None
+                match = re.match(r"^(A|I):(\d+)", vinculo_raw)
+                if match:
+                    tipo_ref, ref_id = match.groups()
+                    if tipo_ref == "A":
+                        channel.ativo_id = int(ref_id)
+                    elif tipo_ref == "I":
+                        channel.ativo_item_id = int(ref_id)
+                channel.save(update_fields=["nome", "tipo_id", "comissionado", "ativo_id", "ativo_item_id"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
-    channels = module.canais.select_related("tipo").order_by("indice")
+    channels = module.canais.select_related("tipo", "ativo", "ativo_item").order_by("indice")
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+    cliente = _get_cliente(request.user)
+    if request.user.is_staff and not cliente:
+        inventarios_qs = Inventario.objects.all()
+    else:
+        inventarios_qs = Inventario.objects.filter(
+            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
+        )
+    if module.rack.inventario_id:
+        ativos_qs = Ativo.objects.filter(inventario=module.rack.inventario)
+    else:
+        ativos_qs = Ativo.objects.filter(inventario__in=inventarios_qs)
+    itens_qs = AtivoItem.objects.filter(ativo__in=ativos_qs).select_related("ativo")
     vacant_slots = RackSlotIO.objects.filter(rack=module.rack, modulo__isnull=True).order_by("posicao")
     return render(
         request,
@@ -1312,6 +1394,8 @@ def ios_rack_modulo_detail(request, pk):
             "module": module,
             "channels": channels,
             "channel_types": channel_types,
+            "ativos": ativos_qs.order_by("nome"),
+            "itens": itens_qs.order_by("ativo__nome", "nome"),
             "rack": module.rack,
             "slot": slot,
             "vacant_slots": vacant_slots,
@@ -2760,12 +2844,28 @@ def ajustes_sistema(request):
             nome = request.POST.get("nome", "").strip().upper()
             if nome:
                 TipoCanalIO.objects.get_or_create(nome=nome, defaults={"ativo": True})
+        if action == "create_tipo_ativo":
+            nome = request.POST.get("nome", "").strip()
+            codigo = request.POST.get("codigo", "").strip().upper()
+            if nome and codigo:
+                TipoAtivo.objects.get_or_create(
+                    nome=nome,
+                    defaults={"codigo": codigo, "ativo": True},
+                )
+        if action == "toggle_tipo_ativo":
+            tipo_id = request.POST.get("tipo_id")
+            tipo = TipoAtivo.objects.filter(pk=tipo_id).first()
+            if tipo:
+                tipo.ativo = not tipo.ativo
+                tipo.save(update_fields=["ativo"])
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
+    tipos_ativos = TipoAtivo.objects.order_by("nome")
     return render(
         request,
         "core/ajustes.html",
         {
             "message": message,
             "channel_types": channel_types,
+            "tipos_ativos": tipos_ativos,
         },
     )

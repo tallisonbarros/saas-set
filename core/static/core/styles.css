@@ -1835,6 +1835,16 @@ select {
   font-size: 12px;
 }
 
+.channel-pill.is-off {
+  background: #f2f4f7;
+  color: #7b8794;
+}
+
+.inline-form {
+  display: inline-flex;
+  align-items: center;
+}
+
 .io-form {
   display: grid;
   gap: 16px;

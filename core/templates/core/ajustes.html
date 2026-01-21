@@ -76,5 +76,41 @@
       </div>
     </div>
 
+    <div class="card compact-card">
+      <div class="panel-title">Tipos de ativo</div>
+      <div class="channel-types">
+        {% for tipo in tipos_ativos %}
+          <span class="channel-pill {% if not tipo.ativo %}is-off{% endif %}">
+            {{ tipo.nome }} ({{ tipo.codigo }})
+          </span>
+          <form method="post" class="inline-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle_tipo_ativo">
+            <input type="hidden" name="tipo_id" value="{{ tipo.id }}">
+            <button class="btn btn-outline btn-compact" type="submit">
+              {% if tipo.ativo %}Desativar{% else %}Ativar{% endif %}
+            </button>
+          </form>
+        {% endfor %}
+        <form method="post" class="channel-type-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_tipo_ativo">
+          <input type="text" name="nome" placeholder="Novo tipo" maxlength="80" required>
+          <input type="text" name="codigo" placeholder="SIGLA" maxlength="10" required data-uppercase>
+          <button class="btn btn-outline" type="submit">Adicionar tipo</button>
+        </form>
+      </div>
+    </div>
+
   </section>
+  <script>
+    (function () {
+      var fields = document.querySelectorAll("[data-uppercase]");
+      fields.forEach(function (input) {
+        input.addEventListener("input", function () {
+          input.value = input.value.toUpperCase();
+        });
+      });
+    })();
+  </script>
 {% endblock %}

@@ -91,6 +91,15 @@
             <input type="number" name="slots_total" min="1" max="60" value="{{ rack.slots_total }}" required>
           </div>
           <div class="channel-row">
+            <div class="channel-index">Inventario</div>
+            <select name="inventario">
+              <option value="">Sem inventario</option>
+              {% for inv in inventarios %}
+                <option value="{{ inv.id }}" {% if rack.inventario_id == inv.id %}selected{% endif %}>{{ inv.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="channel-row">
             <div class="channel-index">ID_PLANTA</div>
             <input type="text" name="id_planta" value="{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% endif %}">
           </div>

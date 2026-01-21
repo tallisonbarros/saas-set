@@ -87,8 +87,8 @@
               <span>Tipo</span>
               <select name="tipo">
                 <option value="">Selecione</option>
-                {% for value, label in tipo_choices %}
-                  <option value="{{ value }}">{{ label }}</option>
+                {% for tipo in tipos_ativos %}
+                  <option value="{{ tipo.id }}">{{ tipo.nome }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -143,7 +143,7 @@
             <div class="proposal-head">
               <div>
                 <div class="proposal-title">{{ ativo.nome }}</div>
-                <div class="proposal-meta">{{ ativo.get_tipo_display|default:"Tipo nao informado" }}</div>
+                <div class="proposal-meta">{% if ativo.tipo %}{{ ativo.tipo.nome }}{% else %}Tipo nao informado{% endif %}</div>
               </div>
               <span class="slot-badge">{{ ativo.itens_total }} itens</span>
             </div>
@@ -155,19 +155,17 @@
                 <span class="badge badge-tagint">Tag interna: {{ ativo.tag_interna }}</span>
               {% endif %}
               {% if ativo.comissionado %}
-                <span class="badge badge-comissionado">
+                <span class="badge badge-comissionado" aria-label="Comissionado" title="Comissionado">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M5 12l4 4 10-10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                   </svg>
-                  Comissionado
                 </span>
               {% endif %}
               {% if ativo.em_manutencao %}
-                <span class="badge badge-manutencao">
+                <span class="badge badge-manutencao" aria-label="Em manutencao" title="Em manutencao">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M21 7.5a5 5 0 0 1-6.8 4.7l-6.7 6.7a1.6 1.6 0 0 1-2.3 0l-.6-.6a1.6 1.6 0 0 1 0-2.3l6.7-6.7A5 5 0 0 1 16.5 3l-2.4 2.4 2.5 2.5L19 5.5A5 5 0 0 1 21 7.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
                   </svg>
-                  Em manutencao
                 </span>
               {% endif %}
             </div>
@@ -293,7 +291,7 @@
           '<input type="text" name="item_nome_' + index + '" placeholder="Item interno">' +
           '<select name="item_tipo_' + index + '">' +
           '<option value="">Selecione</option>' +
-          '{% for value, label in tipo_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}' +
+          '{% for tipo in tipos_ativos %}<option value="{{ tipo.id }}">{{ tipo.nome }}</option>{% endfor %}' +
           '</select>' +
           '<input type="text" name="item_identificacao_' + index + '" placeholder="ID-01" data-uppercase>' +
           '<input type="text" name="item_tag_interna_' + index + '" placeholder="TAG-INT-01" data-uppercase>' +

@@ -70,6 +70,10 @@
       {% for channel in channels %}
         <div class="channel-row">
           <div class="channel-index">Canal {{ channel.indice }}</div>
+          <label class="checkbox-item">
+            <input type="checkbox" name="comissionado_{{ channel.id }}" {% if channel.comissionado %}checked{% endif %}>
+            Comissionado
+          </label>
           <input type="text" name="nome_{{ channel.id }}" value="{{ channel.nome }}">
           <select name="tipo_{{ channel.id }}">
             {% for channel_type in channel_types %}
@@ -78,8 +82,23 @@
               </option>
             {% endfor %}
           </select>
+          <input
+            type="text"
+            name="vinculo_{{ channel.id }}"
+            list="vinculos-list"
+            placeholder="Vincular a ativo ou item"
+            value="{% if channel.ativo_id %}A:{{ channel.ativo_id }} - {{ channel.ativo.nome }}{% elif channel.ativo_item_id %}I:{{ channel.ativo_item_id }} - {{ channel.ativo_item.ativo.nome }} / {{ channel.ativo_item.nome }}{% endif %}"
+          >
         </div>
       {% endfor %}
+      <datalist id="vinculos-list">
+        {% for ativo in ativos %}
+          <option value="A:{{ ativo.id }} - {{ ativo.nome }}"></option>
+        {% endfor %}
+        {% for item in itens %}
+          <option value="I:{{ item.id }} - {{ item.ativo.nome }} / {{ item.nome }}"></option>
+        {% endfor %}
+      </datalist>
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Salvar ajustes</button>
       </div>

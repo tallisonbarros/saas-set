@@ -20,6 +20,7 @@ from .models import (
     StatusCompra,
     TipoCompra,
     TipoPerfil,
+    TipoAtivo,
 )
 
 admin.site.site_header = "SET Admin"
@@ -120,6 +121,13 @@ class AtivoAdmin(admin.ModelAdmin):
 class AtivoItemAdmin(admin.ModelAdmin):
     list_display = ("nome", "ativo", "tipo", "comissionado", "em_manutencao")
     search_fields = ("nome", "ativo__nome", "identificacao", "tag_interna", "tag_set")
+
+
+@admin.register(TipoAtivo)
+class TipoAtivoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "codigo", "ativo")
+    search_fields = ("nome", "codigo")
+    list_filter = ("ativo",)
 
 
 @admin.register(FinanceiroID)

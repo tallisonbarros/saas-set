@@ -45,25 +45,38 @@
           <p class="muted">Selecione um rack.</p>
         </div>
       </div>
-      <div class="proposal-grid">
-        {% for rack in racks %}
-          <article class="proposal-card io-proposal-card">
-            <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
-            <div class="proposal-head">
-              <div>
-                <div class="proposal-title">{{ rack.nome }}</div>
-                <div class="proposal-meta">{{ rack.descricao }}</div>
-              </div>
-              <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
+      {% if rack_groups %}
+        {% for group in rack_groups %}
+          <div class="proposal-toolbar" style="margin-top: 12px;">
+            <div class="proposal-title">
+              {% if group.inventario %}
+                {{ group.inventario.nome }}
+              {% else %}
+                Sem inventario
+              {% endif %}
             </div>
-            {% if rack.id_planta %}
-              <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
-            {% endif %}
-          </article>
-        {% empty %}
-          <div class="muted">Nenhum rack cadastrado ainda.</div>
+          </div>
+          <div class="proposal-grid">
+            {% for rack in group.racks %}
+              <article class="proposal-card io-proposal-card">
+                <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
+                <div class="proposal-head">
+                  <div>
+                    <div class="proposal-title">{{ rack.nome }}</div>
+                    <div class="proposal-meta">{{ rack.descricao }}</div>
+                  </div>
+                  <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
+                </div>
+                {% if rack.id_planta %}
+                  <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
         {% endfor %}
-      </div>
+      {% else %}
+        <div class="muted">Nenhum rack cadastrado ainda.</div>
+      {% endif %}
     </section>
 
     <details class="io-card io-discrete" id="novo-rack">
@@ -84,6 +97,15 @@
               <label class="field">
                 <span>Descricao</span>
                 <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
+              </label>
+              <label class="field">
+                <span>Inventario</span>
+                <select name="inventario">
+                  <option value="">Sem inventario</option>
+                  {% for inv in inventarios %}
+                    <option value="{{ inv.id }}">{{ inv.nome }}</option>
+                  {% endfor %}
+                </select>
               </label>
               <label class="field">
                 <span>ID_PLANTA</span>

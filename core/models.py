@@ -286,6 +286,19 @@ class Inventario(models.Model):
         return self.nome
 
 
+class TipoAtivo(models.Model):
+    nome = models.CharField(max_length=80, unique=True)
+    codigo = models.CharField(max_length=10, unique=True)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 class ModuloIO(models.Model):
     cliente = models.ForeignKey(
         "PerfilUsuario",
@@ -329,6 +342,21 @@ class CanalRackIO(models.Model):
     indice = models.PositiveSmallIntegerField()
     nome = models.CharField(max_length=120, blank=True)
     tipo = models.ForeignKey(TipoCanalIO, on_delete=models.PROTECT, related_name="canais")
+    comissionado = models.BooleanField(default=False)
+    ativo = models.ForeignKey(
+        "Ativo",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="canais_io",
+    )
+    ativo_item = models.ForeignKey(
+        "AtivoItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="canais_io",
+    )
 
     class Meta:
         ordering = ["indice"]
@@ -342,6 +370,13 @@ class CanalRackIO(models.Model):
 
 class RackIO(models.Model):
     cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="io_racks")
+    inventario = models.ForeignKey(
+        "Inventario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="racks_io",
+    )
     id_planta = models.ForeignKey(
         PlantaIO,
         on_delete=models.SET_NULL,
@@ -364,17 +399,6 @@ class RackIO(models.Model):
 
 
 class Ativo(models.Model):
-    class Tipo(models.TextChoices):
-        MOTOR = "MOTOR", "Motor"
-        VALVULA = "VALVULA", "Valvula"
-        EQUIPAMENTO = "EQUIPAMENTO", "Equipamento"
-        CONJUNTO = "CONJUNTO", "Conjunto"
-        TRANSMISSOR_ANALOGICO = "TRANSMISSOR_ANALOGICO", "Transmissor analogico"
-        TRANSMISSOR_DIGITAL = "TRANSMISSOR_DIGITAL", "Transmissor digital"
-        SONORO = "SONORO", "Sonoro"
-        VISUAL = "VISUAL", "Visual"
-        OUTRO = "OUTRO", "Outro"
-
     inventario = models.ForeignKey(Inventario, on_delete=models.CASCADE, related_name="ativos")
     pai = models.ForeignKey(
         "self",
@@ -385,7 +409,13 @@ class Ativo(models.Model):
     )
     setor = models.CharField(max_length=120, blank=True)
     nome = models.CharField(max_length=120)
-    tipo = models.CharField(max_length=80, blank=True, choices=Tipo.choices)
+    tipo = models.ForeignKey(
+        TipoAtivo,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ativos",
+    )
     identificacao = models.CharField(max_length=120, blank=True)
     tag_interna = models.CharField(max_length=120, blank=True)
     tag_set = models.CharField(max_length=120, blank=True)
@@ -419,7 +449,13 @@ class Ativo(models.Model):
 class AtivoItem(models.Model):
     ativo = models.ForeignKey(Ativo, on_delete=models.CASCADE, related_name="itens")
     nome = models.CharField(max_length=120)
-    tipo = models.CharField(max_length=80, blank=True, choices=Ativo.Tipo.choices)
+    tipo = models.ForeignKey(
+        TipoAtivo,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="itens",
+    )
     identificacao = models.CharField(max_length=120, blank=True)
     tag_interna = models.CharField(max_length=120, blank=True)
     tag_set = models.CharField(max_length=120, blank=True)
