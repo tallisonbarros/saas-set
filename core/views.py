@@ -202,6 +202,28 @@ def _has_tipo_any(user, nomes):
     return cliente.tipos.filter(nome__in=nomes).exists()
 
 
+def _create_grupo_payload(request):
+    nome = request.POST.get("grupo_nome", "").strip()
+    if not nome:
+        return {
+            "ok": False,
+            "created": False,
+            "id": None,
+            "nome": None,
+            "message": "Informe um nome de grupo.",
+            "level": "error",
+        }
+    grupo, created = GrupoRackIO.objects.get_or_create(nome=nome)
+    return {
+        "ok": True,
+        "created": created,
+        "id": grupo.id,
+        "nome": grupo.nome,
+        "message": "Grupo criado." if created else "Grupo ja existe.",
+        "level": "success" if created else "warning",
+    }
+
+
 def _ensure_default_cadernos(cliente):
     if not cliente:
         return
@@ -438,30 +460,9 @@ def ios_list(request):
                 )
             return redirect("ios_list")
         if action == "create_grupo":
-            nome = request.POST.get("grupo_nome", "").strip()
-            if not nome:
-                msg = "Informe um nome de grupo."
-                level = "error"
-                created = False
-            else:
-                grupo, created = GrupoRackIO.objects.get_or_create(nome=nome)
-                if created:
-                    msg = "Grupo criado."
-                    level = "success"
-                else:
-                    msg = "Grupo ja existe."
-                    level = "warning"
+            payload = _create_grupo_payload(request)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "ok": bool(nome),
-                        "created": created,
-                        "id": grupo.id if nome and "grupo" in locals() else None,
-                        "nome": grupo.nome if nome and "grupo" in locals() else None,
-                        "message": msg,
-                        "level": level,
-                    }
-                )
+                return JsonResponse(payload)
             return redirect("ios_list")
         if action == "create_channel_type":
             nome = request.POST.get("nome", "").strip().upper()
@@ -602,30 +603,9 @@ def ios_rack_detail(request, pk):
                 )
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "create_grupo":
-            nome = request.POST.get("grupo_nome", "").strip()
-            if not nome:
-                msg = "Informe um nome de grupo."
-                level = "error"
-                created = False
-            else:
-                grupo, created = GrupoRackIO.objects.get_or_create(nome=nome)
-                if created:
-                    msg = "Grupo criado."
-                    level = "success"
-                else:
-                    msg = "Grupo ja existe."
-                    level = "warning"
+            payload = _create_grupo_payload(request)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "ok": bool(nome),
-                        "created": created,
-                        "id": grupo.id if nome and "grupo" in locals() else None,
-                        "nome": grupo.nome if nome and "grupo" in locals() else None,
-                        "message": msg,
-                        "level": level,
-                    }
-                )
+                return JsonResponse(payload)
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "update_rack":
             if not request.user.is_staff and rack.cliente != cliente:
