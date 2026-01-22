@@ -31,7 +31,6 @@
           {% if rack.descricao %}
             <div class="hud-meta centered">{{ rack.descricao }}</div>
           {% endif %}
-          <h1 class="page-title">{{ rack.nome }}</h1>
           {% if rack.local or rack.grupo %}
             <div class="hud-tagset hud-tagset-centered">
               {% if rack.local %}
@@ -42,6 +41,7 @@
               {% endif %}
             </div>
           {% endif %}
+          <h1 class="page-title">{{ rack.nome }}</h1>
           <div class="rack-slot-head">
             <div class="rack-slot-nav">
               {% if prev_slot %}
@@ -89,9 +89,8 @@
       {% for channel in channels %}
         <div class="channel-row">
           <div class="channel-index">Canal {{ channel.indice }}</div>
-          <label class="toggle-chip">
+          <label class="toggle-chip toggle-chip-compact">
             <input type="checkbox" name="comissionado_{{ channel.id }}" {% if channel.comissionado %}checked{% endif %}>
-            <span>Comissionado</span>
           </label>
           <label class="field channel-field">
             <span>Descricao</span>
@@ -145,16 +144,16 @@
         <p class="muted">Renomear, mover ou excluir.</p>
       </div>
     </div>
-    <form class="channel-form" method="post">
+    <form class="manage-form" method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="update_module">
-      <div class="channel-row">
-        <div class="channel-index">Nome</div>
-        <input type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
+      <div class="manage-row">
+        <label class="manage-label" for="module-nome">Nome</label>
+        <input id="module-nome" type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
       </div>
-      <div class="channel-row">
-        <div class="channel-index">Slot vazio</div>
-        <select name="slot_id" {% if not has_vacant_slots %}disabled{% endif %}>
+      <div class="manage-row">
+        <label class="manage-label" for="module-slot">Slot vazio</label>
+        <select id="module-slot" name="slot_id" {% if not has_vacant_slots %}disabled{% endif %}>
           <option value="">Selecione</option>
           {% for vacant in vacant_slots %}
             <option value="{{ vacant.id }}">Slot{{ vacant.posicao|stringformat:"02d" }}</option>
@@ -162,9 +161,9 @@
         </select>
       </div>
       {% if not has_vacant_slots %}
-        <div class="muted">Nenhum slot vazio disponivel no rack.</div>
+        <div class="muted manage-note">Nenhum slot vazio disponivel no rack.</div>
       {% endif %}
-      <label class="checkbox-item">
+      <label class="checkbox-item manage-checkbox">
         <input type="checkbox" name="delete_module">
         Excluir modulo
       </label>

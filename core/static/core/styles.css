@@ -2642,6 +2642,44 @@ select {
   margin-top: 12px;
 }
 
+.manage-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.manage-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.manage-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+}
+
+.manage-form input,
+.manage-form select {
+  width: 100%;
+}
+
+.manage-note {
+  margin-top: -4px;
+}
+
+.manage-checkbox {
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: #fff6ef;
+  font-weight: 600;
+}
+
 .io-compact {
   padding: 16px;
 }
@@ -2675,6 +2713,10 @@ select {
 
 .channel-row-head .channel-col {
   font-weight: 600;
+}
+
+.channel-row-head .channel-col:nth-child(2) {
+  text-align: center;
 }
 
 .channel-type-select {
@@ -2711,6 +2753,10 @@ select {
 
   .channel-row-head {
     display: none;
+  }
+
+  .manage-row {
+    grid-template-columns: 1fr;
   }
 
   .channel-index {
@@ -2755,6 +2801,17 @@ select {
   accent-color: var(--accent);
 }
 
+.toggle-chip-compact {
+  padding: 6px 8px;
+  gap: 0;
+  width: 100%;
+  justify-content: center;
+}
+
+.toggle-chip-compact input {
+  margin: 0;
+}
+
 .channel-hint {
   margin-top: 12px;
 }
@@ -2787,12 +2844,12 @@ select {
   }
 
   .nav-top {
-    justify-content: center;
+    justify-content: space-between;
   }
 
   .nav-actions {
-    width: 100%;
-    justify-content: center;
+    width: auto;
+    justify-content: flex-end;
   }
 }
 
