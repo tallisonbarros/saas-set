@@ -15,6 +15,7 @@ class PerfilUsuario(models.Model):
     plantas = models.ManyToManyField("PlantaIO", blank=True, related_name="usuarios")
     financeiros = models.ManyToManyField("FinanceiroID", blank=True, related_name="usuarios")
     inventarios = models.ManyToManyField("InventarioID", blank=True, related_name="usuarios")
+    listas_ip = models.ManyToManyField("ListaIPID", blank=True, related_name="usuarios")
 
     def __str__(self):
         return self.nome
@@ -243,6 +244,65 @@ class InventarioID(models.Model):
 
     def __str__(self):
         return self.codigo
+
+
+class ListaIPID(models.Model):
+    codigo = models.CharField(max_length=40, unique=True)
+
+    class Meta:
+        ordering = ["codigo"]
+
+    def __str__(self):
+        return self.codigo
+
+
+class ListaIP(models.Model):
+    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="listas_ip")
+    id_listaip = models.ForeignKey(
+        ListaIPID,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="listas",
+    )
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    faixa_inicio = models.GenericIPAddressField()
+    faixa_fim = models.GenericIPAddressField()
+    protocolo_padrao = models.CharField(max_length=30, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class ListaIPItem(models.Model):
+    lista = models.ForeignKey(ListaIP, on_delete=models.CASCADE, related_name="ips")
+    ip = models.GenericIPAddressField()
+    nome_equipamento = models.CharField(max_length=120, blank=True)
+    mac = models.CharField(
+        max_length=30,
+        blank=True,
+        validators=[
+            RegexValidator(
+                regex=r"^[0-9A-Fa-f]{2}([:-]?[0-9A-Fa-f]{2}){5}$",
+                message="MAC deve estar no formato 00:11:22:33:44:55.",
+            )
+        ],
+    )
+    protocolo = models.CharField(max_length=30, blank=True)
+
+    class Meta:
+        ordering = ["ip"]
+        constraints = [
+            models.UniqueConstraint(fields=["lista", "ip"], name="unique_lista_ip"),
+        ]
+
+    def __str__(self):
+        return f"{self.lista.nome} - {self.ip}"
 
 
 class Inventario(models.Model):

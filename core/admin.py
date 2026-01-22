@@ -13,6 +13,9 @@ from .models import (
     PerfilUsuario,
     Inventario,
     InventarioID,
+    ListaIP,
+    ListaIPID,
+    ListaIPItem,
     PlantaIO,
     FinanceiroID,
     Compra,
@@ -103,6 +106,24 @@ class PlantaIOAdmin(admin.ModelAdmin):
 class InventarioIDAdmin(admin.ModelAdmin):
     list_display = ("codigo",)
     search_fields = ("codigo",)
+
+
+@admin.register(ListaIPID)
+class ListaIPIDAdmin(admin.ModelAdmin):
+    list_display = ("codigo",)
+    search_fields = ("codigo",)
+
+
+@admin.register(ListaIP)
+class ListaIPAdmin(admin.ModelAdmin):
+    list_display = ("nome", "cliente", "id_listaip", "faixa_inicio", "faixa_fim", "criado_em")
+    search_fields = ("nome", "cliente__nome", "id_listaip__codigo")
+
+
+@admin.register(ListaIPItem)
+class ListaIPItemAdmin(admin.ModelAdmin):
+    list_display = ("ip", "lista", "nome_equipamento", "mac", "protocolo")
+    search_fields = ("ip", "lista__nome", "nome_equipamento", "mac", "protocolo")
 
 
 @admin.register(Inventario)

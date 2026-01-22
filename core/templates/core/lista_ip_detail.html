@@ -1,0 +1,210 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Lista de IP{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'listas_ip_list' %}">Listas de IP</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ lista.nome }}</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Lista de IP</div>
+        <div class="hud-pill">Rede</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'listas_ip_list' %}">Voltar</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Lista</div>
+          <h1 class="page-title">{{ lista.nome }}</h1>
+          <p class="page-subtitle">{{ lista.descricao|default:"Sem descricao." }}</p>
+        </div>
+      </div>
+      <div class="hud-meta">
+        Faixa: {{ lista.faixa_inicio }} - {{ lista.faixa_fim }}
+        {% if lista.id_listaip %} | ID_LISTAIP: {{ lista.id_listaip.codigo }}{% endif %}
+      </div>
+    </div>
+    <div class="hud-bottom-actions">
+      {% if can_manage %}
+        <a class="btn btn-ghost btn-compact" href="#editar-lista">Editar lista</a>
+        <a class="btn btn-outline btn-compact" href="#ips">Gerenciar IPs</a>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if message %}
+    <div class="notice notice-{{ message_level }}">{{ message }}</div>
+  {% endif %}
+
+  <div class="io-layout">
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Resumo</h2>
+          <p class="muted">Status geral da lista.</p>
+        </div>
+      </div>
+      <div class="proposal-grid">
+        <article class="proposal-card io-proposal-card">
+          <div class="proposal-head">
+            <div>
+              <div class="proposal-title">IPs totais</div>
+              <div class="proposal-meta">Faixa completa cadastrada.</div>
+            </div>
+            <span class="slot-badge">{{ total_ips }}</span>
+          </div>
+        </article>
+        <article class="proposal-card io-proposal-card">
+          <div class="proposal-head">
+            <div>
+              <div class="proposal-title">IPs preenchidos</div>
+              <div class="proposal-meta">Com nome, MAC ou protocolo.</div>
+            </div>
+            <span class="slot-badge">{{ total_preenchidos }}</span>
+          </div>
+        </article>
+        <article class="proposal-card io-proposal-card">
+          <div class="proposal-head">
+            <div>
+              <div class="proposal-title">Protocolo padrao</div>
+              <div class="proposal-meta">{{ lista.protocolo_padrao|default:"Nao definido." }}</div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <details class="io-card io-discrete" id="editar-lista" {% if not can_manage %}open{% endif %}>
+      <summary class="io-discrete-summary">
+        <span class="io-title">Editar lista</span>
+        <span class="muted">Ajuste nome, faixa e protocolo.</span>
+      </summary>
+      <div class="io-discrete-body">
+        {% if can_manage %}
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome da lista</span>
+                <input type="text" name="nome" value="{{ lista.nome }}" required>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" value="{{ lista.descricao }}">
+              </label>
+              <label class="field">
+                <span>Faixa inicio</span>
+                <input type="text" name="faixa_inicio" value="{{ lista.faixa_inicio }}" required>
+              </label>
+              <label class="field">
+                <span>Faixa fim</span>
+                <input type="text" name="faixa_fim" value="{{ lista.faixa_fim }}" required>
+              </label>
+              <label class="field">
+                <span>Protocolo padrao</span>
+                <input type="text" name="protocolo_padrao" value="{{ lista.protocolo_padrao }}">
+              </label>
+              <label class="field">
+                <span>ID_LISTAIP</span>
+                <input type="text" name="id_listaip" value="{% if lista.id_listaip %}{{ lista.id_listaip.codigo }}{% endif %}">
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit" name="action" value="update_lista">Salvar lista</button>
+              <button class="btn btn-ghost" type="submit" name="action" value="regenerate_range">Regerar faixa</button>
+              <button class="btn btn-outline" type="submit" name="action" value="apply_default_protocol">Aplicar protocolo padrao</button>
+            </div>
+          </form>
+          <form method="post" style="margin-top: 12px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_lista">
+            <button class="btn btn-ghost" type="submit" onclick="return confirm('Excluir esta lista?');">Excluir lista</button>
+          </form>
+        {% else %}
+          <div class="muted">Voce tem acesso somente para leitura.</div>
+        {% endif %}
+      </div>
+    </details>
+
+    <section class="io-card io-wide" id="ips">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">IPs da lista</h2>
+          <p class="muted">Atualize nome do equipamento, MAC e protocolo.</p>
+        </div>
+      </div>
+      <form class="io-search-form" method="get">
+        <div class="io-search-row">
+          <label class="field io-search-field">
+            <span>Pesquisar</span>
+            <input type="text" name="q" value="{{ search_term }}" placeholder="IP, equipamento, MAC ou protocolo" autocomplete="off">
+          </label>
+          <div class="io-search-actions">
+            <button class="btn btn-primary" type="submit">Pesquisar</button>
+            {% if search_term %}
+              <a class="btn btn-ghost" href="{% url 'lista_ip_detail' lista.id %}">Limpar</a>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>IP</th>
+              <th>Nome do equipamento</th>
+              <th>MAC</th>
+              <th>Protocolo</th>
+              {% if can_manage %}<th></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+              <tr>
+                <td>{{ item.ip }}</td>
+                {% if can_manage %}
+                  <td>
+                      <input type="text" name="nome_equipamento" value="{{ item.nome_equipamento }}" placeholder="Equipamento" form="item-form-{{ item.id }}">
+                  </td>
+                  <td>
+                      <input type="text" name="mac" value="{{ item.mac }}" placeholder="00:11:22:33:44:55" form="item-form-{{ item.id }}">
+                  </td>
+                  <td>
+                      <input type="text" name="protocolo" value="{{ item.protocolo }}" placeholder="Modbus TCP" form="item-form-{{ item.id }}">
+                  </td>
+                  <td>
+                      <form method="post" id="item-form-{{ item.id }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_item">
+                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                        <button class="btn btn-ghost btn-compact" type="submit">Salvar</button>
+                      </form>
+                  </td>
+                {% else %}
+                  <td>{{ item.nome_equipamento|default:"-" }}</td>
+                  <td>{{ item.mac|default:"-" }}</td>
+                  <td>{{ item.protocolo|default:"-" }}</td>
+                {% endif %}
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="{% if can_manage %}5{% else %}4{% endif %}" class="muted">Nenhum IP encontrado.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+{% endblock %}

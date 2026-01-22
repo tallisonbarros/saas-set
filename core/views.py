@@ -1,4 +1,5 @@
 import calendar
+import ipaddress
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -32,6 +33,9 @@ from .models import (
     FinanceiroID,
     Inventario,
     InventarioID,
+    ListaIP,
+    ListaIPID,
+    ListaIPItem,
     PlantaIO,
     Proposta,
     PropostaAnexo,
@@ -306,6 +310,44 @@ def _is_parcela_valid(value):
     if not value:
         return True
     return bool(_parse_parcela(value))
+
+
+def _ip_range_values(start, end, limit=2048):
+    try:
+        start_ip = ipaddress.ip_address((start or "").strip())
+        end_ip = ipaddress.ip_address((end or "").strip())
+    except ValueError:
+        return None, "IP invalido."
+    if start_ip.version != end_ip.version:
+        return None, "Faixa deve usar o mesmo tipo de IP."
+    start_int = int(start_ip)
+    end_int = int(end_ip)
+    if end_int < start_int:
+        return None, "Faixa invalida."
+    total = end_int - start_int + 1
+    if total > limit:
+        return None, f"Faixa excede limite de {limit} IPs."
+    values = [str(ipaddress.ip_address(ip_int)) for ip_int in range(start_int, end_int + 1)]
+    return values, None
+
+
+def _sync_lista_ip_items(lista, ip_values):
+    existing = {item.ip: item for item in lista.ips.all()}
+    incoming = set(ip_values)
+    to_create = [
+        ListaIPItem(
+            lista=lista,
+            ip=ip_value,
+            protocolo=lista.protocolo_padrao or "",
+        )
+        for ip_value in ip_values
+        if ip_value not in existing
+    ]
+    if to_create:
+        ListaIPItem.objects.bulk_create(to_create)
+    remove_ips = set(existing.keys()) - incoming
+    if remove_ips:
+        lista.ips.filter(ip__in=remove_ips).delete()
 
 
 def home(request):
@@ -1519,6 +1561,195 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
 
 
 @login_required
+def listas_ip_list(request):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    message = None
+    message_level = "info"
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_lista":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            faixa_inicio = request.POST.get("faixa_inicio", "").strip()
+            faixa_fim = request.POST.get("faixa_fim", "").strip()
+            protocolo_padrao = request.POST.get("protocolo_padrao", "").strip()
+            id_listaip_raw = request.POST.get("id_listaip", "").strip()
+            if not nome:
+                message = "Informe um nome para a lista."
+                message_level = "error"
+            else:
+                ip_values, error = _ip_range_values(faixa_inicio, faixa_fim)
+                if error:
+                    message = error
+                    message_level = "error"
+                else:
+                    id_listaip = None
+                    if id_listaip_raw:
+                        id_listaip, _ = ListaIPID.objects.get_or_create(codigo=id_listaip_raw.upper())
+                    lista = ListaIP.objects.create(
+                        cliente=cliente,
+                        id_listaip=id_listaip,
+                        nome=nome,
+                        descricao=descricao,
+                        faixa_inicio=faixa_inicio,
+                        faixa_fim=faixa_fim,
+                        protocolo_padrao=protocolo_padrao,
+                    )
+                    _sync_lista_ip_items(lista, ip_values)
+                    return redirect("listas_ip_list")
+
+    if request.user.is_staff and not cliente:
+        listas = ListaIP.objects.all()
+        can_manage = True
+    else:
+        listas = ListaIP.objects.filter(Q(cliente=cliente) | Q(id_listaip__in=cliente.listas_ip.all()))
+        can_manage = bool(cliente)
+
+    listas = listas.annotate(total_ips=Count("ips")).order_by("nome")
+    return render(
+        request,
+        "core/listas_ip_list.html",
+        {
+            "listas": listas,
+            "can_manage": can_manage,
+            "message": message,
+            "message_level": message_level,
+        },
+    )
+
+
+@login_required
+def lista_ip_detail(request, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    if request.user.is_staff and not cliente:
+        lista = get_object_or_404(ListaIP, pk=pk)
+        can_manage = True
+    else:
+        lista = get_object_or_404(
+            ListaIP,
+            Q(pk=pk),
+            Q(cliente=cliente) | Q(id_listaip__in=cliente.listas_ip.all()),
+        )
+        can_manage = bool(cliente) and lista.cliente_id == cliente.id
+
+    message = request.GET.get("msg", "").strip()
+    message_level = request.GET.get("level", "").strip() or "info"
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action in {"update_lista", "regenerate_range", "delete_lista", "update_item", "apply_default_protocol"}:
+            if not can_manage and not request.user.is_staff:
+                return HttpResponseForbidden("Sem permissao.")
+        if action == "update_lista":
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            faixa_inicio = request.POST.get("faixa_inicio", "").strip()
+            faixa_fim = request.POST.get("faixa_fim", "").strip()
+            protocolo_padrao = request.POST.get("protocolo_padrao", "").strip()
+            id_listaip_raw = request.POST.get("id_listaip", "").strip()
+            if not nome:
+                message = "Informe um nome para a lista."
+                message_level = "error"
+            else:
+                ip_values, error = _ip_range_values(faixa_inicio, faixa_fim)
+                if error:
+                    message = error
+                    message_level = "error"
+                else:
+                    id_listaip = None
+                    if id_listaip_raw:
+                        id_listaip, _ = ListaIPID.objects.get_or_create(codigo=id_listaip_raw.upper())
+                    lista.nome = nome
+                    lista.descricao = descricao
+                    lista.faixa_inicio = faixa_inicio
+                    lista.faixa_fim = faixa_fim
+                    lista.protocolo_padrao = protocolo_padrao
+                    lista.id_listaip = id_listaip
+                    lista.save(
+                        update_fields=[
+                            "nome",
+                            "descricao",
+                            "faixa_inicio",
+                            "faixa_fim",
+                            "protocolo_padrao",
+                            "id_listaip",
+                        ]
+                    )
+                    _sync_lista_ip_items(lista, ip_values)
+                    return redirect("lista_ip_detail", pk=lista.pk)
+        if action == "regenerate_range":
+            ip_values, error = _ip_range_values(lista.faixa_inicio, lista.faixa_fim)
+            if error:
+                message = error
+                message_level = "error"
+            else:
+                _sync_lista_ip_items(lista, ip_values)
+                message = "Faixa atualizada."
+                message_level = "success"
+        if action == "apply_default_protocol":
+            if lista.protocolo_padrao:
+                ListaIPItem.objects.filter(lista=lista, protocolo="").update(protocolo=lista.protocolo_padrao)
+                message = "Protocolo aplicado nos IPs sem valor."
+                message_level = "success"
+            else:
+                message = "Defina um protocolo padrao antes."
+                message_level = "error"
+        if action == "delete_lista":
+            lista.delete()
+            return redirect("listas_ip_list")
+        if action == "update_item":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(ListaIPItem, pk=item_id, lista=lista)
+            item.nome_equipamento = request.POST.get("nome_equipamento", "").strip()
+            item.mac = request.POST.get("mac", "").strip()
+            item.protocolo = request.POST.get("protocolo", "").strip()
+            item.save(update_fields=["nome_equipamento", "mac", "protocolo"])
+            return redirect("lista_ip_detail", pk=lista.pk)
+
+    search_term = request.GET.get("q", "").strip()
+    items = ListaIPItem.objects.filter(lista=lista)
+    if search_term:
+        items = items.filter(
+            Q(ip__icontains=search_term)
+            | Q(nome_equipamento__icontains=search_term)
+            | Q(mac__icontains=search_term)
+            | Q(protocolo__icontains=search_term)
+        )
+    items = list(items)
+    items.sort(key=lambda item: ipaddress.ip_address(item.ip))
+    total_ips = ListaIPItem.objects.filter(lista=lista).count()
+    total_preenchidos = ListaIPItem.objects.filter(
+        lista=lista,
+    ).filter(
+        Q(nome_equipamento__gt="")
+        | Q(mac__gt="")
+        | Q(protocolo__gt="")
+    ).count()
+    return render(
+        request,
+        "core/lista_ip_detail.html",
+        {
+            "lista": lista,
+            "items": items,
+            "total_ips": total_ips,
+            "total_preenchidos": total_preenchidos,
+            "search_term": search_term,
+            "can_manage": can_manage or request.user.is_staff,
+            "message": message,
+            "message_level": message_level,
+        },
+    )
+
+
+@login_required
 def ios_rack_modulo_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
@@ -2037,6 +2268,7 @@ def usuarios_gerenciar_usuario(request, pk):
             plantas_raw = request.POST.get("plantas", "")
             financeiros_raw = request.POST.get("financeiros", "")
             inventarios_raw = request.POST.get("inventarios", "")
+            listas_ip_raw = request.POST.get("listas_ip", "")
             if not perfil:
                 perfil = PerfilUsuario.objects.create(
                     nome=nome or user.username.split("@")[0],
@@ -2073,6 +2305,12 @@ def usuarios_gerenciar_usuario(request, pk):
             inv_codes = [code.strip().upper() for code in cleaned_inv.split(",") if code.strip()]
             inventarios = [InventarioID.objects.get_or_create(codigo=code)[0] for code in inv_codes]
             perfil.inventarios.set(inventarios)
+            cleaned_ip = listas_ip_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned_ip = cleaned_ip.replace(sep, ",")
+            ip_codes = [code.strip().upper() for code in cleaned_ip.split(",") if code.strip()]
+            listas_ip = [ListaIPID.objects.get_or_create(codigo=code)[0] for code in ip_codes]
+            perfil.listas_ip.set(listas_ip)
             return redirect("usuarios_gerenciar_usuario", pk=user.pk)
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()
@@ -2124,6 +2362,7 @@ def meu_perfil(request):
             plantas_raw = request.POST.get("plantas", "")
             financeiros_raw = request.POST.get("financeiros", "")
             inventarios_raw = request.POST.get("inventarios", "")
+            listas_ip_raw = request.POST.get("listas_ip", "")
             if not perfil:
                 perfil = PerfilUsuario.objects.create(
                     nome=nome or (user.username.split("@")[0] if user.username else "Usuario"),
@@ -2158,6 +2397,12 @@ def meu_perfil(request):
             inv_codes = [code.strip().upper() for code in cleaned_inv.split(",") if code.strip()]
             inventarios = [InventarioID.objects.get_or_create(codigo=code)[0] for code in inv_codes]
             perfil.inventarios.set(inventarios)
+            cleaned_ip = listas_ip_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned_ip = cleaned_ip.replace(sep, ",")
+            ip_codes = [code.strip().upper() for code in cleaned_ip.split(",") if code.strip()]
+            listas_ip = [ListaIPID.objects.get_or_create(codigo=code)[0] for code in ip_codes]
+            perfil.listas_ip.set(listas_ip)
             return redirect("meu_perfil")
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()

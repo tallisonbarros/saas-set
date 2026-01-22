@@ -111,6 +111,15 @@
               value="{% if perfil %}{% for inv in perfil.inventarios.all %}{{ inv.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
             >
           </label>
+          <label class="field">
+            <span>ID_LISTAIP (separados por virgula)</span>
+            <input
+              type="text"
+              name="listas_ip"
+              placeholder="LIP-001, LIP-002"
+              value="{% if perfil %}{% for lista in perfil.listas_ip.all %}{{ lista.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+            >
+          </label>
           <button class="btn btn-primary" type="submit">Salvar perfil</button>
         </form>
       </div>

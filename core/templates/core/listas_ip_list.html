@@ -1,0 +1,118 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Listas de IP{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <span>Listas de IP</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Controle de rede</div>
+        <div class="hud-pill">Listas de IP</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <p class="page-subtitle">Gerencie faixas de IP e inventario de equipamentos.</p>
+        </div>
+      </div>
+      <div class="hud-meta">Crie listas, compartilhe por ID e mantenha os dados atualizados.</div>
+    </div>
+    <div class="hud-bottom-actions">
+      {% if can_manage %}
+        <a class="btn btn-ghost btn-compact" href="#nova-lista">Nova lista</a>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if message %}
+    <div class="notice notice-{{ message_level }}">{{ message }}</div>
+  {% endif %}
+
+  <div class="io-layout">
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Listas cadastradas</h2>
+          <p class="muted">Selecione uma lista para editar IPs, MAC e protocolo.</p>
+        </div>
+      </div>
+      <div class="proposal-grid">
+        {% for lista in listas %}
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'lista_ip_detail' lista.id %}" aria-label="Abrir lista"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ lista.nome }}</div>
+                <div class="proposal-meta">{{ lista.descricao|default:"Lista sem descricao." }}</div>
+              </div>
+              <span class="slot-badge">{{ lista.total_ips }} IPs</span>
+            </div>
+            <div class="proposal-meta">Faixa: {{ lista.faixa_inicio }} - {{ lista.faixa_fim }}</div>
+            {% if lista.protocolo_padrao %}
+              <div class="proposal-meta">Protocolo padrao: {{ lista.protocolo_padrao }}</div>
+            {% endif %}
+            {% if lista.id_listaip %}
+              <div class="proposal-meta">ID_LISTAIP: {{ lista.id_listaip.codigo }}</div>
+            {% endif %}
+          </article>
+        {% empty %}
+          <div class="muted">Nenhuma lista cadastrada ainda.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <details class="io-card io-discrete" id="nova-lista">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Nova lista de IP</span>
+        <span class="muted">Cadastrar lista e gerar IPs automaticamente.</span>
+      </summary>
+      <div class="io-discrete-body">
+        {% if can_manage %}
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_lista">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome da lista</span>
+                <input type="text" name="nome" placeholder="Lista rede principal" required>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" placeholder="Linha 01 - Automacao">
+              </label>
+              <label class="field">
+                <span>Faixa inicio</span>
+                <input type="text" name="faixa_inicio" placeholder="192.168.0.1" required>
+              </label>
+              <label class="field">
+                <span>Faixa fim</span>
+                <input type="text" name="faixa_fim" placeholder="192.168.0.50" required>
+              </label>
+              <label class="field">
+                <span>Protocolo padrao</span>
+                <input type="text" name="protocolo_padrao" placeholder="Modbus TCP">
+              </label>
+              <label class="field">
+                <span>ID_LISTAIP</span>
+                <input type="text" name="id_listaip" placeholder="LIP-001">
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Salvar lista</button>
+            </div>
+          </form>
+        {% else %}
+          <div class="muted">Apenas clientes cadastrados podem criar listas.</div>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+{% endblock %}
