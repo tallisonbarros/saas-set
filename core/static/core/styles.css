@@ -1023,6 +1023,50 @@ body {
   }
 }
 
+@media (max-width: 820px) {
+  .finance-wide .table,
+  .finance-wide .table thead,
+  .finance-wide .table tbody,
+  .finance-wide .table th,
+  .finance-wide .table td,
+  .finance-wide .table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .finance-wide .table thead {
+    display: none;
+  }
+
+  .finance-wide .table tr {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    margin-bottom: 12px;
+  }
+
+  .finance-wide .table td {
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .finance-wide .table td:last-child {
+    border-bottom: none;
+  }
+
+  .finance-wide .table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+  }
+}
+
 .item-grid {
   display: grid;
   gap: 10px;
