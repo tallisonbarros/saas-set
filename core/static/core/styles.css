@@ -1346,6 +1346,15 @@ select {
   gap: 16px;
 }
 
+.card.stack {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.card.stack > * {
+  min-width: 0;
+}
+
 .stack.centered {
   justify-items: center;
 }
