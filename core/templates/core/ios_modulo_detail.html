@@ -25,16 +25,6 @@
           <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
           <a class="hud-menu-pill" href="{% url 'ios_rack_detail' rack.id %}">Voltar</a>
         </div>
-        {% if rack.local or rack.grupo %}
-          <div class="hud-tagset">
-            {% if rack.local %}
-              <span class="hud-pill">{{ rack.local.nome }}</span>
-            {% endif %}
-            {% if rack.grupo %}
-              <span class="hud-pill">{{ rack.grupo.nome }}</span>
-            {% endif %}
-          </div>
-        {% endif %}
       </div>
       <div class="page-hud-head centered">
         <div class="page-hud-main">
@@ -42,6 +32,16 @@
             <div class="hud-meta centered">{{ rack.descricao }}</div>
           {% endif %}
           <h1 class="page-title">{{ rack.nome }}</h1>
+          {% if rack.local or rack.grupo %}
+            <div class="hud-tagset">
+              {% if rack.local %}
+                <span class="hud-pill">{{ rack.local.nome }}</span>
+              {% endif %}
+              {% if rack.grupo %}
+                <span class="hud-pill">{{ rack.grupo.nome }}</span>
+              {% endif %}
+            </div>
+          {% endif %}
           <div class="rack-slot-head">
             <div class="rack-slot-nav">
               {% if prev_slot %}

@@ -22,16 +22,6 @@
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
         </div>
-        {% if rack.local or rack.grupo %}
-          <div class="hud-tagset">
-            {% if rack.local %}
-              <span class="hud-pill">{{ rack.local.nome }}</span>
-            {% endif %}
-            {% if rack.grupo %}
-              <span class="hud-pill">{{ rack.grupo.nome }}</span>
-            {% endif %}
-          </div>
-        {% endif %}
       </div>
       <div class="page-hud-head">
         <div>
@@ -39,6 +29,16 @@
             <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
           {% endif %}
           <h1 class="page-title">{{ rack.nome }}</h1>
+          {% if rack.local or rack.grupo %}
+            <div class="hud-tagset">
+              {% if rack.local %}
+                <span class="hud-pill">{{ rack.local.nome }}</span>
+              {% endif %}
+              {% if rack.grupo %}
+                <span class="hud-pill">{{ rack.grupo.nome }}</span>
+              {% endif %}
+            </div>
+          {% endif %}
           <p class="page-subtitle">{{ rack.descricao }}</p>
         </div>
       </div>
