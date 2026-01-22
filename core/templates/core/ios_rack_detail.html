@@ -28,7 +28,6 @@
           {% if rack.inventario %}
             <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
           {% endif %}
-          <h1 class="page-title">{{ rack.nome }}</h1>
           {% if rack.local or rack.grupo %}
             <div class="hud-tagset">
               {% if rack.local %}
@@ -39,6 +38,7 @@
               {% endif %}
             </div>
           {% endif %}
+          <h1 class="page-title">{{ rack.nome }}</h1>
           <p class="page-subtitle">{{ rack.descricao }}</p>
         </div>
       </div>

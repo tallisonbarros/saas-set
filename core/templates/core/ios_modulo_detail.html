@@ -33,7 +33,7 @@
           {% endif %}
           <h1 class="page-title">{{ rack.nome }}</h1>
           {% if rack.local or rack.grupo %}
-            <div class="hud-tagset">
+            <div class="hud-tagset hud-tagset-centered">
               {% if rack.local %}
                 <span class="hud-pill">{{ rack.local.nome }}</span>
               {% endif %}
@@ -79,6 +79,13 @@
     <form class="channel-form" method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="update_channels">
+      <div class="channel-row channel-row-head" aria-hidden="true">
+        <div class="channel-index">Canal</div>
+        <div class="channel-col">Comissionado</div>
+        <div class="channel-col">Descricao</div>
+        <div class="channel-col">Tipo</div>
+        <div class="channel-col">Vinculo</div>
+      </div>
       {% for channel in channels %}
         <div class="channel-row">
           <div class="channel-index">Canal {{ channel.indice }}</div>
