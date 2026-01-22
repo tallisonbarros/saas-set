@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
                     "cliente",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="listas_ip",
+                        related_name="listas_ip_listas",
                         to="core.perfilusuario",
                     ),
                 ),

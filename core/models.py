@@ -257,7 +257,7 @@ class ListaIPID(models.Model):
 
 
 class ListaIP(models.Model):
-    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="listas_ip")
+    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="listas_ip_listas")
     id_listaip = models.ForeignKey(
         ListaIPID,
         on_delete=models.SET_NULL,
