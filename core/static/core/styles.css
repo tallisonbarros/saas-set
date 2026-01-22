@@ -547,6 +547,14 @@ body {
   gap: 8px;
 }
 
+.status-badges {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+
 .proposal-actions {
   display: flex;
   gap: 8px;

@@ -145,19 +145,17 @@
             <div class="proposal-head">
               <div>
                 <div class="proposal-title">{{ ativo.nome }}</div>
-                <div class="proposal-meta">{% if ativo.tipo %}{{ ativo.tipo.nome }}{% else %}Tipo nao informado{% endif %}</div>
+                <div class="proposal-meta">
+                  {% if ativo.tag_set %}{{ ativo.tag_set }} - {% endif %}
+                  {% if ativo.tipo %}{{ ativo.tipo.nome }}{% else %}Tipo nao informado{% endif %}
+                </div>
+                {% if ativo.tag_interna %}
+                  <div class="proposal-meta">Tag interna: {{ ativo.tag_interna }}</div>
+                {% endif %}
                 <div class="proposal-meta">Setor: {{ ativo.setor|default:"-" }}</div>
               </div>
               <div class="module-meta">
-                <div class="proposal-badges">
-                  {% if ativo.tag_set %}
-                    <span class="badge badge-tagset">
-                      {% if ativo.tipo %}{{ ativo.tag_set }}-{{ ativo.tipo.codigo }}{% else %}{{ ativo.tag_set }}{% endif %}
-                    </span>
-                  {% endif %}
-                  {% if ativo.tag_interna %}
-                    <span class="badge badge-tagint">Tag interna: {{ ativo.tag_interna }}</span>
-                  {% endif %}
+                <div class="status-badges">
                   {% if ativo.comissionado %}
                     <span class="badge badge-comissionado" aria-label="Comissionado" title="Comissionado">
                       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
