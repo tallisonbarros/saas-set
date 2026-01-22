@@ -384,8 +384,6 @@ def ios_list(request):
         )
     locais = LocalRackIO.objects.order_by("nome")
     grupos = GrupoRackIO.objects.order_by("nome")
-    grupos = GrupoRackIO.objects.order_by("nome")
-    grupos = GrupoRackIO.objects.order_by("nome")
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
@@ -512,6 +510,7 @@ def ios_list(request):
         )
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     locais = LocalRackIO.objects.order_by("nome")
+    grupos = GrupoRackIO.objects.order_by("nome")
     grupos = GrupoRackIO.objects.order_by("nome")
     search_term = request.GET.get("q", "").strip()
     search_results = []
