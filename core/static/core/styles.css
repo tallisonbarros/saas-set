@@ -2003,6 +2003,17 @@ select {
   color: var(--accent);
 }
 
+.slot-badge-compact {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  background: #f6f8fb;
+  color: #7b8794;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
 .module-list {
   display: grid;
   gap: 12px;
