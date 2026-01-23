@@ -1,0 +1,108 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Radar de atividades{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <span>Radar de atividades</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Radar de atividades</div>
+        <div class="hud-pill">Trabalhos</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <p class="page-subtitle">Registre trabalhos e acompanhe atividades por setor.</p>
+        </div>
+      </div>
+      <div class="hud-meta">Crie radares, compartilhe por ID e acompanhe execucoes.</div>
+    </div>
+    <div class="hud-bottom-actions">
+      {% if can_manage %}
+        <a class="btn btn-ghost btn-compact" href="#novo-radar">Novo radar</a>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if message %}
+    <div class="notice notice-{{ message_level }}">{{ message }}</div>
+  {% endif %}
+
+  <div class="io-layout">
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Radares cadastrados</h2>
+          <p class="muted">Selecione um radar para gerenciar trabalhos e atividades.</p>
+        </div>
+      </div>
+      <div class="proposal-grid">
+        {% for radar in radars %}
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'radar_detail' radar.id %}" aria-label="Abrir radar"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ radar.nome }}</div>
+                <div class="proposal-meta">{{ radar.descricao|default:"Radar sem descricao." }}</div>
+              </div>
+              <span class="slot-badge">{{ radar.total_trabalhos }} trabalhos</span>
+            </div>
+            <div class="proposal-meta">Atividades: {{ radar.total_atividades }}</div>
+            <div class="proposal-meta">Local: {{ radar.local|default:"-" }}</div>
+            {% if radar.id_radar %}
+              <div class="proposal-meta">ID_RADAR: {{ radar.id_radar.codigo }}</div>
+            {% endif %}
+          </article>
+        {% empty %}
+          <div class="muted">Nenhum radar cadastrado ainda.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <details class="io-card io-discrete" id="novo-radar">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Novo radar</span>
+        <span class="muted">Clique para cadastrar um radar.</span>
+      </summary>
+      <div class="io-discrete-body">
+        {% if can_manage %}
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_radar">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome do radar</span>
+                <input type="text" name="nome" placeholder="Radar manutencao" required>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" placeholder="Linha 01 - Execucao preventiva">
+              </label>
+              <label class="field">
+                <span>Local</span>
+                <input type="text" name="local" placeholder="Planta A">
+              </label>
+              <label class="field">
+                <span>ID_RADAR</span>
+                <input type="text" name="id_radar" placeholder="RDR-001">
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Salvar radar</button>
+            </div>
+          </form>
+        {% else %}
+          <div class="muted">Apenas clientes cadastrados podem criar radares.</div>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+{% endblock %}

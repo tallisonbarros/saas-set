@@ -1,0 +1,169 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ radar.nome }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'radar_list' %}">Radar de atividades</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ radar.nome }}</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Radar de atividades</div>
+        <div class="hud-pill">Trabalhos</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'radar_list' %}">Inicio do modulo</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">{{ radar.nome }}</h1>
+          <p class="page-subtitle">
+            {{ radar.descricao|default:"Radar para acompanhamento de atividades." }}
+          </p>
+        </div>
+      </div>
+      <div class="rack-status">
+        <div>
+          <div class="meta-label">Trabalhos</div>
+          <div class="meta-value">{{ trabalhos|length }}</div>
+        </div>
+        <div>
+          <div class="meta-label">ID_RADAR</div>
+          <div class="meta-value">{% if radar.id_radar %}{{ radar.id_radar.codigo }}{% else %}-{% endif %}</div>
+        </div>
+        <div>
+          <div class="meta-label">Local</div>
+          <div class="meta-value">{{ radar.local|default:"-" }}</div>
+        </div>
+        <div>
+          <div class="meta-label">Criador</div>
+          <div class="meta-value">
+            {% if radar.criador %}{{ radar.criador.get_full_name|default:radar.criador.username }}{% else %}-{% endif %}
+          </div>
+        </div>
+      </div>
+      {% if message %}
+        <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="io-layout">
+    <details class="io-card io-discrete" id="novo-trabalho">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Novo trabalho</span>
+        <span class="muted">Cadastre um trabalho e organize atividades.</span>
+      </summary>
+      <div class="io-discrete-body">
+        {% if can_manage %}
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_trabalho">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome</span>
+                <input type="text" name="nome" placeholder="Trabalho eletrico" required>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" placeholder="Revisao preventiva">
+              </label>
+              <label class="field">
+                <span>Data de registro</span>
+                <input type="date" name="data_registro">
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Salvar trabalho</button>
+            </div>
+          </form>
+        {% else %}
+          <div class="muted">Apenas clientes cadastrados podem criar trabalhos.</div>
+        {% endif %}
+      </div>
+    </details>
+
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Trabalhos cadastrados</h2>
+          <p class="muted">Abra um trabalho para registrar atividades.</p>
+        </div>
+      </div>
+      <div class="proposal-grid">
+        {% for trabalho in trabalhos %}
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ trabalho.nome }}</div>
+                <div class="proposal-meta">{{ trabalho.descricao|default:"Trabalho sem descricao." }}</div>
+                <div class="proposal-meta">Registrado em: {{ trabalho.data_registro|date:"d/m/Y" }}</div>
+              </div>
+              <div class="module-meta">
+                <span class="badge badge-{{ trabalho.status|lower }}">{{ trabalho.get_status_display }}</span>
+                <span class="slot-badge slot-badge-compact">{{ trabalho.total_atividades }} atividades</span>
+              </div>
+            </div>
+          </article>
+        {% empty %}
+          <div class="muted">Nenhum trabalho cadastrado ainda.</div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <details class="io-card io-discrete" style="margin-top: 18px;">
+    <summary class="io-discrete-summary">
+      <span class="io-title">Editar radar</span>
+      <span class="muted">Ajuste os dados gerais do radar.</span>
+    </summary>
+    <div class="io-discrete-body">
+      {% if can_manage %}
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_radar">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome</span>
+              <input type="text" name="nome" value="{{ radar.nome }}" required>
+            </label>
+            <label class="field">
+              <span>ID_RADAR</span>
+              <input type="text" name="id_radar" value="{% if radar.id_radar %}{{ radar.id_radar.codigo }}{% endif %}">
+            </label>
+            <label class="field">
+              <span>Local</span>
+              <input type="text" name="local" value="{{ radar.local|default:'' }}">
+            </label>
+            <label class="field" style="grid-column: 1 / -1;">
+              <span>Descricao</span>
+              <textarea name="descricao" rows="3">{{ radar.descricao|default:'' }}</textarea>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+          </div>
+        </form>
+        <form method="post" onsubmit="return confirm('Excluir radar? Esta acao nao pode ser desfeita.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete_radar">
+          <div class="form-actions">
+            <button class="btn btn-outline" type="submit">Excluir radar</button>
+          </div>
+        </form>
+      {% else %}
+        <div class="muted">Apenas o criador pode editar este radar.</div>
+      {% endif %}
+    </div>
+  </details>
+{% endblock %}

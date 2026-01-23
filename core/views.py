@@ -36,6 +36,11 @@ from .models import (
     ListaIP,
     ListaIPID,
     ListaIPItem,
+    Radar,
+    RadarAtividade,
+    RadarContrato,
+    RadarID,
+    RadarTrabalho,
     PlantaIO,
     Proposta,
     PropostaAnexo,
@@ -348,6 +353,21 @@ def _sync_lista_ip_items(lista, ip_values):
     remove_ips = set(existing.keys()) - incoming
     if remove_ips:
         lista.ips.filter(ip__in=remove_ips).delete()
+
+
+def _sync_trabalho_status(trabalho):
+    statuses = list(trabalho.atividades.values_list("status", flat=True))
+    if not statuses:
+        novo_status = RadarTrabalho.Status.PENDENTE
+    elif all(status == RadarTrabalho.Status.FINALIZADA for status in statuses):
+        novo_status = RadarTrabalho.Status.FINALIZADA
+    elif any(status == RadarTrabalho.Status.EXECUTANDO for status in statuses):
+        novo_status = RadarTrabalho.Status.EXECUTANDO
+    else:
+        novo_status = RadarTrabalho.Status.PENDENTE
+    if trabalho.status != novo_status:
+        trabalho.status = novo_status
+        trabalho.save(update_fields=["status"])
 
 
 def home(request):
@@ -1750,6 +1770,319 @@ def lista_ip_detail(request, pk):
 
 
 @login_required
+def radar_list(request):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    message = None
+    message_level = "info"
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_radar":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            local = request.POST.get("local", "").strip()
+            id_radar_raw = request.POST.get("id_radar", "").strip()
+            if not nome:
+                message = "Informe um nome para o radar."
+                message_level = "error"
+            else:
+                id_radar = None
+                if id_radar_raw:
+                    id_radar, _ = RadarID.objects.get_or_create(codigo=id_radar_raw.upper())
+                Radar.objects.create(
+                    cliente=cliente,
+                    nome=nome,
+                    descricao=descricao,
+                    local=local,
+                    id_radar=id_radar,
+                    criador=request.user,
+                )
+                return redirect("radar_list")
+
+    if request.user.is_staff and not cliente:
+        radars = Radar.objects.all()
+        can_manage = True
+    else:
+        radars = Radar.objects.filter(Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()))
+        can_manage = bool(cliente)
+
+    radars = radars.annotate(
+        total_trabalhos=Count("trabalhos", distinct=True),
+        total_atividades=Count("trabalhos__atividades", distinct=True),
+    ).order_by("nome")
+    return render(
+        request,
+        "core/radar_list.html",
+        {
+            "radars": radars,
+            "can_manage": can_manage,
+            "message": message,
+            "message_level": message_level,
+        },
+    )
+
+
+@login_required
+def radar_detail(request, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    if request.user.is_staff and not cliente:
+        radar = get_object_or_404(Radar, pk=pk)
+        can_manage = True
+    else:
+        radar = get_object_or_404(
+            Radar,
+            Q(pk=pk),
+            Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
+        )
+        can_manage = bool(cliente) and radar.cliente_id == cliente.id
+
+    message = None
+    message_level = "info"
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action in {"create_trabalho", "update_radar", "delete_radar"}:
+            if not can_manage and not request.user.is_staff:
+                return HttpResponseForbidden("Sem permissao.")
+        if action == "create_trabalho":
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            data_raw = request.POST.get("data_registro", "").strip()
+            data_registro = None
+            if data_raw:
+                try:
+                    data_registro = datetime.strptime(data_raw, "%Y-%m-%d").date()
+                except ValueError:
+                    data_registro = None
+            if not nome:
+                message = "Informe um nome para o trabalho."
+                message_level = "error"
+            else:
+                RadarTrabalho.objects.create(
+                    radar=radar,
+                    nome=nome,
+                    descricao=descricao,
+                    data_registro=data_registro or timezone.localdate(),
+                )
+                return redirect("radar_detail", pk=radar.pk)
+        if action == "update_radar":
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            local = request.POST.get("local", "").strip()
+            id_radar_raw = request.POST.get("id_radar", "").strip()
+            if not nome:
+                message = "Informe um nome para o radar."
+                message_level = "error"
+            else:
+                id_radar = None
+                if id_radar_raw:
+                    id_radar, _ = RadarID.objects.get_or_create(codigo=id_radar_raw.upper())
+                radar.nome = nome
+                radar.descricao = descricao
+                radar.local = local
+                radar.id_radar = id_radar
+                radar.save(update_fields=["nome", "descricao", "local", "id_radar"])
+                return redirect("radar_detail", pk=radar.pk)
+        if action == "delete_radar":
+            radar.delete()
+            return redirect("radar_list")
+
+    trabalhos = radar.trabalhos.annotate(total_atividades=Count("atividades")).order_by("-data_registro", "nome")
+    return render(
+        request,
+        "core/radar_detail.html",
+        {
+            "radar": radar,
+            "trabalhos": trabalhos,
+            "can_manage": can_manage or request.user.is_staff,
+            "message": message,
+            "message_level": message_level,
+        },
+    )
+
+
+@login_required
+def radar_trabalho_detail(request, radar_pk, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    if request.user.is_staff and not cliente:
+        radar = get_object_or_404(Radar, pk=radar_pk)
+        trabalho = get_object_or_404(RadarTrabalho, pk=pk, radar=radar)
+        can_manage = True
+    else:
+        radar = get_object_or_404(
+            Radar,
+            Q(pk=radar_pk),
+            Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
+        )
+        trabalho = get_object_or_404(RadarTrabalho, pk=pk, radar=radar)
+        can_manage = bool(cliente) and radar.cliente_id == cliente.id
+
+    message = request.GET.get("msg", "").strip()
+    message_level = request.GET.get("level", "").strip() or "info"
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action in {"create_atividade", "update_trabalho", "delete_trabalho", "update_atividade", "delete_atividade", "create_contrato"}:
+            if not can_manage and not request.user.is_staff:
+                return HttpResponseForbidden("Sem permissao.")
+        if action == "create_contrato":
+            nome = request.POST.get("contrato_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de contrato."
+                level = "error"
+                created = False
+            else:
+                contrato, created = RadarContrato.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Contrato criado."
+                    level = "success"
+                else:
+                    msg = "Contrato ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": contrato.id if nome and "contrato" in locals() else None,
+                        "nome": contrato.nome if nome and "contrato" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "contrato", "msg": msg, "level": level}
+            return redirect(f"{reverse('radar_trabalho_detail', args=[radar.pk, trabalho.pk])}?{urlencode(params)}")
+        if action == "update_trabalho":
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            data_raw = request.POST.get("data_registro", "").strip()
+            if not nome:
+                message = "Informe um nome para o trabalho."
+                message_level = "error"
+            else:
+                if data_raw:
+                    try:
+                        trabalho.data_registro = datetime.strptime(data_raw, "%Y-%m-%d").date()
+                    except ValueError:
+                        pass
+                trabalho.nome = nome
+                trabalho.descricao = descricao
+                trabalho.save(update_fields=["nome", "descricao", "data_registro"])
+                _sync_trabalho_status(trabalho)
+                return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "delete_trabalho":
+            trabalho.delete()
+            return redirect("radar_detail", pk=radar.pk)
+        if action == "create_atividade":
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            setor = request.POST.get("setor", "").strip()
+            solicitante = request.POST.get("solicitante", "").strip()
+            responsavel = request.POST.get("responsavel", "").strip()
+            contrato_id = request.POST.get("contrato")
+            horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
+            status_raw = request.POST.get("status", "").strip()
+            if status_raw not in dict(RadarAtividade.Status.choices):
+                status_raw = RadarAtividade.Status.PENDENTE
+            horas = None
+            if horas_raw:
+                try:
+                    horas = Decimal(horas_raw)
+                except InvalidOperation:
+                    horas = None
+            if not nome:
+                message = "Informe um nome para a atividade."
+                message_level = "error"
+            else:
+                contrato = None
+                if contrato_id:
+                    contrato = RadarContrato.objects.filter(pk=contrato_id).first()
+                RadarAtividade.objects.create(
+                    trabalho=trabalho,
+                    nome=nome,
+                    descricao=descricao,
+                    setor=setor,
+                    solicitante=solicitante,
+                    responsavel=responsavel,
+                    contrato=contrato,
+                    horas_trabalho=horas,
+                    status=status_raw,
+                )
+                _sync_trabalho_status(trabalho)
+                return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "update_atividade":
+            atividade_id = request.POST.get("atividade_id")
+            atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            atividade.nome = request.POST.get("nome", "").strip()
+            atividade.descricao = request.POST.get("descricao", "").strip()
+            atividade.setor = request.POST.get("setor", "").strip()
+            atividade.solicitante = request.POST.get("solicitante", "").strip()
+            atividade.responsavel = request.POST.get("responsavel", "").strip()
+            contrato_id = request.POST.get("contrato")
+            atividade.contrato = RadarContrato.objects.filter(pk=contrato_id).first() if contrato_id else None
+            horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
+            if horas_raw:
+                try:
+                    atividade.horas_trabalho = Decimal(horas_raw)
+                except InvalidOperation:
+                    atividade.horas_trabalho = None
+            else:
+                atividade.horas_trabalho = None
+            status_raw = request.POST.get("status", "").strip()
+            if status_raw in dict(RadarAtividade.Status.choices):
+                atividade.status = status_raw
+            atividade.save(
+                update_fields=[
+                    "nome",
+                    "descricao",
+                    "setor",
+                    "solicitante",
+                    "responsavel",
+                    "contrato",
+                    "horas_trabalho",
+                    "status",
+                ]
+            )
+            _sync_trabalho_status(trabalho)
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "delete_atividade":
+            atividade_id = request.POST.get("atividade_id")
+            atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            atividade.delete()
+            _sync_trabalho_status(trabalho)
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+
+    contratos = RadarContrato.objects.order_by("nome")
+    atividades = trabalho.atividades.select_related("contrato").order_by("-criado_em")
+    total_atividades = atividades.count()
+    return render(
+        request,
+        "core/radar_trabalho_detail.html",
+        {
+            "radar": radar,
+            "trabalho": trabalho,
+            "atividades": atividades,
+            "total_atividades": total_atividades,
+            "contratos": contratos,
+            "status_choices": RadarAtividade.Status.choices,
+            "can_manage": can_manage or request.user.is_staff,
+            "message": message,
+            "message_level": message_level,
+            "open_cadastro": request.GET.get("cadastro", "").strip(),
+        },
+    )
+
+
+@login_required
 def ios_rack_modulo_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not request.user.is_staff:
@@ -2269,6 +2602,7 @@ def usuarios_gerenciar_usuario(request, pk):
             financeiros_raw = request.POST.get("financeiros", "")
             inventarios_raw = request.POST.get("inventarios", "")
             listas_ip_raw = request.POST.get("listas_ip", "")
+            radares_raw = request.POST.get("radares", "")
             if not perfil:
                 perfil = PerfilUsuario.objects.create(
                     nome=nome or user.username.split("@")[0],
@@ -2311,6 +2645,12 @@ def usuarios_gerenciar_usuario(request, pk):
             ip_codes = [code.strip().upper() for code in cleaned_ip.split(",") if code.strip()]
             listas_ip = [ListaIPID.objects.get_or_create(codigo=code)[0] for code in ip_codes]
             perfil.listas_ip.set(listas_ip)
+            cleaned_radar = radares_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned_radar = cleaned_radar.replace(sep, ",")
+            radar_codes = [code.strip().upper() for code in cleaned_radar.split(",") if code.strip()]
+            radares = [RadarID.objects.get_or_create(codigo=code)[0] for code in radar_codes]
+            perfil.radares.set(radares)
             return redirect("usuarios_gerenciar_usuario", pk=user.pk)
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()
@@ -2363,6 +2703,7 @@ def meu_perfil(request):
             financeiros_raw = request.POST.get("financeiros", "")
             inventarios_raw = request.POST.get("inventarios", "")
             listas_ip_raw = request.POST.get("listas_ip", "")
+            radares_raw = request.POST.get("radares", "")
             if not perfil:
                 perfil = PerfilUsuario.objects.create(
                     nome=nome or (user.username.split("@")[0] if user.username else "Usuario"),
@@ -2403,6 +2744,12 @@ def meu_perfil(request):
             ip_codes = [code.strip().upper() for code in cleaned_ip.split(",") if code.strip()]
             listas_ip = [ListaIPID.objects.get_or_create(codigo=code)[0] for code in ip_codes]
             perfil.listas_ip.set(listas_ip)
+            cleaned_radar = radares_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned_radar = cleaned_radar.replace(sep, ",")
+            radar_codes = [code.strip().upper() for code in cleaned_radar.split(",") if code.strip()]
+            radares = [RadarID.objects.get_or_create(codigo=code)[0] for code in radar_codes]
+            perfil.radares.set(radares)
             return redirect("meu_perfil")
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()

@@ -120,6 +120,15 @@
               value="{% if perfil %}{% for lista in perfil.listas_ip.all %}{{ lista.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
             >
           </label>
+          <label class="field">
+            <span>ID_RADAR (separados por virgula)</span>
+            <input
+              type="text"
+              name="radares"
+              placeholder="RDR-001, RDR-002"
+              value="{% if perfil %}{% for radar in perfil.radares.all %}{{ radar.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+            >
+          </label>
           <button class="btn btn-primary" type="submit">Salvar perfil</button>
         </form>
       </div>

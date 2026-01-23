@@ -1,0 +1,369 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ trabalho.nome }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'radar_list' %}">Radar de atividades</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'radar_detail' radar.id %}">{{ radar.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ trabalho.nome }}</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Trabalho</div>
+        <div class="hud-pill">Atividades</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar ao radar</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">{{ trabalho.nome }}</h1>
+          <p class="page-subtitle">{{ trabalho.descricao|default:"Detalhes do trabalho e atividades." }}</p>
+        </div>
+      </div>
+      <div class="rack-status">
+        <div>
+          <div class="meta-label">Status</div>
+          <div class="meta-value">{{ trabalho.get_status_display }}</div>
+        </div>
+        <div>
+          <div class="meta-label">Atividades</div>
+          <div class="meta-value">{{ total_atividades }}</div>
+        </div>
+        <div>
+          <div class="meta-label">Data registro</div>
+          <div class="meta-value">{{ trabalho.data_registro|date:"d/m/Y" }}</div>
+        </div>
+        <div>
+          <div class="meta-label">Radar</div>
+          <div class="meta-value">{{ radar.nome }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if message %}
+    <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
+  {% endif %}
+
+  <div class="io-layout">
+    <details class="io-card io-discrete" id="nova-atividade">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Nova atividade</span>
+        <span class="muted">Registre uma nova atividade no trabalho.</span>
+      </summary>
+      <div class="io-discrete-body">
+        {% if can_manage %}
+          <div id="cadastro-message" class="notice" style="display: none;"></div>
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_atividade">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome</span>
+                <input type="text" name="nome" placeholder="Atividade principal" required>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" placeholder="Descricao resumida">
+              </label>
+              <label class="field">
+                <span>Setor</span>
+                <input type="text" name="setor" placeholder="Utilidades">
+              </label>
+              <label class="field">
+                <span>Solicitante</span>
+                <input type="text" name="solicitante" placeholder="Supervisor">
+              </label>
+              <label class="field">
+                <span>Responsavel</span>
+                <input type="text" name="responsavel" placeholder="Equipe tecnica">
+              </label>
+              <label class="field">
+                <span>Horas de trabalho</span>
+                <input type="text" name="horas_trabalho" placeholder="2.5">
+              </label>
+              <label class="field">
+                <div class="field-row">
+                  <span>Contrato</span>
+                  <details class="inline-pop" id="contrato-pop" {% if open_cadastro == 'contrato' %}open{% endif %}>
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Contrato</label>
+                      <input type="text" name="contrato_nome" form="create-contrato-form" placeholder="Novo contrato">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-contrato-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="contrato" id="contrato-select">
+                  <option value="">Selecione</option>
+                  {% for contrato in contratos %}
+                    <option value="{{ contrato.id }}">{{ contrato.nome }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <span>Status</span>
+                <select name="status">
+                  {% for value, label in status_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Salvar atividade</button>
+            </div>
+          </form>
+          <form id="create-contrato-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_contrato">
+          </form>
+        {% else %}
+          <div class="muted">Apenas o criador pode cadastrar atividades.</div>
+        {% endif %}
+      </div>
+    </details>
+
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Atividades registradas</h2>
+          <p class="muted">Edite status, responsavel e dados de cada atividade.</p>
+        </div>
+      </div>
+      <div class="proposal-grid">
+        {% for atividade in atividades %}
+          <article class="proposal-card io-proposal-card">
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ atividade.nome }}</div>
+                <div class="proposal-meta">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
+                <div class="proposal-meta">Setor: {{ atividade.setor|default:"-" }}</div>
+                <div class="proposal-meta">Solicitante: {{ atividade.solicitante|default:"-" }}</div>
+                <div class="proposal-meta">Responsavel: {{ atividade.responsavel|default:"-" }}</div>
+                {% if atividade.contrato %}
+                  <div class="proposal-meta">Contrato: {{ atividade.contrato.nome }}</div>
+                {% endif %}
+              </div>
+              <div class="module-meta">
+                <span class="badge badge-{{ atividade.status|lower }}">{{ atividade.get_status_display }}</span>
+                {% if atividade.horas_trabalho %}
+                  <span class="slot-badge slot-badge-compact">{{ atividade.horas_trabalho }}h</span>
+                {% endif %}
+              </div>
+            </div>
+            {% if can_manage %}
+              <details class="io-discrete" style="margin-top: 12px;">
+                <summary class="io-discrete-summary">
+                  <span class="io-title">Editar atividade</span>
+                  <span class="muted">Atualize dados ou status.</span>
+                </summary>
+                <div class="io-discrete-body">
+                  <form class="io-form" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <div class="io-form-grid">
+                      <label class="field">
+                        <span>Nome</span>
+                        <input type="text" name="nome" value="{{ atividade.nome }}" required>
+                      </label>
+                      <label class="field">
+                        <span>Descricao</span>
+                        <input type="text" name="descricao" value="{{ atividade.descricao|default:'' }}">
+                      </label>
+                      <label class="field">
+                        <span>Setor</span>
+                        <input type="text" name="setor" value="{{ atividade.setor|default:'' }}">
+                      </label>
+                      <label class="field">
+                        <span>Solicitante</span>
+                        <input type="text" name="solicitante" value="{{ atividade.solicitante|default:'' }}">
+                      </label>
+                      <label class="field">
+                        <span>Responsavel</span>
+                        <input type="text" name="responsavel" value="{{ atividade.responsavel|default:'' }}">
+                      </label>
+                      <label class="field">
+                        <span>Horas de trabalho</span>
+                        <input type="text" name="horas_trabalho" value="{{ atividade.horas_trabalho|default:'' }}">
+                      </label>
+                      <label class="field">
+                        <span>Contrato</span>
+                        <select name="contrato">
+                          <option value="">Selecione</option>
+                          {% for contrato in contratos %}
+                            <option value="{{ contrato.id }}" {% if atividade.contrato and contrato.id == atividade.contrato.id %}selected{% endif %}>{{ contrato.nome }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Status</span>
+                        <select name="status">
+                          {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if atividade.status == value %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                    </div>
+                    <div class="form-actions">
+                      <button class="btn btn-primary" type="submit">Salvar atividade</button>
+                    </div>
+                  </form>
+                  <form method="post" onsubmit="return confirm('Excluir atividade?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <div class="form-actions">
+                      <button class="btn btn-outline" type="submit">Excluir atividade</button>
+                    </div>
+                  </form>
+                </div>
+              </details>
+            {% endif %}
+          </article>
+        {% empty %}
+          <div class="muted">Nenhuma atividade registrada ainda.</div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <details class="io-card io-discrete" style="margin-top: 18px;">
+    <summary class="io-discrete-summary">
+      <span class="io-title">Editar trabalho</span>
+      <span class="muted">Ajuste dados do trabalho.</span>
+    </summary>
+    <div class="io-discrete-body">
+      {% if can_manage %}
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_trabalho">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome</span>
+              <input type="text" name="nome" value="{{ trabalho.nome }}" required>
+            </label>
+            <label class="field">
+              <span>Data de registro</span>
+              <input type="date" name="data_registro" value="{{ trabalho.data_registro|date:'Y-m-d' }}">
+            </label>
+            <label class="field" style="grid-column: 1 / -1;">
+              <span>Descricao</span>
+              <textarea name="descricao" rows="3">{{ trabalho.descricao|default:'' }}</textarea>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+          </div>
+        </form>
+        <form method="post" onsubmit="return confirm('Excluir trabalho? Esta acao nao pode ser desfeita.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete_trabalho">
+          <div class="form-actions">
+            <button class="btn btn-outline" type="submit">Excluir trabalho</button>
+          </div>
+        </form>
+      {% else %}
+        <div class="muted">Apenas o criador pode editar este trabalho.</div>
+      {% endif %}
+    </div>
+  </details>
+
+  <script>
+    (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function setMessage(message, level) {
+        var box = document.getElementById("cadastro-message");
+        if (!box) {
+          return;
+        }
+        box.textContent = message;
+        box.className = "notice notice-" + (level || "info");
+        box.style.display = "block";
+      }
+      function bindCadastro(formId, inputSelector, selectId, detailsId) {
+        var formCadastro = document.getElementById(formId);
+        var input = document.querySelector(inputSelector);
+        var select = document.getElementById(selectId);
+        var details = document.getElementById(detailsId);
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          if (!data.get(input.name)) {
+            data.set(input.name, value);
+          }
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage(payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+      bindCadastro(
+        "create-contrato-form",
+        "input[name='contrato_nome'][form='create-contrato-form']",
+        "contrato-select",
+        "contrato-pop"
+      );
+    })();
+  </script>
+{% endblock %}

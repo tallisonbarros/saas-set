@@ -16,6 +16,11 @@ from .models import (
     ListaIP,
     ListaIPID,
     ListaIPItem,
+    Radar,
+    RadarAtividade,
+    RadarContrato,
+    RadarID,
+    RadarTrabalho,
     PlantaIO,
     FinanceiroID,
     Compra,
@@ -124,6 +129,38 @@ class ListaIPAdmin(admin.ModelAdmin):
 class ListaIPItemAdmin(admin.ModelAdmin):
     list_display = ("ip", "lista", "nome_equipamento", "mac", "protocolo")
     search_fields = ("ip", "lista__nome", "nome_equipamento", "mac", "protocolo")
+
+
+@admin.register(RadarID)
+class RadarIDAdmin(admin.ModelAdmin):
+    list_display = ("codigo",)
+    search_fields = ("codigo",)
+
+
+@admin.register(RadarContrato)
+class RadarContratoAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+
+@admin.register(Radar)
+class RadarAdmin(admin.ModelAdmin):
+    list_display = ("nome", "cliente", "id_radar", "local", "criado_em")
+    search_fields = ("nome", "cliente__nome", "id_radar__codigo", "local")
+
+
+@admin.register(RadarTrabalho)
+class RadarTrabalhoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "radar", "status", "data_registro", "criado_em")
+    list_filter = ("status",)
+    search_fields = ("nome", "radar__nome")
+
+
+@admin.register(RadarAtividade)
+class RadarAtividadeAdmin(admin.ModelAdmin):
+    list_display = ("nome", "trabalho", "status", "responsavel", "contrato", "criado_em")
+    list_filter = ("status",)
+    search_fields = ("nome", "trabalho__nome", "responsavel", "solicitante")
 
 
 @admin.register(Inventario)

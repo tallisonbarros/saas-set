@@ -53,6 +53,13 @@ urlpatterns = [
     path('ios/racks/modulos/<int:pk>/', views.ios_rack_modulo_detail, name="ios_rack_modulo_detail"),
     path('listas-ip/', views.listas_ip_list, name="listas_ip_list"),
     path('listas-ip/<int:pk>/', views.lista_ip_detail, name="lista_ip_detail"),
+    path('radar-atividades/', views.radar_list, name="radar_list"),
+    path('radar-atividades/<int:pk>/', views.radar_detail, name="radar_detail"),
+    path(
+        'radar-atividades/<int:radar_pk>/trabalhos/<int:pk>/',
+        views.radar_trabalho_detail,
+        name="radar_trabalho_detail",
+    ),
     path('inventarios/', views.inventarios_list, name="inventarios_list"),
     path('inventarios/<int:pk>/', views.inventario_detail, name="inventario_detail"),
     path('inventarios/<int:pk>/tagset-preview/', views.inventario_tagset_preview, name="inventario_tagset_preview"),

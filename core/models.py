@@ -16,6 +16,7 @@ class PerfilUsuario(models.Model):
     financeiros = models.ManyToManyField("FinanceiroID", blank=True, related_name="usuarios")
     inventarios = models.ManyToManyField("InventarioID", blank=True, related_name="usuarios")
     listas_ip = models.ManyToManyField("ListaIPID", blank=True, related_name="usuarios")
+    radares = models.ManyToManyField("RadarID", blank=True, related_name="usuarios")
 
     def __str__(self):
         return self.nome
@@ -256,6 +257,16 @@ class ListaIPID(models.Model):
         return self.codigo
 
 
+class RadarID(models.Model):
+    codigo = models.CharField(max_length=40, unique=True)
+
+    class Meta:
+        ordering = ["codigo"]
+
+    def __str__(self):
+        return self.codigo
+
+
 class ListaIP(models.Model):
     cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="listas_ip_listas")
     id_listaip = models.ForeignKey(
@@ -303,6 +314,94 @@ class ListaIPItem(models.Model):
 
     def __str__(self):
         return f"{self.lista.nome} - {self.ip}"
+
+
+class RadarContrato(models.Model):
+    nome = models.CharField(max_length=120, unique=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class Radar(models.Model):
+    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="radares")
+    id_radar = models.ForeignKey(
+        RadarID,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="radares",
+    )
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    local = models.CharField(max_length=120, blank=True)
+    criador = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="radares_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class RadarTrabalho(models.Model):
+    class Status(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        EXECUTANDO = "EXECUTANDO", "Executando"
+        FINALIZADA = "FINALIZADA", "Finalizada"
+
+    radar = models.ForeignKey(Radar, on_delete=models.CASCADE, related_name="trabalhos")
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    data_registro = models.DateField(default=timezone.localdate)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data_registro", "nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class RadarAtividade(models.Model):
+    class Status(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        EXECUTANDO = "EXECUTANDO", "Executando"
+        FINALIZADA = "FINALIZADA", "Finalizada"
+
+    trabalho = models.ForeignKey(RadarTrabalho, on_delete=models.CASCADE, related_name="atividades")
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    setor = models.CharField(max_length=120, blank=True)
+    solicitante = models.CharField(max_length=120, blank=True)
+    responsavel = models.CharField(max_length=120, blank=True)
+    contrato = models.ForeignKey(
+        RadarContrato,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="atividades",
+    )
+    horas_trabalho = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+
+    def __str__(self):
+        return self.nome
 
 
 class Inventario(models.Model):
