@@ -2371,6 +2371,25 @@ def proposta_list(request):
         )
         propostas_restantes = propostas.exclude(pk__in=propostas_para_aprovar.values("pk"))
     pendencias_total = propostas_para_aprovar.count()
+    propostas_recebidas = []
+    propostas_enviadas = []
+    recebidas_map = {}
+    enviadas_map = {}
+    for proposta in propostas_restantes:
+        if proposta.criada_por_id == request.user.id:
+            destinatario = proposta.cliente.nome if proposta.cliente else ""
+            if not destinatario:
+                destinatario = proposta.cliente.email if proposta.cliente else "Destino"
+            if destinatario not in enviadas_map:
+                enviadas_map[destinatario] = []
+            enviadas_map[destinatario].append(proposta)
+        else:
+            remetente = proposta.criada_por.username if proposta.criada_por else "Sistema"
+            if remetente not in recebidas_map:
+                recebidas_map[remetente] = []
+            recebidas_map[remetente].append(proposta)
+    propostas_recebidas = [{"nome": key, "propostas": value} for key, value in recebidas_map.items()]
+    propostas_enviadas = [{"nome": key, "propostas": value} for key, value in enviadas_map.items()]
     return render(
         request,
         "core/proposta_list.html",
@@ -2379,6 +2398,8 @@ def proposta_list(request):
             "propostas": propostas,
             "propostas_para_aprovar": propostas_para_aprovar,
             "propostas_restantes": propostas_restantes,
+            "propostas_recebidas": propostas_recebidas,
+            "propostas_enviadas": propostas_enviadas,
             "pendencias_total": pendencias_total,
             "status_filter": status,
             "is_vendedor": True,
