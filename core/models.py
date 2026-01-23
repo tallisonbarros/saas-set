@@ -327,7 +327,7 @@ class RadarContrato(models.Model):
 
 
 class Radar(models.Model):
-    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="radares")
+    cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="radares_cliente")
     id_radar = models.ForeignKey(
         RadarID,
         on_delete=models.SET_NULL,

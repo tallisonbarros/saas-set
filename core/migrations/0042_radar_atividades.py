@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
                     "cliente",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="radares",
+                        related_name="radares_cliente",
                         to="core.perfilusuario",
                     ),
                 ),
