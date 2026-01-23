@@ -18,6 +18,7 @@ from .models import (
     ListaIPItem,
     Radar,
     RadarAtividade,
+    RadarClassificacao,
     RadarContrato,
     RadarID,
     RadarTrabalho,
@@ -143,6 +144,12 @@ class RadarContratoAdmin(admin.ModelAdmin):
     search_fields = ("nome",)
 
 
+@admin.register(RadarClassificacao)
+class RadarClassificacaoAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+
 @admin.register(Radar)
 class RadarAdmin(admin.ModelAdmin):
     list_display = ("nome", "cliente", "id_radar", "local", "criado_em")
@@ -151,14 +158,14 @@ class RadarAdmin(admin.ModelAdmin):
 
 @admin.register(RadarTrabalho)
 class RadarTrabalhoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "radar", "status", "data_registro", "criado_em")
+    list_display = ("nome", "radar", "classificacao", "status", "data_registro", "criado_em")
     list_filter = ("status",)
     search_fields = ("nome", "radar__nome")
 
 
 @admin.register(RadarAtividade)
 class RadarAtividadeAdmin(admin.ModelAdmin):
-    list_display = ("nome", "trabalho", "status", "responsavel", "contrato", "criado_em")
+    list_display = ("nome", "trabalho", "classificacao", "status", "responsavel", "contrato", "criado_em")
     list_filter = ("status",)
     search_fields = ("nome", "trabalho__nome", "responsavel", "solicitante")
 

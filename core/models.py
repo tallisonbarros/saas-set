@@ -326,6 +326,16 @@ class RadarContrato(models.Model):
         return self.nome
 
 
+class RadarClassificacao(models.Model):
+    nome = models.CharField(max_length=120, unique=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 class Radar(models.Model):
     cliente = models.ForeignKey("PerfilUsuario", on_delete=models.CASCADE, related_name="radares_cliente")
     id_radar = models.ForeignKey(
@@ -361,6 +371,13 @@ class RadarTrabalho(models.Model):
         FINALIZADA = "FINALIZADA", "Finalizada"
 
     radar = models.ForeignKey(Radar, on_delete=models.CASCADE, related_name="trabalhos")
+    classificacao = models.ForeignKey(
+        "RadarClassificacao",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trabalhos",
+    )
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)
     data_registro = models.DateField(default=timezone.localdate)
@@ -381,6 +398,13 @@ class RadarAtividade(models.Model):
         FINALIZADA = "FINALIZADA", "Finalizada"
 
     trabalho = models.ForeignKey(RadarTrabalho, on_delete=models.CASCADE, related_name="atividades")
+    classificacao = models.ForeignKey(
+        "RadarClassificacao",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="atividades",
+    )
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)
     setor = models.CharField(max_length=120, blank=True)
