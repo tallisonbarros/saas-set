@@ -26,6 +26,11 @@
           <h1 class="page-title">Dados recebidos</h1>
           <p class="page-subtitle">Ultimos registros enviados pelos agentes locais.</p>
         </div>
+        <form method="post" onsubmit="return confirm('Limpar todos os registros recebidos?');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="clear_ingest">
+          <button class="btn btn-outline" type="submit">Limpar registros</button>
+        </form>
       </div>
     </div>
   </section>

@@ -453,6 +453,9 @@ def painel(request):
 def planta_conectada(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
+    if request.method == "POST" and request.POST.get("action") == "clear_ingest":
+        IngestRecord.objects.all().delete()
+        return redirect("planta_conectada")
     registros = IngestRecord.objects.all().order_by("-created_at")[:200]
     return render(
         request,
