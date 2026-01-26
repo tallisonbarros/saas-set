@@ -37,10 +37,10 @@
 
   <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <form method="get" class="io-form">
-      <div class="io-form-grid">
-        <label class="field">
+      <div style="display: grid; gap: 16px;">
+        <label class="field" style="max-width: 240px; margin: 0 auto; text-align: center;">
           <span>Dia</span>
-          <select name="date">
+          <select name="date" id="milhao-date">
             {% for day in dates %}
               <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
                 {{ day|date:"d/m/Y" }}
@@ -68,9 +68,6 @@
             {% endfor %}
           </div>
         </label>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Atualizar</button>
       </div>
     </form>
   </section>
@@ -141,6 +138,8 @@
   <script>
     (function () {
       var selectAll = document.getElementById("balance-select-all");
+      var dateSelect = document.getElementById("milhao-date");
+      var form = selectAll ? selectAll.closest("form") : null;
       if (!selectAll) {
         return;
       }
@@ -149,7 +148,22 @@
       selectAll.checked = allChecked;
       selectAll.addEventListener("change", function () {
         checkboxes.forEach(function (input) { input.checked = selectAll.checked; });
+        if (form) {
+          form.submit();
+        }
       });
+      checkboxes.forEach(function (input) {
+        input.addEventListener("change", function () {
+          if (form) {
+            form.submit();
+          }
+        });
+      });
+      if (dateSelect && form) {
+        dateSelect.addEventListener("change", function () {
+          form.submit();
+        });
+      }
     })();
   </script>
 {% endblock %}

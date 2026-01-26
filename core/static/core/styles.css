@@ -1599,6 +1599,16 @@ select {
   margin-top: 20px;
 }
 
+.apps-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 320px));
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+.apps-grid .panel-card {
+  max-width: 320px;
+}
+
 .panel-card {
   display: grid;
   gap: 6px;
