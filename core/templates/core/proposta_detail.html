@@ -156,6 +156,13 @@
               <button class="btn btn-outline" type="submit">Marcar como Executando</button>
             </form>
           {% endif %}
+          {% if proposta.aprovada != None and not proposta.finalizada and proposta.andamento != "EXECUTANDO" %}
+            <form method="post" class="stack">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="remove_aprovacao">
+              <button class="btn btn-ghost btn-compact" type="submit">Remover decisao</button>
+            </form>
+          {% endif %}
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete_proposta">

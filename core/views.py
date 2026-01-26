@@ -2473,6 +2473,17 @@ def proposta_detail(request, pk):
                 proposta.andamento = "EXECUTANDO"
                 proposta.save(update_fields=["andamento"])
                 return redirect("proposta_detail", pk=proposta.pk)
+        if action == "remove_aprovacao":
+            if proposta.criada_por_id != request.user.id:
+                return HttpResponseForbidden("Sem permissao.")
+            if proposta.finalizada or proposta.andamento == "EXECUTANDO":
+                message = "Nao e possivel remover a aprovacao apos iniciar a execucao."
+            else:
+                proposta.aprovada = None
+                proposta.aprovado_por = None
+                proposta.decidido_em = None
+                proposta.save(update_fields=["aprovada", "aprovado_por", "decidido_em"])
+                return redirect("proposta_detail", pk=proposta.pk)
         if action == "add_anexo":
             arquivo = request.FILES.get("arquivo")
             tipo = request.POST.get("tipo") or PropostaAnexo.Tipo.OUTROS
