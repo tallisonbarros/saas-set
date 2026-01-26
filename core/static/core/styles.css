@@ -1686,6 +1686,10 @@ select {
   align-items: stretch;
 }
 
+.metrics-balance-filter {
+  margin-top: 8px;
+}
+
 .metric-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
   justify-content: center;
@@ -1797,6 +1801,7 @@ select {
   background: #eef0f4;
   border: 1px solid rgba(120, 130, 150, 0.2);
   align-items: stretch;
+  width: 100%;
 }
 
 .composition-segment {
@@ -1832,8 +1837,21 @@ select {
   gap: 12px;
 }
 
+.composition-mini {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 130, 150, 0.18);
+  background: #f8f9fb;
+  box-shadow: 0 4px 10px rgba(30, 41, 59, 0.04);
+}
+
 .balance-filter-card {
   padding: 16px;
+}
+
+.date-filter-card {
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 .balance-filter-grid {

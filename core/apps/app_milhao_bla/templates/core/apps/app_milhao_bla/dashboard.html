@@ -35,7 +35,7 @@
     </div>
   </section>
 
-  <section class="card app-accent balance-filter-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="card app-accent balance-filter-card date-filter-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <form method="get" class="io-form">
       <div class="balance-filter-grid">
         <label class="field balance-filter-date">
@@ -47,43 +47,6 @@
               </option>
             {% endfor %}
           </select>
-        </label>
-        <label class="field">
-          <span>Balancas</span>
-          <div
-            id="balance-chip-grid"
-            class="balance-toggle-grid balance-toggle-compact"
-            data-selected="{% for bal in selected_balances %}{{ bal }}{% if not forloop.last %},{% endif %}{% endfor %}"
-          >
-            <div class="balance-chip balance-chip-all" data-balance="__all__">
-              <button type="button" class="balance-chip-main">Selecionar todas</button>
-            </div>
-            {% for balanca in balances %}
-              <div class="balance-chip" data-balance="{{ balanca }}">
-                <button
-                  type="button"
-                  class="balance-chip-main{% if balanca in selected_balances %} is-selected{% endif %}"
-                >
-                  <span class="balance-chip-text">
-                    <span class="balance-title">
-                      {% if balanca == "LIMBL01" %}MILHO{% elif balanca == "SECBL01" %}GERMEN{% elif balanca == "SECBL02" %}RESIDUO{% elif balanca == "CLABL01" %}MIUDO{% elif balanca == "CLABL02" %}GRAUDO{% else %}{{ balanca }}{% endif %}
-                    </span>
-                    <span class="balance-subtitle">{{ balanca }}</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class="balance-chip-add{% if balanca in selected_balances %} is-selected{% endif %}"
-                  aria-label="Adicionar {{ balanca }}"
-                >
-                  <span class="balance-chip-symbol">
-                    {% if balanca in selected_balances %}-{% else %}+{% endif %}
-                  </span>
-                </button>
-              </div>
-            {% endfor %}
-          </div>
-          <div id="balance-hidden-inputs"></div>
         </label>
       </div>
     </form>
@@ -103,7 +66,7 @@
         <span
           class="composition-segment"
           style="
-            width: {{ item.percent }}%; min-width: 2px;
+            flex: 0 0 {{ item.percent }}%; min-width: 2px;
             {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
             {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
             {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
@@ -115,7 +78,7 @@
     </div>
     <div class="composition-legend">
       {% for item in composition %}
-        <div class="composition-legend-item">
+        <div class="composition-legend-item composition-mini">
           <div class="composition-legend-left">
             <span
               class="composition-legend-swatch"
@@ -147,6 +110,46 @@
         <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
       {% endif %}
     </div>
+    <form method="get" class="io-form metrics-filter-form">
+    <label class="field metrics-balance-filter">
+      <span>Balancas</span>
+      <div
+        id="balance-chip-grid"
+        class="balance-toggle-grid balance-toggle-compact"
+        data-selected="{% for bal in selected_balances %}{{ bal }}{% if not forloop.last %},{% endif %}{% endfor %}"
+      >
+        <div class="balance-chip balance-chip-all" data-balance="__all__">
+          <button type="button" class="balance-chip-main">Selecionar todas</button>
+        </div>
+        {% for balanca in balances %}
+          <div class="balance-chip" data-balance="{{ balanca }}">
+            <button
+              type="button"
+              class="balance-chip-main{% if balanca in selected_balances %} is-selected{% endif %}"
+            >
+              <span class="balance-chip-text">
+                <span class="balance-title">
+                  {% if balanca == "LIMBL01" %}MILHO{% elif balanca == "SECBL01" %}GERMEN{% elif balanca == "SECBL02" %}RESIDUO{% elif balanca == "CLABL01" %}MIUDO{% elif balanca == "CLABL02" %}GRAUDO{% else %}{{ balanca }}{% endif %}
+                </span>
+                <span class="balance-subtitle">{{ balanca }}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="balance-chip-add{% if balanca in selected_balances %} is-selected{% endif %}"
+              aria-label="Adicionar {{ balanca }}"
+            >
+              <span class="balance-chip-symbol">
+                {% if balanca in selected_balances %}-{% else %}+{% endif %}
+              </span>
+            </button>
+          </div>
+        {% endfor %}
+      </div>
+      <div id="balance-hidden-inputs"></div>
+    </label>
+    </form>
+
     <div class="metrics-overview grid-2 metric-grid">
       <div class="panel-card panel-card-compact metric-card metric-card-primary">
         <div class="metric-label">Total do dia</div>
@@ -222,6 +225,7 @@
         return;
       }
       var form = grid.closest("form");
+      var dateForm = dateSelect ? dateSelect.closest("form") : null;
       var hiddenContainer = document.getElementById("balance-hidden-inputs");
       var selectedRaw = (grid.getAttribute("data-selected") || "").split(",");
       var selected = selectedRaw.map(function (item) { return item.trim(); }).filter(Boolean);
@@ -312,9 +316,9 @@
         }
       });
 
-      if (dateSelect && form) {
+      if (dateSelect && dateForm) {
         dateSelect.addEventListener("change", function () {
-          submit();
+          dateForm.submit();
         });
       }
 
