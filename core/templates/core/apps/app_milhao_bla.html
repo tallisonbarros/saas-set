@@ -1,0 +1,119 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ app.nome }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_home' app.slug %}">{{ app.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>Dashboard</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">{{ app.nome }}</div>
+        <div class="hud-pill">Dashboard</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar ao painel</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Acumulado por hora</h1>
+          <p class="page-subtitle">Balancas LIMBL01, CLABL01, CLABL02, SECBL01 e SECBL02.</p>
+        </div>
+      </div>
+      <div class="hud-meta">
+        Cliente: clienteA · Agente: agente01 · Fonte: balanca_acumulado_hora
+      </div>
+    </div>
+  </section>
+
+  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <form method="get" class="io-form">
+      <div class="io-form-grid">
+        <label class="field">
+          <span>Dia</span>
+          <select name="date">
+            {% for day in dates %}
+              <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
+                {{ day|date:"d/m/Y" }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Balanca</span>
+          <select name="balance">
+            {% for balanca in balances %}
+              <option value="{{ balanca }}" {% if selected_balance == balanca %}selected{% endif %}>
+                {{ balanca }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Atualizar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <div class="grid-2">
+      <div class="panel-card panel-card-compact">
+        <div class="panel-card-top">
+          <div class="panel-title">Total do dia</div>
+        </div>
+        <div class="panel-highlight">R$ {{ total_value|floatformat:2 }}</div>
+      </div>
+      <div class="panel-card panel-card-compact">
+        <div class="panel-card-top">
+          <div class="panel-title">Ultima leitura</div>
+        </div>
+        <div class="panel-highlight">
+          {% if latest_value is not None %}R$ {{ latest_value|floatformat:2 }}{% else %}-{% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Leituras por hora</h2>
+        <p class="muted">Valores acumulados recebidos ao longo do dia.</p>
+      </div>
+    </div>
+    {% if entries %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Balanca</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in entries %}
+              <tr>
+                <td>{{ item.hour }}</td>
+                <td>{{ item.balance }}</td>
+                <td>{% if item.value is not None %}R$ {{ item.value|floatformat:2 }}{% else %}-{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nenhum dado para o filtro selecionado.</p>
+    {% endif %}
+  </section>
+{% endblock %}

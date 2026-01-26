@@ -30,6 +30,7 @@ from .models import (
     TipoCompra,
     TipoPerfil,
     TipoAtivo,
+    App,
 )
 
 admin.site.site_header = "SET Admin"
@@ -100,6 +101,13 @@ class PropostaAdmin(admin.ModelAdmin):
 class TipoPerfilAdmin(admin.ModelAdmin):
     list_display = ("nome",)
     search_fields = ("nome",)
+
+
+@admin.register(App)
+class AppAdmin(admin.ModelAdmin):
+    list_display = ("nome", "slug", "ativo", "icon", "theme_color", "criado_em")
+    search_fields = ("nome", "slug")
+    list_filter = ("ativo",)
 
 
 @admin.register(PlantaIO)

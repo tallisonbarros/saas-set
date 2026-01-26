@@ -1,0 +1,147 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Aplicativos{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <span>Aplicativos</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card stack">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Aplicativos</div>
+        <div class="hud-pill">Admin</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar ao painel</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Gerenciar apps</h1>
+          <p class="page-subtitle">Crie apps e libere acesso para usuarios.</p>
+        </div>
+      </div>
+    </div>
+    {% if message %}
+      <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <details class="io-card io-discrete" open>
+      <summary class="io-discrete-summary">
+        <span class="io-title">Novo app</span>
+        <span class="muted">Cadastre um aplicativo dedicado.</span>
+      </summary>
+      <div class="io-discrete-body">
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_app">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome</span>
+              <input type="text" name="nome" placeholder="App Milhao Bla" required>
+            </label>
+            <label class="field">
+              <span>Slug</span>
+              <input type="text" name="slug" placeholder="appmilhaobla">
+            </label>
+            <label class="field">
+              <span>Icone (texto)</span>
+              <input type="text" name="icon" placeholder="MB">
+            </label>
+            <label class="field">
+              <span>Cor tema</span>
+              <input type="text" name="theme_color" placeholder="#ff7a18">
+            </label>
+            <label class="field" style="grid-column: 1 / -1;">
+              <span>Descricao</span>
+              <textarea name="descricao" rows="3"></textarea>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar app</button>
+          </div>
+        </form>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Apps cadastrados</h2>
+        <p class="muted">Ative, edite ou remova apps.</p>
+      </div>
+    </div>
+    {% if apps %}
+      <div class="user-list">
+        {% for app in apps %}
+          <div class="user-row">
+            <div>
+              <div class="panel-title">{{ app.nome }}</div>
+              <div class="proposal-meta">Slug: {{ app.slug }}</div>
+              <div class="proposal-meta">Status: {% if app.ativo %}Ativo{% else %}Inativo{% endif %}</div>
+            </div>
+            <details class="io-discrete" style="min-width: 280px;">
+              <summary class="io-discrete-summary">
+                <span class="io-title">Editar</span>
+                <span class="muted">Campos do app</span>
+              </summary>
+              <div class="io-discrete-body">
+                <form class="io-form" method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="update_app">
+                  <input type="hidden" name="app_id" value="{{ app.id }}">
+                  <div class="io-form-grid">
+                    <label class="field">
+                      <span>Nome</span>
+                      <input type="text" name="nome" value="{{ app.nome }}">
+                    </label>
+                    <label class="field">
+                      <span>Icone</span>
+                      <input type="text" name="icon" value="{{ app.icon }}">
+                    </label>
+                    <label class="field">
+                      <span>Cor tema</span>
+                      <input type="text" name="theme_color" value="{{ app.theme_color }}">
+                    </label>
+                    <label class="field" style="grid-column: 1 / -1;">
+                      <span>Descricao</span>
+                      <textarea name="descricao" rows="3">{{ app.descricao }}</textarea>
+                    </label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                  </div>
+                </form>
+                <form method="post" style="margin-top: 12px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="toggle_app">
+                  <input type="hidden" name="app_id" value="{{ app.id }}">
+                  <button class="btn btn-ghost" type="submit">
+                    {% if app.ativo %}Desativar{% else %}Ativar{% endif %}
+                  </button>
+                </form>
+                <form method="post" style="margin-top: 8px;" onsubmit="return confirm('Excluir app?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_app">
+                  <input type="hidden" name="app_id" value="{{ app.id }}">
+                  <button class="btn btn-outline" type="submit">Excluir</button>
+                </form>
+              </div>
+            </details>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhum app cadastrado ainda.</p>
+    {% endif %}
+  </section>
+{% endblock %}

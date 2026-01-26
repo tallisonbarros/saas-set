@@ -26,6 +26,7 @@ class PerfilUsuarioAdminForm(forms.ModelForm):
             "inventarios",
             "listas_ip",
             "radares",
+            "apps",
         ]
 
     def clean_email(self):

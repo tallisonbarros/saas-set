@@ -17,6 +17,7 @@ class PerfilUsuario(models.Model):
     inventarios = models.ManyToManyField("InventarioID", blank=True, related_name="usuarios")
     listas_ip = models.ManyToManyField("ListaIPID", blank=True, related_name="usuarios")
     radares = models.ManyToManyField("RadarID", blank=True, related_name="usuarios")
+    apps = models.ManyToManyField("App", blank=True, related_name="usuarios")
 
     def __str__(self):
         return self.nome
@@ -24,6 +25,22 @@ class PerfilUsuario(models.Model):
 
 class TipoPerfil(models.Model):
     nome = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.nome
+
+
+class App(models.Model):
+    slug = models.SlugField(max_length=60, unique=True)
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    icon = models.CharField(max_length=80, blank=True)
+    theme_color = models.CharField(max_length=30, blank=True)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
 
     def __str__(self):
         return self.nome

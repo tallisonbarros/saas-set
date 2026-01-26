@@ -1,0 +1,33 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}{{ app.nome }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ app.nome }}</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">{{ app.nome }}</div>
+        <div class="hud-pill">Aplicativo</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar ao painel</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">{{ app.nome }}</h1>
+          <p class="page-subtitle">{{ app.descricao|default:"Aplicativo dedicado da planta." }}</p>
+        </div>
+      </div>
+      <div class="hud-meta">Modulo isolado preparado para evolucao futura.</div>
+    </div>
+  </section>
+{% endblock %}

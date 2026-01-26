@@ -127,6 +127,38 @@
       </div>
     </div>
 
+    <div class="panel-section">
+      <div class="panel-section-head">
+        <div>
+          <div class="panel-section-title">Aplicativos</div>
+        </div>
+      </div>
+      <div class="panel-grid panel-grid-spaced">
+        {% if apps %}
+          {% for app in apps %}
+            <a class="panel-card app-card" href="{% url 'app_home' app.slug %}" style="--delay: 0.05s;{% if app.theme_color %}--app-accent: {{ app.theme_color }};{% endif %}">
+              <div class="panel-card-top">
+                <div class="panel-title">
+                  {% if app.icon %}
+                    <span class="app-icon" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>{{ app.icon }}</span>
+                  {% else %}
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 5h10v14H7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
+                      <path d="M9 9h6M9 13h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                    </svg>
+                  {% endif %}
+                  {{ app.nome }}
+                </div>
+              </div>
+              <div class="muted">{{ app.descricao|default:"Aplicativo dedicado." }}</div>
+            </a>
+          {% endfor %}
+        {% else %}
+          <div class="muted">Nenhum aplicativo liberado ainda.</div>
+        {% endif %}
+      </div>
+    </div>
+
     {% if role == "ADMIN" %}
       <div class="panel-section">
         <div class="panel-section-head">
@@ -193,6 +225,18 @@
               </div>
             </div>
             <div class="muted">Criacao e gestao de usuarios.</div>
+          </a>
+          <a class="panel-card" href="{% url 'apps_gerenciar' %}" style="--delay: 0.25s;">
+            <div class="panel-card-top">
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"></rect>
+                  <path d="M8 9h8M8 13h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+                Aplicativos
+              </div>
+            </div>
+            <div class="muted">Cadastro e acesso aos apps dedicados.</div>
           </a>
         </div>
       </div>

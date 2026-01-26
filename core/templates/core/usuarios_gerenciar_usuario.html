@@ -129,6 +129,15 @@
               value="{% if perfil %}{% for radar in perfil.radares.all %}{{ radar.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
             >
           </label>
+          <label class="field">
+            <span>APPS (separados por virgula)</span>
+            <input
+              type="text"
+              name="apps"
+              placeholder="app_milhao, app_ubs3"
+              value="{% if perfil %}{% for app in perfil.apps.all %}{{ app.slug }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+            >
+          </label>
           <button class="btn btn-primary" type="submit">Salvar perfil</button>
         </form>
       </div>

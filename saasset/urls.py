@@ -30,6 +30,8 @@ urlpatterns = [
     path('painel/', views.painel, name="painel"),
     path('ingest-gerenciar/', views.planta_conectada, name="ingest_gerenciar"),
     path('planta-conectada/', views.planta_conectada_redirect, name="planta_conectada"),
+    path('apps/gerenciar/', views.apps_gerenciar, name="apps_gerenciar"),
+    path('apps/<slug:slug>/', views.app_home, name="app_home"),
     path('login/', auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
     path('logout/', auth_views.LogoutView.as_view(), name="logout"),
     path('cadastre-se/', views.register, name="register"),

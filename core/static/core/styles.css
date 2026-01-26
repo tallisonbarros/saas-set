@@ -1620,6 +1620,44 @@ select {
   box-shadow: var(--shadow-strong);
 }
 
+.panel-card.app-card {
+  border: 1px solid rgba(214, 171, 142, 0.35);
+  background: radial-gradient(circle at top right, rgba(255, 231, 214, 0.5), #ffffff);
+}
+
+.panel-card.app-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  border: 1px solid var(--app-accent, rgba(255, 154, 86, 0.55));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.panel-card.app-card:hover::after {
+  opacity: 1;
+}
+
+.app-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--app-accent, #ffb36b);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.card.app-accent {
+  border-color: rgba(255, 170, 112, 0.25);
+  background: linear-gradient(180deg, #ffffff 0%, rgba(255, 244, 236, 0.6) 100%);
+}
+
 .panel-title {
   font-weight: 600;
   display: inline-flex;

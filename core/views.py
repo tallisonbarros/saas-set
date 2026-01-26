@@ -39,6 +39,7 @@ from .models import (
     ListaIP,
     ListaIPID,
     ListaIPItem,
+    App,
     IngestRecord,
     Radar,
     RadarAtividade,
@@ -63,6 +64,36 @@ from .models import (
 def _clean_tag_prefix(value):
     value = re.sub(r"[^0-9A-Za-z]", "", (value or "").strip().upper())
     return value[:3] if value else ""
+
+
+def _clean_app_slug(value):
+    value = re.sub(r"[^0-9A-Za-z_-]", "", (value or "").strip().lower())
+    value = value.replace(" ", "_")
+    return value[:60]
+
+
+def _parse_iso_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _extract_balance_name(tag_name):
+    if not tag_name:
+        return None
+    tag_upper = str(tag_name).upper()
+    for name in ("LIMBL01", "CLABL01", "CLABL02", "SECBL01", "SECBL02"):
+        if name in tag_upper:
+            return name
+    return None
 
 
 def _tipo_prefix(tipo, fallback=None):
@@ -436,15 +467,23 @@ def painel(request):
         display_name = cliente.nome
     else:
         display_name = request.user.first_name or request.user.username
+    role = _user_role(request.user)
+    if request.user.is_staff and not cliente:
+        apps = App.objects.filter(ativo=True).order_by("nome")
+    elif cliente:
+        apps = cliente.apps.filter(ativo=True).order_by("nome")
+    else:
+        apps = App.objects.none()
     return render(
         request,
         "core/painel.html",
         {
             "display_name": display_name,
-            "role": _user_role(request.user),
+            "role": role,
             "is_financeiro": True,
             "is_cliente": True,
             "is_vendedor": True,
+            "apps": apps,
         },
     )
 
@@ -469,6 +508,170 @@ def planta_conectada(request):
 @login_required
 def planta_conectada_redirect(request):
     return redirect("ingest_gerenciar")
+
+
+@login_required
+def app_home(request, slug):
+    cliente = _get_cliente(request.user)
+    app = get_object_or_404(App, slug=slug, ativo=True)
+    if request.user.is_staff:
+        allowed = True
+    else:
+        allowed = bool(cliente) and cliente.apps.filter(pk=app.pk).exists()
+    if not allowed:
+        return HttpResponseForbidden("Sem permissao.")
+    if app.slug == "appmilhaobla":
+        return app_milhao_dashboard(request, app)
+    return render(request, "core/app_home.html", {"app": app})
+
+
+@login_required
+def apps_gerenciar(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    message = None
+    message_level = "info"
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_app":
+            nome = request.POST.get("nome", "").strip()
+            slug_raw = request.POST.get("slug", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            icon = request.POST.get("icon", "").strip()
+            theme_color = request.POST.get("theme_color", "").strip()
+            slug = _clean_app_slug(slug_raw or nome)
+            if not nome or not slug:
+                message = "Informe nome e slug valido."
+                message_level = "error"
+            else:
+                app, created = App.objects.get_or_create(
+                    slug=slug,
+                    defaults={
+                        "nome": nome,
+                        "descricao": descricao,
+                        "icon": icon,
+                        "theme_color": theme_color,
+                        "ativo": True,
+                    },
+                )
+                if not created:
+                    app.nome = nome
+                    app.descricao = descricao
+                    app.icon = icon
+                    app.theme_color = theme_color
+                    app.save(update_fields=["nome", "descricao", "icon", "theme_color"])
+                return redirect("apps_gerenciar")
+        if action == "update_app":
+            app_id = request.POST.get("app_id")
+            app = App.objects.filter(pk=app_id).first()
+            if app:
+                nome = request.POST.get("nome", "").strip()
+                descricao = request.POST.get("descricao", "").strip()
+                icon = request.POST.get("icon", "").strip()
+                theme_color = request.POST.get("theme_color", "").strip()
+                if nome:
+                    app.nome = nome
+                app.descricao = descricao
+                app.icon = icon
+                app.theme_color = theme_color
+                app.save(update_fields=["nome", "descricao", "icon", "theme_color"])
+                return redirect("apps_gerenciar")
+        if action == "toggle_app":
+            app_id = request.POST.get("app_id")
+            app = App.objects.filter(pk=app_id).first()
+            if app:
+                app.ativo = not app.ativo
+                app.save(update_fields=["ativo"])
+                return redirect("apps_gerenciar")
+        if action == "delete_app":
+            app_id = request.POST.get("app_id")
+            app = App.objects.filter(pk=app_id).first()
+            if app:
+                app.delete()
+                return redirect("apps_gerenciar")
+    apps = App.objects.all().order_by("nome")
+    return render(
+        request,
+        "core/apps_gerenciar.html",
+        {
+            "apps": apps,
+            "message": message,
+            "message_level": message_level,
+        },
+    )
+
+
+def app_milhao_dashboard(request, app):
+    records = IngestRecord.objects.filter(
+        client_id="clienteA",
+        agent_id="agente01",
+        source__in=["balanca_acumulado_hora", "balanca_acumulado"],
+    ).order_by("-created_at")[:2000]
+    entries = []
+    for record in records:
+        payload = record.payload if isinstance(record.payload, dict) else {}
+        tag_name = payload.get("TagName") or payload.get("tagname")
+        balance_name = _extract_balance_name(tag_name)
+        if not balance_name:
+            continue
+        hora = payload.get("Hora") or payload.get("DataHoraBase") or payload.get("datahora")
+        dt = _parse_iso_datetime(hora)
+        if not dt:
+            continue
+        value = payload.get("ProducaoHora")
+        if value is None:
+            value = payload.get("Delta")
+        try:
+            value = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            value = None
+        entries.append(
+            {
+                "balance": balance_name,
+                "datetime": dt,
+                "date": dt.date(),
+                "hour": dt.strftime("%H:%M"),
+                "value": value,
+            }
+        )
+    entries.sort(key=lambda item: (item["date"], item["hour"]))
+    dates = sorted({item["date"] for item in entries})
+    balances = sorted({item["balance"] for item in entries})
+    selected_date_raw = request.GET.get("date", "")
+    selected_balance = request.GET.get("balance", "")
+    selected_date = None
+    if selected_date_raw:
+        try:
+            selected_date = datetime.strptime(selected_date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = None
+    if not selected_date and dates:
+        selected_date = dates[-1]
+    if selected_balance not in balances:
+        selected_balance = balances[0] if balances else ""
+    filtered = [
+        item
+        for item in entries
+        if (not selected_date or item["date"] == selected_date) and item["balance"] == selected_balance
+    ]
+    total_value = sum(item["value"] or 0 for item in filtered) if filtered else 0
+    latest_value = filtered[-1]["value"] if filtered else None
+    return render(
+        request,
+        "core/apps/app_milhao_bla.html",
+        {
+            "app": app,
+            "theme_color": app.theme_color,
+            "icon": app.icon,
+            "entries": filtered,
+            "dates": dates,
+            "balances": balances,
+            "selected_date": selected_date,
+            "selected_balance": selected_balance,
+            "total_value": total_value,
+            "latest_value": latest_value,
+        },
+    )
 
 
 def register(request):
@@ -2829,6 +3032,7 @@ def usuarios_gerenciar_usuario(request, pk):
             inventarios_raw = request.POST.get("inventarios", "")
             listas_ip_raw = request.POST.get("listas_ip", "")
             radares_raw = request.POST.get("radares", "")
+            apps_raw = request.POST.get("apps", "")
             if not perfil:
                 perfil = PerfilUsuario.objects.create(
                     nome=nome or user.username.split("@")[0],
@@ -2877,6 +3081,20 @@ def usuarios_gerenciar_usuario(request, pk):
             radar_codes = [code.strip().upper() for code in cleaned_radar.split(",") if code.strip()]
             radares = [RadarID.objects.get_or_create(codigo=code)[0] for code in radar_codes]
             perfil.radares.set(radares)
+            cleaned_apps = apps_raw
+            for sep in [";", "\n", "\r", "\t"]:
+                cleaned_apps = cleaned_apps.replace(sep, ",")
+            app_slugs = [_clean_app_slug(code) for code in cleaned_apps.split(",") if code.strip()]
+            apps = []
+            for slug in app_slugs:
+                if not slug:
+                    continue
+                app, created = App.objects.get_or_create(slug=slug, defaults={"nome": slug})
+                if created and not app.nome:
+                    app.nome = slug
+                    app.save(update_fields=["nome"])
+                apps.append(app)
+            perfil.apps.set(apps)
             return redirect("usuarios_gerenciar_usuario", pk=user.pk)
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()
