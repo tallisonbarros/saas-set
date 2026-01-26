@@ -50,23 +50,33 @@
         </label>
         <label class="field">
           <span>Balancas</span>
-          <div class="balance-toggle-grid">
-            <label class="balance-pill balance-pill-select-all">
-              <input type="checkbox" id="balance-select-all">
-              <span>Selecionar todas</span>
-            </label>
+          <div
+            id="balance-chip-grid"
+            class="balance-toggle-grid"
+            data-selected="{% for bal in selected_balances %}{{ bal }}{% if not forloop.last %},{% endif %}{% endfor %}"
+          >
+            <div class="balance-chip balance-chip-all" data-balance="__all__">
+              <button type="button" class="balance-chip-main">Selecionar todas</button>
+            </div>
             {% for balanca in balances %}
-              <label class="balance-pill">
-                <input
-                  type="checkbox"
-                  name="balance"
-                  value="{{ balanca }}"
-                  {% if balanca in selected_balances %}checked{% endif %}
+              <div class="balance-chip" data-balance="{{ balanca }}">
+                <button
+                  type="button"
+                  class="balance-chip-main{% if balanca in selected_balances %} is-selected{% endif %}"
                 >
-                <span>{{ balanca }}</span>
-              </label>
+                  {{ balanca }}
+                </button>
+                <button
+                  type="button"
+                  class="balance-chip-add{% if balanca in selected_balances %} is-selected{% endif %}"
+                  aria-label="Adicionar {{ balanca }}"
+                >
+                  {% if balanca in selected_balances %}-{% else %}+{% endif %}
+                </button>
+              </div>
             {% endfor %}
           </div>
+          <div id="balance-hidden-inputs"></div>
         </label>
       </div>
     </form>
@@ -137,33 +147,100 @@
   </section>
   <script>
     (function () {
-      var selectAll = document.getElementById("balance-select-all");
+      var grid = document.getElementById("balance-chip-grid");
       var dateSelect = document.getElementById("milhao-date");
-      var form = selectAll ? selectAll.closest("form") : null;
-      if (!selectAll) {
+      if (!grid) {
         return;
       }
-      var checkboxes = Array.from(document.querySelectorAll("input[name='balance']"));
-      var allChecked = checkboxes.length > 0 && checkboxes.every(function (input) { return input.checked; });
-      selectAll.checked = allChecked;
-      selectAll.addEventListener("change", function () {
-        checkboxes.forEach(function (input) { input.checked = selectAll.checked; });
+      var form = grid.closest("form");
+      var hiddenContainer = document.getElementById("balance-hidden-inputs");
+      var selectedRaw = (grid.getAttribute("data-selected") || "").split(",");
+      var selected = selectedRaw.map(function (item) { return item.trim(); }).filter(Boolean);
+
+      function setHiddenInputs(values) {
+        if (!hiddenContainer) {
+          return;
+        }
+        hiddenContainer.innerHTML = "";
+        values.forEach(function (value) {
+          var input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "balance";
+          input.value = value;
+          hiddenContainer.appendChild(input);
+        });
+      }
+
+      function updateUI() {
+        var chips = Array.from(grid.querySelectorAll(".balance-chip"));
+        chips.forEach(function (chip) {
+          var balance = chip.getAttribute("data-balance");
+          if (balance === "__all__") {
+            return;
+          }
+          var main = chip.querySelector(".balance-chip-main");
+          var add = chip.querySelector(".balance-chip-add");
+          var isSelected = selected.indexOf(balance) >= 0;
+          if (main) {
+            main.classList.toggle("is-selected", isSelected);
+          }
+          if (add) {
+            add.classList.toggle("is-selected", isSelected);
+            add.textContent = isSelected ? "-" : "+";
+          }
+        });
+        setHiddenInputs(selected);
+      }
+
+      function submit() {
         if (form) {
           form.submit();
         }
-      });
-      checkboxes.forEach(function (input) {
-        input.addEventListener("change", function () {
-          if (form) {
-            form.submit();
+      }
+
+      grid.addEventListener("click", function (event) {
+        var mainButton = event.target.closest(".balance-chip-main");
+        var addButton = event.target.closest(".balance-chip-add");
+        if (!mainButton && !addButton) {
+          return;
+        }
+        var chip = event.target.closest(".balance-chip");
+        if (!chip) {
+          return;
+        }
+        var balance = chip.getAttribute("data-balance");
+        if (balance === "__all__") {
+          selected = Array.from(grid.querySelectorAll(".balance-chip"))
+            .map(function (item) { return item.getAttribute("data-balance"); })
+            .filter(function (item) { return item && item !== "__all__"; });
+          updateUI();
+          submit();
+          return;
+        }
+        if (mainButton) {
+          selected = [balance];
+          updateUI();
+          submit();
+          return;
+        }
+        if (addButton) {
+          if (selected.indexOf(balance) >= 0) {
+            selected = selected.filter(function (item) { return item !== balance; });
+          } else {
+            selected = selected.concat(balance);
           }
-        });
+          updateUI();
+          submit();
+        }
       });
+
       if (dateSelect && form) {
         dateSelect.addEventListener("change", function () {
-          form.submit();
+          submit();
         });
       }
+
+      updateUI();
     })();
   </script>
 {% endblock %}

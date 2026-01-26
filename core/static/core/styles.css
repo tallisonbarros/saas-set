@@ -1689,7 +1689,13 @@ select {
   justify-content: center;
 }
 
-.balance-pill {
+.balance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.balance-chip-main {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -1705,33 +1711,18 @@ select {
   transition: all 0.2s ease;
 }
 
-.balance-pill-select-all {
-  border-style: dashed;
-  background: rgba(255, 248, 240, 0.8);
-  color: #a36a3a;
-}
-
-.balance-pill input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.balance-pill:hover {
+.balance-chip-main:hover {
   border-color: rgba(255, 122, 24, 0.55);
   transform: translateY(-1px);
 }
 
-.balance-pill input:checked + span {
+.balance-chip-main.is-selected {
+  position: relative;
+  z-index: 1;
   color: #2f1a0d;
 }
 
-.balance-pill input:checked + span {
-  position: relative;
-  z-index: 1;
-}
-
-.balance-pill input:checked + span::before {
+.balance-chip-main.is-selected::before {
   content: "";
   position: absolute;
   inset: -8px -14px;
@@ -1739,6 +1730,30 @@ select {
   background: rgba(255, 184, 120, 0.9);
   z-index: -1;
   box-shadow: 0 8px 18px rgba(255, 122, 24, 0.2);
+}
+
+.balance-chip-add {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 122, 24, 0.3);
+  background: #fff;
+  color: #7c4b2a;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.balance-chip-add.is-selected {
+  color: #b42318;
+  border-color: rgba(180, 35, 24, 0.5);
+  background: rgba(180, 35, 24, 0.08);
+}
+
+.balance-chip-all .balance-chip-main {
+  border-style: dashed;
+  background: rgba(255, 248, 240, 0.8);
+  color: #a36a3a;
 }
 
 .panel-title {
