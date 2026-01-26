@@ -638,7 +638,10 @@ def app_milhao_dashboard(request, app):
     dates = sorted({item["date"] for item in entries})
     balances = sorted({item["balance"] for item in entries})
     selected_date_raw = request.GET.get("date", "")
-    selected_balance = request.GET.get("balance", "")
+    selected_balance_raw = request.GET.getlist("balance")
+    if not selected_balance_raw:
+        selected_balance_raw = request.GET.get("balance", "").split(",")
+    selected_balances = [item.strip() for item in selected_balance_raw if item.strip()]
     selected_date = None
     if selected_date_raw:
         try:
@@ -647,14 +650,26 @@ def app_milhao_dashboard(request, app):
             selected_date = None
     if not selected_date and dates:
         selected_date = dates[-1]
-    if selected_balance not in balances:
-        selected_balance = balances[0] if balances else ""
+    valid_balances = {balance for balance in balances}
+    selected_balances = [bal for bal in selected_balances if bal in valid_balances]
+    if not selected_balances and balances:
+        selected_balances = [balances[0]]
     filtered = [
         item
         for item in entries
-        if (not selected_date or item["date"] == selected_date) and item["balance"] == selected_balance
+        if (not selected_date or item["date"] == selected_date)
+        and (not selected_balances or item["balance"] in selected_balances)
     ]
     total_value = sum(item["value"] or 0 for item in filtered) if filtered else 0
+    totals_by_balance = {}
+    for item in filtered:
+        balance = item["balance"]
+        totals_by_balance.setdefault(balance, 0)
+        totals_by_balance[balance] += item["value"] or 0
+    totals_by_balance = [
+        {"balance": balance, "total": totals_by_balance[balance]}
+        for balance in sorted(totals_by_balance.keys())
+    ]
     latest_value = filtered[-1]["value"] if filtered else None
     return render(
         request,
@@ -667,8 +682,9 @@ def app_milhao_dashboard(request, app):
             "dates": dates,
             "balances": balances,
             "selected_date": selected_date,
-            "selected_balance": selected_balance,
+            "selected_balances": selected_balances,
             "total_value": total_value,
+            "totals_by_balance": totals_by_balance,
             "latest_value": latest_value,
         },
     )

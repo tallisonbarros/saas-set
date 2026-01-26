@@ -49,14 +49,24 @@
           </select>
         </label>
         <label class="field">
-          <span>Balanca</span>
-          <select name="balance">
+          <span>Balancas</span>
+          <div class="checkbox-grid">
+            <label class="checkbox-item">
+              <input type="checkbox" id="balance-select-all">
+              Selecionar todas
+            </label>
             {% for balanca in balances %}
-              <option value="{{ balanca }}" {% if selected_balance == balanca %}selected{% endif %}>
+              <label class="checkbox-item">
+                <input
+                  type="checkbox"
+                  name="balance"
+                  value="{{ balanca }}"
+                  {% if balanca in selected_balances %}checked{% endif %}
+                >
                 {{ balanca }}
-              </option>
+              </label>
             {% endfor %}
-          </select>
+          </div>
         </label>
       </div>
       <div class="form-actions">
@@ -71,17 +81,29 @@
         <div class="panel-card-top">
           <div class="panel-title">Total do dia</div>
         </div>
-        <div class="panel-highlight">R$ {{ total_value|floatformat:2 }}</div>
+        <div class="panel-highlight">{{ total_value|floatformat:2 }} kg</div>
       </div>
       <div class="panel-card panel-card-compact">
         <div class="panel-card-top">
           <div class="panel-title">Ultima leitura</div>
         </div>
         <div class="panel-highlight">
-          {% if latest_value is not None %}R$ {{ latest_value|floatformat:2 }}{% else %}-{% endif %}
+          {% if latest_value is not None %}{{ latest_value|floatformat:2 }} kg{% else %}-{% endif %}
         </div>
       </div>
     </div>
+    {% if totals_by_balance %}
+      <div class="panel-grid panel-grid-spaced" style="margin-top: 16px;">
+        {% for item in totals_by_balance %}
+          <div class="panel-card panel-card-compact">
+            <div class="panel-card-top">
+              <div class="panel-title">{{ item.balance }}</div>
+            </div>
+            <div class="panel-highlight">{{ item.total|floatformat:2 }} kg</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
   </section>
 
   <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
@@ -106,7 +128,7 @@
               <tr>
                 <td>{{ item.hour }}</td>
                 <td>{{ item.balance }}</td>
-                <td>{% if item.value is not None %}R$ {{ item.value|floatformat:2 }}{% else %}-{% endif %}</td>
+                <td>{% if item.value is not None %}{{ item.value|floatformat:2 }} kg{% else %}-{% endif %}</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -116,4 +138,18 @@
       <p class="muted">Nenhum dado para o filtro selecionado.</p>
     {% endif %}
   </section>
+  <script>
+    (function () {
+      var selectAll = document.getElementById("balance-select-all");
+      if (!selectAll) {
+        return;
+      }
+      var checkboxes = Array.from(document.querySelectorAll("input[name='balance']"));
+      var allChecked = checkboxes.length > 0 && checkboxes.every(function (input) { return input.checked; });
+      selectAll.checked = allChecked;
+      selectAll.addEventListener("change", function () {
+        checkboxes.forEach(function (input) { input.checked = selectAll.checked; });
+      });
+    })();
+  </script>
 {% endblock %}
