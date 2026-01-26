@@ -133,7 +133,7 @@
           <div class="panel-section-title">Aplicativos</div>
         </div>
       </div>
-      <div class="panel-grid panel-grid-spaced">
+      <div class="panel-grid panel-grid-spaced apps-grid">
         {% if apps %}
           {% for app in apps %}
             <a class="panel-card app-card" href="{% url 'app_home' app.slug %}" style="--delay: 0.05s;{% if app.theme_color %}--app-accent: {{ app.theme_color }};{% endif %}">

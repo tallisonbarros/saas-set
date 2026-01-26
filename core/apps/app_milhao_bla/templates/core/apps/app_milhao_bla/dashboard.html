@@ -35,6 +35,7 @@
     </div>
   </section>
 
+  {% if not composition %}
   <section class="card app-accent balance-filter-card date-filter-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <form method="get" class="io-form">
       <div class="balance-filter-grid">
@@ -51,6 +52,7 @@
       </div>
     </form>
   </section>
+  {% endif %}
 
     {% if composition %}
   <section class="card composition-card">
@@ -59,14 +61,28 @@
         <h2 class="io-title">Proporcao de composicao do dia</h2>
         <p class="muted">Percentual por balanca.</p>
       </div>
-      <div class="panel-tag">Total 100%</div>
+      <div class="composition-head-actions">
+        <div class="panel-tag">Total 100%</div>
+        <form method="get" class="io-form composition-date-form">
+          <label class="field composition-date-field">
+            <span>Dia</span>
+            <select name="date" id="milhao-date" class="composition-date-select">
+              {% for day in dates %}
+                <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
+                  {{ day|date:"d/m/Y" }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+        </form>
+      </div>
     </div>
     <div class="composition-bar-stack">
       {% for item in composition %}
         <span
           class="composition-segment"
           style="
-            flex: 0 0 {{ item.percent }}%; min-width: 2px;
+            flex: 0 0 {{ item.percent|floatformat:1|unlocalize }}%; min-width: 2px;
             {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
             {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
             {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
@@ -91,7 +107,6 @@
               "
             ></span>
             <div class="composition-label">{{ item.label }}</div>
-            <div class="muted">{{ item.balance }}</div>
           </div>
           <div class="composition-value">{{ item.percent|floatformat:1 }}%</div>
         </div>
@@ -161,7 +176,7 @@
         <div class="metric-value">
           {% if latest_value is not None %}{{ latest_value|floatformat:2 }} <span class="metric-unit">kg</span>{% else %}-{% endif %}
         </div>
-        <div class="metric-note">Ultimo valor registrado.</div>
+        <div class="metric-note">Ultimo valor registrado.{% if latest_datetime %} Em {{ latest_datetime|date:"d/m/Y H:i" }}{% endif %}.</div>
       </div>
     </div>
     {% if totals_by_balance %}

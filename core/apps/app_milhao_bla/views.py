@@ -130,6 +130,7 @@ def dashboard(request):
         for balance in sorted(totals_by_balance.keys())
     ]
     latest_value = filtered[-1]["value"] if filtered else None
+    latest_datetime = filtered[-1]["datetime"] if filtered else None
 
     composition_source = [
         item
@@ -184,6 +185,7 @@ def dashboard(request):
             "total_value": total_value,
             "totals_by_balance": totals_by_balance,
             "latest_value": latest_value,
+            "latest_datetime": latest_datetime,
             "composition": composition,
         },
     )
