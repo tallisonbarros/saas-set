@@ -82,7 +82,7 @@
         <span
           class="composition-segment"
           style="
-            flex: 0 0 {{ item.percent|floatformat:1|unlocalize }}%; min-width: 2px;
+            flex: 0 0 {{ item.percent_str }}%; min-width: 2px;
             {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
             {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
             {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;

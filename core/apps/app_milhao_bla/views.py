@@ -167,6 +167,7 @@ def dashboard(request):
                     "balance": item["balance"],
                     "label": item["label"],
                     "percent": percent,
+                    "percent_str": f"{percent:.1f}",
                 }
             )
 
