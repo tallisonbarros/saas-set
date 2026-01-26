@@ -1672,11 +1672,13 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
   justify-content: center;
   gap: 16px;
+  align-items: stretch;
 }
 
 .metric-card {
   max-width: 260px;
   justify-self: center;
+  width: 100%;
 }
 
 .balance-toggle-grid {
@@ -1721,7 +1723,7 @@ select {
 }
 
 .balance-pill input:checked + span {
-  color: #fff;
+  color: #2f1a0d;
 }
 
 .balance-pill input:checked + span {
@@ -1734,9 +1736,9 @@ select {
   position: absolute;
   inset: -8px -14px;
   border-radius: 999px;
-  background: var(--app-accent, #ff7a18);
+  background: rgba(255, 184, 120, 0.9);
   z-index: -1;
-  box-shadow: 0 8px 18px rgba(255, 122, 24, 0.3);
+  box-shadow: 0 8px 18px rgba(255, 122, 24, 0.2);
 }
 
 .panel-title {
