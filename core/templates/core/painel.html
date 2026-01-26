@@ -113,31 +113,17 @@
           </div>
           <div class="muted">Arquivos tecnicos, historicos e revisoes.</div>
         </div>
-        {% if role == "ADMIN" %}
-          <a class="panel-card" href="{% url 'planta_conectada' %}" style="--delay: 0.35s;">
-            <div class="panel-card-top">
-              <div class="panel-title">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                Planta conectada
-              </div>
+        <div class="panel-card panel-disabled" style="--delay: 0.35s;">
+          <div class="panel-card-top">
+            <div class="panel-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+              Planta conectada
             </div>
-            <div class="muted">Monitoramento de automacao e sensores.</div>
-          </a>
-        {% else %}
-          <div class="panel-card panel-disabled" style="--delay: 0.35s;">
-            <div class="panel-card-top">
-              <div class="panel-title">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                Planta conectada
-              </div>
-            </div>
-            <div class="muted">Monitoramento de automacao e sensores.</div>
           </div>
-        {% endif %}
+          <div class="muted">Monitoramento de automacao e sensores.</div>
+        </div>
       </div>
     </div>
 
@@ -182,6 +168,17 @@
               </div>
             </div>
             <div class="muted">Clientes e propostas por cliente.</div>
+          </a>
+          <a class="panel-card" href="{% url 'ingest_gerenciar' %}" style="--delay: 0.18s;">
+            <div class="panel-card-top">
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                INGEST_GERENCIAR
+              </div>
+            </div>
+            <div class="muted">Lotes recebidos e limpeza de registros.</div>
           </a>
           <a class="panel-card" href="{% url 'usuarios' %}" style="--delay: 0.2s;">
             <div class="panel-card-top">

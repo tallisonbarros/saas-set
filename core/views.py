@@ -466,6 +466,11 @@ def planta_conectada(request):
     )
 
 
+@login_required
+def planta_conectada_redirect(request):
+    return redirect("ingest_gerenciar")
+
+
 def register(request):
     if request.user.is_authenticated:
         return redirect("painel")

@@ -1,13 +1,13 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}Planta conectada{% endblock %}
+{% block title %}INGEST_GERENCIAR{% endblock %}
 
 {% block breadcrumbs %}
   <nav class="page-crumbs" aria-label="Breadcrumb">
     <a href="{% url 'painel' %}">Painel</a>
     <span class="crumb-sep">/</span>
-    <span>Planta conectada</span>
+    <span>INGEST_GERENCIAR</span>
   </nav>
 {% endblock %}
 
@@ -15,7 +15,7 @@
   <section class="card">
     <div class="page-hud">
       <div class="hud-top">
-        <div class="hud-title">Planta conectada</div>
+        <div class="hud-title">INGEST_GERENCIAR</div>
         <div class="hud-pill">Ingest</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar ao painel</a>
@@ -23,8 +23,8 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <h1 class="page-title">Dados recebidos</h1>
-          <p class="page-subtitle">Ultimos registros enviados pelos agentes locais.</p>
+          <h1 class="page-title">Lotes recebidos</h1>
+          <p class="page-subtitle">Registros enviados pelos agentes locais.</p>
         </div>
         <form method="post" onsubmit="return confirm('Limpar todos os registros recebidos?');">
           {% csrf_token %}
