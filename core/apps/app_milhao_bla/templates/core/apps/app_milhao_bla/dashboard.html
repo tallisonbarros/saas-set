@@ -30,15 +30,15 @@
         </div>
       </div>
       <div class="hud-meta">
-        Cliente: clienteA · Agente: agente01 · Fonte: balanca_acumulado_hora
+        Cliente: clienteA - Agente: agente01 - Fonte: balanca_acumulado_hora
       </div>
     </div>
   </section>
 
-  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="card app-accent balance-filter-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <form method="get" class="io-form">
-      <div style="display: grid; gap: 16px;">
-        <label class="field" style="max-width: 240px; margin: 0 auto; text-align: center;">
+      <div class="balance-filter-grid">
+        <label class="field balance-filter-date">
           <span>Dia</span>
           <select name="date" id="milhao-date">
             {% for day in dates %}
@@ -52,7 +52,7 @@
           <span>Balancas</span>
           <div
             id="balance-chip-grid"
-            class="balance-toggle-grid"
+            class="balance-toggle-grid balance-toggle-compact"
             data-selected="{% for bal in selected_balances %}{{ bal }}{% if not forloop.last %},{% endif %}{% endfor %}"
           >
             <div class="balance-chip balance-chip-all" data-balance="__all__">
@@ -64,17 +64,21 @@
                   type="button"
                   class="balance-chip-main{% if balanca in selected_balances %} is-selected{% endif %}"
                 >
-                  <span class="balance-title">
-                    {% if balanca == "LIMBL01" %}MILHO{% elif balanca == "SECBL01" %}GERMEN{% elif balanca == "SECBL02" %}RESIDUO{% elif balanca == "CLABL01" %}MIUDO{% elif balanca == "CLABL02" %}GRAUDO{% else %}{{ balanca }}{% endif %}
+                  <span class="balance-chip-text">
+                    <span class="balance-title">
+                      {% if balanca == "LIMBL01" %}MILHO{% elif balanca == "SECBL01" %}GERMEN{% elif balanca == "SECBL02" %}RESIDUO{% elif balanca == "CLABL01" %}MIUDO{% elif balanca == "CLABL02" %}GRAUDO{% else %}{{ balanca }}{% endif %}
+                    </span>
+                    <span class="balance-subtitle">{{ balanca }}</span>
                   </span>
-                  <span class="balance-subtitle">{{ balanca }}</span>
                 </button>
                 <button
                   type="button"
                   class="balance-chip-add{% if balanca in selected_balances %} is-selected{% endif %}"
                   aria-label="Adicionar {{ balanca }}"
                 >
-                  {% if balanca in selected_balances %}-{% else %}+{% endif %}
+                  <span class="balance-chip-symbol">
+                    {% if balanca in selected_balances %}-{% else %}+{% endif %}
+                  </span>
                 </button>
               </div>
             {% endfor %}
@@ -85,37 +89,73 @@
     </form>
   </section>
 
-  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
-    <div class="grid-2 metric-grid">
-      <div class="panel-card panel-card-compact metric-card">
-        <div class="panel-card-top">
-          <div class="panel-title">Total do dia</div>
-        </div>
-        <div class="panel-highlight">{{ total_value|floatformat:2 }} kg</div>
+  <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <div class="io-card-head metrics-head">
+      <div>
+        <h2 class="io-title">Indicadores do dia</h2>
+        <p class="muted">Resumo das balancas selecionadas.</p>
+      </div>
+      {% if selected_date %}
+        <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
+      {% endif %}
+    </div>
+    <div class="metrics-overview grid-2 metric-grid">
+      <div class="panel-card panel-card-compact metric-card metric-card-primary">
+        <div class="metric-label">Total do dia</div>
+        <div class="metric-value">{{ total_value|floatformat:2 }} <span class="metric-unit">kg</span></div>
+        <div class="metric-note">Soma das leituras no periodo.</div>
       </div>
       <div class="panel-card panel-card-compact metric-card">
-        <div class="panel-card-top">
-          <div class="panel-title">Ultima leitura</div>
+        <div class="metric-label">Ultima leitura</div>
+        <div class="metric-value">
+          {% if latest_value is not None %}{{ latest_value|floatformat:2 }} <span class="metric-unit">kg</span>{% else %}-{% endif %}
         </div>
-        <div class="panel-highlight">
-          {% if latest_value is not None %}{{ latest_value|floatformat:2 }} kg{% else %}-{% endif %}
-        </div>
+        <div class="metric-note">Ultimo valor registrado.</div>
       </div>
     </div>
     {% if totals_by_balance %}
-      <div class="panel-grid panel-grid-spaced metric-grid" style="margin-top: 16px;">
-        {% for item in totals_by_balance %}
-          <div class="panel-card panel-card-compact metric-card">
-            <div class="panel-card-top">
-              <div class="panel-title">{{ item.label }}</div>
-              <div class="muted" style="margin-top: 4px;">{{ item.balance }}</div>
+      <div class="metrics-breakdown">
+        <div class="metrics-subtitle">Totais por balanca</div>
+        <div class="panel-grid metric-grid metric-grid-compact">
+          {% for item in totals_by_balance %}
+            <div class="panel-card panel-card-compact metric-card">
+              <div class="panel-card-top">
+                <div class="panel-title">{{ item.label }}</div>
+                <div class="panel-tag">{{ item.balance }}</div>
+              </div>
+              <div class="metric-value">{{ item.total|floatformat:2 }} <span class="metric-unit">kg</span></div>
             </div>
-            <div class="panel-highlight">{{ item.total|floatformat:2 }} kg</div>
-          </div>
-        {% endfor %}
+          {% endfor %}
+        </div>
       </div>
     {% endif %}
   </section>
+
+  {% if composition %}
+  <section class="card composition-card">
+    <div class="io-card-head composition-head">
+      <div>
+        <h2 class="io-title">Proporcao de composicao</h2>
+        <p class="muted">Percentual por balanca (sem MILHO).</p>
+      </div>
+      <div class="panel-tag">Total 100%</div>
+    </div>
+    <div class="composition-list">
+      {% for item in composition %}
+        <div class="composition-row">
+          <div>
+            <div class="composition-label">{{ item.label }}</div>
+            <div class="muted">{{ item.balance }}</div>
+          </div>
+          <div class="composition-value">{{ item.percent|floatformat:1 }}%</div>
+          <div class="composition-bar">
+            <span style="width: {{ item.percent }}%"></span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <div class="io-card-head">
@@ -180,22 +220,31 @@
 
       function updateUI() {
         var chips = Array.from(grid.querySelectorAll(".balance-chip"));
-        chips.forEach(function (chip) {
+        var selectableChips = chips.filter(function (chip) {
+          return chip.getAttribute("data-balance") !== "__all__";
+        });
+        selectableChips.forEach(function (chip) {
           var balance = chip.getAttribute("data-balance");
-          if (balance === "__all__") {
-            return;
-          }
           var main = chip.querySelector(".balance-chip-main");
           var add = chip.querySelector(".balance-chip-add");
+          var symbol = add ? add.querySelector(".balance-chip-symbol") : null;
           var isSelected = selected.indexOf(balance) >= 0;
+          chip.classList.toggle("is-selected", isSelected);
           if (main) {
             main.classList.toggle("is-selected", isSelected);
           }
           if (add) {
             add.classList.toggle("is-selected", isSelected);
-            add.textContent = isSelected ? "-" : "+";
+          }
+          if (symbol) {
+            symbol.textContent = isSelected ? "-" : "+";
           }
         });
+        var allChip = grid.querySelector(".balance-chip-all");
+        if (allChip) {
+          var allSelected = selectableChips.length > 0 && selected.length === selectableChips.length;
+          allChip.classList.toggle("is-selected", allSelected);
+        }
         setHiddenInputs(selected);
       }
 

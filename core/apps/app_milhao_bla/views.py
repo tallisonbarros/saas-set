@@ -130,6 +130,24 @@ def dashboard(request):
         for balance in sorted(totals_by_balance.keys())
     ]
     latest_value = filtered[-1]["value"] if filtered else None
+    composition_items = [item for item in totals_by_balance if item["balance"] != "LIMBL01"]
+    composition_total = sum(item["total"] for item in composition_items)
+    composition = []
+    if composition_items and composition_total > 0:
+        running = 0.0
+        for idx, item in enumerate(composition_items):
+            if idx == len(composition_items) - 1:
+                percent = round(100.0 - running, 1)
+            else:
+                percent = round((item["total"] / composition_total) * 100.0, 1)
+                running += percent
+            composition.append(
+                {
+                    "balance": item["balance"],
+                    "label": item["label"],
+                    "percent": percent,
+                }
+            )
 
     return render(
         request,
@@ -146,5 +164,6 @@ def dashboard(request):
             "total_value": total_value,
             "totals_by_balance": totals_by_balance,
             "latest_value": latest_value,
+            "composition": composition,
         },
     )
