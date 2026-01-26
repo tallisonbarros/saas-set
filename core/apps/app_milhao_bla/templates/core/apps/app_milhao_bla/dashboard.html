@@ -89,6 +89,27 @@
     </form>
   </section>
 
+  {% if composition %}
+  <section class="card composition-card">
+    <div class="io-card-head composition-head">
+      <div>
+        <h2 class="io-title">Proporcao de composicao do dia</h2>
+        <p class="muted">Percentual por balanca.</p>
+      </div>
+      <div class="panel-tag">Total 100%</div>
+    </div>
+    <div class="composition-bar-stack">
+      {% for item in composition %}
+        <span
+          class="composition-segment"
+          style="
+            width: {{ item.percent }}%; min-width: 2px;
+            {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
+            {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
+            {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
+            {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
+            {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
+
   <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <div class="io-card-head metrics-head">
       <div>
@@ -131,26 +152,7 @@
     {% endif %}
   </section>
 
-  {% if composition %}
-  <section class="card composition-card">
-    <div class="io-card-head composition-head">
-      <div>
-        <h2 class="io-title">Proporcao de composicao</h2>
-        <p class="muted">Percentual por balanca.</p>
-      </div>
-      <div class="panel-tag">Total 100%</div>
-    </div>
-    <div class="composition-bar-stack">
-      {% for item in composition %}
-        <span
-          class="composition-segment"
-          style="
-            width: {{ item.percent }}%;
-            {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
-            {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
-            {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
-            {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
-            {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
+  
           "
         ></span>
       {% endfor %}

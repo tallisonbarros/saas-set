@@ -1796,10 +1796,12 @@ select {
   overflow: hidden;
   background: #eef0f4;
   border: 1px solid rgba(120, 130, 150, 0.2);
+  align-items: stretch;
 }
 
 .composition-segment {
   display: block;
+  flex: 0 0 auto;
   height: 100%;
   background: linear-gradient(90deg, var(--segment-color, rgba(255, 140, 26, 0.7)), var(--segment-color-2, rgba(255, 184, 120, 0.85)));
 }
