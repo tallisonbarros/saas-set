@@ -46,6 +46,13 @@ def dashboard(request):
         source__in=["balanca_acumulado_hora", "balanca_acumulado"],
     ).order_by("-created_at")[:2000]
 
+    balance_labels = {
+        "LIMBL01": "MILHO",
+        "SECBL01": "GERMEN",
+        "SECBL02": "RESIDUO",
+        "CLABL01": "MIUDO",
+        "CLABL02": "GRAUDO",
+    }
     entries = []
     for record in records:
         payload = record.payload if isinstance(record.payload, dict) else {}
@@ -67,6 +74,7 @@ def dashboard(request):
         entries.append(
             {
                 "balance": balance_name,
+                "label": balance_labels.get(balance_name, balance_name),
                 "datetime": dt,
                 "date": dt.date(),
                 "hour": dt.strftime("%H:%M"),
@@ -114,7 +122,11 @@ def dashboard(request):
         totals_by_balance.setdefault(balance, 0)
         totals_by_balance[balance] += item["value"] or 0
     totals_by_balance = [
-        {"balance": balance, "total": totals_by_balance[balance]}
+        {
+            "balance": balance,
+            "label": balance_labels.get(balance, balance),
+            "total": totals_by_balance[balance],
+        }
         for balance in sorted(totals_by_balance.keys())
     ]
     latest_value = filtered[-1]["value"] if filtered else None

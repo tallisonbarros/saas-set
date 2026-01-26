@@ -1709,6 +1709,9 @@ select {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
 }
 
 .balance-chip-main:hover {
@@ -1730,6 +1733,17 @@ select {
   background: rgba(255, 184, 120, 0.9);
   z-index: -1;
   box-shadow: 0 8px 18px rgba(255, 122, 24, 0.2);
+}
+
+.balance-title {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+}
+
+.balance-subtitle {
+  font-size: 11px;
+  opacity: 0.7;
 }
 
 .balance-chip-add {
