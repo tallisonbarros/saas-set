@@ -130,7 +130,27 @@ def dashboard(request):
         for balance in sorted(totals_by_balance.keys())
     ]
     latest_value = filtered[-1]["value"] if filtered else None
-    composition_items = [item for item in totals_by_balance if item["balance"] != "LIMBL01"]
+
+    composition_source = [
+        item
+        for item in entries
+        if (not selected_date or item["date"] == selected_date)
+    ]
+    composition_totals = {}
+    for item in composition_source:
+        balance = item["balance"]
+        if balance == "LIMBL01":
+            continue
+        composition_totals.setdefault(balance, 0)
+        composition_totals[balance] += item["value"] or 0
+    composition_items = [
+        {
+            "balance": balance,
+            "label": balance_labels.get(balance, balance),
+            "total": composition_totals[balance],
+        }
+        for balance in sorted(composition_totals.keys())
+    ]
     composition_total = sum(item["total"] for item in composition_items)
     composition = []
     if composition_items and composition_total > 0:

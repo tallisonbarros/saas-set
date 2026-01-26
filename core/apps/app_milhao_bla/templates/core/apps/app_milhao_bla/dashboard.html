@@ -136,21 +136,43 @@
     <div class="io-card-head composition-head">
       <div>
         <h2 class="io-title">Proporcao de composicao</h2>
-        <p class="muted">Percentual por balanca (sem MILHO).</p>
+        <p class="muted">Percentual por balanca.</p>
       </div>
       <div class="panel-tag">Total 100%</div>
     </div>
-    <div class="composition-list">
+    <div class="composition-bar-stack">
       {% for item in composition %}
-        <div class="composition-row">
-          <div>
+        <span
+          class="composition-segment"
+          style="
+            width: {{ item.percent }}%;
+            {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
+            {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
+            {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
+            {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
+            {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
+          "
+        ></span>
+      {% endfor %}
+    </div>
+    <div class="composition-legend">
+      {% for item in composition %}
+        <div class="composition-legend-item">
+          <div class="composition-legend-left">
+            <span
+              class="composition-legend-swatch"
+              style="
+                {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
+                {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
+                {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
+                {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
+                {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
+              "
+            ></span>
             <div class="composition-label">{{ item.label }}</div>
             <div class="muted">{{ item.balance }}</div>
           </div>
           <div class="composition-value">{{ item.percent|floatformat:1 }}%</div>
-          <div class="composition-bar">
-            <span style="width: {{ item.percent }}%"></span>
-          </div>
         </div>
       {% endfor %}
     </div>
