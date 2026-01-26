@@ -1,4 +1,6 @@
 import calendar
+import json
+import os
 import ipaddress
 import re
 from datetime import date, datetime
@@ -6,12 +8,13 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from urllib.parse import urlencode
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 
 from django.contrib.auth.models import User
 from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
@@ -36,6 +39,7 @@ from .models import (
     ListaIP,
     ListaIPID,
     ListaIPItem,
+    IngestRecord,
     Radar,
     RadarAtividade,
     RadarClassificacao,
@@ -375,6 +379,34 @@ def home(request):
     if request.user.is_authenticated:
         logout(request)
     return render(request, "core/home.html")
+
+
+@csrf_exempt
+def api_ingest(request):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    expected_token = (os.environ.get("API_TOKEN") or "").strip()
+    auth_header = request.headers.get("Authorization", "").strip()
+    if not expected_token or auth_header != f"Bearer {expected_token}":
+        return JsonResponse({"ok": False, "error": "unauthorized"}, status=401)
+    try:
+        raw_body = request.body.decode("utf-8") if request.body else ""
+        payload = json.loads(raw_body or "[]")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+    if not isinstance(payload, list):
+        return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+    to_create = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        source_id = str(item.get("source_id", "")).strip()
+        if not source_id:
+            continue
+        to_create.append(IngestRecord(source_id=source_id, payload=item))
+    if to_create:
+        IngestRecord.objects.bulk_create(to_create, ignore_conflicts=True)
+    return JsonResponse({"ok": True, "count": len(payload)})
 
 
 @login_required

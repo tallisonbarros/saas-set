@@ -724,3 +724,15 @@ class RackSlotIO(models.Model):
 
     def __str__(self):
         return f"{self.rack.nome} - S{self.posicao}"
+
+
+class IngestRecord(models.Model):
+    source_id = models.CharField(max_length=120, unique=True)
+    payload = models.JSONField()
+    recebido_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-recebido_em"]
+
+    def __str__(self):
+        return self.source_id
