@@ -62,10 +62,8 @@
         <p class="muted">Percentual por balanca.</p>
       </div>
       <div class="composition-head-actions">
-        <div class="panel-tag">Total 100%</div>
         <form method="get" class="io-form composition-date-form">
           <label class="field composition-date-field">
-            <span>Dia</span>
             <select name="date" id="milhao-date" class="composition-date-select">
               {% for day in dates %}
                 <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
@@ -85,7 +83,7 @@
             flex: 0 0 {{ item.percent_str }}%; min-width: 2px;
             {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
             {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
-            {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
+            {% elif item.balance == 'CLABL01' %}--segment-color: #3b82f6; --segment-color-2: #60a5fa;
             {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
             {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
           "
@@ -101,7 +99,7 @@
               style="
                 {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
                 {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
-                {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
+                {% elif item.balance == 'CLABL01' %}--segment-color: #3b82f6; --segment-color-2: #60a5fa;
                 {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
                 {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
               "

@@ -1814,7 +1814,7 @@ select {
 .composition-legend {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 160px));
   justify-content: center;
 }
 
@@ -1841,13 +1841,21 @@ select {
 
 .composition-mini {
   width: 100%;
-  max-width: 220px;
+  max-width: 140px;
   justify-self: center;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 12px;
   border: 1px solid rgba(120, 130, 150, 0.18);
   background: #f8f9fb;
   box-shadow: 0 4px 10px rgba(30, 41, 59, 0.04);
+}
+
+.composition-label {
+  font-size: 12px;
+}
+
+.composition-value {
+  font-size: 12px;
 }
 
 .composition-date-form {
