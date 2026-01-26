@@ -1668,6 +1668,77 @@ select {
   background: linear-gradient(180deg, #ffffff 0%, rgba(255, 244, 236, 0.6) 100%);
 }
 
+.metric-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
+  justify-content: center;
+  gap: 16px;
+}
+
+.metric-card {
+  max-width: 260px;
+  justify-self: center;
+}
+
+.balance-toggle-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.balance-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 122, 24, 0.3);
+  background: #fff6f0;
+  color: #7c4b2a;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.balance-pill-select-all {
+  border-style: dashed;
+  background: rgba(255, 248, 240, 0.8);
+  color: #a36a3a;
+}
+
+.balance-pill input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.balance-pill:hover {
+  border-color: rgba(255, 122, 24, 0.55);
+  transform: translateY(-1px);
+}
+
+.balance-pill input:checked + span {
+  color: #fff;
+}
+
+.balance-pill input:checked + span {
+  position: relative;
+  z-index: 1;
+}
+
+.balance-pill input:checked + span::before {
+  content: "";
+  position: absolute;
+  inset: -8px -14px;
+  border-radius: 999px;
+  background: var(--app-accent, #ff7a18);
+  z-index: -1;
+  box-shadow: 0 8px 18px rgba(255, 122, 24, 0.3);
+}
+
 .panel-title {
   font-weight: 600;
   display: inline-flex;

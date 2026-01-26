@@ -653,7 +653,10 @@ def app_milhao_dashboard(request, app):
     valid_balances = {balance for balance in balances}
     selected_balances = [bal for bal in selected_balances if bal in valid_balances]
     if not selected_balances and balances:
-        selected_balances = [balances[0]]
+        if "LIMBL01" in balances:
+            selected_balances = ["LIMBL01"]
+        else:
+            selected_balances = [balances[0]]
     filtered = [
         item
         for item in entries
