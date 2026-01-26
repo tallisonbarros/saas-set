@@ -89,7 +89,7 @@
     </form>
   </section>
 
-  {% if composition %}
+    {% if composition %}
   <section class="card composition-card">
     <div class="io-card-head composition-head">
       <div>
@@ -109,6 +109,33 @@
             {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
             {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
             {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
+          "
+        ></span>
+      {% endfor %}
+    </div>
+    <div class="composition-legend">
+      {% for item in composition %}
+        <div class="composition-legend-item">
+          <div class="composition-legend-left">
+            <span
+              class="composition-legend-swatch"
+              style="
+                {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
+                {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
+                {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
+                {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
+                {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
+              "
+            ></span>
+            <div class="composition-label">{{ item.label }}</div>
+            <div class="muted">{{ item.balance }}</div>
+          </div>
+          <div class="composition-value">{{ item.percent|floatformat:1 }}%</div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <div class="io-card-head metrics-head">
@@ -151,35 +178,6 @@
       </div>
     {% endif %}
   </section>
-
-  
-          "
-        ></span>
-      {% endfor %}
-    </div>
-    <div class="composition-legend">
-      {% for item in composition %}
-        <div class="composition-legend-item">
-          <div class="composition-legend-left">
-            <span
-              class="composition-legend-swatch"
-              style="
-                {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
-                {% elif item.balance == 'SECBL02' %}--segment-color: #ef4444; --segment-color-2: #f87171;
-                {% elif item.balance == 'CLABL01' %}--segment-color: #f97316; --segment-color-2: #fb923c;
-                {% elif item.balance == 'CLABL02' %}--segment-color: #f59e0b; --segment-color-2: #fbbf24;
-                {% else %}--segment-color: #f97316; --segment-color-2: #fb923c;{% endif %}
-              "
-            ></span>
-            <div class="composition-label">{{ item.label }}</div>
-            <div class="muted">{{ item.balance }}</div>
-          </div>
-          <div class="composition-value">{{ item.percent|floatformat:1 }}%</div>
-        </div>
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
 
   <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <div class="io-card-head">
