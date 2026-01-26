@@ -113,17 +113,31 @@
           </div>
           <div class="muted">Arquivos tecnicos, historicos e revisoes.</div>
         </div>
-        <div class="panel-card panel-disabled" style="--delay: 0.35s;">
-          <div class="panel-card-top">
-            <div class="panel-title">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-              </svg>
-              Planta conectada
+        {% if role == "ADMIN" %}
+          <a class="panel-card" href="{% url 'planta_conectada' %}" style="--delay: 0.35s;">
+            <div class="panel-card-top">
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                Planta conectada
+              </div>
             </div>
+            <div class="muted">Monitoramento de automacao e sensores.</div>
+          </a>
+        {% else %}
+          <div class="panel-card panel-disabled" style="--delay: 0.35s;">
+            <div class="panel-card-top">
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 16h16M6 16V6h12v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                Planta conectada
+              </div>
+            </div>
+            <div class="muted">Monitoramento de automacao e sensores.</div>
           </div>
-          <div class="muted">Monitoramento de automacao e sensores.</div>
-        </div>
+        {% endif %}
       </div>
     </div>
 

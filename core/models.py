@@ -728,11 +728,14 @@ class RackSlotIO(models.Model):
 
 class IngestRecord(models.Model):
     source_id = models.CharField(max_length=120, unique=True)
+    client_id = models.CharField(max_length=120, blank=True)
+    agent_id = models.CharField(max_length=120, blank=True)
+    source = models.CharField(max_length=120, blank=True)
     payload = models.JSONField()
-    recebido_em = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-recebido_em"]
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.source_id

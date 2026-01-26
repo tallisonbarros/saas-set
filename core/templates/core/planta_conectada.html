@@ -1,0 +1,63 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Planta conectada{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <span>Planta conectada</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Planta conectada</div>
+        <div class="hud-pill">Ingest</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar ao painel</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Dados recebidos</h1>
+          <p class="page-subtitle">Ultimos registros enviados pelos agentes locais.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    {% if registros %}
+      <div class="user-list">
+        {% for registro in registros %}
+          <div class="user-row">
+            <div>
+              <div class="panel-title">{{ registro.source_id }}</div>
+              <div class="proposal-meta">
+                Cliente: {{ registro.client_id|default:"-" }} · Agente: {{ registro.agent_id|default:"-" }}
+              </div>
+              <div class="proposal-meta">
+                Origem: {{ registro.source|default:"-" }} · Recebido: {{ registro.created_at|date:"d/m/Y H:i" }}
+              </div>
+            </div>
+            <details class="io-discrete" style="min-width: 220px;">
+              <summary class="io-discrete-summary">
+                <span class="io-title">Ver payload</span>
+                <span class="muted">JSON bruto</span>
+              </summary>
+              <div class="io-discrete-body">
+                <pre style="white-space: pre-wrap; margin: 0;">{{ registro.payload|pprint }}</pre>
+              </div>
+            </details>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhum dado recebido ainda.</p>
+    {% endif %}
+  </section>
+{% endblock %}

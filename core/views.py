@@ -399,11 +399,30 @@ def api_ingest(request):
     to_create = []
     for item in payload:
         if not isinstance(item, dict):
-            continue
+            return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
         source_id = str(item.get("source_id", "")).strip()
-        if not source_id:
-            continue
-        to_create.append(IngestRecord(source_id=source_id, payload=item))
+        client_id = str(item.get("client_id", "")).strip()
+        agent_id = str(item.get("agent_id", "")).strip()
+        source = str(item.get("source", "")).strip()
+        if not source_id or not client_id or not agent_id or not source:
+            return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+        payload_data = item.get("payload", None)
+        if isinstance(payload_data, str):
+            try:
+                payload_data = json.loads(payload_data)
+            except json.JSONDecodeError:
+                return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+        if payload_data is None:
+            return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+        to_create.append(
+            IngestRecord(
+                source_id=source_id,
+                client_id=client_id,
+                agent_id=agent_id,
+                source=source,
+                payload=payload_data,
+            )
+        )
     if to_create:
         IngestRecord.objects.bulk_create(to_create, ignore_conflicts=True)
     return JsonResponse({"ok": True, "count": len(payload)})
@@ -426,6 +445,20 @@ def painel(request):
             "is_financeiro": True,
             "is_cliente": True,
             "is_vendedor": True,
+        },
+    )
+
+
+@login_required
+def planta_conectada(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    registros = IngestRecord.objects.all().order_by("-created_at")[:200]
+    return render(
+        request,
+        "core/planta_conectada.html",
+        {
+            "registros": registros,
         },
     )
 

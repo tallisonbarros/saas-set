@@ -28,6 +28,7 @@ urlpatterns = [
     path('', views.home, name="home"),
     path('api/ingest', views.api_ingest, name="api_ingest"),
     path('painel/', views.painel, name="painel"),
+    path('planta-conectada/', views.planta_conectada, name="planta_conectada"),
     path('login/', auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
     path('logout/', auth_views.LogoutView.as_view(), name="logout"),
     path('cadastre-se/', views.register, name="register"),
