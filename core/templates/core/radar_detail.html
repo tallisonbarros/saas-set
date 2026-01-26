@@ -50,6 +50,18 @@
             {% if radar.criador %}{{ radar.criador.get_full_name|default:radar.criador.username }}{% else %}-{% endif %}
           </div>
         </div>
+        <div>
+          <div class="meta-label">Acesso</div>
+          <div class="meta-value">
+            {% if is_radar_creator %}
+              <span class="slot-badge slot-badge-compact">Criador</span>
+            {% elif has_id_radar_access %}
+              <span class="slot-badge slot-badge-compact">ID_RADAR</span>
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
       </div>
       <div id="cadastro-message" class="notice" style="display: none;"></div>
       {% if message %}
@@ -126,6 +138,7 @@
       </summary>
       <div class="io-discrete-body">
         {% if can_manage %}
+          <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
           <form class="io-form" method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="create_trabalho">
@@ -171,7 +184,7 @@
             <input type="hidden" name="action" value="create_classificacao">
           </form>
         {% else %}
-          <div class="muted">Apenas clientes cadastrados podem criar trabalhos.</div>
+          <div class="muted">Apenas usuarios com ID_RADAR podem criar trabalhos.</div>
         {% endif %}
       </div>
     </details>
@@ -216,6 +229,7 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
+        <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_radar">
@@ -249,7 +263,7 @@
           </div>
         </form>
       {% else %}
-        <div class="muted">Apenas o criador pode editar este radar.</div>
+        <div class="muted">Apenas usuarios com ID_RADAR podem editar este radar.</div>
       {% endif %}
     </div>
   </details>

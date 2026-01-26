@@ -1835,6 +1835,8 @@ def radar_detail(request, pk):
 
     if request.user.is_staff and not cliente:
         radar = get_object_or_404(Radar, pk=pk)
+        is_creator = False
+        has_id_radar_access = False
         can_manage = True
     else:
         radar = get_object_or_404(
@@ -1842,7 +1844,11 @@ def radar_detail(request, pk):
             Q(pk=pk),
             Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
         )
-        can_manage = bool(cliente) and radar.cliente_id == cliente.id
+        is_creator = bool(cliente) and radar.cliente_id == cliente.id
+        has_id_radar_access = bool(cliente) and (
+            radar.id_radar_id and cliente.radares.filter(pk=radar.id_radar_id).exists()
+        )
+        can_manage = bool(cliente)
 
     message = None
     message_level = "info"
@@ -1948,6 +1954,8 @@ def radar_detail(request, pk):
             "classificacoes": classificacoes,
             "classificacao_filter": classificacao_filter,
             "can_manage": can_manage or request.user.is_staff,
+            "is_radar_creator": is_creator,
+            "has_id_radar_access": has_id_radar_access,
             "message": message,
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
@@ -1964,6 +1972,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
     if request.user.is_staff and not cliente:
         radar = get_object_or_404(Radar, pk=radar_pk)
         trabalho = get_object_or_404(RadarTrabalho, pk=pk, radar=radar)
+        is_creator = False
+        has_id_radar_access = False
         can_manage = True
     else:
         radar = get_object_or_404(
@@ -1972,7 +1982,11 @@ def radar_trabalho_detail(request, radar_pk, pk):
             Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
         )
         trabalho = get_object_or_404(RadarTrabalho, pk=pk, radar=radar)
-        can_manage = bool(cliente) and radar.cliente_id == cliente.id
+        is_creator = bool(cliente) and radar.cliente_id == cliente.id
+        has_id_radar_access = bool(cliente) and (
+            radar.id_radar_id and cliente.radares.filter(pk=radar.id_radar_id).exists()
+        )
+        can_manage = bool(cliente)
 
     message = request.GET.get("msg", "").strip()
     message_level = request.GET.get("level", "").strip() or "info"
@@ -2180,6 +2194,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "classificacao_filter": classificacao_filter,
             "status_choices": RadarAtividade.Status.choices,
             "can_manage": can_manage or request.user.is_staff,
+            "is_radar_creator": is_creator,
+            "has_id_radar_access": has_id_radar_access,
             "message": message,
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
