@@ -92,50 +92,6 @@
   {% endif %}
 
   <div class="io-layout">
-    <details class="io-card io-discrete" id="nova-atividade">
-      <summary class="io-discrete-summary">
-        <span class="io-title">Nova atividade</span>
-        <span class="muted">Registre uma nova atividade no trabalho.</span>
-      </summary>
-      <div class="io-discrete-body">
-        {% if can_manage %}
-          <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
-          <div id="cadastro-message" class="notice" style="display: none;"></div>
-          <form class="io-form" method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_atividade">
-            <div class="io-form-grid">
-              <label class="field">
-                <span>Nome</span>
-                <input type="text" name="nome" placeholder="Atividade principal" required>
-              </label>
-              <label class="field">
-                <span>Descricao</span>
-                <input type="text" name="descricao" placeholder="Descricao resumida">
-              </label>
-              <label class="field">
-                <span>Horas de trabalho</span>
-                <input type="text" name="horas_trabalho" placeholder="2.5">
-              </label>
-              <label class="field">
-                <span>Status</span>
-                <select name="status">
-                  {% for value, label in status_choices %}
-                    <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-            </div>
-            <div class="form-actions">
-              <button class="btn btn-primary" type="submit">Salvar atividade</button>
-            </div>
-          </form>
-        {% else %}
-          <div class="muted">Apenas usuarios com ID_RADAR podem cadastrar atividades.</div>
-        {% endif %}
-      </div>
-    </details>
-
     <section class="io-card">
       <div class="io-card-head">
         <div>
@@ -151,34 +107,32 @@
         </div>
       </div>
 
-      <div class="proposal-grid">
-        <div class="muted">Executando</div>
+      <div class="proposal-grid status-group status-list">
+        <div class="muted status-label">Executando</div>
         {% for atividade in atividades_execucao %}
-          <article class="proposal-card io-proposal-card proposal-card-executando">
-            <div class="proposal-head">
-              <div>
-                <div class="proposal-title">{{ atividade.nome }}</div>
-                <div class="proposal-meta">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
-              </div>
-              <div class="module-meta">
-                <span class="badge badge-{{ atividade.status|lower }}">{{ atividade.get_status_display }}</span>
-                {% if atividade.horas_trabalho %}
-                  <span class="slot-badge slot-badge-compact">{{ atividade.horas_trabalho }}h</span>
-                {% endif %}
-                {% if can_manage %}
-                  <button
-                    class="btn btn-ghost btn-compact js-editar-atividade"
-                    type="button"
-                    data-atividade-id="{{ atividade.id }}"
-                    data-atividade-nome="{{ atividade.nome|default:'' }}"
-                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                    data-atividade-status="{{ atividade.status }}"
-                  >
-                    Editar
-                  </button>
-                {% endif %}
-              </div>
+          <article class="proposal-card io-proposal-card proposal-card-executando activity-row" data-atividade-id="{{ atividade.id }}">
+            <div class="activity-row-main">
+              <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
+              <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
+            </div>
+            <div class="activity-row-meta">
+              <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
+              {% if atividade.horas_trabalho %}
+                <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
+              {% endif %}
+              {% if can_manage %}
+                <button
+                  class="btn btn-ghost btn-compact js-editar-atividade"
+                  type="button"
+                  data-atividade-id="{{ atividade.id }}"
+                  data-atividade-nome="{{ atividade.nome|default:'' }}"
+                  data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                  data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                  data-atividade-status="{{ atividade.status }}"
+                >
+                  Editar
+                </button>
+              {% endif %}
             </div>
           </article>
         {% empty %}
@@ -186,34 +140,32 @@
         {% endfor %}
       </div>
 
-      <div class="proposal-grid">
-        <div class="muted">Pendentes</div>
+      <div class="proposal-grid status-group status-list">
+        <div class="muted status-label">Pendentes</div>
         {% for atividade in atividades_pendentes %}
-          <article class="proposal-card io-proposal-card">
-            <div class="proposal-head">
-              <div>
-                <div class="proposal-title">{{ atividade.nome }}</div>
-                <div class="proposal-meta">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
-              </div>
-              <div class="module-meta">
-                <span class="badge badge-{{ atividade.status|lower }}">{{ atividade.get_status_display }}</span>
-                {% if atividade.horas_trabalho %}
-                  <span class="slot-badge slot-badge-compact">{{ atividade.horas_trabalho }}h</span>
-                {% endif %}
-                {% if can_manage %}
-                  <button
-                    class="btn btn-ghost btn-compact js-editar-atividade"
-                    type="button"
-                    data-atividade-id="{{ atividade.id }}"
-                    data-atividade-nome="{{ atividade.nome|default:'' }}"
-                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                    data-atividade-status="{{ atividade.status }}"
-                  >
-                    Editar
-                  </button>
-                {% endif %}
-              </div>
+          <article class="proposal-card io-proposal-card activity-row" data-atividade-id="{{ atividade.id }}">
+            <div class="activity-row-main">
+              <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
+              <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
+            </div>
+            <div class="activity-row-meta">
+              <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
+              {% if atividade.horas_trabalho %}
+                <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
+              {% endif %}
+              {% if can_manage %}
+                <button
+                  class="btn btn-ghost btn-compact js-editar-atividade"
+                  type="button"
+                  data-atividade-id="{{ atividade.id }}"
+                  data-atividade-nome="{{ atividade.nome|default:'' }}"
+                  data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                  data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                  data-atividade-status="{{ atividade.status }}"
+                >
+                  Editar
+                </button>
+              {% endif %}
             </div>
           </article>
         {% empty %}
@@ -221,34 +173,32 @@
         {% endfor %}
       </div>
 
-      <div class="proposal-grid">
-        <div class="muted">Finalizadas{% if not show_all_finalizados %} (mes atual){% endif %}</div>
+      <div class="proposal-grid status-group status-list">
+        <div class="muted status-label">Finalizadas{% if not show_all_finalizados %} (mes atual){% endif %}</div>
         {% for atividade in atividades_finalizadas %}
-          <article class="proposal-card io-proposal-card">
-            <div class="proposal-head">
-              <div>
-                <div class="proposal-title">{{ atividade.nome }}</div>
-                <div class="proposal-meta">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
-              </div>
-              <div class="module-meta">
-                <span class="badge badge-{{ atividade.status|lower }}">{{ atividade.get_status_display }}</span>
-                {% if atividade.horas_trabalho %}
-                  <span class="slot-badge slot-badge-compact">{{ atividade.horas_trabalho }}h</span>
-                {% endif %}
-                {% if can_manage %}
-                  <button
-                    class="btn btn-ghost btn-compact js-editar-atividade"
-                    type="button"
-                    data-atividade-id="{{ atividade.id }}"
-                    data-atividade-nome="{{ atividade.nome|default:'' }}"
-                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                    data-atividade-status="{{ atividade.status }}"
-                  >
-                    Editar
-                  </button>
-                {% endif %}
-              </div>
+          <article class="proposal-card io-proposal-card activity-row" data-atividade-id="{{ atividade.id }}">
+            <div class="activity-row-main">
+              <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
+              <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
+            </div>
+            <div class="activity-row-meta">
+              <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
+              {% if atividade.horas_trabalho %}
+                <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
+              {% endif %}
+              {% if can_manage %}
+                <button
+                  class="btn btn-ghost btn-compact js-editar-atividade"
+                  type="button"
+                  data-atividade-id="{{ atividade.id }}"
+                  data-atividade-nome="{{ atividade.nome|default:'' }}"
+                  data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                  data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                  data-atividade-status="{{ atividade.status }}"
+                >
+                  Editar
+                </button>
+              {% endif %}
             </div>
           </article>
         {% empty %}
@@ -258,7 +208,7 @@
     </section>
 
     {% if can_manage %}
-      <section class="io-card" id="editar-atividade">
+      <section class="io-card" id="editar-atividade" {% if not edit_atividade %}style="display: none;"{% endif %}>
         <div class="io-card-head">
           <div>
             <h2 class="io-title">Editar atividade</h2>
@@ -294,10 +244,10 @@
             </div>
             <div class="form-actions">
               <button class="btn btn-primary" type="submit">Salvar atividade</button>
-              <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}#editar-atividade">Cancelar</a>
+              <button class="btn btn-ghost btn-compact" type="button" id="cancelar-edicao-atividade">Cancelar</button>
             </div>
           </form>
-          <form method="post" onsubmit="return confirm('Excluir atividade?');">
+          <form method="post" id="delete-atividade-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete_atividade">
             <input type="hidden" name="atividade_id" value="{{ edit_atividade.id|default:'' }}">
@@ -305,13 +255,54 @@
               <button class="btn btn-outline" type="submit" {% if not edit_atividade %}disabled{% endif %}>Excluir atividade</button>
             </div>
           </form>
-          {% if not edit_atividade %}
-            <div class="muted" style="margin-top: 8px;">Clique em "Editar" em uma atividade para abrir o formulario aqui.</div>
-          {% endif %}
         </div>
       </section>
     {% endif %}
   </div>
+
+  <details class="io-card io-discrete" id="nova-atividade" style="margin-top: 18px;">
+    <summary class="io-discrete-summary">
+      <span class="io-title">Nova atividade</span>
+      <span class="muted">Registre uma nova atividade no trabalho.</span>
+    </summary>
+    <div class="io-discrete-body">
+      {% if can_manage %}
+        <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
+        <div id="cadastro-message" class="notice" style="display: none;"></div>
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_atividade">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome</span>
+              <input type="text" name="nome" placeholder="Atividade principal" required>
+            </label>
+            <label class="field">
+              <span>Descricao</span>
+              <input type="text" name="descricao" placeholder="Descricao resumida">
+            </label>
+            <label class="field">
+              <span>Horas de trabalho</span>
+              <input type="text" name="horas_trabalho" placeholder="2.5">
+            </label>
+            <label class="field">
+              <span>Status</span>
+              <select name="status">
+                {% for value, label in status_choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar atividade</button>
+          </div>
+        </form>
+      {% else %}
+        <div class="muted">Apenas usuarios com ID_RADAR podem cadastrar atividades.</div>
+      {% endif %}
+    </div>
+  </details>
 
   <details class="io-card io-discrete" style="margin-top: 18px;">
     <summary class="io-discrete-summary">
@@ -509,10 +500,83 @@
 
   <script>
     (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
       function setField(form, name, value) {
         var input = form.querySelector("[name='" + name + "']");
         if (input) {
           input.value = value || "";
+        }
+      }
+      function hideEditor(editor) {
+        var form = editor.querySelector("form.io-form");
+        if (form) {
+          form.reset();
+          setField(form, "atividade_id", "");
+        }
+        var deleteForm = editor.querySelector("form#delete-atividade-form");
+        if (deleteForm) {
+          setField(deleteForm, "atividade_id", "");
+          var deleteButton = deleteForm.querySelector("button[type='submit']");
+          if (deleteButton) {
+            deleteButton.disabled = true;
+          }
+        }
+        editor.style.display = "none";
+      }
+      function updateCard(payload) {
+        if (!payload || !payload.id) {
+          return;
+        }
+        var card = document.querySelector("[data-atividade-id='" + payload.id + "']");
+        if (!card) {
+          return;
+        }
+        var nomeEl = card.querySelector(".js-atividade-nome");
+        if (nomeEl) {
+          nomeEl.textContent = payload.nome || "";
+        }
+        var descricaoEl = card.querySelector(".js-atividade-descricao");
+        if (descricaoEl) {
+          descricaoEl.textContent = payload.descricao || "Atividade sem descricao.";
+        }
+        var statusEl = card.querySelector(".js-atividade-status");
+        if (statusEl && payload.status) {
+          statusEl.textContent = payload.status_label || payload.status;
+          statusEl.className = "badge badge-" + payload.status.toLowerCase() + " js-atividade-status";
+        }
+        var horasEl = card.querySelector(".js-atividade-horas");
+        if (payload.horas_trabalho) {
+          if (!horasEl) {
+            horasEl = document.createElement("span");
+            horasEl.className = "slot-badge slot-badge-compact js-atividade-horas";
+            var meta = card.querySelector(".module-meta");
+            if (meta) {
+              meta.insertBefore(horasEl, meta.querySelector(".js-editar-atividade"));
+            }
+          }
+          horasEl.textContent = payload.horas_trabalho + "h";
+        } else if (horasEl) {
+          horasEl.remove();
+        }
+        var editButton = card.querySelector(".js-editar-atividade");
+        if (editButton) {
+          editButton.dataset.atividadeNome = payload.nome || "";
+          editButton.dataset.atividadeDescricao = payload.descricao || "";
+          editButton.dataset.atividadeHoras = payload.horas_trabalho || "";
+          editButton.dataset.atividadeStatus = payload.status || "";
+        }
+      }
+      function removeCard(id) {
+        var card = document.querySelector("[data-atividade-id='" + id + "']");
+        if (card) {
+          card.remove();
         }
       }
       var buttons = document.querySelectorAll(".js-editar-atividade");
@@ -526,6 +590,7 @@
           if (!form) {
             return;
           }
+          editor.style.display = "";
           setField(form, "atividade_id", button.dataset.atividadeId);
           setField(form, "nome", button.dataset.atividadeNome);
           setField(form, "descricao", button.dataset.atividadeDescricao);
@@ -539,9 +604,64 @@
               deleteButton.disabled = false;
             }
           }
-          editor.querySelector(".io-discrete-body").scrollIntoView({ behavior: "smooth", block: "start" });
+          editor.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       });
+      var cancelButton = document.getElementById("cancelar-edicao-atividade");
+      if (cancelButton) {
+        cancelButton.addEventListener("click", function () {
+          hideEditor(editor);
+        });
+      }
+
+      var updateForm = editor.querySelector("form.io-form");
+      if (updateForm) {
+        updateForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var data = new FormData(updateForm);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.ok) {
+                updateCard(payload);
+                hideEditor(editor);
+              }
+            });
+        });
+      }
+
+      var deleteForm = editor.querySelector("form#delete-atividade-form");
+      if (deleteForm) {
+        deleteForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          if (!confirm("Excluir atividade?")) {
+            return;
+          }
+          var data = new FormData(deleteForm);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.ok) {
+                removeCard(payload.id);
+                hideEditor(editor);
+              }
+            });
+        });
+      }
     })();
   </script>
 {% endblock %}

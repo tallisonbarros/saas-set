@@ -114,8 +114,8 @@
         </div>
       </div>
 
-      <div class="proposal-grid">
-        <div class="muted">Executando</div>
+      <div class="proposal-grid status-group">
+        <div class="muted status-label">Executando</div>
         {% for trabalho in trabalhos_execucao %}
           <article class="proposal-card io-proposal-card proposal-card-executando">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
@@ -139,8 +139,8 @@
         {% endfor %}
       </div>
 
-      <div class="proposal-grid">
-        <div class="muted">Pendentes</div>
+      <div class="proposal-grid status-group">
+        <div class="muted status-label">Pendentes</div>
         {% for trabalho in trabalhos_pendentes %}
           <article class="proposal-card io-proposal-card">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
@@ -164,8 +164,8 @@
         {% endfor %}
       </div>
 
-      <div class="proposal-grid">
-        <div class="muted">Finalizados{% if not show_all_finalizados %} (mes atual){% endif %}</div>
+      <div class="proposal-grid status-group">
+        <div class="muted status-label">Finalizados{% if not show_all_finalizados %} (mes atual){% endif %}</div>
         {% for trabalho in trabalhos_finalizados %}
           <article class="proposal-card io-proposal-card">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>

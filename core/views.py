@@ -2374,9 +2374,10 @@ def radar_trabalho_detail(request, radar_pk, pk):
             trabalho.delete()
             return redirect("radar_detail", pk=radar.pk)
         if action == "duplicate_trabalho":
+            nome_copia = f"{trabalho.nome} - COPIA"
             novo_trabalho = RadarTrabalho.objects.create(
                 radar=radar,
-                nome=trabalho.nome,
+                nome=nome_copia,
                 descricao=trabalho.descricao,
                 data_registro=trabalho.data_registro,
                 classificacao=trabalho.classificacao,
@@ -2452,12 +2453,31 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 ]
             )
             _sync_trabalho_status(trabalho)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "id": atividade.id,
+                        "nome": atividade.nome,
+                        "descricao": atividade.descricao,
+                        "status": atividade.status,
+                        "status_label": atividade.get_status_display(),
+                        "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
+                    }
+                )
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_atividade":
             atividade_id = request.POST.get("atividade_id")
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
             atividade.delete()
             _sync_trabalho_status(trabalho)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "id": atividade_id,
+                    }
+                )
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
 
     contratos = RadarContrato.objects.order_by("nome")

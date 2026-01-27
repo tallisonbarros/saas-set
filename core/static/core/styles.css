@@ -416,6 +416,66 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.status-group .status-label {
+  grid-column: 1 / -1;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: 2px;
+  margin-bottom: -6px;
+}
+
+.status-list {
+  grid-template-columns: 1fr;
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+}
+
+.activity-row .proposal-title {
+  font-size: 15px;
+}
+
+.activity-row .proposal-meta {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.activity-row-main {
+  min-width: 0;
+}
+
+.activity-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (min-width: 720px) {
+  .activity-row-meta {
+    min-width: 180px;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
+  .activity-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .activity-row-meta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 .proposal-section {
   display: grid;
   gap: 12px;
