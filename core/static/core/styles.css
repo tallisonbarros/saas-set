@@ -824,6 +824,21 @@ body {
   flex-wrap: wrap;
 }
 
+.hud-logo-wrap {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.hud-logo {
+  width: clamp(44px, 10vw, 72px);
+  height: clamp(44px, 10vw, 72px);
+  border-radius: 999px;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 16px rgba(30, 41, 59, 0.18);
+}
+
 .page-hud-head.centered {
   justify-content: center;
   text-align: center;
