@@ -403,7 +403,7 @@ def api_ingest(request):
         return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
     if not isinstance(payload, list):
         return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
-    to_create = []
+    items_by_source = {}
     for item in payload:
         if not isinstance(item, dict):
             return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
@@ -421,17 +421,31 @@ def api_ingest(request):
                 return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
         if payload_data is None:
             return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
-        to_create.append(
-            IngestRecord(
-                source_id=source_id,
-                client_id=client_id,
-                agent_id=agent_id,
-                source=source,
-                payload=payload_data,
-            )
-        )
-    if to_create:
-        IngestRecord.objects.bulk_create(to_create, ignore_conflicts=True)
+        items_by_source[source_id] = {
+            "client_id": client_id,
+            "agent_id": agent_id,
+            "source": source,
+            "payload": payload_data,
+        }
+    if items_by_source:
+        existing_records = IngestRecord.objects.filter(source_id__in=items_by_source.keys())
+        existing_by_source = {record.source_id: record for record in existing_records}
+        to_update = []
+        to_create = []
+        for source_id, data in items_by_source.items():
+            existing = existing_by_source.get(source_id)
+            if existing:
+                existing.client_id = data["client_id"]
+                existing.agent_id = data["agent_id"]
+                existing.source = data["source"]
+                existing.payload = data["payload"]
+                to_update.append(existing)
+            else:
+                to_create.append(IngestRecord(source_id=source_id, **data))
+        if to_update:
+            IngestRecord.objects.bulk_update(to_update, ["client_id", "agent_id", "source", "payload"])
+        if to_create:
+            IngestRecord.objects.bulk_create(to_create)
     return JsonResponse({"ok": True, "count": len(payload)})
 
 
