@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
@@ -131,6 +131,18 @@ def dashboard(request):
     ]
     latest_value = filtered[-1]["value"] if filtered else None
     latest_datetime = filtered[-1]["datetime"] if filtered else None
+    latest_by_balance_map = {}
+    for item in filtered:
+        latest_by_balance_map[item["balance"]] = item
+    latest_by_balance = [
+        {
+            "balance": balance,
+            "label": balance_labels.get(balance, balance),
+            "value": latest_by_balance_map[balance]["value"],
+            "datetime": latest_by_balance_map[balance]["datetime"],
+        }
+        for balance in sorted(latest_by_balance_map.keys())
+    ]
 
     composition_source = [
         item
@@ -171,6 +183,42 @@ def dashboard(request):
                 }
             )
 
+    avg_total_14 = None
+    avg_by_balance = {}
+    if selected_date and selected_balances:
+        window_end = selected_date
+        window_start = selected_date - timedelta(days=13)
+        window_dates = [window_start + timedelta(days=offset) for offset in range(14)]
+        window_set = set(window_dates)
+        daily_total = {day: 0.0 for day in window_dates}
+        daily_by_balance = {balance: {day: 0.0 for day in window_dates} for balance in selected_balances}
+        for item in entries:
+            if item["date"] not in window_set:
+                continue
+            if item["balance"] not in selected_balances:
+                continue
+            value = item["value"] or 0
+            daily_total[item["date"]] += value
+            daily_by_balance[item["balance"]][item["date"]] += value
+        total_days = [value for value in daily_total.values() if value > 0]
+        if total_days:
+            avg_total_14 = sum(total_days) / len(total_days)
+        avg_by_balance = {}
+        for balance, totals in daily_by_balance.items():
+            balance_days = [value for value in totals.values() if value > 0]
+            if balance_days:
+                avg_by_balance[balance] = sum(balance_days) / len(balance_days)
+
+    totals_by_balance = [
+        {
+            "balance": item["balance"],
+            "label": item["label"],
+            "total": item["total"],
+            "avg_14": avg_by_balance.get(item["balance"]),
+        }
+        for item in totals_by_balance
+    ]
+
     return render(
         request,
         "core/apps/app_milhao_bla/dashboard.html",
@@ -187,6 +235,8 @@ def dashboard(request):
             "totals_by_balance": totals_by_balance,
             "latest_value": latest_value,
             "latest_datetime": latest_datetime,
+            "latest_by_balance": latest_by_balance,
+            "avg_total_14": avg_total_14,
             "composition": composition,
         },
     )

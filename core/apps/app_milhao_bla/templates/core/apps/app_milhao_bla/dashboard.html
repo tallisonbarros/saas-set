@@ -14,7 +14,13 @@
 {% endblock %}
 
 {% block content %}
+  <div class="card-stack" style="display: flex; flex-direction: column; gap: 16px;">
   <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    {% if app.logo %}
+      <div class="hud-logo-wrap" style="display: flex; justify-content: center; margin: 6px 0 18px;">
+        <img class="hud-logo" src="{{ app.logo.url }}" alt="Logo {{ app.nome }}" style="max-width: 220px; height: auto; display: block;" />
+      </div>
+    {% endif %}
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">{{ app.nome }}</div>
@@ -25,14 +31,8 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <h1 class="page-title">Acumulado por hora</h1>
           <p class="page-subtitle">Balancas LIMBL01, CLABL01, CLABL02, SECBL01 e SECBL02.</p>
         </div>
-        {% if app.logo %}
-          <div class="hud-logo-wrap">
-            <img class="hud-logo" src="{{ app.logo.url }}" alt="Logo {{ app.nome }}" />
-          </div>
-        {% endif %}
       </div>
       <div class="hud-meta">
         Cliente: clienteA - Agente: agente01 - Fonte: balanca_acumulado_hora
@@ -43,10 +43,13 @@
   {% if not composition %}
   <section class="card app-accent balance-filter-card date-filter-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <form method="get" class="io-form">
+      {% for bal in selected_balances %}
+        <input type="hidden" name="balance" value="{{ bal }}" />
+      {% endfor %}
       <div class="balance-filter-grid">
         <label class="field balance-filter-date">
           <span>Dia</span>
-          <select name="date" id="milhao-date">
+          <select name="date" class="milhao-date-select">
             {% for day in dates %}
               <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
                 {{ day|date:"d/m/Y" }}
@@ -68,8 +71,11 @@
       </div>
       <div class="composition-head-actions">
         <form method="get" class="io-form composition-date-form">
+          {% for bal in selected_balances %}
+            <input type="hidden" name="balance" value="{{ bal }}" />
+          {% endfor %}
           <label class="field composition-date-field">
-            <select name="date" id="milhao-date" class="composition-date-select">
+            <select name="date" class="milhao-date-select composition-date-select">
               {% for day in dates %}
                 <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
                   {{ day|date:"d/m/Y" }}
@@ -124,11 +130,17 @@
         <h2 class="io-title">Indicadores do dia</h2>
         <p class="muted">Resumo das balancas selecionadas.</p>
       </div>
-      {% if selected_date %}
-        <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
-      {% endif %}
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+        {% if selected_date %}
+          <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
+        {% endif %}
+        <div class="muted" style="font-size: 12px; opacity: 0.7;">Media calculada dos ultimos 14 dias (dias sem leitura nao entram)</div>
+      </div>
     </div>
     <form method="get" class="io-form metrics-filter-form">
+    {% if selected_date %}
+      <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
+    {% endif %}
     <label class="field metrics-balance-filter">
       <span>Balancas</span>
       <div
@@ -171,18 +183,14 @@
     <div class="metrics-overview grid-2 metric-grid">
       <div class="panel-card panel-card-compact metric-card metric-card-primary">
         <div class="metric-label">Total do dia</div>
+        {% if avg_total_14 is not None %}
+          <div class="panel-tag">MEDIA {{ avg_total_14|floatformat:2 }} kg</div>
+        {% endif %}
         <div class="metric-value">{{ total_value|floatformat:2 }} <span class="metric-unit">kg</span></div>
         <div class="metric-note">Soma das leituras no periodo.</div>
       </div>
-      <div class="panel-card panel-card-compact metric-card">
-        <div class="metric-label">Ultima leitura</div>
-        <div class="metric-value">
-          {% if latest_value is not None %}{{ latest_value|floatformat:2 }} <span class="metric-unit">kg</span>{% else %}-{% endif %}
-        </div>
-        <div class="metric-note">Ultimo valor registrado.{% if latest_datetime %} Em {{ latest_datetime|date:"d/m/Y H:i" }}{% endif %}.</div>
-      </div>
     </div>
-    {% if totals_by_balance %}
+    {% if totals_by_balance and selected_balances|length > 1 %}
       <div class="metrics-breakdown">
         <div class="metrics-subtitle">Totais por balanca</div>
         <div class="panel-grid metric-grid metric-grid-compact">
@@ -191,6 +199,9 @@
               <div class="panel-card-top">
                 <div class="panel-title">{{ item.label }}</div>
                 <div class="panel-tag">{{ item.balance }}</div>
+                {% if item.avg_14 is not None %}
+                  <div class="panel-tag">MEDIA {{ item.avg_14|floatformat:2 }} kg</div>
+                {% endif %}
               </div>
               <div class="metric-value">{{ item.total|floatformat:2 }} <span class="metric-unit">kg</span></div>
             </div>
@@ -235,15 +246,44 @@
       <p class="muted">Nenhum dado para o filtro selecionado.</p>
     {% endif %}
   </section>
+
+  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Ultima leitura por balanca</h2>
+        <p class="muted">Leitura mais recente para cada balanca no dia filtrado.</p>
+      </div>
+    </div>
+    {% if latest_by_balance %}
+      <div class="panel-grid metric-grid metric-grid-compact">
+        {% for item in latest_by_balance %}
+          <div class="panel-card panel-card-compact metric-card">
+            <div class="panel-card-top">
+              <div class="panel-title">{{ item.label }}</div>
+              <div class="panel-tag">{{ item.balance }}</div>
+            </div>
+            <div class="metric-value">
+              {% if item.value is not None %}{{ item.value|floatformat:2 }} <span class="metric-unit">kg</span>{% else %}-{% endif %}
+            </div>
+            <div class="metric-note">
+              {% if item.datetime %}Em {{ item.datetime|date:"d/m/Y H:i" }}.{% else %}Sem leitura.{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhuma leitura para o filtro selecionado.</p>
+    {% endif %}
+  </section>
+  </div>
   <script>
     (function () {
       var grid = document.getElementById("balance-chip-grid");
-      var dateSelect = document.getElementById("milhao-date");
+      var dateSelects = Array.from(document.querySelectorAll(".milhao-date-select"));
       if (!grid) {
         return;
       }
       var form = grid.closest("form");
-      var dateForm = dateSelect ? dateSelect.closest("form") : null;
       var hiddenContainer = document.getElementById("balance-hidden-inputs");
       var selectedRaw = (grid.getAttribute("data-selected") || "").split(",");
       var selected = selectedRaw.map(function (item) { return item.trim(); }).filter(Boolean);
@@ -334,9 +374,19 @@
         }
       });
 
-      if (dateSelect && dateForm) {
-        dateSelect.addEventListener("change", function () {
-          dateForm.submit();
+      if (dateSelects.length) {
+        dateSelects.forEach(function (select) {
+          select.addEventListener("change", function () {
+            var value = select.value;
+            dateSelects.forEach(function (other) {
+              if (other !== select) {
+                other.value = value;
+              }
+            });
+            if (select.form) {
+              select.form.submit();
+            }
+          });
         });
       }
 
