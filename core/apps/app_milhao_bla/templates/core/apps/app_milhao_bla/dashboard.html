@@ -28,9 +28,11 @@
           <h1 class="page-title">Acumulado por hora</h1>
           <p class="page-subtitle">Balancas LIMBL01, CLABL01, CLABL02, SECBL01 e SECBL02.</p>
         </div>
-        <div class="hud-logo-wrap">
-          <img class="hud-logo" src="{% static 'core/apps/app_milhao_bla/logo_milhao.jpg' %}" alt="Logo Milhao" />
-        </div>
+        {% if app.logo %}
+          <div class="hud-logo-wrap">
+            <img class="hud-logo" src="{{ app.logo.url }}" alt="Logo {{ app.nome }}" />
+          </div>
+        {% endif %}
       </div>
       <div class="hud-meta">
         Cliente: clienteA - Agente: agente01 - Fonte: balanca_acumulado_hora

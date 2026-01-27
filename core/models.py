@@ -35,6 +35,7 @@ class App(models.Model):
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)
     icon = models.CharField(max_length=80, blank=True)
+    logo = models.ImageField(upload_to="apps/logos/", blank=True, null=True)
     theme_color = models.CharField(max_length=30, blank=True)
     ativo = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)

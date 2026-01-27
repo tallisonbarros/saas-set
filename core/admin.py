@@ -105,7 +105,7 @@ class TipoPerfilAdmin(admin.ModelAdmin):
 
 @admin.register(App)
 class AppAdmin(admin.ModelAdmin):
-    list_display = ("nome", "slug", "ativo", "icon", "theme_color", "criado_em")
+    list_display = ("nome", "slug", "ativo", "icon", "logo", "theme_color", "criado_em")
     search_fields = ("nome", "slug")
     list_filter = ("ativo",)
 
