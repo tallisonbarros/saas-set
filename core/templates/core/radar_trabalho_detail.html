@@ -139,11 +139,20 @@
     <section class="io-card">
       <div class="io-card-head">
         <div>
-          <h2 class="io-title">Atividades executando</h2>
-          <p class="muted">Atividades em andamento.</p>
+          <h2 class="io-title">Atividades</h2>
+          <p class="muted">Executando, pendentes e finalizadas.</p>
+        </div>
+        <div class="module-meta">
+          {% if has_finalizadas_antigas and not show_all_finalizados %}
+            <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}{% if finalizados_toggle_query %}?{{ finalizados_toggle_query }}{% endif %}">Mostrar todas finalizadas</a>
+          {% elif show_all_finalizados %}
+            <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Mostrar finalizadas do mes</a>
+          {% endif %}
         </div>
       </div>
+
       <div class="proposal-grid">
+        <div class="muted">Executando</div>
         {% for atividade in atividades_execucao %}
           <article class="proposal-card io-proposal-card proposal-card-executando">
             <div class="proposal-head">
@@ -157,7 +166,17 @@
                   <span class="slot-badge slot-badge-compact">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
-                  <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}?editar={{ atividade.id }}#editar-atividade">Editar</a>
+                  <button
+                    class="btn btn-ghost btn-compact js-editar-atividade"
+                    type="button"
+                    data-atividade-id="{{ atividade.id }}"
+                    data-atividade-nome="{{ atividade.nome|default:'' }}"
+                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                    data-atividade-status="{{ atividade.status }}"
+                  >
+                    Editar
+                  </button>
                 {% endif %}
               </div>
             </div>
@@ -166,16 +185,9 @@
           <div class="muted">Nenhuma atividade executando.</div>
         {% endfor %}
       </div>
-    </section>
 
-    <section class="io-card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Atividades pendentes</h2>
-          <p class="muted">Aguardando inicio.</p>
-        </div>
-      </div>
       <div class="proposal-grid">
+        <div class="muted">Pendentes</div>
         {% for atividade in atividades_pendentes %}
           <article class="proposal-card io-proposal-card">
             <div class="proposal-head">
@@ -189,7 +201,17 @@
                   <span class="slot-badge slot-badge-compact">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
-                  <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}?editar={{ atividade.id }}#editar-atividade">Editar</a>
+                  <button
+                    class="btn btn-ghost btn-compact js-editar-atividade"
+                    type="button"
+                    data-atividade-id="{{ atividade.id }}"
+                    data-atividade-nome="{{ atividade.nome|default:'' }}"
+                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                    data-atividade-status="{{ atividade.status }}"
+                  >
+                    Editar
+                  </button>
                 {% endif %}
               </div>
             </div>
@@ -198,23 +220,9 @@
           <div class="muted">Nenhuma atividade pendente.</div>
         {% endfor %}
       </div>
-    </section>
 
-    <section class="io-card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Atividades finalizadas{% if not show_all_finalizados %} (mes atual){% endif %}</h2>
-          <p class="muted">Historico de atividades concluidas (data de criacao).</p>
-        </div>
-        <div class="module-meta">
-          {% if has_finalizadas_antigas and not show_all_finalizados %}
-            <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}{% if finalizados_toggle_query %}?{{ finalizados_toggle_query }}{% endif %}">Mostrar todas</a>
-          {% elif show_all_finalizados %}
-            <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Mostrar apenas do mes</a>
-          {% endif %}
-        </div>
-      </div>
       <div class="proposal-grid">
+        <div class="muted">Finalizadas{% if not show_all_finalizados %} (mes atual){% endif %}</div>
         {% for atividade in atividades_finalizadas %}
           <article class="proposal-card io-proposal-card">
             <div class="proposal-head">
@@ -228,7 +236,17 @@
                   <span class="slot-badge slot-badge-compact">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
-                  <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}?editar={{ atividade.id }}#editar-atividade">Editar</a>
+                  <button
+                    class="btn btn-ghost btn-compact js-editar-atividade"
+                    type="button"
+                    data-atividade-id="{{ atividade.id }}"
+                    data-atividade-nome="{{ atividade.nome|default:'' }}"
+                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                    data-atividade-status="{{ atividade.status }}"
+                  >
+                    Editar
+                  </button>
                 {% endif %}
               </div>
             </div>
@@ -247,53 +265,50 @@
             <p class="muted">Selecione uma atividade para editar no card abaixo.</p>
           </div>
         </div>
-        {% if edit_atividade %}
-          <div class="io-discrete-body">
-            <form class="io-form" method="post">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="update_atividade">
-              <input type="hidden" name="atividade_id" value="{{ edit_atividade.id }}">
-              <div class="io-form-grid">
-                <label class="field">
-                  <span>Nome</span>
-                  <input type="text" name="nome" value="{{ edit_atividade.nome }}" required>
-                </label>
-                <label class="field">
-                  <span>Descricao</span>
-                  <input type="text" name="descricao" value="{{ edit_atividade.descricao|default:'' }}">
-                </label>
-                <label class="field">
-                  <span>Horas de trabalho</span>
-                  <input type="text" name="horas_trabalho" value="{{ edit_atividade.horas_trabalho|default:'' }}">
-                </label>
-                <label class="field">
-                  <span>Status</span>
-                  <select name="status">
-                    {% for value, label in status_choices %}
-                      <option value="{{ value }}" {% if edit_atividade.status == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-              </div>
-              <div class="form-actions">
-                <button class="btn btn-primary" type="submit">Salvar atividade</button>
-                <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}#editar-atividade">Cancelar</a>
-              </div>
-            </form>
-            <form method="post" onsubmit="return confirm('Excluir atividade?');">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="delete_atividade">
-              <input type="hidden" name="atividade_id" value="{{ edit_atividade.id }}">
-              <div class="form-actions">
-                <button class="btn btn-outline" type="submit">Excluir atividade</button>
-              </div>
-            </form>
-          </div>
-        {% else %}
-          <div class="io-discrete-body">
-            <div class="muted">Clique em "Editar" em uma atividade para abrir o formulario aqui.</div>
-          </div>
-        {% endif %}
+        <div class="io-discrete-body">
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_atividade">
+            <input type="hidden" name="atividade_id" value="{{ edit_atividade.id|default:'' }}">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome</span>
+                <input type="text" name="nome" value="{{ edit_atividade.nome|default:'' }}" required>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" value="{{ edit_atividade.descricao|default:'' }}">
+              </label>
+              <label class="field">
+                <span>Horas de trabalho</span>
+                <input type="text" name="horas_trabalho" value="{{ edit_atividade.horas_trabalho|default:'' }}">
+              </label>
+              <label class="field">
+                <span>Status</span>
+                <select name="status">
+                  {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if edit_atividade and edit_atividade.status == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Salvar atividade</button>
+              <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}#editar-atividade">Cancelar</a>
+            </div>
+          </form>
+          <form method="post" onsubmit="return confirm('Excluir atividade?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_atividade">
+            <input type="hidden" name="atividade_id" value="{{ edit_atividade.id|default:'' }}">
+            <div class="form-actions">
+              <button class="btn btn-outline" type="submit" {% if not edit_atividade %}disabled{% endif %}>Excluir atividade</button>
+            </div>
+          </form>
+          {% if not edit_atividade %}
+            <div class="muted" style="margin-top: 8px;">Clique em "Editar" em uma atividade para abrir o formulario aqui.</div>
+          {% endif %}
+        </div>
       </section>
     {% endif %}
   </div>
@@ -489,6 +504,44 @@
         "classificacao-select",
         "classificacao-pop"
       );
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function setField(form, name, value) {
+        var input = form.querySelector("[name='" + name + "']");
+        if (input) {
+          input.value = value || "";
+        }
+      }
+      var buttons = document.querySelectorAll(".js-editar-atividade");
+      var editor = document.getElementById("editar-atividade");
+      if (!buttons.length || !editor) {
+        return;
+      }
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          var form = editor.querySelector("form.io-form");
+          if (!form) {
+            return;
+          }
+          setField(form, "atividade_id", button.dataset.atividadeId);
+          setField(form, "nome", button.dataset.atividadeNome);
+          setField(form, "descricao", button.dataset.atividadeDescricao);
+          setField(form, "horas_trabalho", button.dataset.atividadeHoras);
+          setField(form, "status", button.dataset.atividadeStatus);
+          var deleteForm = editor.querySelector("form[method='post']:not(.io-form)");
+          if (deleteForm) {
+            setField(deleteForm, "atividade_id", button.dataset.atividadeId);
+            var deleteButton = deleteForm.querySelector("button[type='submit']");
+            if (deleteButton) {
+              deleteButton.disabled = false;
+            }
+          }
+          editor.querySelector(".io-discrete-body").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
     })();
   </script>
 {% endblock %}
