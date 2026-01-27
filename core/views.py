@@ -2046,6 +2046,7 @@ def radar_detail(request, pk):
     message = None
     message_level = "info"
     classificacoes = RadarClassificacao.objects.order_by("nome")
+    classificacao_filter = request.GET.get("classificacao", "").strip()
     if request.method == "POST":
         action = request.POST.get("action")
         if action in {
