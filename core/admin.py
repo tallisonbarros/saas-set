@@ -166,16 +166,26 @@ class RadarAdmin(admin.ModelAdmin):
 
 @admin.register(RadarTrabalho)
 class RadarTrabalhoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "radar", "classificacao", "status", "data_registro", "criado_em")
+    list_display = (
+        "nome",
+        "radar",
+        "classificacao",
+        "contrato",
+        "setor",
+        "responsavel",
+        "status",
+        "data_registro",
+        "criado_em",
+    )
     list_filter = ("status",)
     search_fields = ("nome", "radar__nome")
 
 
 @admin.register(RadarAtividade)
 class RadarAtividadeAdmin(admin.ModelAdmin):
-    list_display = ("nome", "trabalho", "classificacao", "status", "responsavel", "contrato", "criado_em")
+    list_display = ("nome", "trabalho", "status", "horas_trabalho", "criado_em")
     list_filter = ("status",)
-    search_fields = ("nome", "trabalho__nome", "responsavel", "solicitante")
+    search_fields = ("nome", "trabalho__nome")
 
 
 @admin.register(Inventario)

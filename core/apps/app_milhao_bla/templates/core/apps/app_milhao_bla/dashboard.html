@@ -247,34 +247,6 @@
     {% endif %}
   </section>
 
-  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Ultima leitura por balanca</h2>
-        <p class="muted">Leitura mais recente para cada balanca no dia filtrado.</p>
-      </div>
-    </div>
-    {% if latest_by_balance %}
-      <div class="panel-grid metric-grid metric-grid-compact">
-        {% for item in latest_by_balance %}
-          <div class="panel-card panel-card-compact metric-card">
-            <div class="panel-card-top">
-              <div class="panel-title">{{ item.label }}</div>
-              <div class="panel-tag">{{ item.balance }}</div>
-            </div>
-            <div class="metric-value">
-              {% if item.value is not None %}{{ item.value|floatformat:2 }} <span class="metric-unit">kg</span>{% else %}-{% endif %}
-            </div>
-            <div class="metric-note">
-              {% if item.datetime %}Em {{ item.datetime|date:"d/m/Y H:i" }}.{% else %}Sem leitura.{% endif %}
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">Nenhuma leitura para o filtro selecionado.</p>
-    {% endif %}
-  </section>
   </div>
   <script>
     (function () {

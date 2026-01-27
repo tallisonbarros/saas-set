@@ -129,20 +129,6 @@ def dashboard(request):
         }
         for balance in sorted(totals_by_balance.keys())
     ]
-    latest_value = filtered[-1]["value"] if filtered else None
-    latest_datetime = filtered[-1]["datetime"] if filtered else None
-    latest_by_balance_map = {}
-    for item in filtered:
-        latest_by_balance_map[item["balance"]] = item
-    latest_by_balance = [
-        {
-            "balance": balance,
-            "label": balance_labels.get(balance, balance),
-            "value": latest_by_balance_map[balance]["value"],
-            "datetime": latest_by_balance_map[balance]["datetime"],
-        }
-        for balance in sorted(latest_by_balance_map.keys())
-    ]
 
     composition_source = [
         item
@@ -233,9 +219,6 @@ def dashboard(request):
             "selected_balances": selected_balances,
             "total_value": total_value,
             "totals_by_balance": totals_by_balance,
-            "latest_value": latest_value,
-            "latest_datetime": latest_datetime,
-            "latest_by_balance": latest_by_balance,
             "avg_total_14": avg_total_14,
             "composition": composition,
         },

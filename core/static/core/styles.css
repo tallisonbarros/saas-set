@@ -467,6 +467,11 @@ body {
   background: linear-gradient(140deg, #ffffff 0%, #ffe7d7 100%);
 }
 
+.proposal-card-executando {
+  border-color: rgba(44, 111, 79, 0.35);
+  background: linear-gradient(140deg, #ffffff 0%, #e7f5ec 100%);
+}
+
 .proposal-card-standby {
   border-style: dashed;
   border-color: rgba(75, 90, 107, 0.35);
@@ -1269,8 +1274,8 @@ body {
 }
 
 .badge-executando {
-  background: #ffd9bf;
-  color: #a84200;
+  background: #e7f5ec;
+  color: #2c6f4f;
 }
 
 .badge-finalizado {

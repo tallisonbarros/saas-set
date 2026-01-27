@@ -34,7 +34,7 @@
       <div class="rack-status">
         <div>
           <div class="meta-label">Trabalhos</div>
-          <div class="meta-value">{{ trabalhos|length }}</div>
+          <div class="meta-value">{{ total_trabalhos }}</div>
         </div>
         <div>
           <div class="meta-label">ID_RADAR</div>
@@ -80,7 +80,7 @@
       </div>
       <div class="proposal-grid">
         {% for trabalho in trabalhos_execucao %}
-          <article class="proposal-card io-proposal-card">
+          <article class="proposal-card io-proposal-card proposal-card-executando">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
             <div class="proposal-head">
               <div>
@@ -152,6 +152,37 @@
                 <input type="text" name="descricao" placeholder="Revisao preventiva">
               </label>
               <label class="field">
+                <span>Setor</span>
+                <input type="text" name="setor" placeholder="Utilidades">
+              </label>
+              <label class="field">
+                <span>Solicitante</span>
+                <input type="text" name="solicitante" placeholder="Supervisor">
+              </label>
+              <label class="field">
+                <span>Responsavel</span>
+                <input type="text" name="responsavel" placeholder="Equipe tecnica">
+              </label>
+              <label class="field">
+                <div class="field-row">
+                  <span>Contrato</span>
+                  <details class="inline-pop" id="contrato-pop" {% if open_cadastro == 'contrato' %}open{% endif %}>
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Contrato</label>
+                      <input type="text" name="contrato_nome" form="create-contrato-form" placeholder="Novo contrato">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-contrato-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="contrato" id="contrato-select">
+                  <option value="">Selecione</option>
+                  {% for contrato in contratos %}
+                    <option value="{{ contrato.id }}">{{ contrato.nome }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
                 <span>Data de registro</span>
                 <input type="date" name="data_registro">
               </label>
@@ -183,6 +214,10 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="create_classificacao">
           </form>
+          <form id="create-contrato-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_contrato">
+          </form>
         {% else %}
           <div class="muted">Apenas usuarios com ID_RADAR podem criar trabalhos.</div>
         {% endif %}
@@ -192,12 +227,12 @@
     <section class="io-card">
       <div class="io-card-head">
         <div>
-          <h2 class="io-title">Trabalhos cadastrados</h2>
-          <p class="muted">Abra um trabalho para registrar atividades.</p>
+          <h2 class="io-title">Trabalhos pendentes</h2>
+          <p class="muted">Aguardando inicio ou planejamento.</p>
         </div>
       </div>
       <div class="proposal-grid">
-        {% for trabalho in trabalhos %}
+        {% for trabalho in trabalhos_pendentes %}
           <article class="proposal-card io-proposal-card">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
             <div class="proposal-head">
@@ -216,7 +251,46 @@
             </div>
           </article>
         {% empty %}
-          <div class="muted">Nenhum trabalho cadastrado ainda.</div>
+          <div class="muted">Nenhum trabalho pendente.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Trabalhos finalizados{% if not show_all_finalizados %} (mes atual){% endif %}</h2>
+          <p class="muted">Historico de trabalhos concluídos (data de criacao).</p>
+        </div>
+        <div class="module-meta">
+          {% if has_finalizados_antigos and not show_all_finalizados %}
+            <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_toggle_query %}?{{ finalizados_toggle_query }}{% endif %}">Mostrar todos</a>
+          {% elif show_all_finalizados %}
+            <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Mostrar apenas do mes</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="proposal-grid">
+        {% for trabalho in trabalhos_finalizados %}
+          <article class="proposal-card io-proposal-card">
+            <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
+            <div class="proposal-head">
+              <div>
+                <div class="proposal-title">{{ trabalho.nome }}</div>
+                <div class="proposal-meta">{{ trabalho.descricao|default:"Trabalho sem descricao." }}</div>
+                <div class="proposal-meta">Registrado em: {{ trabalho.data_registro|date:"d/m/Y" }}</div>
+                {% if trabalho.classificacao %}
+                  <div class="proposal-meta">Classificacao: {{ trabalho.classificacao.nome }}</div>
+                {% endif %}
+              </div>
+              <div class="module-meta">
+                <span class="badge badge-{{ trabalho.status|lower }}">{{ trabalho.get_status_display }}</span>
+                <span class="slot-badge slot-badge-compact">{{ trabalho.total_atividades }} atividades</span>
+              </div>
+            </div>
+          </article>
+        {% empty %}
+          <div class="muted">Nenhum trabalho finalizado.</div>
         {% endfor %}
       </div>
     </section>
@@ -344,6 +418,12 @@
             });
         });
       }
+      bindCadastro(
+        "create-contrato-form",
+        "input[name='contrato_nome'][form='create-contrato-form']",
+        "contrato-select",
+        "contrato-pop"
+      );
       bindCadastro(
         "create-classificacao-form",
         "input[name='classificacao_nome'][form='create-classificacao-form']",

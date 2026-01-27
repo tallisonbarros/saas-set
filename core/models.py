@@ -396,8 +396,18 @@ class RadarTrabalho(models.Model):
         blank=True,
         related_name="trabalhos",
     )
+    contrato = models.ForeignKey(
+        RadarContrato,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trabalhos",
+    )
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)
+    setor = models.CharField(max_length=120, blank=True)
+    solicitante = models.CharField(max_length=120, blank=True)
+    responsavel = models.CharField(max_length=120, blank=True)
     data_registro = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -416,25 +426,8 @@ class RadarAtividade(models.Model):
         FINALIZADA = "FINALIZADA", "Finalizada"
 
     trabalho = models.ForeignKey(RadarTrabalho, on_delete=models.CASCADE, related_name="atividades")
-    classificacao = models.ForeignKey(
-        "RadarClassificacao",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="atividades",
-    )
     nome = models.CharField(max_length=120)
     descricao = models.TextField(blank=True)
-    setor = models.CharField(max_length=120, blank=True)
-    solicitante = models.CharField(max_length=120, blank=True)
-    responsavel = models.CharField(max_length=120, blank=True)
-    contrato = models.ForeignKey(
-        RadarContrato,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="atividades",
-    )
     horas_trabalho = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
     criado_em = models.DateTimeField(auto_now_add=True)

@@ -2046,10 +2046,15 @@ def radar_detail(request, pk):
     message = None
     message_level = "info"
     classificacoes = RadarClassificacao.objects.order_by("nome")
-    classificacao_filter = request.GET.get("classificacao", "").strip()
     if request.method == "POST":
         action = request.POST.get("action")
-        if action in {"create_trabalho", "update_radar", "delete_radar", "create_classificacao"}:
+        if action in {
+            "create_trabalho",
+            "update_radar",
+            "delete_radar",
+            "create_classificacao",
+            "create_contrato",
+        }:
             if not can_manage and not request.user.is_staff:
                 return HttpResponseForbidden("Sem permissao.")
         if action == "create_classificacao":
@@ -2079,9 +2084,40 @@ def radar_detail(request, pk):
                 )
             params = {"cadastro": "classificacao", "msg": msg, "level": level}
             return redirect(f"{reverse('radar_detail', args=[radar.pk])}?{urlencode(params)}")
+        if action == "create_contrato":
+            nome = request.POST.get("contrato_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de contrato."
+                level = "error"
+                created = False
+            else:
+                contrato, created = RadarContrato.objects.get_or_create(nome=nome)
+                if created:
+                    msg = "Contrato criado."
+                    level = "success"
+                else:
+                    msg = "Contrato ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": contrato.id if nome and "contrato" in locals() else None,
+                        "nome": contrato.nome if nome and "contrato" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            params = {"cadastro": "contrato", "msg": msg, "level": level}
+            return redirect(f"{reverse('radar_detail', args=[radar.pk])}?{urlencode(params)}")
         if action == "create_trabalho":
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
+            setor = request.POST.get("setor", "").strip()
+            solicitante = request.POST.get("solicitante", "").strip()
+            responsavel = request.POST.get("responsavel", "").strip()
+            contrato_id = request.POST.get("contrato")
             data_raw = request.POST.get("data_registro", "").strip()
             classificacao_id = request.POST.get("classificacao")
             data_registro = None
@@ -2094,6 +2130,9 @@ def radar_detail(request, pk):
                 message = "Informe um nome para o trabalho."
                 message_level = "error"
             else:
+                contrato = None
+                if contrato_id:
+                    contrato = RadarContrato.objects.filter(pk=contrato_id).first()
                 classificacao = None
                 if classificacao_id:
                     classificacao = RadarClassificacao.objects.filter(pk=classificacao_id).first()
@@ -2101,6 +2140,10 @@ def radar_detail(request, pk):
                     radar=radar,
                     nome=nome,
                     descricao=descricao,
+                    setor=setor,
+                    solicitante=solicitante,
+                    responsavel=responsavel,
+                    contrato=contrato,
                     data_registro=data_registro or timezone.localdate(),
                     classificacao=classificacao,
                 )
@@ -2127,24 +2170,49 @@ def radar_detail(request, pk):
             radar.delete()
             return redirect("radar_list")
 
-    trabalhos_execucao = radar.trabalhos.filter(status=RadarTrabalho.Status.EXECUTANDO)
-    trabalhos_execucao = trabalhos_execucao.annotate(total_atividades=Count("atividades")).select_related(
-        "classificacao"
+    trabalhos_base = radar.trabalhos.annotate(total_atividades=Count("atividades")).select_related(
+        "classificacao",
+        "contrato",
     )
-    trabalhos = radar.trabalhos.annotate(total_atividades=Count("atividades")).select_related("classificacao")
     if classificacao_filter:
-        trabalhos_execucao = trabalhos_execucao.filter(classificacao_id=classificacao_filter)
-        trabalhos = trabalhos.filter(classificacao_id=classificacao_filter)
-    trabalhos = trabalhos.order_by("-data_registro", "nome")
+        trabalhos_base = trabalhos_base.filter(classificacao_id=classificacao_filter)
+    today = timezone.localdate()
+    show_all_finalizados = request.GET.get("finalizados") == "all"
+    base_params = request.GET.copy()
+    base_params.pop("finalizados", None)
+    toggle_params = base_params.copy()
+    toggle_params["finalizados"] = "all"
+    total_trabalhos = trabalhos_base.count()
+    trabalhos_execucao = trabalhos_base.filter(status=RadarTrabalho.Status.EXECUTANDO)
+    trabalhos_pendentes = trabalhos_base.filter(status=RadarTrabalho.Status.PENDENTE)
+    trabalhos_finalizados = trabalhos_base.filter(status=RadarTrabalho.Status.FINALIZADA)
+    trabalhos_finalizados_mes = trabalhos_finalizados.filter(
+        criado_em__year=today.year,
+        criado_em__month=today.month,
+    )
+    trabalhos_finalizados_antigos = trabalhos_finalizados.exclude(
+        criado_em__year=today.year,
+        criado_em__month=today.month,
+    )
+    if show_all_finalizados:
+        trabalhos_finalizados_mes = trabalhos_finalizados
     trabalhos_execucao = trabalhos_execucao.order_by("-data_registro", "nome")
+    trabalhos_pendentes = trabalhos_pendentes.order_by("-data_registro", "nome")
+    trabalhos_finalizados_mes = trabalhos_finalizados_mes.order_by("-data_registro", "nome")
+    has_finalizados_antigos = trabalhos_finalizados_antigos.exists()
     return render(
         request,
         "core/radar_detail.html",
         {
             "radar": radar,
-            "trabalhos": trabalhos,
             "trabalhos_execucao": trabalhos_execucao,
+            "trabalhos_pendentes": trabalhos_pendentes,
+            "trabalhos_finalizados": trabalhos_finalizados_mes,
+            "show_all_finalizados": show_all_finalizados,
+            "has_finalizados_antigos": has_finalizados_antigos,
+            "total_trabalhos": total_trabalhos,
             "classificacoes": classificacoes,
+            "contratos": RadarContrato.objects.order_by("nome"),
             "classificacao_filter": classificacao_filter,
             "can_manage": can_manage or request.user.is_staff,
             "is_radar_creator": is_creator,
@@ -2152,6 +2220,8 @@ def radar_detail(request, pk):
             "message": message,
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
+            "finalizados_toggle_query": toggle_params.urlencode() if toggle_params else "finalizados=all",
+            "finalizados_reset_query": base_params.urlencode() if base_params else "",
         },
     )
 
@@ -2192,6 +2262,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "create_atividade",
             "update_trabalho",
             "delete_trabalho",
+            "duplicate_trabalho",
             "update_atividade",
             "delete_atividade",
             "create_contrato",
@@ -2256,8 +2327,12 @@ def radar_trabalho_detail(request, radar_pk, pk):
         if action == "update_trabalho":
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
+            setor = request.POST.get("setor", "").strip()
+            solicitante = request.POST.get("solicitante", "").strip()
+            responsavel = request.POST.get("responsavel", "").strip()
             data_raw = request.POST.get("data_registro", "").strip()
             classificacao_id = request.POST.get("classificacao")
+            contrato_id = request.POST.get("contrato")
             if not nome:
                 message = "Informe um nome para o trabalho."
                 message_level = "error"
@@ -2271,22 +2346,63 @@ def radar_trabalho_detail(request, radar_pk, pk):
                     trabalho.classificacao = RadarClassificacao.objects.filter(pk=classificacao_id).first()
                 else:
                     trabalho.classificacao = None
+                if contrato_id:
+                    trabalho.contrato = RadarContrato.objects.filter(pk=contrato_id).first()
+                else:
+                    trabalho.contrato = None
                 trabalho.nome = nome
                 trabalho.descricao = descricao
-                trabalho.save(update_fields=["nome", "descricao", "data_registro", "classificacao"])
+                trabalho.setor = setor
+                trabalho.solicitante = solicitante
+                trabalho.responsavel = responsavel
+                trabalho.save(
+                    update_fields=[
+                        "nome",
+                        "descricao",
+                        "data_registro",
+                        "classificacao",
+                        "contrato",
+                        "setor",
+                        "solicitante",
+                        "responsavel",
+                    ]
+                )
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_trabalho":
             trabalho.delete()
             return redirect("radar_detail", pk=radar.pk)
+        if action == "duplicate_trabalho":
+            novo_trabalho = RadarTrabalho.objects.create(
+                radar=radar,
+                nome=trabalho.nome,
+                descricao=trabalho.descricao,
+                data_registro=trabalho.data_registro,
+                classificacao=trabalho.classificacao,
+                contrato=trabalho.contrato,
+                setor=trabalho.setor,
+                solicitante=trabalho.solicitante,
+                responsavel=trabalho.responsavel,
+            )
+            atividades = list(trabalho.atividades.all())
+            if atividades:
+                RadarAtividade.objects.bulk_create(
+                    [
+                        RadarAtividade(
+                            trabalho=novo_trabalho,
+                            nome=atividade.nome,
+                            descricao=atividade.descricao,
+                            horas_trabalho=atividade.horas_trabalho,
+                            status=atividade.status,
+                        )
+                        for atividade in atividades
+                    ]
+                )
+            _sync_trabalho_status(novo_trabalho)
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=novo_trabalho.pk)
         if action == "create_atividade":
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
-            setor = request.POST.get("setor", "").strip()
-            solicitante = request.POST.get("solicitante", "").strip()
-            responsavel = request.POST.get("responsavel", "").strip()
-            contrato_id = request.POST.get("contrato")
-            classificacao_id = request.POST.get("classificacao")
             horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
             status_raw = request.POST.get("status", "").strip()
             if status_raw not in dict(RadarAtividade.Status.choices):
@@ -2301,21 +2417,10 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 message = "Informe um nome para a atividade."
                 message_level = "error"
             else:
-                contrato = None
-                if contrato_id:
-                    contrato = RadarContrato.objects.filter(pk=contrato_id).first()
-                classificacao = None
-                if classificacao_id:
-                    classificacao = RadarClassificacao.objects.filter(pk=classificacao_id).first()
                 RadarAtividade.objects.create(
                     trabalho=trabalho,
                     nome=nome,
                     descricao=descricao,
-                    setor=setor,
-                    solicitante=solicitante,
-                    responsavel=responsavel,
-                    contrato=contrato,
-                    classificacao=classificacao,
                     horas_trabalho=horas,
                     status=status_raw,
                 )
@@ -2326,15 +2431,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
             atividade.nome = request.POST.get("nome", "").strip()
             atividade.descricao = request.POST.get("descricao", "").strip()
-            atividade.setor = request.POST.get("setor", "").strip()
-            atividade.solicitante = request.POST.get("solicitante", "").strip()
-            atividade.responsavel = request.POST.get("responsavel", "").strip()
-            contrato_id = request.POST.get("contrato")
-            atividade.contrato = RadarContrato.objects.filter(pk=contrato_id).first() if contrato_id else None
-            classificacao_id = request.POST.get("classificacao")
-            atividade.classificacao = (
-                RadarClassificacao.objects.filter(pk=classificacao_id).first() if classificacao_id else None
-            )
             horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
             if horas_raw:
                 try:
@@ -2350,11 +2446,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 update_fields=[
                     "nome",
                     "descricao",
-                    "setor",
-                    "solicitante",
-                    "responsavel",
-                    "contrato",
-                    "classificacao",
                     "horas_trabalho",
                     "status",
                 ]
@@ -2369,22 +2460,47 @@ def radar_trabalho_detail(request, radar_pk, pk):
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
 
     contratos = RadarContrato.objects.order_by("nome")
-    atividades = trabalho.atividades.select_related("contrato", "classificacao")
-    if classificacao_filter:
-        atividades = atividades.filter(classificacao_id=classificacao_filter)
-    atividades = atividades.order_by("-criado_em")
-    total_atividades = atividades.count()
+    atividades_base = trabalho.atividades.all()
+    today = timezone.localdate()
+    show_all_finalizados = request.GET.get("finalizados") == "all"
+    base_params = request.GET.copy()
+    base_params.pop("finalizados", None)
+    toggle_params = base_params.copy()
+    toggle_params["finalizados"] = "all"
+    atividades_execucao = atividades_base.filter(status=RadarAtividade.Status.EXECUTANDO).order_by("-criado_em")
+    atividades_pendentes = atividades_base.filter(status=RadarAtividade.Status.PENDENTE).order_by("-criado_em")
+    atividades_finalizadas = atividades_base.filter(status=RadarAtividade.Status.FINALIZADA)
+    atividades_finalizadas_mes = atividades_finalizadas.filter(
+        criado_em__year=today.year,
+        criado_em__month=today.month,
+    )
+    atividades_finalizadas_antigas = atividades_finalizadas.exclude(
+        criado_em__year=today.year,
+        criado_em__month=today.month,
+    )
+    if show_all_finalizados:
+        atividades_finalizadas_mes = atividades_finalizadas
+    atividades_finalizadas_mes = atividades_finalizadas_mes.order_by("-criado_em")
+    has_finalizadas_antigas = atividades_finalizadas_antigas.exists()
+    edit_atividade = None
+    edit_atividade_id = request.GET.get("editar", "").strip()
+    if edit_atividade_id:
+        edit_atividade = RadarAtividade.objects.filter(pk=edit_atividade_id, trabalho=trabalho).first()
+    total_atividades = atividades_base.count()
     return render(
         request,
         "core/radar_trabalho_detail.html",
         {
             "radar": radar,
             "trabalho": trabalho,
-            "atividades": atividades,
+            "atividades_execucao": atividades_execucao,
+            "atividades_pendentes": atividades_pendentes,
+            "atividades_finalizadas": atividades_finalizadas_mes,
+            "show_all_finalizados": show_all_finalizados,
+            "has_finalizadas_antigas": has_finalizadas_antigas,
             "total_atividades": total_atividades,
             "contratos": contratos,
             "classificacoes": classificacoes,
-            "classificacao_filter": classificacao_filter,
             "status_choices": RadarAtividade.Status.choices,
             "can_manage": can_manage or request.user.is_staff,
             "is_radar_creator": is_creator,
@@ -2392,6 +2508,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "message": message,
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
+            "edit_atividade": edit_atividade,
+            "finalizados_toggle_query": toggle_params.urlencode() if toggle_params else "finalizados=all",
+            "finalizados_reset_query": base_params.urlencode() if base_params else "",
         },
     )
 
