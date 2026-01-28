@@ -32,6 +32,16 @@ def _extract_balance_name(tag_name):
     return None
 
 
+def _format_kg(value):
+    if value is None:
+        return None
+    try:
+        rounded = round(float(value))
+    except (TypeError, ValueError):
+        return None
+    return f"{rounded:,.0f}".replace(",", ".")
+
+
 @login_required
 def dashboard(request):
     app = get_object_or_404(App, slug="appmilhaobla", ativo=True)
@@ -79,6 +89,7 @@ def dashboard(request):
                 "date": dt.date(),
                 "hour": dt.strftime("%H:%M"),
                 "value": value,
+                "value_display": _format_kg(value),
             }
         )
 
@@ -116,6 +127,7 @@ def dashboard(request):
         and (not selected_balances or item["balance"] in selected_balances)
     ]
     total_value = sum(item["value"] or 0 for item in filtered) if filtered else 0
+    total_value_display = _format_kg(total_value)
     totals_by_balance = {}
     for item in filtered:
         balance = item["balance"]
@@ -126,6 +138,7 @@ def dashboard(request):
             "balance": balance,
             "label": balance_labels.get(balance, balance),
             "total": totals_by_balance[balance],
+            "total_display": _format_kg(totals_by_balance[balance]),
         }
         for balance in sorted(totals_by_balance.keys())
     ]
@@ -201,6 +214,8 @@ def dashboard(request):
             "label": item["label"],
             "total": item["total"],
             "avg_14": avg_by_balance.get(item["balance"]),
+            "total_display": item["total_display"],
+            "avg_14_display": _format_kg(avg_by_balance.get(item["balance"])),
         }
         for item in totals_by_balance
     ]
@@ -218,8 +233,10 @@ def dashboard(request):
             "selected_date": selected_date,
             "selected_balances": selected_balances,
             "total_value": total_value,
+            "total_value_display": total_value_display,
             "totals_by_balance": totals_by_balance,
             "avg_total_14": avg_total_14,
+            "avg_total_14_display": _format_kg(avg_total_14),
             "composition": composition,
         },
     )
