@@ -109,26 +109,46 @@
   {% endif %}
 
   {% if composition %}
-  <section class="card composition-card">
-    <form method="get" class="io-form composition-date-form" style="width: 100%; display: flex; justify-content: center;">
+  <section class="card composition-card" style="padding: 14px;">
+    <form method="get" class="io-form composition-date-form" style="width: 100%; display: flex; justify-content: center; margin: 0;">
       {% for bal in selected_balances %}
         <input type="hidden" name="balance" value="{{ bal }}" />
       {% endfor %}
-      <label class="field composition-date-field" style="width: 100%; max-width: 320px; margin: 0 auto;">
-        <select name="date" class="milhao-date-select composition-date-select" style="width: 100%;">
-          {% for day in dates %}
-            <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
-              {{ day|date:"d/m/Y" }}
-            </option>
-          {% endfor %}
-        </select>
-      </label>
+      <div style="width: 100%; display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 10px;">
+        {% if prev_date %}
+          <a
+            href="?date={{ prev_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
+            aria-label="Dia anterior"
+            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: #fff; text-decoration: none; color: inherit;"
+          >&lt;</a>
+        {% else %}
+          <span aria-hidden="true" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); opacity: 0.35;">&lt;</span>
+        {% endif %}
+        <label class="field composition-date-field" style="width: 100%; max-width: 320px; margin: 0 auto;">
+          <select name="date" class="milhao-date-select composition-date-select" style="width: 100%;">
+            {% for day in dates %}
+              <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
+                {{ day|date:"d/m/Y" }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        {% if next_date %}
+          <a
+            href="?date={{ next_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
+            aria-label="Dia seguinte"
+            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: #fff; text-decoration: none; color: inherit;"
+          >&gt;</a>
+        {% else %}
+          <span aria-hidden="true" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); opacity: 0.35;">&gt;</span>
+        {% endif %}
+      </div>
     </form>
   </section>
   {% endif %}
 
-  <section class="card">
-    <form method="get" class="io-form metrics-filter-form">
+  <section class="card" style="padding: 12px;">
+    <form method="get" class="io-form metrics-filter-form" style="margin-top: 0; gap: 10px;">
     {% if selected_date %}
       <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
     {% endif %}
@@ -138,6 +158,7 @@
         id="balance-chip-grid"
         class="balance-toggle-grid balance-toggle-compact"
         data-selected="{% for bal in selected_balances %}{{ bal }}{% if not forloop.last %},{% endif %}{% endfor %}"
+        style="gap: 8px;"
       >
         <div class="balance-chip balance-chip-all" data-balance="__all__">
           <button type="button" class="balance-chip-main">Selecionar todas</button>
@@ -172,7 +193,7 @@
     </form>
   </section>
 
-  <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }}; padding: 16px;"{% endif %}>
     <div class="io-card-head metrics-head">
       <div>
         <h2 class="io-title">Indicadores do dia</h2>

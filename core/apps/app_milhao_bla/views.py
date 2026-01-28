@@ -126,6 +126,18 @@ def dashboard(request):
         if (not selected_date or item["date"] == selected_date)
         and (not selected_balances or item["balance"] in selected_balances)
     ]
+
+    prev_date = None
+    next_date = None
+    if selected_date and dates:
+        try:
+            idx = dates.index(selected_date)
+            if idx > 0:
+                prev_date = dates[idx - 1]
+            if idx < len(dates) - 1:
+                next_date = dates[idx + 1]
+        except ValueError:
+            pass
     total_value = sum(item["value"] or 0 for item in filtered) if filtered else 0
     total_value_display = _format_kg(total_value)
     totals_by_balance = {}
@@ -238,5 +250,7 @@ def dashboard(request):
             "avg_total_14": avg_total_14,
             "avg_total_14_display": _format_kg(avg_total_14),
             "composition": composition,
+            "prev_date": prev_date,
+            "next_date": next_date,
         },
     )

@@ -408,6 +408,14 @@ body {
   display: inline-table;
 }
 
+.milhao-readings {
+  text-align: center;
+}
+
+.milhao-readings .table {
+  text-align: left;
+}
+
 .milhao-readings .table th,
 .milhao-readings .table td {
   padding: 6px 6px;
