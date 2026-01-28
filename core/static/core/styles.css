@@ -402,11 +402,18 @@ body {
   margin-top: 10px;
   font-size: 12px;
   table-layout: fixed;
+  width: max-content;
+  max-width: 100%;
+  display: inline-table;
 }
 
 .milhao-readings .table th,
 .milhao-readings .table td {
   padding: 6px 6px;
+}
+
+.milhao-readings .table-wrap {
+  overflow-x: auto;
 }
 
 .milhao-readings .table td .muted {
