@@ -111,12 +111,12 @@
 
   {% if composition %}
   <section class="card composition-card">
-    <form method="get" class="io-form composition-date-form">
+    <form method="get" class="io-form composition-date-form" style="width: 100%; display: flex; justify-content: center;">
       {% for bal in selected_balances %}
         <input type="hidden" name="balance" value="{{ bal }}" />
       {% endfor %}
-      <label class="field composition-date-field">
-        <select name="date" class="milhao-date-select composition-date-select">
+      <label class="field composition-date-field" style="width: 100%; max-width: 320px; margin: 0 auto;">
+        <select name="date" class="milhao-date-select composition-date-select" style="width: 100%;">
           {% for day in dates %}
             <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
               {{ day|date:"d/m/Y" }}
