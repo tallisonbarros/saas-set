@@ -2015,6 +2015,38 @@ select {
   min-width: 160px;
 }
 
+@media (max-width: 700px) {
+  .composition-head {
+    align-items: flex-start;
+  }
+
+  .composition-head-actions,
+  .composition-date-form {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .composition-date-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .composition-legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .composition-mini {
+    max-width: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .composition-legend {
+    grid-template-columns: 1fr;
+  }
+}
+
 .balance-filter-card {
   padding: 16px;
 }
@@ -3533,5 +3565,30 @@ select {
 
   .rack-channel-head {
     display: none;
+  }
+
+  .milhao-readings .table {
+    min-width: 200px;
+  }
+
+  .page-hud .hud-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-hud .hud-menu {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .page-hud .hud-menu-pill {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .page-hud .page-hud-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
