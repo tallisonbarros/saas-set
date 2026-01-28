@@ -1,5 +1,6 @@
 {% extends "core/base.html" %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}{{ app.nome }}{% endblock %}
 
@@ -183,10 +184,10 @@
     <div class="metrics-overview grid-2 metric-grid">
       <div class="panel-card panel-card-compact metric-card metric-card-primary">
         <div class="metric-label">Total do dia</div>
+        <div class="metric-value">{{ total_value|floatformat:0|intcomma }} <span class="metric-unit">kg</span></div>
         {% if avg_total_14 is not None %}
-          <div class="panel-tag">MEDIA {{ avg_total_14|floatformat:2 }} kg</div>
+          <div class="panel-tag">MEDIA {{ avg_total_14|floatformat:0|intcomma }} kg</div>
         {% endif %}
-        <div class="metric-value">{{ total_value|floatformat:2 }} <span class="metric-unit">kg</span></div>
         <div class="metric-note">Soma das leituras no periodo.</div>
       </div>
     </div>
@@ -199,11 +200,11 @@
               <div class="panel-card-top">
                 <div class="panel-title">{{ item.label }}</div>
                 <div class="panel-tag">{{ item.balance }}</div>
-                {% if item.avg_14 is not None %}
-                  <div class="panel-tag">MEDIA {{ item.avg_14|floatformat:2 }} kg</div>
-                {% endif %}
               </div>
-              <div class="metric-value">{{ item.total|floatformat:2 }} <span class="metric-unit">kg</span></div>
+              <div class="metric-value">{{ item.total|floatformat:0|intcomma }} <span class="metric-unit">kg</span></div>
+              {% if item.avg_14 is not None %}
+                <div class="panel-tag">MEDIA {{ item.avg_14|floatformat:0|intcomma }} kg</div>
+              {% endif %}
             </div>
           {% endfor %}
         </div>
@@ -241,7 +242,7 @@
                   <div>{{ item.label }}</div>
                   <div class="muted">{{ item.balance }}</div>
                 </td>
-                <td>{% if item.value is not None %}{{ item.value|floatformat:2 }} kg{% else %}-{% endif %}</td>
+                <td>{% if item.value is not None %}{{ item.value|floatformat:0|intcomma }} kg{% else %}-{% endif %}</td>
               </tr>
             {% endfor %}
           </tbody>
