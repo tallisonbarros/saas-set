@@ -829,9 +829,30 @@ def ios_rack_detail(request, pk):
         )
     else:
         rack = get_object_or_404(RackIO, pk=pk)
+    can_manage = bool(
+        request.user.is_staff
+        or (
+            cliente
+            and (
+                rack.cliente_id == cliente.id
+                or (rack.id_planta_id and cliente.plantas.filter(pk=rack.id_planta_id).exists())
+            )
+        )
+    )
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
+        if action in {
+            "update_rack",
+            "delete_rack",
+            "add_first",
+            "add_to_slot",
+            "assign_modules",
+            "remove_from_slot",
+            "move_left",
+            "move_right",
+        } and not can_manage:
+            return HttpResponseForbidden("Sem permissao.")
         if action == "create_local":
             nome = request.POST.get("local_nome", "").strip()
             if not nome:
@@ -864,8 +885,6 @@ def ios_rack_detail(request, pk):
                 return JsonResponse(payload)
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "update_rack":
-            if not request.user.is_staff and rack.cliente != cliente:
-                return HttpResponseForbidden("Sem permissao.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             local_id = request.POST.get("local")
@@ -955,8 +974,6 @@ def ios_rack_detail(request, pk):
             rack.save(update_fields=["nome", "descricao", "local", "grupo", "id_planta", "slots_total", "inventario"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "delete_rack":
-            if not request.user.is_staff and rack.cliente != cliente:
-                return HttpResponseForbidden("Sem permissao.")
             rack.delete()
             return redirect("ios_list")
         if action in ["add_first", "add_to_slot"]:
@@ -993,8 +1010,6 @@ def ios_rack_detail(request, pk):
                 slot.save(update_fields=["modulo"])
             return redirect("ios_rack_detail", pk=rack.pk)
         if action == "assign_modules":
-            if not request.user.is_staff and rack.cliente != cliente:
-                return HttpResponseForbidden("Sem permissao.")
             modules_qs = ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True))
             for key, value in request.POST.items():
                 if not key.startswith("slot_"):
@@ -2550,6 +2565,19 @@ def ios_rack_modulo_detail(request, pk):
         )
     else:
         module = get_object_or_404(module_qs, pk=pk)
+    can_manage = bool(
+        request.user.is_staff
+        or (
+            cliente
+            and (
+                module.rack.cliente_id == cliente.id
+                or (
+                    module.rack.id_planta_id
+                    and cliente.plantas.filter(pk=module.rack.id_planta_id).exists()
+                )
+            )
+        )
+    )
     slot = RackSlotIO.objects.filter(modulo=module).select_related("rack").first()
     prev_slot = None
     next_slot = None
@@ -2568,6 +2596,14 @@ def ios_rack_modulo_detail(request, pk):
         )
     if request.method == "POST":
         action = request.POST.get("action")
+        if action in {
+            "update_module_name",
+            "update_module",
+            "move_to_slot",
+            "delete_module",
+            "update_channels",
+        } and not can_manage:
+            return HttpResponseForbidden("Sem permissao.")
         if action == "update_module_name":
             nome = request.POST.get("nome", "").strip()
             module.nome = nome
