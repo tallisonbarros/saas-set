@@ -15,7 +15,7 @@
 
 {% block content %}
   <div class="card-stack" style="display: flex; flex-direction: column; gap: 16px;">
-  <section class="card app-accent" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="card app-accent milhao-readings" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     {% if app.logo %}
       <div class="hud-logo-wrap" style="display: flex; justify-content: center; margin: 6px 0 18px;">
         <img class="hud-logo" src="{{ app.logo.url }}" alt="Logo {{ app.nome }}" style="max-width: 220px; height: auto; display: block;" />
@@ -219,8 +219,13 @@
       </div>
     </div>
     {% if entries %}
-      <div class="table-wrap is-compact">
-        <table class="table table-compact milhao-table">
+      <div class="table-wrap">
+        <table class="table">
+          <colgroup>
+            <col style="width: 64px;">
+            <col>
+            <col style="width: 90px;">
+          </colgroup>
           <thead>
             <tr>
               <th>Hora</th>

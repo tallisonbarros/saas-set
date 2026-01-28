@@ -398,61 +398,35 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.table-wrap.is-compact .table {
+.milhao-readings .table {
   margin-top: 10px;
   font-size: 12px;
   table-layout: fixed;
 }
 
-.table-wrap.is-compact .table th,
-.table-wrap.is-compact .table td {
-  padding: 8px 8px;
+.milhao-readings .table th,
+.milhao-readings .table td {
+  padding: 6px 6px;
 }
 
-.table-wrap.is-compact .table td .muted {
+.milhao-readings .table td .muted {
   font-size: 11px;
 }
 
-.table-wrap.is-compact .table th:first-child,
-.table-wrap.is-compact .table td:first-child {
-  width: 70px;
-  white-space: nowrap;
+.milhao-readings .table th,
+.milhao-readings .table td {
+  vertical-align: top;
 }
 
-.table-wrap.is-compact .table th:nth-child(2),
-.table-wrap.is-compact .table td:nth-child(2) {
-  width: 110px;
-}
-
-.table-wrap.is-compact .table th:last-child,
-.table-wrap.is-compact .table td:last-child {
-  width: 120px;
-  white-space: nowrap;
+.milhao-readings .table td:last-child,
+.milhao-readings .table th:last-child {
   text-align: left;
-}
-
-.milhao-table td:nth-child(2) {
   white-space: nowrap;
 }
 
 @media (max-width: 640px) {
-  .table-wrap.is-compact .table {
+  .milhao-readings .table {
     font-size: 11px;
-  }
-
-  .table-wrap.is-compact .table th,
-  .table-wrap.is-compact .table td {
-    padding: 6px 6px;
-  }
-
-  .table-wrap.is-compact .table th:nth-child(2),
-  .table-wrap.is-compact .table td:nth-child(2) {
-    width: 90px;
-  }
-
-  .table-wrap.is-compact .table th:last-child,
-  .table-wrap.is-compact .table td:last-child {
-    width: 100px;
   }
 }
 
