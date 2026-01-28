@@ -2002,7 +2002,9 @@ select {
 .composition-date-form {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  width: 100%;
 }
 
 .composition-head-actions {
@@ -2014,10 +2016,13 @@ select {
 .composition-date-field {
   margin: 0;
   text-align: right;
+  width: 100%;
+  max-width: 320px;
 }
 
 .composition-date-select {
   min-width: 160px;
+  width: 100%;
 }
 
 @media (max-width: 700px) {

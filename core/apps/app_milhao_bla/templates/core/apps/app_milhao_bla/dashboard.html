@@ -70,22 +70,6 @@
         <h2 class="io-title">Proporcao de composicao do dia</h2>
         <p class="muted">Percentual por balanca.</p>
       </div>
-      <div class="composition-head-actions">
-        <form method="get" class="io-form composition-date-form">
-          {% for bal in selected_balances %}
-            <input type="hidden" name="balance" value="{{ bal }}" />
-          {% endfor %}
-          <label class="field composition-date-field">
-            <select name="date" class="milhao-date-select composition-date-select">
-              {% for day in dates %}
-                <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
-                  {{ day|date:"d/m/Y" }}
-                </option>
-              {% endfor %}
-            </select>
-          </label>
-        </form>
-      </div>
     </div>
     <div class="composition-bar-stack">
       {% for item in composition %}
@@ -125,19 +109,26 @@
   </section>
   {% endif %}
 
-  <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
-    <div class="io-card-head metrics-head">
-      <div>
-        <h2 class="io-title">Indicadores do dia</h2>
-        <p class="muted">Resumo das balancas selecionadas.</p>
-      </div>
-      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-        {% if selected_date %}
-          <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
-        {% endif %}
-        <div class="muted" style="font-size: 12px; opacity: 0.7;">Media calculada dos ultimos 14 dias (dias sem leitura nao entram)</div>
-      </div>
-    </div>
+  {% if composition %}
+  <section class="card composition-card">
+    <form method="get" class="io-form composition-date-form">
+      {% for bal in selected_balances %}
+        <input type="hidden" name="balance" value="{{ bal }}" />
+      {% endfor %}
+      <label class="field composition-date-field">
+        <select name="date" class="milhao-date-select composition-date-select">
+          {% for day in dates %}
+            <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
+              {{ day|date:"d/m/Y" }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="card">
     <form method="get" class="io-form metrics-filter-form">
     {% if selected_date %}
       <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
@@ -180,7 +171,21 @@
       <div id="balance-hidden-inputs"></div>
     </label>
     </form>
+  </section>
 
+  <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <div class="io-card-head metrics-head">
+      <div>
+        <h2 class="io-title">Indicadores do dia</h2>
+        <p class="muted">Resumo das balancas selecionadas.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+        {% if selected_date %}
+          <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
+        {% endif %}
+        <div class="muted" style="font-size: 12px; opacity: 0.7;">Media calculada dos ultimos 14 dias (dias sem leitura nao entram)</div>
+      </div>
+    </div>
     <div class="metrics-overview grid-2 metric-grid">
       <div class="panel-card panel-card-compact metric-card metric-card-primary">
         <div class="metric-label">Total do dia</div>
