@@ -401,9 +401,10 @@ body {
 .milhao-readings .table {
   margin-top: 10px;
   font-size: 12px;
-  table-layout: fixed;
-  width: max-content;
+  table-layout: auto;
+  width: auto;
   max-width: 100%;
+  min-width: 0;
   display: inline-table;
 }
 
@@ -413,7 +414,10 @@ body {
 }
 
 .milhao-readings .table-wrap {
-  overflow-x: auto;
+  width: auto;
+  max-width: 100%;
+  display: inline-block;
+  overflow-x: visible;
 }
 
 .milhao-readings .table td .muted {
@@ -431,9 +435,22 @@ body {
   white-space: nowrap;
 }
 
+.milhao-readings .table th:first-child,
+.milhao-readings .table td:first-child,
+.milhao-readings .table th:last-child,
+.milhao-readings .table td:last-child {
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
   .milhao-readings .table {
     font-size: 11px;
+  }
+}
+
+@media (max-width: 700px) {
+  .milhao-readings .table {
+    min-width: 0;
   }
 }
 
