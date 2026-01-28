@@ -9,8 +9,10 @@ class Migration(migrations.Migration):
         ("core", "0016_io_default_modules"),
     ]
 
-    operations = [
-        migrations.RunSQL(
+    def migrate_caderno_clientes(apps, schema_editor):
+        if schema_editor.connection.vendor != "postgresql":
+            return
+        schema_editor.execute(
             """
             DO $$
             BEGIN
@@ -29,7 +31,9 @@ class Migration(migrations.Migration):
                     ALTER TABLE core_caderno DROP COLUMN cliente_id;
                 END IF;
             END $$;
-            """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
+            """
+        )
+
+    operations = [
+        migrations.RunPython(migrate_caderno_clientes, reverse_code=migrations.RunPython.noop),
     ]

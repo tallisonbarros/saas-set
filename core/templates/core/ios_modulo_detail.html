@@ -63,6 +63,25 @@
               {% endif %}
             </div>
           </div>
+          <div class="io-slot-nav">
+            <div class="io-slot-row" aria-label="Navegacao de slots do rack">
+              {% for rack_slot in rack_slots %}
+                {% if rack_slot.modulo_id %}
+                  <a
+                    class="io-slot-chip {% if slot and rack_slot.id == slot.id %}is-active{% endif %}"
+                    href="{% url 'ios_rack_modulo_detail' rack_slot.modulo.id %}"
+                    aria-label="Ir para slot {{ rack_slot.posicao }}"
+                  >
+                    {{ rack_slot.posicao|stringformat:"02d" }}
+                  </a>
+                {% else %}
+                  <span class="io-slot-chip is-empty" aria-label="Slot {{ rack_slot.posicao }} vazio">
+                    {{ rack_slot.posicao|stringformat:"02d" }}
+                  </span>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
           <div class="page-subtitle">{{ module.nome|default:module.modulo_modelo.nome }}</div>
         </div>
       </div>
@@ -82,15 +101,19 @@
       <div class="channel-row channel-row-head" aria-hidden="true">
         <div class="channel-index">Canal</div>
         <div class="channel-col">Comissionado</div>
+        <div class="channel-col">Tag</div>
         <div class="channel-col">Descricao</div>
         <div class="channel-col">Tipo</div>
-        <div class="channel-col">Vinculo</div>
       </div>
       {% for channel in channels %}
         <div class="channel-row">
           <div class="channel-index">Canal {{ channel.indice }}</div>
           <label class="toggle-chip toggle-chip-compact">
             <input type="checkbox" name="comissionado_{{ channel.id }}" {% if channel.comissionado %}checked{% endif %}>
+          </label>
+          <label class="field channel-field">
+            <span>Tag</span>
+            <input type="text" name="tag_{{ channel.id }}" value="{{ channel.tag }}" class="channel-tag-input" placeholder="TAG">
           </label>
           <label class="field channel-field">
             <span>Descricao</span>
@@ -106,71 +129,80 @@
             {% endfor %}
             </select>
           </label>
-          <label class="field channel-field">
-            <span>Vinculo</span>
-            <input
-              type="text"
-              name="vinculo_{{ channel.id }}"
-              list="vinculos-list"
-              placeholder="Vincular a ativo ou item"
-              class="channel-link-input"
-              value="{% if channel.ativo_id %}{{ channel.ativo.tag_set }}{% elif channel.ativo_item_id %}{{ channel.ativo_item.tag_set }}{% endif %}"
-            >
-          </label>
         </div>
       {% endfor %}
-      <datalist id="vinculos-list">
-        {% for ativo in ativos %}
-          {% if ativo.tag_set %}
-            <option value="{{ ativo.tag_set }}"></option>
-          {% endif %}
-        {% endfor %}
-        {% for item in itens %}
-          {% if item.tag_set %}
-            <option value="{{ item.tag_set }}"></option>
-          {% endif %}
-        {% endfor %}
-      </datalist>
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Salvar ajustes</button>
       </div>
     </form>
   </section>
 
-  <section class="io-card io-compact io-compact-card">
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Gerenciar modulo</h2>
-        <p class="muted">Renomear, mover ou excluir.</p>
-      </div>
+  <details class="io-card io-compact io-compact-card" data-auto-collapse="true">
+    <summary class="io-discrete-summary compact">
+      <span class="io-title">Gerenciar modulo</span>
+      <span class="muted">Renomear, mover ou excluir.</span>
+    </summary>
+    <div class="io-discrete-body">
+      <form class="manage-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_module">
+        <div class="manage-row">
+          <label class="manage-label" for="module-nome">Nome</label>
+          <input id="module-nome" type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
+        </div>
+        <div class="manage-row">
+          <label class="manage-label" for="module-slot">Mover para slot vazio</label>
+          <select id="module-slot" name="slot_id" {% if not has_vacant_slots %}disabled{% endif %}>
+            <option value="">Selecione</option>
+            {% for vacant in vacant_slots %}
+              <option value="{{ vacant.id }}">Slot{{ vacant.posicao|stringformat:"02d" }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% if not has_vacant_slots %}
+          <div class="muted manage-note">Nenhum slot vazio disponivel para mover.</div>
+        {% endif %}
+        <div class="form-actions">
+          <button class="btn btn-outline" type="submit">Salvar</button>
+        </div>
+      </form>
+      <form method="post" class="form-actions manage-delete-actions">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_module">
+        <button class="btn btn-outline" type="submit" onclick="return confirm('Excluir modulo? Esta acao nao pode ser desfeita.');">
+          Excluir modulo
+        </button>
+      </form>
     </div>
-    <form class="manage-form" method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="update_module">
-      <div class="manage-row">
-        <label class="manage-label" for="module-nome">Nome</label>
-        <input id="module-nome" type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
-      </div>
-      <div class="manage-row">
-        <label class="manage-label" for="module-slot">Slot vazio</label>
-        <select id="module-slot" name="slot_id" {% if not has_vacant_slots %}disabled{% endif %}>
-          <option value="">Selecione</option>
-          {% for vacant in vacant_slots %}
-            <option value="{{ vacant.id }}">Slot{{ vacant.posicao|stringformat:"02d" }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% if not has_vacant_slots %}
-        <div class="muted manage-note">Nenhum slot vazio disponivel no rack.</div>
-      {% endif %}
-      <label class="checkbox-item manage-checkbox">
-        <input type="checkbox" name="delete_module">
-        Excluir modulo
-      </label>
-      <div class="form-actions">
-        <button class="btn btn-outline" type="submit">Salvar</button>
-      </div>
-    </form>
-  </section>
+  </details>
+
+  <script>
+    (function () {
+      var inputs = document.querySelectorAll(".channel-tag-input");
+      function normalize(value) {
+        return (value || "").replace(/\s+/g, "").toUpperCase();
+      }
+      inputs.forEach(function (input) {
+        input.addEventListener("input", function () {
+          var next = normalize(input.value);
+          if (next !== input.value) {
+            input.value = next;
+          }
+        });
+        input.addEventListener("blur", function () {
+          input.value = normalize(input.value);
+        });
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var blocks = document.querySelectorAll("details[data-auto-collapse]");
+      blocks.forEach(function (block) {
+        block.open = false;
+      });
+    })();
+  </script>
 
 {% endblock %}

@@ -2645,43 +2645,28 @@ def ios_rack_modulo_detail(request, pk):
             return redirect("ios_rack_detail", pk=rack_id)
         if action == "update_channels":
             for channel in module.canais.all():
+                tag_raw = request.POST.get(f"tag_{channel.id}", "")
                 nome_raw = request.POST.get(f"nome_{channel.id}")
                 tipo_id = request.POST.get(f"tipo_{channel.id}")
                 comissionado = request.POST.get(f"comissionado_{channel.id}") == "on"
-                vinculo_raw = request.POST.get(f"vinculo_{channel.id}", "").strip()
                 if nome_raw is None:
                     continue
+                if tag_raw is not None:
+                    channel.tag = "".join(tag_raw.split()).upper()
                 channel.nome = nome_raw.strip()
                 if tipo_id:
                     channel.tipo_id = tipo_id
                 channel.comissionado = comissionado
-                channel.ativo_id = None
-                channel.ativo_item_id = None
-                if vinculo_raw:
-                    ativo_match = Ativo.objects.filter(tag_set__iexact=vinculo_raw).first()
-                    item_match = AtivoItem.objects.filter(tag_set__iexact=vinculo_raw).first()
-                    if item_match:
-                        channel.ativo_item_id = item_match.id
-                        channel.ativo_id = item_match.ativo_id
-                    elif ativo_match:
-                        channel.ativo_id = ativo_match.id
-                channel.save(update_fields=["nome", "tipo_id", "comissionado", "ativo_id", "ativo_item_id"])
+                channel.save(update_fields=["tag", "nome", "tipo_id", "comissionado"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
     channels = module.canais.select_related("tipo", "ativo", "ativo_item").order_by("indice")
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
-    cliente = _get_cliente(request.user)
-    if request.user.is_staff and not cliente:
-        inventarios_qs = Inventario.objects.all()
-    else:
-        inventarios_qs = Inventario.objects.filter(
-            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
-        )
-    if module.rack.inventario_id:
-        ativos_qs = Ativo.objects.filter(inventario=module.rack.inventario)
-    else:
-        ativos_qs = Ativo.objects.filter(inventario__in=inventarios_qs)
-    itens_qs = AtivoItem.objects.filter(ativo__in=ativos_qs).select_related("ativo")
     vacant_slots = RackSlotIO.objects.filter(rack=module.rack, modulo__isnull=True).order_by("posicao")
+    rack_slots = (
+        RackSlotIO.objects.filter(rack=module.rack)
+        .select_related("modulo")
+        .order_by("posicao")
+    )
     return render(
         request,
         "core/ios_modulo_detail.html",
@@ -2689,14 +2674,13 @@ def ios_rack_modulo_detail(request, pk):
             "module": module,
             "channels": channels,
             "channel_types": channel_types,
-            "ativos": ativos_qs.order_by("nome"),
-            "itens": itens_qs.order_by("ativo__nome", "nome"),
             "rack": module.rack,
             "slot": slot,
             "vacant_slots": vacant_slots,
             "has_vacant_slots": vacant_slots.exists(),
             "prev_slot": prev_slot,
             "next_slot": next_slot,
+            "rack_slots": rack_slots,
         },
     )
 

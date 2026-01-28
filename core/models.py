@@ -554,6 +554,7 @@ class ModuloRackIO(models.Model):
 class CanalRackIO(models.Model):
     modulo = models.ForeignKey(ModuloRackIO, on_delete=models.CASCADE, related_name="canais")
     indice = models.PositiveSmallIntegerField()
+    tag = models.CharField(max_length=120, blank=True)
     nome = models.CharField(max_length=120, blank=True)
     tipo = models.ForeignKey(TipoCanalIO, on_delete=models.PROTECT, related_name="canais")
     comissionado = models.BooleanField(default=False)
