@@ -745,6 +745,7 @@ class IngestRecord(models.Model):
     source = models.CharField(max_length=120, blank=True)
     payload = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
 
     class Meta:
         ordering = ["-created_at"]

@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
 from django.contrib.auth.models import User
 from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
@@ -427,23 +428,28 @@ def api_ingest(request):
             "source": source,
             "payload": payload_data,
         }
-    if items_by_source:
-        existing_records = IngestRecord.objects.filter(source_id__in=items_by_source.keys())
-        existing_by_source = {record.source_id: record for record in existing_records}
-        to_update = []
-        to_create = []
-        for source_id, data in items_by_source.items():
-            existing = existing_by_source.get(source_id)
-            if existing:
-                existing.client_id = data["client_id"]
-                existing.agent_id = data["agent_id"]
-                existing.source = data["source"]
-                existing.payload = data["payload"]
-                to_update.append(existing)
-            else:
-                to_create.append(IngestRecord(source_id=source_id, **data))
+        if items_by_source:
+            existing_records = IngestRecord.objects.filter(source_id__in=items_by_source.keys())
+            existing_by_source = {record.source_id: record for record in existing_records}
+            to_update = []
+            to_create = []
+            now = timezone.now()
+            for source_id, data in items_by_source.items():
+                existing = existing_by_source.get(source_id)
+                if existing:
+                    existing.client_id = data["client_id"]
+                    existing.agent_id = data["agent_id"]
+                    existing.source = data["source"]
+                    existing.payload = data["payload"]
+                    existing.updated_at = now
+                    to_update.append(existing)
+                else:
+                    to_create.append(IngestRecord(source_id=source_id, **data))
         if to_update:
-            IngestRecord.objects.bulk_update(to_update, ["client_id", "agent_id", "source", "payload"])
+            IngestRecord.objects.bulk_update(
+                to_update,
+                ["client_id", "agent_id", "source", "payload", "updated_at"],
+            )
         if to_create:
             IngestRecord.objects.bulk_create(to_create)
     return JsonResponse({"ok": True, "count": len(payload)})
