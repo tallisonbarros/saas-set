@@ -171,6 +171,7 @@
                 <tr>
                   <th>IP</th>
                   <th>Nome do equipamento</th>
+                  <th>Descricao</th>
                   <th>MAC</th>
                   <th>Protocolo</th>
                 </tr>
@@ -189,6 +190,18 @@
                         data-dup-key="{{ item.nome_equipamento|default:''|upper }}"
                         data-dup-type="nome"
                         data-item-id="{{ item.id }}"
+                        data-col="0"
+                      >
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        name="descricao_{{ item.id }}"
+                        value="{{ item.descricao }}"
+                        placeholder="Descricao"
+                        class="descricao-input"
+                        data-item-id="{{ item.id }}"
+                        data-col="1"
                       >
                     </td>
                     <td>
@@ -201,6 +214,7 @@
                         data-dup-key="{{ item.mac|default:''|upper }}"
                         data-dup-type="mac"
                         data-item-id="{{ item.id }}"
+                        data-col="2"
                       >
                     </td>
                     <td>
@@ -211,12 +225,13 @@
                         placeholder="Modbus TCP"
                         class="protocolo-input"
                         data-item-id="{{ item.id }}"
+                        data-col="3"
                       >
                     </td>
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="4" class="muted">Nenhum IP encontrado.</td>
+                    <td colspan="5" class="muted">Nenhum IP encontrado.</td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -228,6 +243,7 @@
               <tr>
                 <th>IP</th>
                 <th>Nome do equipamento</th>
+                <th>Descricao</th>
                 <th>MAC</th>
                 <th>Protocolo</th>
               </tr>
@@ -237,12 +253,13 @@
                 <tr>
                   <td>{{ item.ip }}</td>
                   <td>{{ item.nome_equipamento|default:"-" }}</td>
+                  <td>{{ item.descricao|default:"-" }}</td>
                   <td>{{ item.mac|default:"-" }}</td>
                   <td>{{ item.protocolo|default:"-" }}</td>
                 </tr>
               {% empty %}
                 <tr>
-                  <td colspan="4" class="muted">Nenhum IP encontrado.</td>
+                  <td colspan="5" class="muted">Nenhum IP encontrado.</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -285,9 +302,11 @@
           return;
         }
         var nomeInput = row.querySelector(".equipamento-input");
+        var descInput = row.querySelector(".descricao-input");
         var macInput = row.querySelector(".mac-input");
         var protoInput = row.querySelector(".protocolo-input");
         var itemId = (nomeInput && nomeInput.getAttribute("data-item-id"))
+          || (descInput && descInput.getAttribute("data-item-id"))
           || (macInput && macInput.getAttribute("data-item-id"))
           || (protoInput && protoInput.getAttribute("data-item-id"));
         if (!itemId) {
@@ -297,6 +316,7 @@
         data.set("action", "inline_update_item");
         data.set("item_id", itemId);
         data.set("nome_equipamento", nomeInput ? nomeInput.value : "");
+        data.set("descricao", descInput ? descInput.value : "");
         data.set("mac", macInput ? macInput.value : "");
         data.set("protocolo", protoInput ? protoInput.value : "");
         fetch(window.location.pathname + window.location.search, {
@@ -338,7 +358,7 @@
         inputs.forEach(function (input) {
           input.addEventListener("paste", function (event) {
             var text = (event.clipboardData || window.clipboardData).getData("text");
-            if (!text || text.indexOf("\n") === -1) {
+            if (!text || text.indexOf("\n") === -1 || text.indexOf("\t") !== -1) {
               return;
             }
             event.preventDefault();
@@ -361,6 +381,55 @@
                 normalizeFn(target);
               }
               markDirty(target);
+            });
+            refreshDupes();
+          });
+        });
+      }
+      function bindGridPaste(inputs) {
+        inputs.forEach(function (input) {
+          input.addEventListener("paste", function (event) {
+            var text = (event.clipboardData || window.clipboardData).getData("text");
+            if (!text || text.indexOf("\t") === -1) {
+              return;
+            }
+            event.preventDefault();
+            var rows = text.split(/\r?\n/).filter(function (line) { return line.length > 0; });
+            if (!rows.length) {
+              return;
+            }
+            var allRows = Array.from(document.querySelectorAll("#ips-bulk-form tbody tr"));
+            var startRow = input.closest("tr");
+            var startIndex = allRows.indexOf(startRow);
+            if (startIndex < 0) {
+              return;
+            }
+            var startCol = parseInt(input.getAttribute("data-col"), 10) || 0;
+            rows.forEach(function (rowText, rowOffset) {
+              var cols = rowText.split("\t");
+              var rowEl = allRows[startIndex + rowOffset];
+              if (!rowEl) {
+                return;
+              }
+              var cells = [
+                rowEl.querySelector(".equipamento-input"),
+                rowEl.querySelector(".descricao-input"),
+                rowEl.querySelector(".mac-input"),
+                rowEl.querySelector(".protocolo-input"),
+              ];
+              cols.forEach(function (value, colOffset) {
+                var target = cells[startCol + colOffset];
+                if (!target) {
+                  return;
+                }
+                target.value = value;
+                if (target.classList.contains("equipamento-input")) {
+                  normalizeEquip(target);
+                } else if (target.classList.contains("mac-input")) {
+                  normalizeMac(target);
+                }
+                markDirty(target);
+              });
             });
             refreshDupes();
           });
@@ -392,9 +461,11 @@
           data.set("action", "bulk_update_items");
           rows.forEach(function (row) {
             var nomeInput = row.querySelector(".equipamento-input");
+            var descInput = row.querySelector(".descricao-input");
             var macInput = row.querySelector(".mac-input");
             var protoInput = row.querySelector(".protocolo-input");
             var itemId = (nomeInput && nomeInput.getAttribute("data-item-id"))
+              || (descInput && descInput.getAttribute("data-item-id"))
               || (macInput && macInput.getAttribute("data-item-id"))
               || (protoInput && protoInput.getAttribute("data-item-id"));
             if (!itemId) {
@@ -402,6 +473,7 @@
             }
             data.append("item_id", itemId);
             data.set("nome_equipamento_" + itemId, nomeInput ? nomeInput.value : "");
+            data.set("descricao_" + itemId, descInput ? descInput.value : "");
             data.set("mac_" + itemId, macInput ? macInput.value : "");
             data.set("protocolo_" + itemId, protoInput ? protoInput.value : "");
           });
@@ -443,12 +515,24 @@
             markDirty(input);
           });
         });
+        var descInputs = document.querySelectorAll(".descricao-input");
+        descInputs.forEach(function (input) {
+          input.addEventListener("input", function () {
+            markDirty(input);
+          });
+        });
         bindEnterToSave(equipInputs);
+        bindEnterToSave(descInputs);
         bindEnterToSave(macInputs);
         bindEnterToSave(protoInputs);
         bindPaste(equipInputs, normalizeEquip);
+        bindPaste(descInputs);
         bindPaste(macInputs, normalizeMac);
         bindPaste(protoInputs);
+        bindGridPaste(equipInputs);
+        bindGridPaste(descInputs);
+        bindGridPaste(macInputs);
+        bindGridPaste(protoInputs);
         refreshDupes();
       }
       function ensureStyle() {

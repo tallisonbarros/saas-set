@@ -312,6 +312,7 @@ class ListaIPItem(models.Model):
     lista = models.ForeignKey(ListaIP, on_delete=models.CASCADE, related_name="ips")
     ip = models.GenericIPAddressField()
     nome_equipamento = models.CharField(max_length=120, blank=True)
+    descricao = models.CharField(max_length=200, blank=True)
     mac = models.CharField(
         max_length=30,
         blank=True,

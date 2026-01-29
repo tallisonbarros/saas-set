@@ -330,6 +330,14 @@ def _is_parcela_valid(value):
     return bool(_parse_parcela(value))
 
 
+def _normalize_channel_tag(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    value = re.sub(r"\s+", "_", value)
+    return value.upper()
+
+
 def _ip_range_values(start, end, limit=2048):
     try:
         start_ip = ipaddress.ip_address((start or "").strip())
@@ -1949,15 +1957,17 @@ def lista_ip_detail(request, pk):
                 if not item:
                     continue
                 nome_raw = request.POST.get(f"nome_equipamento_{item_id}", "").strip()
+                descricao_raw = request.POST.get(f"descricao_{item_id}", "").strip()
                 mac_raw = request.POST.get(f"mac_{item_id}", "").strip()
                 protocolo_raw = request.POST.get(f"protocolo_{item_id}", "").strip()
                 item.nome_equipamento = nome_raw
+                item.descricao = descricao_raw
                 item.mac = mac_raw
                 item.protocolo = protocolo_raw
             if items_map:
                 ListaIPItem.objects.bulk_update(
                     items_map.values(),
-                    ["nome_equipamento", "mac", "protocolo"],
+                    ["nome_equipamento", "descricao", "mac", "protocolo"],
                 )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"ok": True, "updated": len(items_map)})
@@ -1966,9 +1976,10 @@ def lista_ip_detail(request, pk):
             item_id = request.POST.get("item_id")
             item = get_object_or_404(ListaIPItem, pk=item_id, lista=lista)
             item.nome_equipamento = request.POST.get("nome_equipamento", "").strip()
+            item.descricao = request.POST.get("descricao", "").strip()
             item.mac = request.POST.get("mac", "").strip()
             item.protocolo = request.POST.get("protocolo", "").strip()
-            item.save(update_fields=["nome_equipamento", "mac", "protocolo"])
+            item.save(update_fields=["nome_equipamento", "descricao", "mac", "protocolo"])
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"ok": True})
             return redirect("lista_ip_detail", pk=lista.pk)
@@ -1979,6 +1990,7 @@ def lista_ip_detail(request, pk):
         items = items.filter(
             Q(ip__icontains=search_term)
             | Q(nome_equipamento__icontains=search_term)
+            | Q(descricao__icontains=search_term)
             | Q(mac__icontains=search_term)
             | Q(protocolo__icontains=search_term)
         )
@@ -2695,14 +2707,61 @@ def ios_rack_modulo_detail(request, pk):
                 if nome_raw is None:
                     continue
                 if tag_raw is not None:
-                    channel.tag = "".join(tag_raw.split()).upper()
+                    channel.tag = _normalize_channel_tag(tag_raw)
                 channel.nome = nome_raw.strip()
                 if tipo_id:
                     channel.tipo_id = tipo_id
                 channel.comissionado = comissionado
                 channel.save(update_fields=["tag", "nome", "tipo_id", "comissionado"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
-    channels = module.canais.select_related("tipo", "ativo", "ativo_item").order_by("indice")
+        if action == "bulk_update_channels":
+            channel_ids = request.POST.getlist("channel_id")
+            channels_qs = module.canais.filter(id__in=channel_ids)
+            channels_map = {str(channel.id): channel for channel in channels_qs}
+            for channel_id in channel_ids:
+                channel = channels_map.get(channel_id)
+                if not channel:
+                    continue
+                tag_raw = request.POST.get(f"tag_{channel_id}", "")
+                nome_raw = request.POST.get(f"nome_{channel_id}", "")
+                tipo_id = request.POST.get(f"tipo_{channel_id}")
+                comissionado = request.POST.get(f"comissionado_{channel_id}") == "on"
+                channel.tag = _normalize_channel_tag(tag_raw)
+                channel.nome = (nome_raw or "").strip()
+                if tipo_id:
+                    channel.tipo_id = tipo_id
+                channel.comissionado = comissionado
+            if channels_map:
+                CanalRackIO.objects.bulk_update(
+                    channels_map.values(),
+                    ["tag", "nome", "tipo_id", "comissionado"],
+                )
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "updated": len(channels_map)})
+            return redirect("ios_rack_modulo_detail", pk=module.pk)
+        if action == "inline_update_channel":
+            channel_id = request.POST.get("channel_id")
+            channel = get_object_or_404(module.canais, pk=channel_id)
+            tag_raw = request.POST.get("tag", "")
+            nome_raw = request.POST.get("nome", "")
+            tipo_id = request.POST.get("tipo")
+            comissionado = request.POST.get("comissionado") == "on"
+            channel.tag = _normalize_channel_tag(tag_raw)
+            channel.nome = (nome_raw or "").strip()
+            if tipo_id:
+                channel.tipo_id = tipo_id
+            channel.comissionado = comissionado
+            channel.save(update_fields=["tag", "nome", "tipo_id", "comissionado"])
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True})
+            return redirect("ios_rack_modulo_detail", pk=module.pk)
+    channels = list(module.canais.select_related("tipo", "ativo", "ativo_item").order_by("indice"))
+    tag_counts = {}
+    for channel in channels:
+        tag_key = (channel.tag or "").strip().upper()
+        if tag_key:
+            tag_counts[tag_key] = tag_counts.get(tag_key, 0) + 1
+    tags_repetidas = {key for key, count in tag_counts.items() if count > 1}
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     vacant_slots = RackSlotIO.objects.filter(rack=module.rack, modulo__isnull=True).order_by("posicao")
     rack_slots = (
@@ -2717,6 +2776,7 @@ def ios_rack_modulo_detail(request, pk):
             "module": module,
             "channels": channels,
             "channel_types": channel_types,
+            "tags_repetidas": tags_repetidas,
             "rack": module.rack,
             "slot": slot,
             "vacant_slots": vacant_slots,

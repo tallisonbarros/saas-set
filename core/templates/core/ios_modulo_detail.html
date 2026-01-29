@@ -106,22 +106,42 @@
         <div class="channel-col">Tipo</div>
       </div>
       {% for channel in channels %}
-        <div class="channel-row">
+        <div class="channel-row" data-channel-id="{{ channel.id }}">
           <div class="channel-index">Canal {{ channel.indice }}</div>
           <label class="toggle-chip toggle-chip-compact">
-            <input type="checkbox" name="comissionado_{{ channel.id }}" {% if channel.comissionado %}checked{% endif %}>
+            <input
+              type="checkbox"
+              name="comissionado_{{ channel.id }}"
+              class="channel-comm-input"
+              data-channel-id="{{ channel.id }}"
+              {% if channel.comissionado %}checked{% endif %}
+            >
           </label>
           <label class="field channel-field">
             <span>Tag</span>
-            <input type="text" name="tag_{{ channel.id }}" value="{{ channel.tag }}" class="channel-tag-input" placeholder="TAG">
+            <input
+              type="text"
+              name="tag_{{ channel.id }}"
+              value="{{ channel.tag }}"
+              class="channel-tag-input{% if channel.tag and channel.tag|upper in tags_repetidas %} field-dup{% endif %}"
+              placeholder="TAG"
+              data-dup-type="tag"
+              data-channel-id="{{ channel.id }}"
+            >
           </label>
           <label class="field channel-field">
             <span>Descricao</span>
-            <input type="text" name="nome_{{ channel.id }}" value="{{ channel.nome }}">
+            <input
+              type="text"
+              name="nome_{{ channel.id }}"
+              value="{{ channel.nome }}"
+              class="channel-desc-input"
+              data-channel-id="{{ channel.id }}"
+            >
           </label>
           <label class="field channel-field">
             <span>Tipo</span>
-            <select name="tipo_{{ channel.id }}" class="channel-type-select">
+            <select name="tipo_{{ channel.id }}" class="channel-type-select" data-channel-id="{{ channel.id }}">
             {% for channel_type in channel_types %}
               <option value="{{ channel_type.id }}" {% if channel_type.id == channel.tipo.id %}selected{% endif %}>
                 {{ channel_type.nome }}
@@ -178,21 +198,275 @@
 
   <script>
     (function () {
-      var inputs = document.querySelectorAll(".channel-tag-input");
-      function normalize(value) {
-        return (value || "").replace(/\s+/g, "").toUpperCase();
+      function normalizeTag(value) {
+        return (value || "").trim().replace(/\s+/g, "_").toUpperCase();
       }
-      inputs.forEach(function (input) {
-        input.addEventListener("input", function () {
-          var next = normalize(input.value);
-          if (next !== input.value) {
-            input.value = next;
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function markDirty(input) {
+        var row = input.closest(".channel-row");
+        if (row) {
+          row.setAttribute("data-dirty", "1");
+        }
+      }
+      function showRowToast(row, text) {
+        if (!row) {
+          return;
+        }
+        row.style.position = "relative";
+        var toast = row.querySelector(".row-toast");
+        if (!toast) {
+          toast = document.createElement("span");
+          toast.className = "row-toast";
+          row.appendChild(toast);
+        }
+        toast.textContent = text || "Salvo";
+        row.classList.add("show-toast");
+        clearTimeout(row._toastTimer);
+        row._toastTimer = setTimeout(function () {
+          row.classList.remove("show-toast");
+        }, 1200);
+      }
+      function postInlineSave(row) {
+        if (!row) {
+          return;
+        }
+        var tagInput = row.querySelector(".channel-tag-input");
+        var descInput = row.querySelector(".channel-desc-input");
+        var typeSelect = row.querySelector(".channel-type-select");
+        var commInput = row.querySelector(".channel-comm-input");
+        var channelId = row.getAttribute("data-channel-id");
+        if (!channelId) {
+          return;
+        }
+        var data = new FormData();
+        data.set("action", "inline_update_channel");
+        data.set("channel_id", channelId);
+        data.set("tag", tagInput ? tagInput.value : "");
+        data.set("nome", descInput ? descInput.value : "");
+        data.set("tipo", typeSelect ? typeSelect.value : "");
+        if (commInput && commInput.checked) {
+          data.set("comissionado", "on");
+        }
+        fetch(window.location.pathname + window.location.search, {
+          method: "POST",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCookie("csrftoken"),
+          },
+          body: data,
+        }).then(function () {
+          row.removeAttribute("data-dirty");
+          showRowToast(row, "Salvo");
+        });
+      }
+      function refreshDupes() {
+        var inputs = document.querySelectorAll(".channel-tag-input");
+        var counts = {};
+        inputs.forEach(function (input) {
+          var value = (input.value || "").trim().toUpperCase();
+          if (!value) {
+            return;
+          }
+          counts[value] = (counts[value] || 0) + 1;
+        });
+        inputs.forEach(function (input) {
+          var value = (input.value || "").trim().toUpperCase();
+          var isDup = value && counts[value] > 1;
+          input.classList.toggle("field-dup", isDup);
+          if (isDup) {
+            input.setAttribute("title", "TAG repetida");
+          } else {
+            input.removeAttribute("title");
           }
         });
-        input.addEventListener("blur", function () {
-          input.value = normalize(input.value);
+      }
+      function bindPaste(inputs, normalizeFn) {
+        inputs.forEach(function (input) {
+          input.addEventListener("paste", function (event) {
+            var text = (event.clipboardData || window.clipboardData).getData("text");
+            if (!text || text.indexOf("\n") === -1 || text.indexOf("\t") !== -1) {
+              return;
+            }
+            event.preventDefault();
+            var lines = text.split(/\r?\n/).filter(function (line) { return line.length > 0; });
+            if (!lines.length) {
+              return;
+            }
+            var all = Array.from(inputs);
+            var startIndex = all.indexOf(input);
+            if (startIndex < 0) {
+              return;
+            }
+            lines.forEach(function (line, idx) {
+              var target = all[startIndex + idx];
+              if (!target) {
+                return;
+              }
+              target.value = line;
+              if (normalizeFn) {
+                target.value = normalizeFn(target.value);
+              }
+              markDirty(target);
+            });
+            refreshDupes();
+          });
         });
-      });
+      }
+      function bindGridPaste(tagInputs) {
+        tagInputs.forEach(function (input) {
+          input.addEventListener("paste", function (event) {
+            var text = (event.clipboardData || window.clipboardData).getData("text");
+            if (!text || text.indexOf("\t") === -1) {
+              return;
+            }
+            event.preventDefault();
+            var rows = text.split(/\r?\n/).filter(function (line) { return line.length > 0; });
+            if (!rows.length) {
+              return;
+            }
+            var allRows = Array.from(document.querySelectorAll(".channel-row"));
+            var startRow = input.closest(".channel-row");
+            var startIndex = allRows.indexOf(startRow);
+            if (startIndex < 0) {
+              return;
+            }
+            rows.forEach(function (rowText, rowOffset) {
+              var columns = rowText.split("\t");
+              var rowEl = allRows[startIndex + rowOffset];
+              if (!rowEl) {
+                return;
+              }
+              var tagInput = rowEl.querySelector(".channel-tag-input");
+              var descInput = rowEl.querySelector(".channel-desc-input");
+              if (tagInput && columns[0] !== undefined) {
+                tagInput.value = normalizeTag(columns[0]);
+                markDirty(tagInput);
+              }
+              if (descInput && columns[1] !== undefined) {
+                descInput.value = columns[1];
+                markDirty(descInput);
+              }
+            });
+            refreshDupes();
+          });
+        });
+      }
+      function bindEnterToSave(inputs) {
+        inputs.forEach(function (input) {
+          input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              var row = input.closest(".channel-row");
+              postInlineSave(row);
+            }
+          });
+        });
+      }
+      function bindBulkSubmit() {
+        var form = document.querySelector(".channel-form");
+        if (!form) {
+          return;
+        }
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var rows = Array.from(form.querySelectorAll(".channel-row[data-dirty='1']"));
+          if (!rows.length) {
+            return;
+          }
+          var data = new FormData();
+          data.set("action", "bulk_update_channels");
+          rows.forEach(function (row) {
+            var channelId = row.getAttribute("data-channel-id");
+            if (!channelId) {
+              return;
+            }
+            var tagInput = row.querySelector(".channel-tag-input");
+            var descInput = row.querySelector(".channel-desc-input");
+            var typeSelect = row.querySelector(".channel-type-select");
+            var commInput = row.querySelector(".channel-comm-input");
+            data.append("channel_id", channelId);
+            data.set("tag_" + channelId, tagInput ? tagInput.value : "");
+            data.set("nome_" + channelId, descInput ? descInput.value : "");
+            data.set("tipo_" + channelId, typeSelect ? typeSelect.value : "");
+            if (commInput && commInput.checked) {
+              data.set("comissionado_" + channelId, "on");
+            }
+          });
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          }).then(function () {
+            rows.forEach(function (row) {
+              row.removeAttribute("data-dirty");
+              showRowToast(row, "Salvo");
+            });
+          });
+        });
+      }
+      function bindInputs() {
+        var tagInputs = document.querySelectorAll(".channel-tag-input");
+        tagInputs.forEach(function (input) {
+          input.addEventListener("input", function () {
+            var next = normalizeTag(input.value);
+            if (next !== input.value) {
+              input.value = next;
+            }
+            markDirty(input);
+            refreshDupes();
+          });
+          input.addEventListener("blur", function () {
+            input.value = normalizeTag(input.value);
+            refreshDupes();
+          });
+          input.value = normalizeTag(input.value);
+        });
+        var descInputs = document.querySelectorAll(".channel-desc-input");
+        descInputs.forEach(function (input) {
+          input.addEventListener("input", function () {
+            markDirty(input);
+          });
+        });
+        var typeSelects = document.querySelectorAll(".channel-type-select");
+        typeSelects.forEach(function (select) {
+          select.addEventListener("change", function () {
+            markDirty(select);
+          });
+        });
+        var commInputs = document.querySelectorAll(".channel-comm-input");
+        commInputs.forEach(function (input) {
+          input.addEventListener("change", function () {
+            markDirty(input);
+          });
+        });
+        bindEnterToSave(tagInputs);
+        bindEnterToSave(descInputs);
+        bindPaste(tagInputs, normalizeTag);
+        bindPaste(descInputs);
+        bindGridPaste(tagInputs);
+        refreshDupes();
+      }
+      function ensureStyle() {
+        var style = document.createElement("style");
+        style.textContent = ".field-dup{border-color:#d04b3b;box-shadow:0 0 0 1px rgba(208,75,59,.15)}"
+          + ".row-toast{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#1f6f3d;color:#fff;"
+          + "padding:4px 8px;border-radius:999px;font-size:12px;opacity:0;transition:opacity .2s ease}"
+          + ".channel-row.show-toast .row-toast{opacity:1}";
+        document.head.appendChild(style);
+      }
+      ensureStyle();
+      bindInputs();
+      bindBulkSubmit();
     })();
   </script>
 

@@ -136,8 +136,8 @@ class ListaIPAdmin(admin.ModelAdmin):
 
 @admin.register(ListaIPItem)
 class ListaIPItemAdmin(admin.ModelAdmin):
-    list_display = ("ip", "lista", "nome_equipamento", "mac", "protocolo")
-    search_fields = ("ip", "lista__nome", "nome_equipamento", "mac", "protocolo")
+    list_display = ("ip", "lista", "nome_equipamento", "descricao", "mac", "protocolo")
+    search_fields = ("ip", "lista__nome", "nome_equipamento", "descricao", "mac", "protocolo")
 
 
 @admin.register(RadarID)
