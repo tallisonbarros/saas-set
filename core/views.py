@@ -42,6 +42,7 @@ from .models import (
     ListaIPItem,
     App,
     IngestRecord,
+    AdminAccessLog,
     Radar,
     RadarAtividade,
     RadarClassificacao,
@@ -4355,6 +4356,29 @@ def admin_explorar(request):
             "cliente_sort": cliente_sort,
             "proposta_status": proposta_status,
             "proposta_sort": proposta_sort,
+        },
+    )
+
+
+@login_required
+def admin_logs(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    user_q = request.GET.get("user", "").strip()
+    module_q = request.GET.get("module", "").strip()
+    logs_qs = AdminAccessLog.objects.select_related("user").all()
+    if user_q:
+        logs_qs = logs_qs.filter(user__username__icontains=user_q)
+    if module_q:
+        logs_qs = logs_qs.filter(module__icontains=module_q)
+    logs = logs_qs.order_by("-created_at")[:500]
+    return render(
+        request,
+        "core/admin_logs.html",
+        {
+            "logs": logs,
+            "user_q": user_q,
+            "module_q": module_q,
         },
     )
 
