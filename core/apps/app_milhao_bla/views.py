@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render
 
@@ -81,6 +82,9 @@ def dashboard(request):
             value = float(value) if value is not None else None
         except (TypeError, ValueError):
             value = None
+        ingest_dt = record.created_at
+        if ingest_dt and timezone.is_aware(ingest_dt):
+            ingest_dt = timezone.localtime(ingest_dt)
         entries.append(
             {
                 "balance": balance_name,
@@ -88,6 +92,8 @@ def dashboard(request):
                 "datetime": dt,
                 "date": dt.date(),
                 "hour": dt.strftime("%H:%M"),
+                "ingest_datetime": ingest_dt,
+                "ingest_time": ingest_dt.strftime("%H:%M") if ingest_dt else None,
                 "value": value,
                 "value_display": _format_kg(value),
             }
@@ -130,9 +136,10 @@ def dashboard(request):
     last_by_balance = {}
     for item in filtered:
         balance = item["balance"]
+        ingest_dt = item.get("ingest_datetime") or item["datetime"]
         current = last_by_balance.get(balance)
-        if not current or item["datetime"] > current:
-            last_by_balance[balance] = item["datetime"]
+        if ingest_dt and (not current or ingest_dt > current):
+            last_by_balance[balance] = ingest_dt
     last_ingests = [
         {
             "balance": balance,
