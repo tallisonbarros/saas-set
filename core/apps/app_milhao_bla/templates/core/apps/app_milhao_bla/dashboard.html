@@ -242,6 +242,13 @@
       <div>
         <h2 class="io-title">Leituras por hora</h2>
         <p class="muted">Valores acumulados recebidos ao longo do dia.</p>
+        {% if last_ingests %}
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+            {% for item in last_ingests %}
+              <span class="panel-tag">Ultima {{ item.label }}: {{ item.time }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
       </div>
     </div>
     {% if entries %}

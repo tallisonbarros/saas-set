@@ -127,6 +127,21 @@ def dashboard(request):
         and (not selected_balances or item["balance"] in selected_balances)
     ]
 
+    last_by_balance = {}
+    for item in filtered:
+        balance = item["balance"]
+        current = last_by_balance.get(balance)
+        if not current or item["datetime"] > current:
+            last_by_balance[balance] = item["datetime"]
+    last_ingests = [
+        {
+            "balance": balance,
+            "label": balance_labels.get(balance, balance),
+            "time": last_by_balance[balance].strftime("%H:%M"),
+        }
+        for balance in sorted(last_by_balance.keys())
+    ]
+
     prev_date = None
     next_date = None
     if selected_date and dates:
@@ -252,5 +267,6 @@ def dashboard(request):
             "composition": composition,
             "prev_date": prev_date,
             "next_date": next_date,
+            "last_ingests": last_ingests,
         },
     )
