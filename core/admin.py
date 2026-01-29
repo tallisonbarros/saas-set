@@ -10,6 +10,7 @@ from .models import (
     CategoriaCompra,
     Caderno,
     CentroCusto,
+    AdminAccessLog,
     PerfilUsuario,
     Inventario,
     InventarioID,
@@ -270,3 +271,11 @@ class CompraAdmin(admin.ModelAdmin):
             total += (item.valor or 0) * (item.quantidade or 0)
         return total
     total_itens.short_description = "Total"
+
+
+@admin.register(AdminAccessLog)
+class AdminAccessLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "user", "module")
+    list_filter = ("module",)
+    search_fields = ("user__username", "module")
+    ordering = ("-created_at",)

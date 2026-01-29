@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.utils import timezone
@@ -753,3 +754,26 @@ class IngestRecord(models.Model):
 
     def __str__(self):
         return self.source_id
+
+
+class AdminAccessLog(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="admin_access_logs",
+    )
+    module = models.CharField(max_length=120)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["module", "created_at"]),
+        ]
+
+    def __str__(self):
+        user_label = self.user.username if self.user else "anon"
+        return f"{user_label} - {self.module}"
