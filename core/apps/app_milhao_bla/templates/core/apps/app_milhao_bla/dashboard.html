@@ -273,6 +273,9 @@
                 <td>
                   <div>{{ item.label }}</div>
                   <div class="muted">{{ item.balance }}</div>
+                  {% if debug_ingest and item.ingest_time %}
+                    <div class="muted">Recebido: {{ item.ingest_time }}</div>
+                  {% endif %}
                 </td>
                 <td>{% if item.value_display %}{{ item.value_display }} kg{% else %}-{% endif %}</td>
               </tr>

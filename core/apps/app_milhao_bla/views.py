@@ -104,6 +104,7 @@ def dashboard(request):
     balances = sorted({item["balance"] for item in entries})
 
     selected_date_raw = request.GET.get("date", "")
+    debug_ingest = request.GET.get("debug_ingest") == "1"
     selected_balance_raw = request.GET.getlist("balance")
     if not selected_balance_raw:
         selected_balance_raw = request.GET.get("balance", "").split(",")
@@ -275,5 +276,6 @@ def dashboard(request):
             "prev_date": prev_date,
             "next_date": next_date,
             "last_ingests": last_ingests,
+            "debug_ingest": debug_ingest,
         },
     )
