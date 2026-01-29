@@ -21,7 +21,7 @@
         <div class="hud-title">Painel da compra</div>
         <div class="hud-pill">Nova compra</div>
         <div class="hud-menu" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'financeiro' %}">Inicio do modulo</a>
+          <a class="hud-menu-pill" href="{% url 'financeiro' %}">Financeiro</a>
         </div>
       </div>
       <div class="page-hud-head">
@@ -53,16 +53,16 @@
           </div>
           <div class="field">
             <label>Nome</label>
-            <input type="text" name="nome" placeholder="Compra de insumos">
+            <input type="text" name="nome" placeholder="Compra de insumos" value="{{ initial.nome }}">
           </div>
           <div class="field">
             <label>Descricao</label>
-            <textarea name="descricao" rows="3"></textarea>
+            <textarea name="descricao" rows="3">{{ initial.descricao }}</textarea>
           </div>
           <div class="finance-form-grid">
             <div class="field">
               <label>Data</label>
-              <input type="date" name="data">
+              <input type="date" name="data" value="{{ initial.data }}">
             </div>
             <div class="field">
               <div class="field-row">
@@ -79,7 +79,7 @@
               <select name="categoria" id="categoria-select">
                 <option value="">Selecione</option>
                 {% for c in categorias %}
-                  <option value="{{ c.id }}">{{ c.nome }}</option>
+                  <option value="{{ c.id }}" {% if initial.categoria_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -100,7 +100,7 @@
               <select name="centro_custo" id="centro-select">
                 <option value="">Selecione</option>
                 {% for c in centros %}
-                  <option value="{{ c.id }}">{{ c.nome }}</option>
+                  <option value="{{ c.id }}" {% if initial.centro_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -113,30 +113,54 @@
               <span class="muted">Item</span>
               <span class="muted">Qtd.</span>
               <span class="muted">Valor</span>
+              <span class="muted">Parcela</span>
               <span class="muted">Tipo</span>
               <span class="muted">Pago</span>
               <span class="muted">Acao</span>
             </div>
             <div id="item-list" class="stack">
-              <div class="item-grid">
-                <input type="text" name="item_nome_0" placeholder="Descricao do item">
-                <input type="number" name="item_quantidade_0" min="1" placeholder="1">
-                <input type="text" name="item_valor_0" placeholder="0,00">
-                <select name="item_tipo_0">
-                  <option value="">Selecione</option>
-                  {% for t in tipos %}
-                    <option value="{{ t.id }}">{{ t.nome }}</option>
-                  {% endfor %}
-                </select>
-                <label class="checkbox-item">
-                  <input type="checkbox" name="item_pago_0">
-                  <span>Pago</span>
-                </label>
-                <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
-              </div>
+              {% if initial.itens %}
+                {% for item in initial.itens %}
+                  <div class="item-grid">
+                    <input type="text" name="item_nome_{{ forloop.counter0 }}" placeholder="Descricao do item" value="{{ item.nome }}">
+                    <input type="number" name="item_quantidade_{{ forloop.counter0 }}" min="1" placeholder="1" value="{{ item.quantidade }}">
+                    <input type="text" name="item_valor_{{ forloop.counter0 }}" placeholder="0,00" value="{{ item.valor|default_if_none:'' }}">
+                    <input type="text" name="item_parcela_{{ forloop.counter0 }}" placeholder="1/1" value="{{ item.parcela|default:'1/1' }}">
+                    <select name="item_tipo_{{ forloop.counter0 }}">
+                      <option value="">Selecione</option>
+                      {% for t in tipos %}
+                        <option value="{{ t.id }}" {% if item.tipo and item.tipo.id == t.id %}selected{% endif %}>{{ t.nome }}</option>
+                      {% endfor %}
+                    </select>
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="item_pago_{{ forloop.counter0 }}" {% if item.pago %}checked{% endif %}>
+                      <span>Pago</span>
+                    </label>
+                    <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="item-grid">
+                  <input type="text" name="item_nome_0" placeholder="Descricao do item">
+                  <input type="number" name="item_quantidade_0" min="1" placeholder="1">
+                  <input type="text" name="item_valor_0" placeholder="0,00">
+                  <input type="text" name="item_parcela_0" placeholder="1/1" value="1/1">
+                  <select name="item_tipo_0">
+                    <option value="">Selecione</option>
+                    {% for t in tipos %}
+                      <option value="{{ t.id }}">{{ t.nome }}</option>
+                    {% endfor %}
+                  </select>
+                  <label class="checkbox-item">
+                    <input type="checkbox" name="item_pago_0">
+                    <span>Pago</span>
+                  </label>
+                  <button class="btn btn-ghost btn-compact item-remove" type="button">Remover</button>
+                </div>
+              {% endif %}
             </div>
           </div>
-          <input type="hidden" id="total_items" name="total_items" value="1">
+          <input type="hidden" id="total_items" name="total_items" value="{% if initial.itens %}{{ initial.itens|length }}{% else %}1{% endif %}">
           <button class="btn btn-ghost" type="button" id="add-item">Novo item</button>
         </div>
         <button class="btn btn-primary" type="submit">Registrar</button>
@@ -243,6 +267,7 @@
           row.querySelector("input[name^='item_nome_']").name = "item_nome_" + index;
           row.querySelector("input[name^='item_quantidade_']").name = "item_quantidade_" + index;
           row.querySelector("input[name^='item_valor_']").name = "item_valor_" + index;
+          row.querySelector("input[name^='item_parcela_']").name = "item_parcela_" + index;
           row.querySelector("select[name^='item_tipo_']").name = "item_tipo_" + index;
           row.querySelector("input[name^='item_pago_']").name = "item_pago_" + index;
         });
@@ -271,6 +296,7 @@
           '<input type="text" name="item_nome_' + index + '" placeholder="Descricao do item">' +
           '<input type="number" name="item_quantidade_' + index + '" min="1" placeholder="1">' +
           '<input type="text" name="item_valor_' + index + '" placeholder="0,00">' +
+          '<input type="text" name="item_parcela_' + index + '" placeholder="1/1" value="1/1">' +
           '<select name="item_tipo_' + index + '">' +
           '<option value="">Selecione</option>' +
           '{% for t in tipos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}' +
@@ -292,12 +318,14 @@
             var nome = row.querySelector("input[name^='item_nome_']");
             var quantidade = row.querySelector("input[name^='item_quantidade_']");
             var valor = row.querySelector("input[name^='item_valor_']");
+            var parcela = row.querySelector("input[name^='item_parcela_']");
             var tipo = row.querySelector("select[name^='item_tipo_']");
             var pago = row.querySelector("input[name^='item_pago_']");
             var hasAny =
               (nome && nome.value.trim()) ||
               (quantidade && quantidade.value.trim()) ||
               (valor && valor.value.trim()) ||
+              (parcela && parcela.value.trim()) ||
               (tipo && tipo.value) ||
               (pago && pago.checked);
             if (hasAny && nome && !nome.value.trim()) {

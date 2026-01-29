@@ -785,25 +785,51 @@ def ios_list(request):
     grupos = GrupoRackIO.objects.order_by("nome")
     grupos = GrupoRackIO.objects.order_by("nome")
     search_term = request.GET.get("q", "").strip()
+    rack_filter = request.GET.get("rack", "").strip()
     search_results = []
     search_count = 0
-    if search_term:
+    if search_term or rack_filter:
         slot_pos_subquery = RackSlotIO.objects.filter(modulo_id=OuterRef("modulo_id")).values("posicao")[:1]
         search_filter = (
             Q(nome__icontains=search_term)
             | Q(modulo__nome__icontains=search_term)
             | Q(modulo__modulo_modelo__nome__icontains=search_term)
             | Q(modulo__rack__nome__icontains=search_term)
+            | Q(ativo__tag_set__icontains=search_term)
+            | Q(ativo_item__tag_set__icontains=search_term)
         )
+        channels = CanalRackIO.objects.filter(modulo__rack__in=racks)
+        if rack_filter and rack_filter.isdigit():
+            channels = channels.filter(modulo__rack_id=int(rack_filter))
+        if search_term:
+            channels = channels.filter(search_filter)
         channels = (
-            CanalRackIO.objects.filter(modulo__rack__in=racks)
-            .filter(search_filter)
-            .select_related("modulo", "modulo__rack", "modulo__modulo_modelo", "tipo")
+            channels.select_related("modulo", "modulo__rack", "modulo__modulo_modelo", "tipo")
             .annotate(slot_pos=Subquery(slot_pos_subquery))
             .order_by("modulo__rack__nome", "slot_pos", "indice")[:200]
         )
         search_results = list(channels)
         search_count = len(search_results)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        payload = []
+        for channel in search_results:
+            payload.append(
+                {
+                    "rack": channel.modulo.rack.nome,
+                    "slot": f"S{channel.slot_pos}" if channel.slot_pos else "-",
+                    "modulo": channel.modulo.nome or channel.modulo.modulo_modelo.nome,
+                    "canal": f"CH{channel.indice:02d}",
+                    "canal_nome": channel.nome or "Sem nome",
+                    "tipo": channel.tipo.nome,
+                    "url": reverse("ios_rack_modulo_detail", kwargs={"pk": channel.modulo.id}),
+                }
+            )
+        return JsonResponse(
+            {
+                "count": search_count,
+                "results": payload,
+            }
+        )
     return render(
         request,
         "core/ios_list.html",
@@ -813,6 +839,7 @@ def ios_list(request):
             "channel_types": channel_types,
             "can_manage": bool(cliente),
             "search_term": search_term,
+            "rack_filter": rack_filter,
             "search_results": search_results,
             "search_count": search_count,
             "inventarios": inventarios_qs.order_by("nome"),
@@ -3461,6 +3488,7 @@ def financeiro_nova(request):
     if not cliente and not request.user.is_staff:
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
+    from_compra_id = request.GET.get("from_compra")
     message = request.GET.get("msg", "").strip()
     message_level = request.GET.get("level", "").strip() or "info"
     open_cadastro = request.GET.get("cadastro", "").strip()
@@ -3546,14 +3574,24 @@ def financeiro_nova(request):
                 item_nome = request.POST.get(f"item_nome_{idx}", "").strip()
                 item_valor = request.POST.get(f"item_valor_{idx}", "").replace(",", ".").strip()
                 item_quantidade = request.POST.get(f"item_quantidade_{idx}", "").strip()
+                item_parcela = request.POST.get(f"item_parcela_{idx}", "").strip()
                 item_tipo = request.POST.get(f"item_tipo_{idx}")
                 item_pago = request.POST.get(f"item_pago_{idx}") == "on"
                 if item_nome:
+                    if item_parcela and not _is_parcela_valid(item_parcela):
+                        msg = "Parcela invalida. Use 01/36 ou 1/-."
+                        params = {"msg": msg, "level": "error"}
+                        if caderno_id:
+                            params["caderno_id"] = caderno_id
+                        if from_compra_id:
+                            params["from_compra"] = from_compra_id
+                        return redirect(f"{reverse('financeiro_nova')}?{urlencode(params)}")
                     itens_payload.append(
                         {
                             "nome": item_nome,
                             "valor": item_valor,
                             "quantidade": item_quantidade,
+                            "parcela": item_parcela,
                             "tipo_id": item_tipo,
                             "pago": item_pago,
                         }
@@ -3599,11 +3637,13 @@ def financeiro_nova(request):
                     except ValueError:
                         quantidade = 1
                     quantidade = max(1, quantidade)
+                    parcela = _normalize_parcela(item["parcela"], "1/1")
                     CompraItem.objects.create(
                         compra=compra,
                         nome=item["nome"],
                         valor=valor,
                         quantidade=quantidade,
+                        parcela=parcela,
                         tipo_id=item["tipo_id"] or None,
                         pago=item["pago"],
                     )
@@ -3618,6 +3658,34 @@ def financeiro_nova(request):
     centros = CentroCusto.objects.order_by("nome")
     tipos = TipoCompra.objects.order_by("nome")
     selected_caderno_id = request.GET.get("caderno_id") or ""
+    initial = {
+        "nome": "",
+        "descricao": "",
+        "data": "",
+        "categoria_id": "",
+        "centro_id": "",
+        "itens": [],
+    }
+    if from_compra_id:
+        compra_qs = Compra.objects.filter(pk=from_compra_id)
+        if not request.user.is_staff:
+            compra_qs = compra_qs.filter(
+                Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())
+            )
+        compra_ref = (
+            compra_qs.select_related("categoria", "centro_custo", "caderno")
+            .prefetch_related("itens")
+            .first()
+        )
+        if compra_ref:
+            selected_caderno_id = str(compra_ref.caderno_id or selected_caderno_id)
+            base_nome = compra_ref.nome or compra_ref.descricao or "Compra"
+            initial["nome"] = f"COPIA {base_nome}".strip()
+            initial["descricao"] = compra_ref.descricao or ""
+            initial["data"] = compra_ref.data.strftime("%Y-%m-%d") if compra_ref.data else ""
+            initial["categoria_id"] = str(compra_ref.categoria_id or "")
+            initial["centro_id"] = str(compra_ref.centro_custo_id or "")
+            initial["itens"] = list(compra_ref.itens.all())
 
     return render(
         request,
@@ -3629,6 +3697,7 @@ def financeiro_nova(request):
             "centros": centros,
             "tipos": tipos,
             "selected_caderno_id": str(selected_caderno_id),
+            "initial": initial,
             "message": message,
             "message_level": message_level,
             "open_cadastro": open_cadastro,

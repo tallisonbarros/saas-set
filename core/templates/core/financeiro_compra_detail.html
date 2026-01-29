@@ -21,10 +21,16 @@
         <div class="hud-title">Painel da compra</div>
         <div class="hud-pill">Resumo</div>
         <div class="hud-menu" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'financeiro' %}">Inicio do modulo</a>
+          <a class="hud-menu-pill" href="{% url 'financeiro' %}">Financeiro</a>
           {% if compra.caderno %}
-            <a class="hud-menu-pill" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Voltar</a>
+            <a class="hud-menu-pill" href="{% url 'financeiro_caderno_detail' compra.caderno.id %}">Caderno</a>
           {% endif %}
+          {% if compra.caderno %}
+            <a class="hud-menu-pill" href="{% url 'financeiro_nova' %}?caderno_id={{ compra.caderno.id }}">Nova</a>
+          {% else %}
+            <a class="hud-menu-pill" href="{% url 'financeiro_nova' %}">Nova</a>
+          {% endif %}
+          <a class="hud-menu-pill" href="{% url 'financeiro_nova' %}?from_compra={{ compra.id }}">Duplicar</a>
         </div>
       </div>
       <div class="page-hud-head">

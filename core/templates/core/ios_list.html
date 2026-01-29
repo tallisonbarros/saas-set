@@ -207,7 +207,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Pesquisa de I/Os</h2>
-          <p class="muted">Busque por rack, modulo ou canal.</p>
+          <p class="muted">Busque por rack, modulo, canal ou TAG.</p>
         </div>
       </div>
       <form class="io-search-form" method="get">
@@ -216,17 +216,29 @@
             <span>Pesquisar</span>
             <input type="text" name="q" value="{{ search_term }}" placeholder="Ex: Rack Principal, Modulo A, Canal 05" autocomplete="off">
           </label>
+          <label class="field io-search-field">
+            <span>Rack</span>
+            <select name="rack" id="io-search-rack">
+              <option value="">Todos</option>
+              {% for rack in racks %}
+                <option value="{{ rack.id }}" {% if rack_filter == rack.id|stringformat:"s" %}selected{% endif %}>
+                  {{ rack.nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
           <div class="io-search-actions">
             <button class="btn btn-primary" type="submit">Pesquisar</button>
-            {% if search_term %}
+            {% if search_term or rack_filter %}
               <a class="btn btn-ghost" href="{% url 'ios_list' %}">Limpar</a>
             {% endif %}
           </div>
         </div>
       </form>
-      {% if search_term %}
+      <div class="io-search-loading is-hidden" id="io-search-loading">Buscando...</div>
+      <div id="io-search-results" {% if not search_term and not rack_filter %}class="is-hidden"{% endif %}>
         <div class="io-search-meta">
-          <span class="slot-badge">{{ search_count }} resultado{{ search_count|pluralize }}</span>
+          <span class="slot-badge" id="io-search-count">{{ search_count }} resultado{{ search_count|pluralize }}</span>
         </div>
         {% if search_results %}
           <div class="table-wrap">
@@ -241,7 +253,7 @@
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="io-search-table-body">
                 {% for channel in search_results %}
                   <tr>
                     <td>{{ channel.modulo.rack.nome }}</td>
@@ -270,10 +282,11 @@
               </tbody>
             </table>
           </div>
+          <div class="muted is-hidden" id="io-search-empty">Nenhum resultado encontrado.</div>
         {% else %}
-          <div class="muted">Nenhum resultado encontrado.</div>
+          <div class="muted" id="io-search-empty">Nenhum resultado encontrado.</div>
         {% endif %}
-      {% endif %}
+      </div>
     </section>
   </div>
   <script>
@@ -407,8 +420,104 @@
             });
         });
       }
+      function debounce(fn, wait) {
+        var timeout;
+        return function () {
+          var context = this;
+          var args = arguments;
+          clearTimeout(timeout);
+          timeout = setTimeout(function () {
+            fn.apply(context, args);
+          }, wait);
+        };
+      }
+      function updateSearchUI(payload) {
+        var resultsWrap = document.getElementById("io-search-results");
+        var countEl = document.getElementById("io-search-count");
+        var body = document.getElementById("io-search-table-body");
+        var emptyEl = document.getElementById("io-search-empty");
+        var loadingEl = document.getElementById("io-search-loading");
+        if (!resultsWrap || !countEl || !body || !emptyEl) {
+          return;
+        }
+        if (loadingEl) {
+          loadingEl.classList.add("is-hidden");
+        }
+        var count = payload.count || 0;
+        countEl.textContent = count + " resultado" + (count === 1 ? "" : "s");
+        body.innerHTML = "";
+        if (!payload.results || !payload.results.length) {
+          emptyEl.classList.remove("is-hidden");
+          resultsWrap.classList.remove("is-hidden");
+          return;
+        }
+        payload.results.forEach(function (row) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + row.rack + "</td>" +
+            "<td>" + row.slot + "</td>" +
+            "<td>" + row.modulo + "</td>" +
+            "<td>" + row.canal + " - " + row.canal_nome + "</td>" +
+            "<td>" + row.tipo + "</td>" +
+            "<td><a class=\"btn btn-ghost\" href=\"" + row.url + "\">Abrir modulo</a></td>";
+          body.appendChild(tr);
+        });
+        emptyEl.classList.add("is-hidden");
+        resultsWrap.classList.remove("is-hidden");
+      }
+      function bindSearch() {
+        var form = document.querySelector(".io-search-form");
+        var input = form ? form.querySelector("input[name='q']") : null;
+        var rackSelect = document.getElementById("io-search-rack");
+        var loadingEl = document.getElementById("io-search-loading");
+        if (!form || !input || !rackSelect) {
+          return;
+        }
+        var runSearch = function () {
+          var term = input.value.trim();
+          var rack = rackSelect.value;
+          if (!term && !rack) {
+            var wrap = document.getElementById("io-search-results");
+            if (wrap) {
+              wrap.classList.add("is-hidden");
+            }
+            if (loadingEl) {
+              loadingEl.classList.add("is-hidden");
+            }
+            return;
+          }
+          if (loadingEl) {
+            loadingEl.classList.remove("is-hidden");
+          }
+          var params = new URLSearchParams();
+          if (term) {
+            params.set("q", term);
+          }
+          if (rack) {
+            params.set("rack", rack);
+          }
+          fetch(window.location.pathname + "?" + params.toString(), {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(updateSearchUI)
+            .catch(function () {
+              if (loadingEl) {
+                loadingEl.classList.add("is-hidden");
+              }
+            });
+        };
+        var debounced = debounce(runSearch, 300);
+        input.addEventListener("input", debounced);
+        rackSelect.addEventListener("change", runSearch);
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          runSearch();
+        });
+      }
       bindCadastro();
       bindGrupo();
+      bindSearch();
     })();
   </script>
 {% endblock %}

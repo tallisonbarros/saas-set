@@ -21,8 +21,9 @@
       <div class="hud-top">
         <div class="hud-title">Painel mensal</div>
         <div class="hud-menu" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'financeiro' %}">Inicio do modulo</a>
-          <a class="hud-menu-pill" href="{% url 'financeiro_cadernos' %}">Voltar</a>
+          <a class="hud-menu-pill" href="{% url 'financeiro' %}">Financeiro</a>
+          <a class="hud-menu-pill" href="{% url 'financeiro_cadernos' %}">Cadernos</a>
+          <a class="hud-menu-pill" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
         </div>
       </div>
     <div class="page-hud-head">
@@ -31,9 +32,6 @@
         <p class="page-subtitle">Pagamentos e pendencias.</p>
       </div>
     </div>
-  </div>
-  <div class="hud-bottom-actions">
-    <a class="btn btn-outline btn-compact" href="{% url 'financeiro_nova' %}?caderno_id={{ caderno.id }}">Criar compra</a>
   </div>
     <form id="mes-navegacao-form" class="month-nav-form" method="get">
       <input
