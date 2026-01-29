@@ -188,6 +188,7 @@
                         class="equipamento-input{% if item.nome_equipamento and item.nome_equipamento|upper in nomes_repetidos %} field-dup{% endif %}"
                         data-dup-key="{{ item.nome_equipamento|default:''|upper }}"
                         data-dup-type="nome"
+                        data-item-id="{{ item.id }}"
                       >
                     </td>
                     <td>
@@ -199,13 +200,20 @@
                         class="mac-input{% if item.mac and item.mac|upper in macs_repetidos %} field-dup{% endif %}"
                         data-dup-key="{{ item.mac|default:''|upper }}"
                         data-dup-type="mac"
+                        data-item-id="{{ item.id }}"
                       >
                     </td>
                     <td>
-                      <input type="text" name="protocolo_{{ item.id }}" value="{{ item.protocolo }}" placeholder="Modbus TCP">
+                      <input
+                        type="text"
+                        name="protocolo_{{ item.id }}"
+                        value="{{ item.protocolo }}"
+                        placeholder="Modbus TCP"
+                        class="protocolo-input"
+                        data-item-id="{{ item.id }}"
+                      >
                     </td>
                   </tr>
-                  <input type="hidden" name="item_id" value="{{ item.id }}">
                 {% empty %}
                   <tr>
                     <td colspan="4" class="muted">Nenhum IP encontrado.</td>
@@ -258,6 +266,51 @@
         }
         input.value = out.join(":");
       }
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function markDirty(input) {
+        var row = input.closest("tr");
+        if (row) {
+          row.setAttribute("data-dirty", "1");
+        }
+      }
+      function postInlineSave(row) {
+        if (!row) {
+          return;
+        }
+        var nomeInput = row.querySelector(".equipamento-input");
+        var macInput = row.querySelector(".mac-input");
+        var protoInput = row.querySelector(".protocolo-input");
+        var itemId = (nomeInput && nomeInput.getAttribute("data-item-id"))
+          || (macInput && macInput.getAttribute("data-item-id"))
+          || (protoInput && protoInput.getAttribute("data-item-id"));
+        if (!itemId) {
+          return;
+        }
+        var data = new FormData();
+        data.set("action", "inline_update_item");
+        data.set("item_id", itemId);
+        data.set("nome_equipamento", nomeInput ? nomeInput.value : "");
+        data.set("mac", macInput ? macInput.value : "");
+        data.set("protocolo", protoInput ? protoInput.value : "");
+        fetch(window.location.pathname + window.location.search, {
+          method: "POST",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCookie("csrftoken"),
+          },
+          body: data,
+        }).then(function () {
+          row.removeAttribute("data-dirty");
+          showRowToast(row, "Salvo");
+        });
+      }
       function refreshDupes() {
         var inputs = document.querySelectorAll("[data-dup-type]");
         var counts = { nome: {}, mac: {} };
@@ -281,11 +334,96 @@
           }
         });
       }
+      function bindPaste(inputs, normalizeFn) {
+        inputs.forEach(function (input) {
+          input.addEventListener("paste", function (event) {
+            var text = (event.clipboardData || window.clipboardData).getData("text");
+            if (!text || text.indexOf("\n") === -1) {
+              return;
+            }
+            event.preventDefault();
+            var lines = text.split(/\r?\n/).filter(function (line) { return line.length > 0; });
+            if (!lines.length) {
+              return;
+            }
+            var all = Array.from(inputs);
+            var startIndex = all.indexOf(input);
+            if (startIndex < 0) {
+              return;
+            }
+            lines.forEach(function (line, idx) {
+              var target = all[startIndex + idx];
+              if (!target) {
+                return;
+              }
+              target.value = line;
+              if (normalizeFn) {
+                normalizeFn(target);
+              }
+              markDirty(target);
+            });
+            refreshDupes();
+          });
+        });
+      }
+      function bindEnterToSave(inputs) {
+        inputs.forEach(function (input) {
+          input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              var row = input.closest("tr");
+              postInlineSave(row);
+            }
+          });
+        });
+      }
+      function bindBulkSubmit() {
+        var form = document.getElementById("ips-bulk-form");
+        if (!form) {
+          return;
+        }
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var rows = Array.from(form.querySelectorAll("tbody tr[data-dirty='1']"));
+          if (!rows.length) {
+            return;
+          }
+          var data = new FormData();
+          data.set("action", "bulk_update_items");
+          rows.forEach(function (row) {
+            var nomeInput = row.querySelector(".equipamento-input");
+            var macInput = row.querySelector(".mac-input");
+            var protoInput = row.querySelector(".protocolo-input");
+            var itemId = (nomeInput && nomeInput.getAttribute("data-item-id"))
+              || (macInput && macInput.getAttribute("data-item-id"))
+              || (protoInput && protoInput.getAttribute("data-item-id"));
+            if (!itemId) {
+              return;
+            }
+            data.append("item_id", itemId);
+            data.set("nome_equipamento_" + itemId, nomeInput ? nomeInput.value : "");
+            data.set("mac_" + itemId, macInput ? macInput.value : "");
+            data.set("protocolo_" + itemId, protoInput ? protoInput.value : "");
+          });
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          }).then(function () {
+            rows.forEach(function (row) { row.removeAttribute("data-dirty"); });
+            rows.forEach(function (row) { showRowToast(row, "Salvo"); });
+          });
+        });
+      }
       function bindInputs() {
         var equipInputs = document.querySelectorAll(".equipamento-input");
         equipInputs.forEach(function (input) {
           input.addEventListener("input", function () {
             normalizeEquip(input);
+            markDirty(input);
             refreshDupes();
           });
           normalizeEquip(input);
@@ -294,19 +432,54 @@
         macInputs.forEach(function (input) {
           input.addEventListener("input", function () {
             normalizeMac(input);
+            markDirty(input);
             refreshDupes();
           });
           normalizeMac(input);
         });
+        var protoInputs = document.querySelectorAll(".protocolo-input");
+        protoInputs.forEach(function (input) {
+          input.addEventListener("input", function () {
+            markDirty(input);
+          });
+        });
+        bindEnterToSave(equipInputs);
+        bindEnterToSave(macInputs);
+        bindEnterToSave(protoInputs);
+        bindPaste(equipInputs, normalizeEquip);
+        bindPaste(macInputs, normalizeMac);
+        bindPaste(protoInputs);
         refreshDupes();
       }
       function ensureStyle() {
         var style = document.createElement("style");
-        style.textContent = ".field-dup{border-color:#d04b3b;box-shadow:0 0 0 1px rgba(208,75,59,.15)}";
+        style.textContent = ".field-dup{border-color:#d04b3b;box-shadow:0 0 0 1px rgba(208,75,59,.15)}"
+          + ".row-toast{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#1f6f3d;color:#fff;"
+          + "padding:4px 8px;border-radius:999px;font-size:12px;opacity:0;transition:opacity .2s ease}"
+          + "tr.show-toast .row-toast{opacity:1}";
         document.head.appendChild(style);
+      }
+      function showRowToast(row, text) {
+        if (!row) {
+          return;
+        }
+        row.style.position = "relative";
+        var toast = row.querySelector(".row-toast");
+        if (!toast) {
+          toast = document.createElement("span");
+          toast.className = "row-toast";
+          row.appendChild(toast);
+        }
+        toast.textContent = text || "Salvo";
+        row.classList.add("show-toast");
+        clearTimeout(row._toastTimer);
+        row._toastTimer = setTimeout(function () {
+          row.classList.remove("show-toast");
+        }, 1200);
       }
       ensureStyle();
       bindInputs();
+      bindBulkSubmit();
     })();
   </script>
 {% endblock %}

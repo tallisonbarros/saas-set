@@ -1959,6 +1959,18 @@ def lista_ip_detail(request, pk):
                     items_map.values(),
                     ["nome_equipamento", "mac", "protocolo"],
                 )
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "updated": len(items_map)})
+            return redirect("lista_ip_detail", pk=lista.pk)
+        if action == "inline_update_item":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(ListaIPItem, pk=item_id, lista=lista)
+            item.nome_equipamento = request.POST.get("nome_equipamento", "").strip()
+            item.mac = request.POST.get("mac", "").strip()
+            item.protocolo = request.POST.get("protocolo", "").strip()
+            item.save(update_fields=["nome_equipamento", "mac", "protocolo"])
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True})
             return redirect("lista_ip_detail", pk=lista.pk)
 
     search_term = request.GET.get("q", "").strip()
