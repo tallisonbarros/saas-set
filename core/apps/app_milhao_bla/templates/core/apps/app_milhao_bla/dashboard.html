@@ -245,7 +245,7 @@
         {% if last_ingests %}
           <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
             {% for item in last_ingests %}
-              <span class="panel-tag">Ultima Leitura: {{ item.label }}: {{ item.time }}</span>
+              <span class="panel-tag">Ultima Leitura {{ item.label }}: {{ item.time }}</span>
             {% endfor %}
           </div>
         {% endif %}

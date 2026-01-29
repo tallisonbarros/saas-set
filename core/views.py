@@ -1940,13 +1940,25 @@ def lista_ip_detail(request, pk):
         if action == "delete_lista":
             lista.delete()
             return redirect("listas_ip_list")
-        if action == "update_item":
-            item_id = request.POST.get("item_id")
-            item = get_object_or_404(ListaIPItem, pk=item_id, lista=lista)
-            item.nome_equipamento = request.POST.get("nome_equipamento", "").strip()
-            item.mac = request.POST.get("mac", "").strip()
-            item.protocolo = request.POST.get("protocolo", "").strip()
-            item.save(update_fields=["nome_equipamento", "mac", "protocolo"])
+        if action == "bulk_update_items":
+            item_ids = request.POST.getlist("item_id")
+            items_qs = ListaIPItem.objects.filter(lista=lista, id__in=item_ids)
+            items_map = {str(item.id): item for item in items_qs}
+            for item_id in item_ids:
+                item = items_map.get(item_id)
+                if not item:
+                    continue
+                nome_raw = request.POST.get(f"nome_equipamento_{item_id}", "").strip()
+                mac_raw = request.POST.get(f"mac_{item_id}", "").strip()
+                protocolo_raw = request.POST.get(f"protocolo_{item_id}", "").strip()
+                item.nome_equipamento = nome_raw
+                item.mac = mac_raw
+                item.protocolo = protocolo_raw
+            if items_map:
+                ListaIPItem.objects.bulk_update(
+                    items_map.values(),
+                    ["nome_equipamento", "mac", "protocolo"],
+                )
             return redirect("lista_ip_detail", pk=lista.pk)
 
     search_term = request.GET.get("q", "").strip()
@@ -1960,6 +1972,17 @@ def lista_ip_detail(request, pk):
         )
     items = list(items)
     items.sort(key=lambda item: ipaddress.ip_address(item.ip))
+    nome_counts = {}
+    mac_counts = {}
+    for item in items:
+        nome_key = (item.nome_equipamento or "").strip().upper()
+        mac_key = (item.mac or "").strip().upper()
+        if nome_key:
+            nome_counts[nome_key] = nome_counts.get(nome_key, 0) + 1
+        if mac_key:
+            mac_counts[mac_key] = mac_counts.get(mac_key, 0) + 1
+    nomes_repetidos = {key for key, count in nome_counts.items() if count > 1}
+    macs_repetidos = {key for key, count in mac_counts.items() if count > 1}
     total_ips = ListaIPItem.objects.filter(lista=lista).count()
     total_preenchidos = ListaIPItem.objects.filter(
         lista=lista,
@@ -1980,6 +2003,8 @@ def lista_ip_detail(request, pk):
             "can_manage": can_manage or request.user.is_staff,
             "message": message,
             "message_level": message_level,
+            "nomes_repetidos": nomes_repetidos,
+            "macs_repetidos": macs_repetidos,
         },
     )
 

@@ -159,52 +159,154 @@
         </div>
       </form>
       <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>IP</th>
-              <th>Nome do equipamento</th>
-              <th>MAC</th>
-              <th>Protocolo</th>
-              {% if can_manage %}<th></th>{% endif %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in items %}
+        {% if can_manage %}
+          <form method="post" id="ips-bulk-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="bulk_update_items">
+            <div class="form-actions" style="margin-bottom: 12px;">
+              <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>IP</th>
+                  <th>Nome do equipamento</th>
+                  <th>MAC</th>
+                  <th>Protocolo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in items %}
+                  <tr>
+                    <td>{{ item.ip }}</td>
+                    <td>
+                      <input
+                        type="text"
+                        name="nome_equipamento_{{ item.id }}"
+                        value="{{ item.nome_equipamento }}"
+                        placeholder="Equipamento"
+                        class="equipamento-input{% if item.nome_equipamento and item.nome_equipamento|upper in nomes_repetidos %} field-dup{% endif %}"
+                        data-dup-key="{{ item.nome_equipamento|default:''|upper }}"
+                        data-dup-type="nome"
+                      >
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        name="mac_{{ item.id }}"
+                        value="{{ item.mac }}"
+                        placeholder="00:11:22:33:44:55"
+                        class="mac-input{% if item.mac and item.mac|upper in macs_repetidos %} field-dup{% endif %}"
+                        data-dup-key="{{ item.mac|default:''|upper }}"
+                        data-dup-type="mac"
+                      >
+                    </td>
+                    <td>
+                      <input type="text" name="protocolo_{{ item.id }}" value="{{ item.protocolo }}" placeholder="Modbus TCP">
+                    </td>
+                  </tr>
+                  <input type="hidden" name="item_id" value="{{ item.id }}">
+                {% empty %}
+                  <tr>
+                    <td colspan="4" class="muted">Nenhum IP encontrado.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </form>
+        {% else %}
+          <table class="table">
+            <thead>
               <tr>
-                <td>{{ item.ip }}</td>
-                {% if can_manage %}
-                  <td>
-                      <input type="text" name="nome_equipamento" value="{{ item.nome_equipamento }}" placeholder="Equipamento" form="item-form-{{ item.id }}">
-                  </td>
-                  <td>
-                      <input type="text" name="mac" value="{{ item.mac }}" placeholder="00:11:22:33:44:55" form="item-form-{{ item.id }}">
-                  </td>
-                  <td>
-                      <input type="text" name="protocolo" value="{{ item.protocolo }}" placeholder="Modbus TCP" form="item-form-{{ item.id }}">
-                  </td>
-                  <td>
-                      <form method="post" id="item-form-{{ item.id }}">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="update_item">
-                        <input type="hidden" name="item_id" value="{{ item.id }}">
-                        <button class="btn btn-ghost btn-compact" type="submit">Salvar</button>
-                      </form>
-                  </td>
-                {% else %}
+                <th>IP</th>
+                <th>Nome do equipamento</th>
+                <th>MAC</th>
+                <th>Protocolo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+                <tr>
+                  <td>{{ item.ip }}</td>
                   <td>{{ item.nome_equipamento|default:"-" }}</td>
                   <td>{{ item.mac|default:"-" }}</td>
                   <td>{{ item.protocolo|default:"-" }}</td>
-                {% endif %}
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="{% if can_manage %}5{% else %}4{% endif %}" class="muted">Nenhum IP encontrado.</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="4" class="muted">Nenhum IP encontrado.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
       </div>
     </section>
   </div>
+  <script>
+    (function () {
+      function normalizeEquip(input) {
+        var raw = input.value || "";
+        var up = raw.toUpperCase().replace(/\s+/g, "_");
+        input.value = up;
+      }
+      function normalizeMac(input) {
+        var raw = (input.value || "").toUpperCase().replace(/[^0-9A-F]/g, "");
+        var out = [];
+        for (var i = 0; i < raw.length && i < 12; i += 2) {
+          out.push(raw.slice(i, i + 2));
+        }
+        input.value = out.join(":");
+      }
+      function refreshDupes() {
+        var inputs = document.querySelectorAll("[data-dup-type]");
+        var counts = { nome: {}, mac: {} };
+        inputs.forEach(function (input) {
+          var type = input.getAttribute("data-dup-type");
+          var value = (input.value || "").trim().toUpperCase();
+          if (!value) {
+            return;
+          }
+          counts[type][value] = (counts[type][value] || 0) + 1;
+        });
+        inputs.forEach(function (input) {
+          var type = input.getAttribute("data-dup-type");
+          var value = (input.value || "").trim().toUpperCase();
+          var isDup = value && counts[type][value] > 1;
+          input.classList.toggle("field-dup", isDup);
+          if (isDup) {
+            input.setAttribute("title", "Valor repetido");
+          } else {
+            input.removeAttribute("title");
+          }
+        });
+      }
+      function bindInputs() {
+        var equipInputs = document.querySelectorAll(".equipamento-input");
+        equipInputs.forEach(function (input) {
+          input.addEventListener("input", function () {
+            normalizeEquip(input);
+            refreshDupes();
+          });
+          normalizeEquip(input);
+        });
+        var macInputs = document.querySelectorAll(".mac-input");
+        macInputs.forEach(function (input) {
+          input.addEventListener("input", function () {
+            normalizeMac(input);
+            refreshDupes();
+          });
+          normalizeMac(input);
+        });
+        refreshDupes();
+      }
+      function ensureStyle() {
+        var style = document.createElement("style");
+        style.textContent = ".field-dup{border-color:#d04b3b;box-shadow:0 0 0 1px rgba(208,75,59,.15)}";
+        document.head.appendChild(style);
+      }
+      ensureStyle();
+      bindInputs();
+    })();
+  </script>
 {% endblock %}
