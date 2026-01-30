@@ -25,9 +25,6 @@
       </div>
       <div class="page-hud-head">
         <div>
-          {% if rack.inventario %}
-            <div class="page-kicker">Inventario: {{ rack.inventario.nome }}</div>
-          {% endif %}
           {% if rack.local or rack.grupo %}
             <div class="hud-tagset">
               {% if rack.local %}
@@ -213,15 +210,6 @@
           <div class="rack-edit-field rack-edit-wide">
             <label for="rack-descricao">Descricao</label>
             <input id="rack-descricao" type="text" name="descricao" value="{{ rack.descricao }}">
-          </div>
-          <div class="rack-edit-field">
-            <label for="rack-inventario">Inventario</label>
-            <select id="rack-inventario" name="inventario">
-              <option value="">Sem inventario</option>
-              {% for inv in inventarios %}
-                <option value="{{ inv.id }}" {% if rack.inventario_id == inv.id %}selected{% endif %}>{{ inv.nome }}</option>
-              {% endfor %}
-            </select>
           </div>
           <div class="rack-edit-field">
             <div class="rack-edit-label-row">

@@ -43,66 +43,39 @@
           <p class="muted">Selecione um rack.</p>
         </div>
       </div>
-      {% if rack_groups %}
-        {% for group in rack_groups %}
-          <div class="io-card" style="margin-top: 12px;">
-            <div class="io-card-head">
-              <div>
-                <h3 class="io-title">
-                  {% if group.local %}
-                    {{ group.local.nome }}
-                  {% else %}
-                    Sem local
-                  {% endif %}
-                </h3>
-              </div>
-            </div>
-            {% for subgroup in group.groups %}
-              <div class="proposal-section-subtitle">
-                {% if subgroup.grupo %}
-                  Grupo: {{ subgroup.grupo.nome }}
-                {% else %}
-                  Sem grupo
-                {% endif %}
-              </div>
-              <div class="proposal-grid">
-                {% for rack in subgroup.racks %}
-                  <article class="proposal-card io-proposal-card">
-                    <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
-                    <div class="proposal-head">
-                      <div>
-                        <div class="proposal-title">{{ rack.nome }}</div>
-                        <div class="proposal-meta">{{ rack.descricao }}</div>
-                        {% if rack.inventario or rack.local or rack.grupo %}
-                          <div class="proposal-badges">
-                            {% if rack.inventario %}
-                              <span class="badge badge-tagset">Inventario: {{ rack.inventario.nome }}</span>
-                            {% endif %}
-                            {% if rack.local %}
-                              <span class="badge badge-tagset">{{ rack.local.nome }}</span>
-                            {% endif %}
-                            {% if rack.grupo %}
-                              <span class="badge badge-tagset">{{ rack.grupo.nome }}</span>
-                            {% endif %}
-                          </div>
-                        {% endif %}
-                      </div>
-                      <div class="module-meta">
-                        <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
-                        <span class="mini-badge {% if rack.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
-                          {% if rack.all_canais_comissionados %}V{% else %}X{% endif %}
-                        </span>
-                      </div>
+      {% if racks %}
+        <div class="proposal-grid">
+          {% for rack in racks %}
+            <article class="proposal-card io-proposal-card">
+              <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
+              <div class="proposal-head">
+                <div>
+                  <div class="proposal-title">{{ rack.nome }}</div>
+                  <div class="proposal-meta">{{ rack.descricao }}</div>
+                  {% if rack.local or rack.grupo %}
+                    <div class="proposal-badges">
+                      {% if rack.local %}
+                        <span class="badge badge-tagset">{{ rack.local.nome }}</span>
+                      {% endif %}
+                      {% if rack.grupo %}
+                        <span class="badge badge-tagset">{{ rack.grupo.nome }}</span>
+                      {% endif %}
                     </div>
-                    {% if rack.id_planta %}
-                      <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
-                    {% endif %}
-                  </article>
-                {% endfor %}
+                  {% endif %}
+                </div>
+                <div class="module-meta">
+                  <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
+                  <span class="mini-badge {% if rack.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
+                    {% if rack.all_canais_comissionados %}V{% else %}X{% endif %}
+                  </span>
+                </div>
               </div>
-            {% endfor %}
-          </div>
-        {% endfor %}
+              {% if rack.id_planta %}
+                <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
       {% else %}
         <div class="muted">Nenhum rack cadastrado ainda.</div>
       {% endif %}
@@ -126,15 +99,6 @@
               <label class="field">
                 <span>Descricao</span>
                 <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
-              </label>
-              <label class="field">
-                <span>Inventario</span>
-                <select name="inventario">
-                  <option value="">Sem inventario</option>
-                  {% for inv in inventarios %}
-                    <option value="{{ inv.id }}">{{ inv.nome }}</option>
-                  {% endfor %}
-                </select>
               </label>
               <label class="field">
                 <div class="field-row">

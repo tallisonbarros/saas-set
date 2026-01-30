@@ -483,20 +483,40 @@ class Inventario(models.Model):
 
 
 class LocalRackIO(models.Model):
-    nome = models.CharField(max_length=120, unique=True)
+    cliente = models.ForeignKey(
+        "PerfilUsuario",
+        on_delete=models.CASCADE,
+        related_name="locais_rack",
+        null=True,
+        blank=True,
+    )
+    nome = models.CharField(max_length=120)
 
     class Meta:
         ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["cliente", "nome"], name="unique_localrackio_cliente_nome"),
+        ]
 
     def __str__(self):
         return self.nome
 
 
 class GrupoRackIO(models.Model):
-    nome = models.CharField(max_length=120, unique=True)
+    cliente = models.ForeignKey(
+        "PerfilUsuario",
+        on_delete=models.CASCADE,
+        related_name="grupos_rack",
+        null=True,
+        blank=True,
+    )
+    nome = models.CharField(max_length=120)
 
     class Meta:
         ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["cliente", "nome"], name="unique_gruporackio_cliente_nome"),
+        ]
 
     def __str__(self):
         return self.nome
