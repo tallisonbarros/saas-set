@@ -811,7 +811,7 @@ def ios_list(request):
         if search_term:
             search_filter = (
                 Q(tag__icontains=search_term)
-                | Q(nome__icontains=search_term)
+                | Q(descricao__icontains=search_term)
                 | Q(modulo__nome__icontains=search_term)
                 | Q(modulo__modulo_modelo__nome__icontains=search_term)
                 | Q(modulo__modulo_modelo__marca__icontains=search_term)
@@ -847,7 +847,7 @@ def ios_list(request):
                     "slot": f"S{channel.slot_pos}" if channel.slot_pos else "-",
                     "modulo": channel.modulo.nome or channel.modulo.modulo_modelo.nome,
                     "canal": f"CH{channel.indice:02d}",
-                    "canal_nome": channel.nome or "Sem nome",
+                    "canal_tag": channel.tag or "-",
                     "tipo": channel.tipo.nome,
                     "local": channel.modulo.rack.local.nome if channel.modulo.rack.local_id else "-",
                     "grupo": channel.modulo.rack.grupo.nome if channel.modulo.rack.grupo_id else "-",
@@ -1026,7 +1026,7 @@ def ios_rack_detail(request, pk):
                                 module_channels.setdefault(channel.modulo_id, []).append(
                                     {
                                         "canal": f"{channel.indice:02d}",
-                                        "nome": channel.nome or "-",
+                                        "nome": channel.descricao or "-",
                                         "tipo": channel.tipo.nome if channel.tipo_id else "-",
                                     }
                                 )
@@ -1082,7 +1082,7 @@ def ios_rack_detail(request, pk):
                     CanalRackIO(
                         modulo=modulo,
                         indice=index,
-                        nome="",
+                        descricao="",
                         tipo=module_modelo.tipo_base,
                     )
                     for index in range(1, module_modelo.quantidade_canais + 1)
@@ -1117,7 +1117,7 @@ def ios_rack_detail(request, pk):
                     CanalRackIO(
                         modulo=modulo,
                         indice=index,
-                        nome="",
+                        descricao="",
                         tipo=module_modelo.tipo_base,
                     )
                     for index in range(1, module_modelo.quantidade_canais + 1)
@@ -1179,7 +1179,7 @@ def ios_rack_detail(request, pk):
             module_channels.setdefault(channel.modulo_id, []).append(
                 {
                     "canal": f"{channel.indice:02d}",
-                    "nome": channel.nome or "-",
+                    "nome": channel.descricao or "-",
                     "tipo": channel.tipo.nome if channel.tipo_id else "-",
                 }
             )
@@ -1189,8 +1189,8 @@ def ios_rack_detail(request, pk):
         .order_by("nome")
     )
     available_qs = (
-        CanalRackIO.objects.filter(modulo__rack=rack)
-        .filter(Q(nome__isnull=True) | Q(nome__exact=""))
+            CanalRackIO.objects.filter(modulo__rack=rack)
+        .filter(Q(descricao__isnull=True) | Q(descricao__exact=""))
         .values("tipo__nome")
         .annotate(total=Count("id"))
         .order_by("tipo__nome")
@@ -2769,18 +2769,18 @@ def ios_rack_modulo_detail(request, pk):
         if action == "update_channels":
             for channel in module.canais.all():
                 tag_raw = request.POST.get(f"tag_{channel.id}", "")
-                nome_raw = request.POST.get(f"nome_{channel.id}")
+                descricao_raw = request.POST.get(f"descricao_{channel.id}")
                 tipo_id = request.POST.get(f"tipo_{channel.id}")
                 comissionado = request.POST.get(f"comissionado_{channel.id}") == "on"
-                if nome_raw is None:
+                if descricao_raw is None:
                     continue
                 if tag_raw is not None:
                     channel.tag = _normalize_channel_tag(tag_raw)
-                channel.nome = nome_raw.strip()
+                channel.descricao = descricao_raw.strip()
                 if tipo_id:
                     channel.tipo_id = tipo_id
                 channel.comissionado = comissionado
-                channel.save(update_fields=["tag", "nome", "tipo_id", "comissionado"])
+                channel.save(update_fields=["tag", "descricao", "tipo_id", "comissionado"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
         if action == "bulk_update_channels":
             channel_ids = request.POST.getlist("channel_id")
@@ -2791,18 +2791,18 @@ def ios_rack_modulo_detail(request, pk):
                 if not channel:
                     continue
                 tag_raw = request.POST.get(f"tag_{channel_id}", "")
-                nome_raw = request.POST.get(f"nome_{channel_id}", "")
+                descricao_raw = request.POST.get(f"descricao_{channel_id}", "")
                 tipo_id = request.POST.get(f"tipo_{channel_id}")
                 comissionado = request.POST.get(f"comissionado_{channel_id}") == "on"
                 channel.tag = _normalize_channel_tag(tag_raw)
-                channel.nome = (nome_raw or "").strip()
+                channel.descricao = (descricao_raw or "").strip()
                 if tipo_id:
                     channel.tipo_id = tipo_id
                 channel.comissionado = comissionado
             if channels_map:
                 CanalRackIO.objects.bulk_update(
                     channels_map.values(),
-                    ["tag", "nome", "tipo_id", "comissionado"],
+                    ["tag", "descricao", "tipo_id", "comissionado"],
                 )
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"ok": True, "updated": len(channels_map)})
@@ -2811,15 +2811,15 @@ def ios_rack_modulo_detail(request, pk):
             channel_id = request.POST.get("channel_id")
             channel = get_object_or_404(module.canais, pk=channel_id)
             tag_raw = request.POST.get("tag", "")
-            nome_raw = request.POST.get("nome", "")
+            descricao_raw = request.POST.get("descricao", "")
             tipo_id = request.POST.get("tipo")
             comissionado = request.POST.get("comissionado") == "on"
             channel.tag = _normalize_channel_tag(tag_raw)
-            channel.nome = (nome_raw or "").strip()
+            channel.descricao = (descricao_raw or "").strip()
             if tipo_id:
                 channel.tipo_id = tipo_id
             channel.comissionado = comissionado
-            channel.save(update_fields=["tag", "nome", "tipo_id", "comissionado"])
+            channel.save(update_fields=["tag", "descricao", "tipo_id", "comissionado"])
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({"ok": True})
             return redirect("ios_rack_modulo_detail", pk=module.pk)

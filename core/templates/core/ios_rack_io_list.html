@@ -66,10 +66,10 @@
               <td>{{ canal.modulo.nome|default:canal.modulo.modulo_modelo.nome }}</td>
               <td>CH{{ canal.indice|stringformat:"02d" }}</td>
               <td>
-                {% if canal.nome %}
-                  {{ canal.nome }}
+                {% if canal.descricao %}
+                  {{ canal.descricao }}
                 {% else %}
-                  Sem nome
+                  Sem descricao
                 {% endif %}
               </td>
               <td>{{ canal.tipo.nome }}</td>

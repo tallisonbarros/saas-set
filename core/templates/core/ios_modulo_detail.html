@@ -133,8 +133,8 @@
             <span>Descricao</span>
             <input
               type="text"
-              name="nome_{{ channel.id }}"
-              value="{{ channel.nome }}"
+              name="descricao_{{ channel.id }}"
+              value="{{ channel.descricao }}"
               class="channel-desc-input"
               data-channel-id="{{ channel.id }}"
             >
@@ -249,7 +249,7 @@
         data.set("action", "inline_update_channel");
         data.set("channel_id", channelId);
         data.set("tag", tagInput ? tagInput.value : "");
-        data.set("nome", descInput ? descInput.value : "");
+        data.set("descricao", descInput ? descInput.value : "");
         data.set("tipo", typeSelect ? typeSelect.value : "");
         if (commInput && commInput.checked) {
           data.set("comissionado", "on");
@@ -393,7 +393,7 @@
             var commInput = row.querySelector(".channel-comm-input");
             data.append("channel_id", channelId);
             data.set("tag_" + channelId, tagInput ? tagInput.value : "");
-            data.set("nome_" + channelId, descInput ? descInput.value : "");
+            data.set("descricao_" + channelId, descInput ? descInput.value : "");
             data.set("tipo_" + channelId, typeSelect ? typeSelect.value : "");
             if (commInput && commInput.checked) {
               data.set("comissionado_" + channelId, "on");

@@ -280,10 +280,10 @@
                   <td>{{ channel.modulo.nome|default:channel.modulo.modulo_modelo.nome }}</td>
                   <td>
                     CH{{ channel.indice }} -
-                    {% if channel.nome %}
-                      {{ channel.nome }}
+                    {% if channel.tag %}
+                      {{ channel.tag }}
                     {% else %}
-                      Sem nome
+                      Sem TAG
                     {% endif %}
                   </td>
                   <td>{{ channel.tipo.nome }}</td>
@@ -476,7 +476,7 @@
             "<td>" + row.grupo + "</td>" +
             "<td>" + row.slot + "</td>" +
             "<td>" + row.modulo + "</td>" +
-            "<td>" + row.canal + " - " + row.canal_nome + "</td>" +
+            "<td>" + row.canal + " - " + row.canal_tag + "</td>" +
             "<td>" + row.tipo + "</td>" +
             "<td><a class=\"btn btn-ghost\" href=\"" + row.url + "\">Abrir modulo</a></td>";
           body.appendChild(tr);

@@ -14,7 +14,10 @@ def copy_nome_to_tag(apps, schema_editor):
     for channel in CanalRackIO.objects.all().iterator():
         if channel.tag:
             continue
-        channel.tag = _normalize_tag(channel.nome)
+        base = getattr(channel, "descricao", None)
+        if base is None:
+            base = getattr(channel, "nome", "")
+        channel.tag = _normalize_tag(base)
         channel.save(update_fields=["tag"])
 
 
