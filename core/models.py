@@ -784,6 +784,8 @@ class IngestErrorLog(models.Model):
     error = models.CharField(max_length=120)
     raw_payload = models.JSONField(null=True, blank=True)
     raw_body = models.TextField(blank=True)
+    resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -121,6 +121,36 @@ def _normalize_required_fields(required_fields):
     return normalized
 
 
+def _upsert_ingest_items(items_by_source):
+    if not items_by_source:
+        return 0
+    to_create = [
+        IngestRecord(source_id=source_id, **data)
+        for source_id, data in items_by_source.items()
+    ]
+    if to_create:
+        IngestRecord.objects.bulk_create(to_create, ignore_conflicts=True)
+    records = IngestRecord.objects.filter(source_id__in=items_by_source.keys())
+    to_update = []
+    now = timezone.now()
+    for record in records:
+        data = items_by_source.get(record.source_id)
+        if not data:
+            continue
+        record.client_id = data["client_id"]
+        record.agent_id = data["agent_id"]
+        record.source = data["source"]
+        record.payload = data["payload"]
+        record.updated_at = now
+        to_update.append(record)
+    if to_update:
+        IngestRecord.objects.bulk_update(
+            to_update,
+            ["client_id", "agent_id", "source", "payload", "updated_at"],
+        )
+    return len(items_by_source)
+
+
 def _clean_tag_prefix(value):
     value = re.sub(r"[^0-9A-Za-z]", "", (value or "").strip().upper())
     return value[:3] if value else ""
@@ -526,30 +556,7 @@ def api_ingest(request):
             "payload": payload_data,
         }
     if items_by_source:
-        to_create = [
-            IngestRecord(source_id=source_id, **data)
-            for source_id, data in items_by_source.items()
-        ]
-        if to_create:
-            IngestRecord.objects.bulk_create(to_create, ignore_conflicts=True)
-        records = IngestRecord.objects.filter(source_id__in=items_by_source.keys())
-        to_update = []
-        now = timezone.now()
-        for record in records:
-            data = items_by_source.get(record.source_id)
-            if not data:
-                continue
-            record.client_id = data["client_id"]
-            record.agent_id = data["agent_id"]
-            record.source = data["source"]
-            record.payload = data["payload"]
-            record.updated_at = now
-            to_update.append(record)
-        if to_update:
-            IngestRecord.objects.bulk_update(
-                to_update,
-                ["client_id", "agent_id", "source", "payload", "updated_at"],
-            )
+        _upsert_ingest_items(items_by_source)
     return JsonResponse({"ok": True, "count": len(payload)})
 
 @csrf_exempt
@@ -644,6 +651,50 @@ def planta_conectada(request):
             rule_id = request.POST.get("rule_id")
             if rule_id:
                 IngestRule.objects.filter(pk=rule_id).delete()
+            return redirect("planta_conectada")
+        if action == "reprocess_ingest_errors":
+            rules_by_source = {
+                rule.source.strip().lower(): (rule.required_fields or [])
+                for rule in IngestRule.objects.all()
+                if rule.source
+            }
+            items_by_source = {}
+            logs_to_resolve = []
+            for log in IngestErrorLog.objects.filter(resolved=False).order_by("created_at"):
+                item = log.raw_payload
+                if not isinstance(item, dict):
+                    continue
+                source_id = str(item.get("source_id", "")).strip()
+                client_id = str(item.get("client_id", "")).strip()
+                agent_id = str(item.get("agent_id", "")).strip()
+                source = str(item.get("source", "")).strip()
+                if not source_id or not client_id or not agent_id or not source:
+                    continue
+                payload_data = item.get("payload", None)
+                if isinstance(payload_data, str):
+                    try:
+                        payload_data = json.loads(payload_data)
+                    except json.JSONDecodeError:
+                        continue
+                if payload_data is None:
+                    continue
+                is_valid, _ = _validate_payload_by_source(source, payload_data, rules_by_source)
+                if not is_valid:
+                    continue
+                items_by_source[source_id] = {
+                    "client_id": client_id,
+                    "agent_id": agent_id,
+                    "source": source,
+                    "payload": payload_data,
+                }
+                logs_to_resolve.append(log)
+            if items_by_source:
+                _upsert_ingest_items(items_by_source)
+                now = timezone.now()
+                for log in logs_to_resolve:
+                    log.resolved = True
+                    log.resolved_at = now
+                IngestErrorLog.objects.bulk_update(logs_to_resolve, ["resolved", "resolved_at"])
             return redirect("planta_conectada")
     registros = IngestRecord.objects.all().order_by("-created_at")[:200]
     ingest_rules = IngestRule.objects.all().order_by("source")

@@ -48,6 +48,9 @@
               <div class="proposal-meta">
                 Recebido: {{ log.created_at|date:"d/m/Y H:i" }}
               </div>
+              <div class="proposal-meta">
+                Status: {{ log.resolved|yesno:"Resolvido,Pendente" }}
+              </div>
             </div>
             <details class="io-discrete" style="min-width: 220px;">
               <summary class="io-discrete-summary">
