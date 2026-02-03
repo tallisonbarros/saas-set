@@ -239,6 +239,8 @@
     });
 
     form.addEventListener("submit", () => {
+      addChip(input.value);
+      input.value = "";
       updateHiddenFields(chips, hidden);
     });
   }
