@@ -43,39 +43,63 @@
           <p class="muted">Selecione um rack.</p>
         </div>
       </div>
-      {% if racks %}
-        <div class="proposal-grid">
-          {% for rack in racks %}
-            <article class="proposal-card io-proposal-card">
-              <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
-              <div class="proposal-head">
-                <div>
-                  <div class="proposal-title">{{ rack.nome }}</div>
-                  <div class="proposal-meta">{{ rack.descricao }}</div>
-                  {% if rack.local or rack.grupo %}
-                    <div class="proposal-badges">
-                      {% if rack.local %}
-                        <span class="badge badge-tagset">{{ rack.local.nome }}</span>
-                      {% endif %}
-                      {% if rack.grupo %}
-                        <span class="badge badge-tagset">{{ rack.grupo.nome }}</span>
-                      {% endif %}
-                    </div>
+      {% if rack_groups %}
+        {% for group in rack_groups %}
+          <div class="io-card" style="margin-top: 12px;">
+            <div class="io-card-head">
+              <div>
+                <h3 class="io-title">
+                  {% if group.local %}
+                    {{ group.local.nome }}
+                  {% else %}
+                    Sem local
                   {% endif %}
-                </div>
-                <div class="module-meta">
-                  <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
-                  <span class="mini-badge {% if rack.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
-                    {% if rack.all_canais_comissionados %}V{% else %}X{% endif %}
-                  </span>
-                </div>
+                </h3>
               </div>
-              {% if rack.id_planta %}
-                <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
-              {% endif %}
-            </article>
-          {% endfor %}
-        </div>
+            </div>
+            {% for subgroup in group.groups %}
+              <div class="proposal-section-subtitle">
+                {% if subgroup.grupo %}
+                  Grupo: {{ subgroup.grupo.nome }}
+                {% else %}
+                  Sem grupo
+                {% endif %}
+              </div>
+              <div class="proposal-grid">
+                {% for rack in subgroup.racks %}
+                  <article class="proposal-card io-proposal-card">
+                    <a class="proposal-link" href="{% url 'ios_rack_detail' rack.id %}" aria-label="Abrir rack"></a>
+                    <div class="proposal-head">
+                      <div>
+                        <div class="proposal-title">{{ rack.nome }}</div>
+                        <div class="proposal-meta">{{ rack.descricao }}</div>
+                        {% if rack.local or rack.grupo %}
+                          <div class="proposal-badges">
+                            {% if rack.local %}
+                              <span class="badge badge-tagset">{{ rack.local.nome }}</span>
+                            {% endif %}
+                            {% if rack.grupo %}
+                              <span class="badge badge-tagset">{{ rack.grupo.nome }}</span>
+                            {% endif %}
+                          </div>
+                        {% endif %}
+                      </div>
+                      <div class="module-meta">
+                        <span class="slot-badge">{{ rack.ocupados }}/{{ rack.slots_total }} slots</span>
+                        <span class="mini-badge {% if rack.all_canais_comissionados %}mini-badge-ok{% else %}mini-badge-off{% endif %}">
+                          {% if rack.all_canais_comissionados %}V{% else %}X{% endif %}
+                        </span>
+                      </div>
+                    </div>
+                    {% if rack.id_planta %}
+                      <div class="proposal-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</div>
+                    {% endif %}
+                  </article>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
       {% else %}
         <div class="muted">Nenhum rack cadastrado ainda.</div>
       {% endif %}
@@ -191,17 +215,39 @@
               {% endfor %}
             </select>
           </label>
+          <label class="field io-search-field">
+            <span>Local</span>
+            <select name="local" id="io-search-local">
+              <option value="">Todos</option>
+              {% for local in locais %}
+                <option value="{{ local.id }}" {% if local_filter == local.id|stringformat:"s" %}selected{% endif %}>
+                  {{ local.nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field io-search-field">
+            <span>Grupo</span>
+            <select name="grupo" id="io-search-grupo">
+              <option value="">Todos</option>
+              {% for grupo in grupos %}
+                <option value="{{ grupo.id }}" {% if grupo_filter == grupo.id|stringformat:"s" %}selected{% endif %}>
+                  {{ grupo.nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
           <div class="io-search-actions">
             <button class="btn btn-primary" type="submit">Pesquisar</button>
-            {% if search_term or rack_filter %}
+            {% if search_term or rack_filter or local_filter or grupo_filter %}
               <a class="btn btn-ghost" href="{% url 'ios_list' %}">Limpar</a>
             {% endif %}
           </div>
         </div>
       </form>
       <div class="io-search-loading is-hidden" id="io-search-loading">Buscando...</div>
-      <div id="io-search-results" {% if not search_term and not rack_filter %}class="is-hidden"{% endif %}>
-        <div class="io-search-meta">
+      <div id="io-search-results" {% if not search_term and not rack_filter and not local_filter and not grupo_filter %}class="is-hidden"{% endif %}>
+        <div class="io-search-meta io-search-meta-alert" id="io-search-meta">
           <span class="slot-badge" id="io-search-count">{{ search_count }} resultado{{ search_count|pluralize }}</span>
         </div>
         {% if search_results %}
@@ -210,6 +256,8 @@
               <thead>
                 <tr>
                   <th>Rack</th>
+                  <th>Local</th>
+                  <th>Grupo</th>
                   <th>Slot</th>
                   <th>Modulo</th>
                   <th>Canal</th>
@@ -221,6 +269,8 @@
                 {% for channel in search_results %}
                   <tr>
                     <td>{{ channel.modulo.rack.nome }}</td>
+                    <td>{% if channel.modulo.rack.local %}{{ channel.modulo.rack.local.nome }}{% else %}-{% endif %}</td>
+                    <td>{% if channel.modulo.rack.grupo %}{{ channel.modulo.rack.grupo.nome }}{% else %}-{% endif %}</td>
                     <td>
                       {% if channel.slot_pos %}
                         S{{ channel.slot_pos }}
@@ -246,9 +296,9 @@
               </tbody>
             </table>
           </div>
-          <div class="muted is-hidden" id="io-search-empty">Nenhum resultado encontrado.</div>
+          <div class="notice notice-warning is-hidden" id="io-search-empty">Nenhum resultado encontrado.</div>
         {% else %}
-          <div class="muted" id="io-search-empty">Nenhum resultado encontrado.</div>
+          <div class="notice notice-warning" id="io-search-empty">Nenhum resultado encontrado.</div>
         {% endif %}
       </div>
     </section>
@@ -401,24 +451,31 @@
         var body = document.getElementById("io-search-table-body");
         var emptyEl = document.getElementById("io-search-empty");
         var loadingEl = document.getElementById("io-search-loading");
+        var metaEl = document.getElementById("io-search-meta");
         if (!resultsWrap || !countEl || !body || !emptyEl) {
           return;
-        }
-        if (loadingEl) {
-          loadingEl.classList.add("is-hidden");
         }
         var count = payload.count || 0;
         countEl.textContent = count + " resultado" + (count === 1 ? "" : "s");
         body.innerHTML = "";
         if (!payload.results || !payload.results.length) {
+          emptyEl.textContent = "Nenhum resultado encontrado.";
           emptyEl.classList.remove("is-hidden");
+          if (metaEl) {
+            metaEl.classList.remove("notice", "notice-success");
+          }
           resultsWrap.classList.remove("is-hidden");
           return;
+        }
+        if (metaEl) {
+          metaEl.classList.add("notice", "notice-success");
         }
         payload.results.forEach(function (row) {
           var tr = document.createElement("tr");
           tr.innerHTML =
             "<td>" + row.rack + "</td>" +
+            "<td>" + row.local + "</td>" +
+            "<td>" + row.grupo + "</td>" +
             "<td>" + row.slot + "</td>" +
             "<td>" + row.modulo + "</td>" +
             "<td>" + row.canal + " - " + row.canal_nome + "</td>" +
@@ -433,14 +490,18 @@
         var form = document.querySelector(".io-search-form");
         var input = form ? form.querySelector("input[name='q']") : null;
         var rackSelect = document.getElementById("io-search-rack");
+        var localSelect = document.getElementById("io-search-local");
+        var grupoSelect = document.getElementById("io-search-grupo");
         var loadingEl = document.getElementById("io-search-loading");
-        if (!form || !input || !rackSelect) {
+        if (!form || !input || !rackSelect || !localSelect || !grupoSelect) {
           return;
         }
         var runSearch = function () {
           var term = input.value.trim();
           var rack = rackSelect.value;
-          if (!term && !rack) {
+          var local = localSelect.value;
+          var grupo = grupoSelect.value;
+          if (!term && !rack && !local && !grupo) {
             var wrap = document.getElementById("io-search-results");
             if (wrap) {
               wrap.classList.add("is-hidden");
@@ -453,6 +514,7 @@
           if (loadingEl) {
             loadingEl.classList.remove("is-hidden");
           }
+          var emptyEl = document.getElementById("io-search-empty");
           var params = new URLSearchParams();
           if (term) {
             params.set("q", term);
@@ -460,12 +522,36 @@
           if (rack) {
             params.set("rack", rack);
           }
+          if (local) {
+            params.set("local", local);
+          }
+          if (grupo) {
+            params.set("grupo", grupo);
+          }
           fetch(window.location.pathname + "?" + params.toString(), {
             headers: { "X-Requested-With": "XMLHttpRequest" },
           })
-            .then(function (resp) { return resp.json(); })
+            .then(function (resp) {
+              if (!resp.ok) {
+                throw new Error("HTTP " + resp.status);
+              }
+              return resp.json();
+            })
             .then(updateSearchUI)
             .catch(function () {
+              var wrap = document.getElementById("io-search-results");
+              if (emptyEl) {
+                emptyEl.textContent = "Nao foi possivel buscar agora.";
+                emptyEl.classList.remove("is-hidden");
+              }
+              if (metaEl) {
+                metaEl.classList.remove("notice", "notice-success");
+              }
+              if (wrap) {
+                wrap.classList.remove("is-hidden");
+              }
+            })
+            .finally(function () {
               if (loadingEl) {
                 loadingEl.classList.add("is-hidden");
               }
@@ -474,6 +560,8 @@
         var debounced = debounce(runSearch, 300);
         input.addEventListener("input", debounced);
         rackSelect.addEventListener("change", runSearch);
+        localSelect.addEventListener("change", runSearch);
+        grupoSelect.addEventListener("change", runSearch);
         form.addEventListener("submit", function (event) {
           event.preventDefault();
           runSearch();

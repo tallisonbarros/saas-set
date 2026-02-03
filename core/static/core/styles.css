@@ -3015,6 +3015,13 @@ select {
   margin-top: 12px;
 }
 
+.io-search-meta-alert {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 102, 0, 0.12);
+  background: #fff6ef;
+}
+
 .io-search-loading {
   margin-top: 10px;
   font-size: 12px;
@@ -3276,6 +3283,7 @@ select {
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 2px;
+  font-size: 0.5em;
 }
 
 .slot-empty {

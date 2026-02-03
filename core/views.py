@@ -801,21 +801,35 @@ def ios_list(request):
         grupos = GrupoRackIO.objects.filter(cliente=cliente).order_by("nome")
     search_term = request.GET.get("q", "").strip()
     rack_filter = request.GET.get("rack", "").strip()
+    local_filter = request.GET.get("local", "").strip()
+    grupo_filter = request.GET.get("grupo", "").strip()
     search_results = []
     search_count = 0
-    if search_term or rack_filter:
+    if search_term or rack_filter or local_filter or grupo_filter:
         slot_pos_subquery = RackSlotIO.objects.filter(modulo_id=OuterRef("modulo_id")).values("posicao")[:1]
-        search_filter = (
-            Q(nome__icontains=search_term)
-            | Q(modulo__nome__icontains=search_term)
-            | Q(modulo__modulo_modelo__nome__icontains=search_term)
-            | Q(modulo__rack__nome__icontains=search_term)
-            | Q(ativo__tag_set__icontains=search_term)
-            | Q(ativo_item__tag_set__icontains=search_term)
-        )
+        search_filter = Q()
+        if search_term:
+            search_filter = (
+                Q(nome__icontains=search_term)
+                | Q(modulo__nome__icontains=search_term)
+                | Q(modulo__modulo_modelo__nome__icontains=search_term)
+                | Q(modulo__modulo_modelo__marca__icontains=search_term)
+                | Q(modulo__modulo_modelo__modelo__icontains=search_term)
+                | Q(modulo__rack__nome__icontains=search_term)
+                | Q(modulo__rack__local__nome__icontains=search_term)
+                | Q(modulo__rack__grupo__nome__icontains=search_term)
+                | Q(ativo__tag_set__icontains=search_term)
+                | Q(ativo_item__tag_set__icontains=search_term)
+            )
+            if search_term.isdigit():
+                search_filter = search_filter | Q(indice=int(search_term))
         channels = CanalRackIO.objects.filter(modulo__rack__in=racks)
         if rack_filter and rack_filter.isdigit():
             channels = channels.filter(modulo__rack_id=int(rack_filter))
+        if local_filter and local_filter.isdigit():
+            channels = channels.filter(modulo__rack__local_id=int(local_filter))
+        if grupo_filter and grupo_filter.isdigit():
+            channels = channels.filter(modulo__rack__grupo_id=int(grupo_filter))
         if search_term:
             channels = channels.filter(search_filter)
         channels = (
@@ -836,6 +850,8 @@ def ios_list(request):
                     "canal": f"CH{channel.indice:02d}",
                     "canal_nome": channel.nome or "Sem nome",
                     "tipo": channel.tipo.nome,
+                    "local": channel.modulo.rack.local.nome if channel.modulo.rack.local_id else "-",
+                    "grupo": channel.modulo.rack.grupo.nome if channel.modulo.rack.grupo_id else "-",
                     "url": reverse("ios_rack_modulo_detail", kwargs={"pk": channel.modulo.id}),
                 }
             )
@@ -855,6 +871,8 @@ def ios_list(request):
             "can_manage": bool(cliente),
             "search_term": search_term,
             "rack_filter": rack_filter,
+            "local_filter": local_filter,
+            "grupo_filter": grupo_filter,
             "search_results": search_results,
             "search_count": search_count,
             "inventarios": inventarios_qs.order_by("nome"),
