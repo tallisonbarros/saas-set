@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.home, name="home"),
     path('api/ingest', views.api_ingest, name="api_ingest"),
+    path('api/ingest/rules', views.api_ingest_rules, name="api_ingest_rules"),
     path('painel/', views.painel, name="painel"),
     path('ingest-gerenciar/', views.planta_conectada, name="ingest_gerenciar"),
     path('planta-conectada/', views.planta_conectada_redirect, name="planta_conectada"),

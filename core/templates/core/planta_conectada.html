@@ -36,6 +36,68 @@
   </section>
 
   <section class="card">
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">Regras de payload por source</h2>
+        <p class="page-subtitle">Defina campos obrigatorios por tipo de source.</p>
+      </div>
+    </div>
+    <form method="post" class="user-row ingest-rule-form" style="gap: 16px;" id="ingest-rule-create">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_ingest_rule">
+      <label class="field" style="min-width: 180px;">
+        <span class="field-label">Source</span>
+        <input class="field-input" type="text" name="source" placeholder="balanca" required>
+      </label>
+      <div class="field" style="flex: 1;">
+        <span class="field-label">Campos obrigatorios</span>
+        <div class="user-row" style="gap: 8px; align-items: flex-end;">
+          <input class="field-input" type="text" name="required_field_input" placeholder="Digite e clique em adicionar">
+          <button class="btn btn-outline" type="button" data-action="add-field">Adicionar</button>
+        </div>
+        <div class="user-row" style="gap: 8px; flex-wrap: wrap; margin-top: 8px;" data-role="chips"></div>
+        <input type="hidden" name="required_fields" value="[]">
+      </div>
+      <button class="btn btn-primary" type="submit">Salvar regra</button>
+    </form>
+    {% if ingest_rules %}
+      <div class="user-list">
+        {% for rule in ingest_rules %}
+          <div class="user-row" data-rule-row="true">
+            <div>
+              <div class="panel-title">{{ rule.source }}</div>
+              <form method="post" class="proposal-meta ingest-rule-form" style="margin-top: 6px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_ingest_rule">
+                <input type="hidden" name="rule_id" value="{{ rule.id }}">
+                <div class="user-row" style="gap: 8px; align-items: flex-end;">
+                  <input class="field-input" type="text" name="required_field_input" placeholder="Novo campo">
+                  <button class="btn btn-outline" type="button" data-action="add-field">Adicionar</button>
+                  <button class="btn btn-primary" type="submit">Salvar</button>
+                </div>
+                <div class="user-row" style="gap: 8px; flex-wrap: wrap; margin-top: 8px;" data-role="chips">
+                  {% for item in rule.required_fields %}
+                    <button class="btn btn-ghost" type="button" data-action="remove-field" data-value="{{ item }}">x {{ item }}</button>
+                  {% endfor %}
+                </div>
+                <input type="hidden" name="required_fields" value="{{ rule.required_fields_json|escapejs }}">
+              </form>
+            </div>
+            <form method="post" onsubmit="return confirm('Remover regra?');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete_ingest_rule">
+              <input type="hidden" name="rule_id" value="{{ rule.id }}">
+              <button class="btn btn-ghost" type="submit">Remover</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhuma regra cadastrada.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
     {% if registros %}
       <div class="user-list">
         {% for registro in registros %}
@@ -65,4 +127,122 @@
       <p class="muted">Nenhum dado recebido ainda.</p>
     {% endif %}
   </section>
+
+  <section class="card">
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">Erros de ingest</h2>
+        <p class="page-subtitle">Ultimos erros rejeitados pelo endpoint.</p>
+      </div>
+    </div>
+    {% if error_logs %}
+      <div class="user-list">
+        {% for log in error_logs %}
+          <div class="user-row">
+            <div>
+              <div class="panel-title">{{ log.error }}</div>
+              <div class="proposal-meta">
+                Source: {{ log.source|default:"-" }} Â· Source ID: {{ log.source_id|default:"-" }}
+              </div>
+              <div class="proposal-meta">
+                Cliente: {{ log.client_id|default:"-" }} Â· Agente: {{ log.agent_id|default:"-" }}
+              </div>
+              <div class="proposal-meta">
+                Recebido: {{ log.created_at|date:"d/m/Y H:i" }}
+              </div>
+            </div>
+            <details class="io-discrete" style="min-width: 220px;">
+              <summary class="io-discrete-summary">
+                <span class="io-title">Ver payload</span>
+                <span class="muted">JSON bruto</span>
+              </summary>
+              <div class="io-discrete-body">
+                <pre style="white-space: pre-wrap; margin: 0;">{{ log.raw_payload|pprint }}</pre>
+              </div>
+            </details>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhum erro registrado ainda.</p>
+    {% endif %}
+  </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function updateHiddenFields(container, hiddenInput) {
+    const values = Array.from(container.querySelectorAll("[data-action='remove-field']"))
+      .map((btn) => btn.dataset.value)
+      .filter((value) => value);
+    hiddenInput.value = JSON.stringify(values);
+  }
+
+  function bindRuleForm(form) {
+    const addButton = form.querySelector("[data-action='add-field']");
+    const input = form.querySelector("input[name='required_field_input']");
+    const chips = form.querySelector("[data-role='chips']");
+    const hidden = form.querySelector("input[name='required_fields']");
+
+    if (!addButton || !input || !chips || !hidden) {
+      return;
+    }
+
+    try {
+      const existing = JSON.parse(hidden.value || "[]");
+      if (Array.isArray(existing) && chips.childElementCount === 0) {
+        existing.forEach((value) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn btn-ghost";
+          btn.dataset.action = "remove-field";
+          btn.dataset.value = value;
+          btn.textContent = "x " + value;
+          chips.appendChild(btn);
+        });
+      }
+    } catch (err) {
+      hidden.value = "[]";
+    }
+
+    addButton.addEventListener("click", () => {
+      const value = (input.value || "").trim();
+      if (!value) {
+        return;
+      }
+      const exists = Array.from(chips.querySelectorAll("[data-action='remove-field']"))
+        .some((btn) => btn.dataset.value === value);
+      if (exists) {
+        input.value = "";
+        return;
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-ghost";
+      btn.dataset.action = "remove-field";
+      btn.dataset.value = value;
+      btn.textContent = "x " + value;
+      chips.appendChild(btn);
+      input.value = "";
+      updateHiddenFields(chips, hidden);
+    });
+
+    chips.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-action='remove-field']");
+      if (!btn) {
+        return;
+      }
+      btn.remove();
+      updateHiddenFields(chips, hidden);
+    });
+
+    form.addEventListener("submit", () => {
+      updateHiddenFields(chips, hidden);
+    });
+  }
+
+  document.querySelectorAll(".ingest-rule-form").forEach((form) => {
+    bindRuleForm(form);
+  });
+</script>
 {% endblock %}

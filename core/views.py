@@ -1,5 +1,7 @@
 import calendar
+import hmac
 import json
+import logging
 import os
 import ipaddress
 import re
@@ -42,6 +44,8 @@ from .models import (
     ListaIPItem,
     App,
     IngestRecord,
+    IngestErrorLog,
+    IngestRule,
     AdminAccessLog,
     Radar,
     RadarAtividade,
@@ -61,6 +65,60 @@ from .models import (
     AtivoItem,
     TipoAtivo,
 )
+
+logger = logging.getLogger(__name__)
+
+def _parse_bearer_token(auth_header):
+    if not auth_header:
+        return ""
+    parts = auth_header.strip().split()
+    if len(parts) < 2 or parts[0].lower() != "bearer":
+        return ""
+    return " ".join(parts[1:]).strip()
+
+
+def _validate_payload_by_source(source, payload_data, rules_by_source):
+    source_key = (source or "").strip().lower()
+    rules = rules_by_source.get(source_key)
+    if rules is None:
+        return False, "unknown_source"
+    if not isinstance(payload_data, dict):
+        return False, "payload_not_object"
+    payload_keys = {str(key).strip().lower() for key in payload_data.keys()}
+    missing = [key for key in rules if str(key).strip().lower() not in payload_keys]
+    if missing:
+        return False, f"missing:{','.join(missing)}"
+    return True, None
+
+
+def _log_ingest_error(error, item=None, raw_body=None):
+    try:
+        item = item or {}
+        IngestErrorLog.objects.create(
+            source_id=str(item.get("source_id", "")).strip(),
+            client_id=str(item.get("client_id", "")).strip(),
+            agent_id=str(item.get("agent_id", "")).strip(),
+            source=str(item.get("source", "")).strip(),
+            error=error,
+            raw_payload=item if isinstance(item, dict) else None,
+            raw_body=raw_body or "",
+        )
+    except Exception:
+        logger.exception("Failed to log ingest error")
+
+def _normalize_required_fields(required_fields):
+    normalized = []
+    seen = set()
+    for item in required_fields or []:
+        value = str(item).strip()
+        if not value:
+            continue
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(value)
+    return normalized
 
 
 def _clean_tag_prefix(value):
@@ -412,33 +470,54 @@ def api_ingest(request):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     expected_token = (os.environ.get("API_TOKEN") or "").strip()
-    auth_header = request.headers.get("Authorization", "").strip()
-    if not expected_token or auth_header != f"Bearer {expected_token}":
+    auth_header = request.headers.get("Authorization", "")
+    token = _parse_bearer_token(auth_header)
+    if not expected_token or not token or not hmac.compare_digest(token, expected_token):
+        _log_ingest_error("unauthorized", raw_body=request.body.decode("utf-8", errors="replace") if request.body else "")
         return JsonResponse({"ok": False, "error": "unauthorized"}, status=401)
     try:
         raw_body = request.body.decode("utf-8") if request.body else ""
         payload = json.loads(raw_body or "[]")
     except json.JSONDecodeError:
+        _log_ingest_error("invalid_json", raw_body=request.body.decode("utf-8", errors="replace") if request.body else "")
         return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
     if not isinstance(payload, list):
+        _log_ingest_error("invalid_payload", raw_body=raw_body)
         return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+    rules_by_source = {
+        rule.source.strip().lower(): (rule.required_fields or [])
+        for rule in IngestRule.objects.all()
+        if rule.source
+    }
     items_by_source = {}
     for item in payload:
         if not isinstance(item, dict):
+            _log_ingest_error("invalid_payload", item=item, raw_body=raw_body)
             return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
         source_id = str(item.get("source_id", "")).strip()
         client_id = str(item.get("client_id", "")).strip()
         agent_id = str(item.get("agent_id", "")).strip()
         source = str(item.get("source", "")).strip()
         if not source_id or not client_id or not agent_id or not source:
+            _log_ingest_error("invalid_payload", item=item, raw_body=raw_body)
             return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
         payload_data = item.get("payload", None)
         if isinstance(payload_data, str):
             try:
                 payload_data = json.loads(payload_data)
             except json.JSONDecodeError:
+                _log_ingest_error("invalid_payload", item=item, raw_body=raw_body)
                 return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
         if payload_data is None:
+            _log_ingest_error("invalid_payload", item=item, raw_body=raw_body)
+            return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+        is_valid, validation_error = _validate_payload_by_source(
+            source,
+            payload_data,
+            rules_by_source,
+        )
+        if not is_valid:
+            _log_ingest_error(f"invalid_payload:{validation_error}", item=item, raw_body=raw_body)
             return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
         items_by_source[source_id] = {
             "client_id": client_id,
@@ -446,31 +525,48 @@ def api_ingest(request):
             "source": source,
             "payload": payload_data,
         }
-        if items_by_source:
-            existing_records = IngestRecord.objects.filter(source_id__in=items_by_source.keys())
-            existing_by_source = {record.source_id: record for record in existing_records}
-            to_update = []
-            to_create = []
-            now = timezone.now()
-            for source_id, data in items_by_source.items():
-                existing = existing_by_source.get(source_id)
-                if existing:
-                    existing.client_id = data["client_id"]
-                    existing.agent_id = data["agent_id"]
-                    existing.source = data["source"]
-                    existing.payload = data["payload"]
-                    existing.updated_at = now
-                    to_update.append(existing)
-                else:
-                    to_create.append(IngestRecord(source_id=source_id, **data))
+    if items_by_source:
+        to_create = [
+            IngestRecord(source_id=source_id, **data)
+            for source_id, data in items_by_source.items()
+        ]
+        if to_create:
+            IngestRecord.objects.bulk_create(to_create, ignore_conflicts=True)
+        records = IngestRecord.objects.filter(source_id__in=items_by_source.keys())
+        to_update = []
+        now = timezone.now()
+        for record in records:
+            data = items_by_source.get(record.source_id)
+            if not data:
+                continue
+            record.client_id = data["client_id"]
+            record.agent_id = data["agent_id"]
+            record.source = data["source"]
+            record.payload = data["payload"]
+            record.updated_at = now
+            to_update.append(record)
         if to_update:
             IngestRecord.objects.bulk_update(
                 to_update,
                 ["client_id", "agent_id", "source", "payload", "updated_at"],
             )
-        if to_create:
-            IngestRecord.objects.bulk_create(to_create)
     return JsonResponse({"ok": True, "count": len(payload)})
+
+@csrf_exempt
+def api_ingest_rules(request):
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    expected_token = (os.environ.get("API_TOKEN") or "").strip()
+    auth_header = request.headers.get("Authorization", "")
+    token = _parse_bearer_token(auth_header)
+    if not expected_token or not token or not hmac.compare_digest(token, expected_token):
+        return JsonResponse({"ok": False, "error": "unauthorized"}, status=401)
+    source = request.GET.get("source", "").strip().lower()
+    rules_qs = IngestRule.objects.all()
+    if source:
+        rules_qs = rules_qs.filter(source=source)
+    rules = {rule.source: (rule.required_fields or []) for rule in rules_qs}
+    return JsonResponse({"ok": True, "rules": rules})
 
 
 @login_required
@@ -506,15 +602,61 @@ def painel(request):
 def planta_conectada(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
-    if request.method == "POST" and request.POST.get("action") == "clear_ingest":
-        IngestRecord.objects.all().delete()
-        return redirect("planta_conectada")
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "clear_ingest":
+            IngestRecord.objects.all().delete()
+            return redirect("planta_conectada")
+        if action == "save_ingest_rule":
+            source = request.POST.get("source", "").strip().lower()
+            required_raw = request.POST.get("required_fields", "").strip()
+            required_fields = []
+            if required_raw:
+                try:
+                    data = json.loads(required_raw)
+                    if isinstance(data, list):
+                        required_fields = [str(item).strip() for item in data if str(item).strip()]
+                except json.JSONDecodeError:
+                    required_fields = []
+            if source:
+                required_fields = _normalize_required_fields(required_fields)
+                IngestRule.objects.update_or_create(
+                    source=source,
+                    defaults={"required_fields": required_fields},
+                )
+            return redirect("planta_conectada")
+        if action == "update_ingest_rule":
+            rule_id = request.POST.get("rule_id")
+            required_raw = request.POST.get("required_fields", "").strip()
+            required_fields = []
+            if required_raw:
+                try:
+                    data = json.loads(required_raw)
+                    if isinstance(data, list):
+                        required_fields = [str(item).strip() for item in data if str(item).strip()]
+                except json.JSONDecodeError:
+                    required_fields = []
+            if rule_id:
+                required_fields = _normalize_required_fields(required_fields)
+                IngestRule.objects.filter(pk=rule_id).update(required_fields=required_fields)
+            return redirect("planta_conectada")
+        if action == "delete_ingest_rule":
+            rule_id = request.POST.get("rule_id")
+            if rule_id:
+                IngestRule.objects.filter(pk=rule_id).delete()
+            return redirect("planta_conectada")
     registros = IngestRecord.objects.all().order_by("-created_at")[:200]
+    error_logs = IngestErrorLog.objects.all().order_by("-created_at")[:200]
+    ingest_rules = IngestRule.objects.all().order_by("source")
+    for rule in ingest_rules:
+        rule.required_fields_json = json.dumps(rule.required_fields or [])
     return render(
         request,
         "core/planta_conectada.html",
         {
             "registros": registros,
+            "error_logs": error_logs,
+            "ingest_rules": ingest_rules,
         },
     )
 

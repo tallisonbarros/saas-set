@@ -776,6 +776,40 @@ class IngestRecord(models.Model):
         return self.source_id
 
 
+class IngestErrorLog(models.Model):
+    source_id = models.CharField(max_length=120, blank=True)
+    client_id = models.CharField(max_length=120, blank=True)
+    agent_id = models.CharField(max_length=120, blank=True)
+    source = models.CharField(max_length=120, blank=True)
+    error = models.CharField(max_length=120)
+    raw_payload = models.JSONField(null=True, blank=True)
+    raw_body = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["source", "created_at"]),
+            models.Index(fields=["source_id", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.error} - {self.source_id or self.source or 'ingest'}"
+
+
+class IngestRule(models.Model):
+    source = models.CharField(max_length=120, unique=True)
+    required_fields = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    class Meta:
+        ordering = ["source"]
+
+    def __str__(self):
+        return self.source
+
+
 class AdminAccessLog(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
