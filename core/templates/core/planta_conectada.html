@@ -51,14 +51,11 @@
       </label>
       <div class="field" style="flex: 1;">
         <span class="field-label">Campos obrigatorios</span>
-        <div class="user-row" style="gap: 8px; align-items: flex-end;">
-          <input class="field-input" type="text" name="required_field_input" placeholder="Digite e clique em adicionar">
-          <button class="btn btn-outline" type="button" data-action="add-field">Adicionar</button>
-        </div>
-        <div class="user-row" style="gap: 8px; flex-wrap: wrap; margin-top: 8px;" data-role="chips"></div>
+        <input class="field-input" type="text" name="required_field_input" placeholder="Digite e pressione Enter">
+        <div class="user-row" style="gap: 6px; flex-wrap: wrap; margin-top: 6px;" data-role="chips"></div>
         <input type="hidden" name="required_fields" value="[]">
       </div>
-      <button class="btn btn-primary" type="submit">Salvar regra</button>
+      <button class="btn btn-primary" type="submit">Salvar</button>
     </form>
     {% if ingest_rules %}
       <div class="user-list">
@@ -70,12 +67,11 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_ingest_rule">
                 <input type="hidden" name="rule_id" value="{{ rule.id }}">
-                <div class="user-row" style="gap: 8px; align-items: flex-end;">
+                <div class="user-row" style="gap: 6px; align-items: center;">
                   <input class="field-input" type="text" name="required_field_input" placeholder="Novo campo">
-                  <button class="btn btn-outline" type="button" data-action="add-field">Adicionar</button>
                   <button class="btn btn-primary" type="submit">Salvar</button>
                 </div>
-                <div class="user-row" style="gap: 8px; flex-wrap: wrap; margin-top: 8px;" data-role="chips">
+                <div class="user-row" style="gap: 6px; flex-wrap: wrap; margin-top: 6px;" data-role="chips">
                   {% for item in rule.required_fields %}
                     <button class="btn btn-ghost" type="button" data-action="remove-field" data-value="{{ item }}">x {{ item }}</button>
                   {% endfor %}
@@ -179,12 +175,11 @@
   }
 
   function bindRuleForm(form) {
-    const addButton = form.querySelector("[data-action='add-field']");
     const input = form.querySelector("input[name='required_field_input']");
     const chips = form.querySelector("[data-role='chips']");
     const hidden = form.querySelector("input[name='required_fields']");
 
-    if (!addButton || !input || !chips || !hidden) {
+    if (!input || !chips || !hidden) {
       return;
     }
 
@@ -205,26 +200,33 @@
       hidden.value = "[]";
     }
 
-    addButton.addEventListener("click", () => {
-      const value = (input.value || "").trim();
-      if (!value) {
+    function addChip(value) {
+      const trimmed = (value || "").trim();
+      if (!trimmed) {
         return;
       }
       const exists = Array.from(chips.querySelectorAll("[data-action='remove-field']"))
-        .some((btn) => btn.dataset.value === value);
+        .some((btn) => (btn.dataset.value || "").toLowerCase() === trimmed.toLowerCase());
       if (exists) {
-        input.value = "";
         return;
       }
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn btn-ghost";
       btn.dataset.action = "remove-field";
-      btn.dataset.value = value;
-      btn.textContent = "x " + value;
+      btn.dataset.value = trimmed;
+      btn.textContent = "x " + trimmed;
       chips.appendChild(btn);
-      input.value = "";
       updateHiddenFields(chips, hidden);
+    }
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+      event.preventDefault();
+      addChip(input.value);
+      input.value = "";
     });
 
     chips.addEventListener("click", (event) => {
