@@ -252,49 +252,52 @@
         </div>
         <div class="table-wrap">
           <table class="table io-search-table">
-            <thead>
-              <tr>
-                <th>Rack</th>
-                <th>Local</th>
-                <th>Grupo</th>
-                <th>Slot</th>
-                <th>Modulo</th>
-                <th>Canal</th>
-                <th>Tipo</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="io-search-table-body">
-              {% for channel in search_results %}
+              <thead>
                 <tr>
-                  <td>{{ channel.modulo.rack.nome }}</td>
-                  <td>{% if channel.modulo.rack.local %}{{ channel.modulo.rack.local.nome }}{% else %}-{% endif %}</td>
-                  <td>{% if channel.modulo.rack.grupo %}{{ channel.modulo.rack.grupo.nome }}{% else %}-{% endif %}</td>
-                  <td>
-                    {% if channel.slot_pos %}
-                      S{{ channel.slot_pos }}
-                    {% else %}
-                      -
-                    {% endif %}
-                  </td>
-                  <td>{{ channel.modulo.nome|default:channel.modulo.modulo_modelo.nome }}</td>
-                  <td>
-                    CH{{ channel.indice }} -
-                    {% if channel.tag %}
-                      {{ channel.tag }}
-                    {% else %}
-                      Sem TAG
-                    {% endif %}
-                  </td>
-                  <td>{{ channel.tipo.nome }}</td>
-                  <td>
-                    <a class="btn btn-ghost" href="{% url 'ios_rack_modulo_detail' channel.modulo.id %}">Abrir modulo</a>
-                  </td>
+                  <th>Rack</th>
+                  <th>Local</th>
+                  <th>Grupo</th>
+                  <th>Slot</th>
+                  <th>Canal</th>
+                  <th>Tipo</th>
+                  <th></th>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody id="io-search-table-body">
+                {% for channel in search_results %}
+                  <tr>
+                    <td>{{ channel.modulo.rack.nome }}</td>
+                    <td>{% if channel.modulo.rack.local %}{{ channel.modulo.rack.local.nome }}{% else %}-{% endif %}</td>
+                    <td>{% if channel.modulo.rack.grupo %}{{ channel.modulo.rack.grupo.nome }}{% else %}-{% endif %}</td>
+                    <td>
+                      {% if channel.slot_pos %}
+                        S{{ channel.slot_pos }}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                    <td>
+                      CH{{ channel.indice }} -
+                      {% if channel.tag %}
+                        {{ channel.tag }}
+                      {% else %}
+                        Sem TAG
+                      {% endif %}
+                    </td>
+                    <td>{{ channel.tipo.nome }}</td>
+                    <td>
+                      <a class="btn btn-ghost icon-only" href="{% url 'ios_rack_modulo_detail' channel.modulo.id %}" aria-label="Abrir detalhes do modulo" title="Abrir detalhes">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M14 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                          <path d="M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                        </svg>
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         <div class="notice notice-warning {% if search_results %}is-hidden{% endif %}" id="io-search-empty">
           Nenhum resultado encontrado.
         </div>
@@ -475,10 +478,13 @@
             "<td>" + row.local + "</td>" +
             "<td>" + row.grupo + "</td>" +
             "<td>" + row.slot + "</td>" +
-            "<td>" + row.modulo + "</td>" +
             "<td>" + row.canal + " - " + row.canal_tag + "</td>" +
             "<td>" + row.tipo + "</td>" +
-            "<td><a class=\"btn btn-ghost\" href=\"" + row.url + "\">Abrir modulo</a></td>";
+            "<td><a class=\"btn btn-ghost icon-only\" href=\"" + row.url + "\" aria-label=\"Abrir detalhes do modulo\" title=\"Abrir detalhes\">" +
+            "<svg class=\"icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">" +
+            "<path d=\"M14 5l7 7-7 7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>" +
+            "<path d=\"M3 12h18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"></path>" +
+            "</svg></a></td>";
           body.appendChild(tr);
         });
         emptyEl.classList.add("is-hidden");
