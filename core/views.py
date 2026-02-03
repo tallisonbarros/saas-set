@@ -810,7 +810,8 @@ def ios_list(request):
         search_filter = Q()
         if search_term:
             search_filter = (
-                Q(nome__icontains=search_term)
+                Q(tag__icontains=search_term)
+                | Q(nome__icontains=search_term)
                 | Q(modulo__nome__icontains=search_term)
                 | Q(modulo__modulo_modelo__nome__icontains=search_term)
                 | Q(modulo__modulo_modelo__marca__icontains=search_term)
@@ -818,8 +819,6 @@ def ios_list(request):
                 | Q(modulo__rack__nome__icontains=search_term)
                 | Q(modulo__rack__local__nome__icontains=search_term)
                 | Q(modulo__rack__grupo__nome__icontains=search_term)
-                | Q(ativo__tag_set__icontains=search_term)
-                | Q(ativo_item__tag_set__icontains=search_term)
             )
             if search_term.isdigit():
                 search_filter = search_filter | Q(indice=int(search_term))
