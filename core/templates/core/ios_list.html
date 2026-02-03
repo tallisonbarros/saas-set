@@ -250,56 +250,54 @@
         <div class="io-search-meta io-search-meta-alert" id="io-search-meta">
           <span class="slot-badge" id="io-search-count">{{ search_count }} resultado{{ search_count|pluralize }}</span>
         </div>
-        {% if search_results %}
-          <div class="table-wrap">
-            <table class="table io-search-table">
-              <thead>
+        <div class="table-wrap">
+          <table class="table io-search-table">
+            <thead>
+              <tr>
+                <th>Rack</th>
+                <th>Local</th>
+                <th>Grupo</th>
+                <th>Slot</th>
+                <th>Modulo</th>
+                <th>Canal</th>
+                <th>Tipo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="io-search-table-body">
+              {% for channel in search_results %}
                 <tr>
-                  <th>Rack</th>
-                  <th>Local</th>
-                  <th>Grupo</th>
-                  <th>Slot</th>
-                  <th>Modulo</th>
-                  <th>Canal</th>
-                  <th>Tipo</th>
-                  <th></th>
+                  <td>{{ channel.modulo.rack.nome }}</td>
+                  <td>{% if channel.modulo.rack.local %}{{ channel.modulo.rack.local.nome }}{% else %}-{% endif %}</td>
+                  <td>{% if channel.modulo.rack.grupo %}{{ channel.modulo.rack.grupo.nome }}{% else %}-{% endif %}</td>
+                  <td>
+                    {% if channel.slot_pos %}
+                      S{{ channel.slot_pos }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td>{{ channel.modulo.nome|default:channel.modulo.modulo_modelo.nome }}</td>
+                  <td>
+                    CH{{ channel.indice }} -
+                    {% if channel.nome %}
+                      {{ channel.nome }}
+                    {% else %}
+                      Sem nome
+                    {% endif %}
+                  </td>
+                  <td>{{ channel.tipo.nome }}</td>
+                  <td>
+                    <a class="btn btn-ghost" href="{% url 'ios_rack_modulo_detail' channel.modulo.id %}">Abrir modulo</a>
+                  </td>
                 </tr>
-              </thead>
-              <tbody id="io-search-table-body">
-                {% for channel in search_results %}
-                  <tr>
-                    <td>{{ channel.modulo.rack.nome }}</td>
-                    <td>{% if channel.modulo.rack.local %}{{ channel.modulo.rack.local.nome }}{% else %}-{% endif %}</td>
-                    <td>{% if channel.modulo.rack.grupo %}{{ channel.modulo.rack.grupo.nome }}{% else %}-{% endif %}</td>
-                    <td>
-                      {% if channel.slot_pos %}
-                        S{{ channel.slot_pos }}
-                      {% else %}
-                        -
-                      {% endif %}
-                    </td>
-                    <td>{{ channel.modulo.nome|default:channel.modulo.modulo_modelo.nome }}</td>
-                    <td>
-                      CH{{ channel.indice }} -
-                      {% if channel.nome %}
-                        {{ channel.nome }}
-                      {% else %}
-                        Sem nome
-                      {% endif %}
-                    </td>
-                    <td>{{ channel.tipo.nome }}</td>
-                    <td>
-                      <a class="btn btn-ghost" href="{% url 'ios_rack_modulo_detail' channel.modulo.id %}">Abrir modulo</a>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          <div class="notice notice-warning is-hidden" id="io-search-empty">Nenhum resultado encontrado.</div>
-        {% else %}
-          <div class="notice notice-warning" id="io-search-empty">Nenhum resultado encontrado.</div>
-        {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="notice notice-warning {% if search_results %}is-hidden{% endif %}" id="io-search-empty">
+          Nenhum resultado encontrado.
+        </div>
       </div>
     </section>
   </div>
