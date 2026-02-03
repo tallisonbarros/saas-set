@@ -1,0 +1,66 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}INGEST_DETALHE{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'ingest_gerenciar' %}">INGEST_GERENCIAR</a>
+    <span class="crumb-sep">/</span>
+    <span>DETALHE</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">INGEST_DETALHE</div>
+        <div class="hud-pill">{{ registro.source|default:"-" }}</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'ingest_gerenciar' %}">Voltar</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">{{ registro.source_id }}</h1>
+          <p class="page-subtitle">Detalhes completos do ingest recebido.</p>
+        </div>
+        <form method="post" onsubmit="return confirm('Criar/atualizar regras com base neste payload?');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_ingest_rule">
+          <button class="btn btn-primary" type="submit">Criar source</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="user-list">
+      <div class="user-row">
+        <div>
+          <div class="panel-title">Identificadores</div>
+          <div class="proposal-meta">Source: {{ registro.source|default:"-" }}</div>
+          <div class="proposal-meta">Source ID: {{ registro.source_id }}</div>
+          <div class="proposal-meta">Cliente: {{ registro.client_id|default:"-" }}</div>
+          <div class="proposal-meta">Agente: {{ registro.agent_id|default:"-" }}</div>
+          <div class="proposal-meta">Recebido: {{ registro.created_at|date:"d/m/Y H:i" }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <details class="io-discrete" open>
+      <summary class="io-discrete-summary">
+        <span class="io-title">Payload</span>
+        <span class="muted">JSON bruto</span>
+      </summary>
+      <div class="io-discrete-body">
+        <pre style="white-space: pre-wrap; margin: 0;">{{ registro.payload|pprint }}</pre>
+      </div>
+    </details>
+  </section>
+{% endblock %}

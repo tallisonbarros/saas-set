@@ -1,0 +1,68 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}INGEST_ERROS{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'ingest_gerenciar' %}">INGEST_GERENCIAR</a>
+    <span class="crumb-sep">/</span>
+    <span>INGEST_ERROS</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">INGEST_ERROS</div>
+        <div class="hud-pill">Logs</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'ingest_gerenciar' %}">Voltar</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Erros de ingest</h1>
+          <p class="page-subtitle">Ultimos erros rejeitados pelo endpoint.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    {% if error_logs %}
+      <div class="user-list">
+        {% for log in error_logs %}
+          <div class="user-row">
+            <div>
+              <div class="panel-title">{{ log.error }}</div>
+              <div class="proposal-meta">
+                Source: {{ log.source|default:"-" }} Â· Source ID: {{ log.source_id|default:"-" }}
+              </div>
+              <div class="proposal-meta">
+                Cliente: {{ log.client_id|default:"-" }} Â· Agente: {{ log.agent_id|default:"-" }}
+              </div>
+              <div class="proposal-meta">
+                Recebido: {{ log.created_at|date:"d/m/Y H:i" }}
+              </div>
+            </div>
+            <details class="io-discrete" style="min-width: 220px;">
+              <summary class="io-discrete-summary">
+                <span class="io-title">Ver payload</span>
+                <span class="muted">JSON bruto</span>
+              </summary>
+              <div class="io-discrete-body">
+                <pre style="white-space: pre-wrap; margin: 0;">{{ log.raw_payload|pprint }}</pre>
+              </div>
+            </details>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhum erro registrado ainda.</p>
+    {% endif %}
+  </section>
+{% endblock %}

@@ -646,17 +646,53 @@ def planta_conectada(request):
                 IngestRule.objects.filter(pk=rule_id).delete()
             return redirect("planta_conectada")
     registros = IngestRecord.objects.all().order_by("-created_at")[:200]
-    error_logs = IngestErrorLog.objects.all().order_by("-created_at")[:200]
     ingest_rules = IngestRule.objects.all().order_by("source")
     for rule in ingest_rules:
         rule.required_fields_json = json.dumps(rule.required_fields or [])
     return render(
         request,
-        "core/planta_conectada.html",
+        "core/ingest_gerenciar.html",
         {
             "registros": registros,
-            "error_logs": error_logs,
             "ingest_rules": ingest_rules,
+        },
+    )
+
+
+@login_required
+def ingest_error_logs(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    logs = IngestErrorLog.objects.all().order_by("-created_at")[:500]
+    return render(
+        request,
+        "core/ingest_erros.html",
+        {
+            "error_logs": logs,
+        },
+    )
+
+
+@login_required
+def ingest_detail(request, pk):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    registro = get_object_or_404(IngestRecord, pk=pk)
+    payload = registro.payload if isinstance(registro.payload, dict) else {}
+    if request.method == "POST" and request.POST.get("action") == "create_ingest_rule":
+        if registro.source:
+            required_fields = _normalize_required_fields(list(payload.keys()))
+            IngestRule.objects.update_or_create(
+                source=registro.source.strip().lower(),
+                defaults={"required_fields": required_fields},
+            )
+        return redirect("ingest_detail", pk=registro.pk)
+    return render(
+        request,
+        "core/ingest_detail.html",
+        {
+            "registro": registro,
+            "payload": payload,
         },
     )
 
