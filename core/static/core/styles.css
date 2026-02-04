@@ -734,6 +734,12 @@ body {
   color: var(--muted);
 }
 
+.proposal-card-footer {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(122, 107, 96, 0.3);
+}
+
 .proposal-card-badges {
   display: flex;
   flex-direction: column;
