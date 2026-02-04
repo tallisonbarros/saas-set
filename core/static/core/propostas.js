@@ -5,7 +5,7 @@
   }
 
   const tabs = Array.from(document.querySelectorAll("[data-proposta-tab]"));
-  const filtersWrap = document.querySelector("[data-proposta-filters]");
+  const filtersWrap = document.querySelector(".proposal-filter-row .filters");
   const titleEl = document.querySelector("[data-proposta-title]");
   const subtitleEl = document.querySelector("[data-proposta-subtitle]");
   const summaryWrap = document.querySelector("[data-proposta-summary]");

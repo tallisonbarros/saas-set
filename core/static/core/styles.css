@@ -772,19 +772,6 @@ body {
   z-index: 2;
 }
 
-.proposal-link-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
-
 .proposal-card-sent {
   background: linear-gradient(140deg, #ffffff 0%, #f1f4f8 100%);
   border-color: rgba(83, 100, 124, 0.55);
