@@ -5,12 +5,9 @@
   }
 
   const tabs = Array.from(document.querySelectorAll("[data-proposta-tab]"));
-  const filtersWrap = document.querySelector(".proposal-filter-row .filters");
   const titleEl = document.querySelector("[data-proposta-title]");
   const subtitleEl = document.querySelector("[data-proposta-subtitle]");
   const summaryWrap = document.querySelector("[data-proposta-summary]");
-  const searchForm = document.querySelector(".proposal-search");
-  const searchInput = document.querySelector("[data-proposta-search]");
   const url = container.dataset.propostasUrl;
 
   const MODE_CONFIG = {
@@ -23,14 +20,6 @@
         total: "Total recebidas",
         finalizadas_90: "Finalizadas (90 dias)",
       },
-      filters: [
-        { label: "Todas", value: "" },
-        { label: "Pendentes", value: "pendente" },
-        { label: "Levantamento", value: "levantamento" },
-        { label: "Aprovadas", value: "aprovada" },
-        { label: "Reprovadas", value: "reprovada" },
-        { label: "Finalizadas (90 dias)", value: "finalizada" },
-      ],
     },
     enviadas: {
       title: "Propostas enviadas",
@@ -41,14 +30,6 @@
         total: "Total enviadas",
         finalizadas_90: "Finalizadas (90 dias)",
       },
-      filters: [
-        { label: "Todas", value: "" },
-        { label: "Pendentes", value: "pendente" },
-        { label: "Levantamento", value: "levantamento" },
-        { label: "Aprovadas", value: "aprovada" },
-        { label: "Reprovadas", value: "reprovada" },
-        { label: "Finalizadas (90 dias)", value: "finalizada" },
-      ],
     },
   };
 
@@ -82,29 +63,6 @@
       return "enviadas";
     }
     return "recebidas";
-  };
-
-  const renderFilters = (mode, activeStatus) => {
-    if (!filtersWrap) {
-      return;
-    }
-    const config = MODE_CONFIG[mode];
-    filtersWrap.innerHTML = "";
-    config.filters.forEach((filter) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `filter-pill${filter.value === activeStatus ? " active" : ""}`;
-      button.dataset.filterValue = filter.value;
-      button.textContent = filter.label;
-      button.addEventListener("click", () => {
-        setState({ status: filter.value }, { pushHistory: true, refresh: true, resetScroll: true });
-      });
-      filtersWrap.appendChild(button);
-    });
-    const statusInput = searchForm?.querySelector('input[name="status"]');
-    if (statusInput) {
-      statusInput.value = activeStatus || "";
-    }
   };
 
   const updateHeader = (mode) => {
@@ -188,8 +146,6 @@
 
   let state = {
     mode: resolveMode(container.dataset.mode || ""),
-    status: container.dataset.status || "",
-    q: container.dataset.search || "",
   };
 
   const syncUrl = (mode, status, q, push) => {
@@ -212,19 +168,13 @@
     }
   };
 
-  const fetchData = async ({ mode, status, q }) => {
+  const fetchData = async ({ mode }) => {
     if (!url) {
       return;
     }
     renderSkeleton();
     const params = new URLSearchParams();
     params.set("mode", mode);
-    if (status) {
-      params.set("status", status);
-    }
-    if (q) {
-      params.set("q", q);
-    }
     try {
       const response = await fetch(`${url}?${params.toString()}`, {
         headers: {
@@ -254,18 +204,7 @@
     saveModeToStorage(state.mode);
     setActiveTab(state.mode);
     updateHeader(state.mode);
-    renderFilters(state.mode, state.status);
-    if (searchForm) {
-      const modeInput = searchForm.querySelector('input[name="mode"]');
-      if (modeInput) {
-        modeInput.value = state.mode;
-      }
-      const statusInput = searchForm.querySelector('input[name="status"]');
-      if (statusInput) {
-        statusInput.value = state.status || "";
-      }
-    }
-    syncUrl(state.mode, state.status, state.q, pushHistory);
+    syncUrl(state.mode, "", "", pushHistory);
     if (refresh) {
       fetchData(state);
     }
@@ -277,40 +216,21 @@
       if (newMode === state.mode) {
         return;
       }
-      setState({ mode: newMode, status: "" }, { pushHistory: true, refresh: true });
+      setState({ mode: newMode }, { pushHistory: true, refresh: true });
     });
   });
 
-  if (searchForm) {
-    searchForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const query = (searchInput?.value || "").trim();
-      setState({ q: query }, { pushHistory: true, refresh: true });
-    });
-  }
-
   window.addEventListener("popstate", () => {
-    const { mode, status, q } = getQueryParams();
+    const { mode } = getQueryParams();
     const nextMode = resolveMode(mode || loadModeFromStorage());
-    const nextStatus = status || "";
-    const nextQ = q || "";
-    if (searchInput) {
-      searchInput.value = nextQ;
-    }
-    setState({ mode: nextMode, status: nextStatus, q: nextQ }, { pushHistory: false, refresh: true });
+    setState({ mode: nextMode }, { pushHistory: false, refresh: true });
   });
 
   const initialParams = getQueryParams();
   const initialMode = resolveMode(initialParams.mode || loadModeFromStorage() || state.mode);
-  const initialStatus = initialParams.status || state.status;
-  const initialQ = initialParams.q || state.q;
-  if (searchInput) {
-    searchInput.value = initialQ;
-  }
-  const shouldRefresh =
-    initialMode !== state.mode || initialStatus !== state.status || initialQ !== state.q;
-  setState({ mode: initialMode, status: initialStatus, q: initialQ }, { pushHistory: false, refresh: false });
+  const shouldRefresh = initialMode !== state.mode;
+  setState({ mode: initialMode }, { pushHistory: false, refresh: false });
   if (shouldRefresh) {
-    fetchData({ mode: initialMode, status: initialStatus, q: initialQ });
+    fetchData({ mode: initialMode });
   }
 })();

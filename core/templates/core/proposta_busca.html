@@ -1,0 +1,112 @@
+{% extends "core/base.html" %}
+
+{% block title %}Buscar propostas{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'propostas' %}?mode={{ tipo_ativo }}">Propostas</a>
+    <span class="crumb-sep">/</span>
+    <span>Busca</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card stack">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Busca de propostas</div>
+        <div class="hud-pill">{% if tipo_ativo == "enviadas" %}Enviadas{% else %}Recebidas{% endif %}</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'propostas' %}?mode={{ tipo_ativo }}">Voltar para lista</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Resultados da busca</h1>
+          <p class="page-subtitle">Consulta em formato tabela com filtros.</p>
+        </div>
+      </div>
+    </div>
+
+    <form class="proposal-search-form" method="get">
+      <div>
+        <label for="id_mode">Modo</label>
+        <select id="id_mode" name="mode">
+          <option value="recebidas" {% if tipo_ativo == "recebidas" %}selected{% endif %}>Recebidas</option>
+          <option value="enviadas" {% if tipo_ativo == "enviadas" %}selected{% endif %}>Enviadas</option>
+        </select>
+      </div>
+      <div>
+        <label for="id_status">Status</label>
+        <select id="id_status" name="status">
+          <option value="" {% if not status_filter %}selected{% endif %}>Todos</option>
+          <option value="pendente" {% if status_filter == "pendente" %}selected{% endif %}>Pendentes</option>
+          <option value="levantamento" {% if status_filter == "levantamento" %}selected{% endif %}>Levantamento</option>
+          <option value="aprovada" {% if status_filter == "aprovada" %}selected{% endif %}>Aprovadas</option>
+          <option value="reprovada" {% if status_filter == "reprovada" %}selected{% endif %}>Reprovadas</option>
+          <option value="finalizada" {% if status_filter == "finalizada" %}selected{% endif %}>Finalizadas (90 dias)</option>
+        </select>
+      </div>
+      <div class="proposal-search-grow">
+        <label for="id_q">Busca</label>
+        <input id="id_q" type="search" name="q" value="{{ search_term }}" placeholder="Codigo, nome, descricao, email...">
+      </div>
+      <div class="proposal-search-actions">
+        <button class="btn btn-primary" type="submit">Buscar</button>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Codigo</th>
+            <th>Nome</th>
+            <th>Status</th>
+            <th>{% if tipo_ativo == "enviadas" %}Para{% else %}De{% endif %}</th>
+            <th>Valor</th>
+            <th>Criada em</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for proposta in page_obj %}
+            <tr>
+              <td>{{ proposta.codigo }}</td>
+              <td>{{ proposta.nome }}</td>
+              <td><span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span></td>
+              <td>
+                {% if tipo_ativo == "enviadas" %}
+                  {{ proposta.cliente.nome|default:"Sistema" }}
+                {% else %}
+                  {{ proposta.criada_por.username|default:"Sistema" }}
+                {% endif %}
+              </td>
+              <td>{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</td>
+              <td>{{ proposta.criado_em|date:"d/m/Y H:i" }}</td>
+              <td><a class="btn btn-ghost btn-compact" href="{% url 'proposta_detail' proposta.pk %}">Abrir</a></td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7">Nenhum resultado para os filtros informados.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-ghost btn-compact" href="?mode={{ tipo_ativo }}&status={{ status_filter }}&q={{ search_term|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+        {% endif %}
+        <span class="pagination-info">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a class="btn btn-ghost btn-compact" href="?mode={{ tipo_ativo }}&status={{ status_filter }}&q={{ search_term|urlencode }}&page={{ page_obj.next_page_number }}">Proxima</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

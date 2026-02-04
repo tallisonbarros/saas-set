@@ -19,6 +19,7 @@
         <div class="hud-pill">Carteira comercial</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill hud-menu-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
+          <a class="hud-menu-pill" href="{% url 'propostas_busca' %}?mode={{ tipo_ativo }}">Buscar propostas</a>
         </div>
       </div>
       <div class="page-hud-head">
@@ -87,29 +88,11 @@
           </button>
         </div>
       </div>
-      <div class="proposal-filter-row">
-        <div class="filters"></div>
-        <form class="proposal-search" method="get">
-          <input type="hidden" name="mode" value="{{ tipo_ativo }}">
-          <input type="hidden" name="status" value="{{ status_filter|default:'' }}">
-          <input
-            type="search"
-            name="q"
-            value="{{ search_term }}"
-            data-proposta-search
-            placeholder="Buscar por codigo / nome / email"
-            aria-label="Buscar propostas"
-          >
-          <button class="btn btn-ghost btn-compact" type="submit">Buscar</button>
-        </form>
-      </div>
       <div
         id="proposal-listings"
         class="proposal-listings"
         data-propostas-url="{% url 'propostas_data' %}"
         data-mode="{{ tipo_ativo }}"
-        data-status="{{ status_filter|default:'' }}"
-        data-search="{{ search_term|default:'' }}"
       >
         {% include "core/propostas/_sections.html" %}
       </div>

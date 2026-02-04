@@ -3253,9 +3253,9 @@ def _proposta_quick_stats(user, cliente, tipo):
 @login_required
 def proposta_list(request):
     cliente = _get_cliente(request.user)
-    status_filter = request.GET.get("status", "").strip().lower() or None
     tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
-    search_term = request.GET.get("q", "").strip()
+    status_filter = None
+    search_term = ""
     pendencias_total = _pendencias_total(request.user, cliente)
     sections = _build_proposta_sections(request.user, cliente, tipo_ativo, status_filter, search_term=search_term)
     status_label_map = {
@@ -3296,8 +3296,8 @@ def proposta_data(request):
         return HttpResponseNotAllowed(["GET"])
     cliente = _get_cliente(request.user)
     tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
-    status_filter = request.GET.get("status", "").strip().lower() or None
-    search_term = request.GET.get("q", "").strip()
+    status_filter = None
+    search_term = ""
     sections = _build_proposta_sections(request.user, cliente, tipo_ativo, status_filter, search_term=search_term)
     status_label_map = {
         "pendente": "Pendentes",
@@ -3348,6 +3348,30 @@ def proposta_finalizadas_arquivo(request):
             "page_obj": page_obj,
             "cutoff": cutoff,
             "tipo_ativo": tipo_ativo,
+        },
+    )
+
+
+@login_required
+def proposta_busca(request):
+    cliente = _get_cliente(request.user)
+    tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
+    status_filter = request.GET.get("status", "").strip().lower() or None
+    search_term = request.GET.get("q", "").strip()
+    base = _proposta_status_annotations(_proposta_tipo_qs(request.user, cliente, tipo_ativo))
+    base = _apply_search_filter(base, search_term)
+    resultados = _apply_status_filter(base, status_filter).order_by("-criado_em")
+    paginator = Paginator(resultados, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(
+        request,
+        "core/proposta_busca.html",
+        {
+            "cliente": cliente,
+            "tipo_ativo": tipo_ativo,
+            "status_filter": status_filter or "",
+            "search_term": search_term,
+            "page_obj": page_obj,
         },
     )
 
