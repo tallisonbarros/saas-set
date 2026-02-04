@@ -3101,10 +3101,10 @@ def _proposta_status_annotations(queryset):
         queryset.annotate(
             status_order=Case(
                 When(finalizada=True, then=Value(6)),
-                When(valor__isnull=True, then=Value(0)),
                 When(andamento="EXECUTANDO", then=Value(4)),
                 When(aprovada=True, then=Value(3)),
                 When(aprovada=False, then=Value(5)),
+                When(aprovada__isnull=True, valor__isnull=True, then=Value(1)),
                 When(aprovada__isnull=True, valor=0, then=Value(1)),
                 default=Value(2),
                 output_field=IntegerField(),
@@ -3113,8 +3113,8 @@ def _proposta_status_annotations(queryset):
         .annotate(
             status_label=Case(
                 When(finalizada=True, then=Value("Finalizada")),
-                When(valor__isnull=True, then=Value("Rascunho")),
                 When(andamento="EXECUTANDO", then=Value("Executando")),
+                When(aprovada__isnull=True, valor__isnull=True, then=Value("Levantamento")),
                 When(aprovada__isnull=True, valor=0, then=Value("Levantamento")),
                 When(aprovada=True, then=Value("Aprovada")),
                 When(aprovada=False, then=Value("Reprovada")),
@@ -3154,7 +3154,7 @@ def _apply_status_filter(queryset, status_filter):
     if status_filter == "pendente":
         return queryset.filter(aprovada__isnull=True, valor__isnull=False).exclude(valor=0)
     if status_filter == "levantamento":
-        return queryset.filter(aprovada__isnull=True, valor=0)
+        return queryset.filter(aprovada__isnull=True).filter(Q(valor=0) | Q(valor__isnull=True))
     if status_filter == "aprovada":
         return queryset.filter(aprovada=True)
     if status_filter == "reprovada":
@@ -3201,7 +3201,7 @@ def _build_proposta_sections(user, cliente, tipo, status_filter, search_term=Non
     para_aprovar = Proposta.objects.none()
     aguardando_aprovacao = Proposta.objects.none()
     executando = Proposta.objects.none()
-    rascunhos = Proposta.objects.none()
+    levantamento = Proposta.objects.none()
     if cliente:
         para_aprovar = tipo_qs.filter(
             aprovada__isnull=True,
@@ -3214,21 +3214,24 @@ def _build_proposta_sections(user, cliente, tipo, status_filter, search_term=Non
         valor__gt=0,
         finalizada=False,
     ).order_by("-criado_em")
-    rascunhos = tipo_qs.filter(valor__isnull=True, finalizada=False).order_by("-criado_em")
     if tipo == "recebidas":
         executando = tipo_qs.filter(andamento="EXECUTANDO", finalizada=False).order_by("-criado_em")
+    levantamento = tipo_qs.filter(aprovada__isnull=True, finalizada=False).filter(
+        Q(valor=0) | Q(valor__isnull=True)
+    ).order_by("-criado_em")
     todas = _apply_status_filter(tipo_qs, status_filter)
     todas = todas.exclude(
         Q(finalizada=True) & Q(finalizada_em__lt=cutoff)
     )
     finalizadas_90 = tipo_qs.filter(finalizada=True, finalizada_em__gte=cutoff).order_by("-finalizada_em")
+    finalizadas_lista = list(finalizadas_90)
     return {
         "para_aprovar": para_aprovar,
         "aguardando_aprovacao": aguardando_aprovacao,
         "executando": executando,
-        "rascunhos": rascunhos,
+        "levantamento": levantamento,
         "todas": _group_propostas(todas, tipo),
-        "finalizadas_90": _group_propostas(finalizadas_90, tipo),
+        "finalizadas_90": finalizadas_lista,
     }
 
 
@@ -3272,7 +3275,7 @@ def proposta_list(request):
             "propostas_para_aprovar": sections["para_aprovar"],
             "propostas_aguardando": sections["aguardando_aprovacao"],
             "propostas_executando": sections["executando"],
-            "propostas_rascunhos": sections["rascunhos"],
+            "propostas_levantamento": sections["levantamento"],
             "propostas_todas": sections["todas"],
             "propostas_finalizadas": sections["finalizadas_90"],
             "pendencias_total": pendencias_total,
@@ -3310,7 +3313,7 @@ def proposta_data(request):
             "propostas_para_aprovar": sections["para_aprovar"],
             "propostas_aguardando": sections["aguardando_aprovacao"],
             "propostas_executando": sections["executando"],
-            "propostas_rascunhos": sections["rascunhos"],
+            "propostas_levantamento": sections["levantamento"],
             "propostas_todas": sections["todas"],
             "propostas_finalizadas": sections["finalizadas_90"],
             "status_filter": status_filter,
@@ -3456,9 +3459,7 @@ def proposta_detail(request, pk):
         status_label = "Aprovada"
     elif proposta.aprovada is False:
         status_label = "Reprovada"
-    elif proposta.valor is None:
-        status_label = "Rascunho"
-    elif proposta.valor == 0:
+    elif proposta.valor is None or proposta.valor == 0:
         status_label = "Levantamento"
     else:
         status_label = "Pendente"
@@ -3524,7 +3525,7 @@ def proposta_nova_vendedor(request):
             if not nome or not descricao:
                 message = "Preencha nome e descricao."
             elif valor_raw and valor is None:
-                message = "Informe um valor valido ou deixe em branco para rascunho."
+                message = "Informe um valor valido ou deixe em branco para levantamento."
             else:
                 proposta = Proposta.objects.create(
                     cliente=destinatario,
@@ -3563,7 +3564,7 @@ def aprovar_proposta(request, pk):
     if proposta.cliente.usuario_id != request.user.id:
         return HttpResponseForbidden("Somente o destinatario pode aprovar.")
     if proposta.valor is None or proposta.valor == 0:
-        return HttpResponseForbidden("Proposta sem valor definido.")
+        return HttpResponseForbidden("Proposta em levantamento.")
     if proposta.aprovada is None:
         proposta.aprovada = True
         proposta.decidido_em = timezone.now()
