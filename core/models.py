@@ -152,13 +152,14 @@ class Proposta(models.Model):
     nome = models.CharField(max_length=120)
     codigo = models.CharField(max_length=40, blank=True)
     descricao = models.TextField()
-    valor = models.DecimalField(max_digits=12, decimal_places=2)
+    valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     prioridade = models.PositiveSmallIntegerField(
         default=50,
         validators=[MinValueValidator(1), MaxValueValidator(99)],
     )
     aprovada = models.BooleanField(null=True, blank=True)
     finalizada = models.BooleanField(default=False)
+    finalizada_em = models.DateTimeField(null=True, blank=True)
     andamento = models.CharField(max_length=20, blank=True, default="")
     criado_em = models.DateTimeField(auto_now_add=True)
     decidido_em = models.DateTimeField(null=True, blank=True)

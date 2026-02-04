@@ -5,13 +5,15 @@ import logging
 import os
 import ipaddress
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from urllib.parse import urlencode
 from django.utils import timezone
@@ -3085,94 +3087,264 @@ def ios_rack_modulo_detail(request, pk):
     )
 
 
+def _normalize_proposta_tipo(raw_tipo):
+    tipo = (raw_tipo or "").strip().lower()
+    if tipo in {"enviadas", "enviada", "sent"}:
+        return "enviadas"
+    if tipo in {"recebidas", "recebida", "received"}:
+        return "recebidas"
+    return "recebidas"
+
+
+def _proposta_status_annotations(queryset):
+    return (
+        queryset.annotate(
+            status_order=Case(
+                When(finalizada=True, then=Value(6)),
+                When(valor__isnull=True, then=Value(0)),
+                When(andamento="EXECUTANDO", then=Value(4)),
+                When(aprovada=True, then=Value(3)),
+                When(aprovada=False, then=Value(5)),
+                When(aprovada__isnull=True, valor=0, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+        )
+        .annotate(
+            status_label=Case(
+                When(finalizada=True, then=Value("Finalizada")),
+                When(valor__isnull=True, then=Value("Rascunho")),
+                When(andamento="EXECUTANDO", then=Value("Executando")),
+                When(aprovada__isnull=True, valor=0, then=Value("Levantamento")),
+                When(aprovada=True, then=Value("Aprovada")),
+                When(aprovada=False, then=Value("Reprovada")),
+                default=Value("Pendente"),
+            )
+        )
+    )
+
+
+def _proposta_base_qs(user, cliente):
+    base = Proposta.objects.select_related("cliente", "criada_por")
+    if cliente:
+        return base.filter(Q(criada_por=user) | Q(cliente=cliente)).distinct()
+    return base.filter(criada_por=user)
+
+
+def _proposta_tipo_qs(user, cliente, tipo):
+    base = _proposta_base_qs(user, cliente)
+    if tipo == "enviadas":
+        return base.filter(criada_por=user)
+    if not cliente:
+        return base.none()
+    return base.filter(cliente=cliente).exclude(criada_por=user)
+
+
+def _pendencias_total(user, cliente):
+    if not cliente:
+        return 0
+    return (
+        Proposta.objects.filter(cliente=cliente, aprovada__isnull=True, valor__gt=0, finalizada=False)
+        .filter(cliente__usuario=user)
+        .count()
+    )
+
+
+def _apply_status_filter(queryset, status_filter):
+    if status_filter == "pendente":
+        return queryset.filter(aprovada__isnull=True, valor__isnull=False).exclude(valor=0)
+    if status_filter == "levantamento":
+        return queryset.filter(aprovada__isnull=True, valor=0)
+    if status_filter == "aprovada":
+        return queryset.filter(aprovada=True)
+    if status_filter == "reprovada":
+        return queryset.filter(aprovada=False)
+    if status_filter == "finalizada":
+        return queryset.filter(finalizada=True)
+    return queryset
+
+
+def _apply_search_filter(queryset, search_term):
+    term = (search_term or "").strip()
+    if not term:
+        return queryset
+    return queryset.filter(
+        Q(codigo__icontains=term)
+        | Q(nome__icontains=term)
+        | Q(descricao__icontains=term)
+        | Q(cliente__nome__icontains=term)
+        | Q(cliente__email__icontains=term)
+        | Q(criada_por__username__icontains=term)
+        | Q(criada_por__email__icontains=term)
+    )
+
+
+def _group_propostas(propostas, tipo):
+    agrupadas = {}
+    for proposta in propostas:
+        if tipo == "enviadas":
+            destino = proposta.cliente.nome if proposta.cliente else ""
+            if not destino:
+                destino = proposta.cliente.email if proposta.cliente else "Destino"
+            chave = destino
+        else:
+            chave = proposta.criada_por.username if proposta.criada_por else "Sistema"
+        agrupadas.setdefault(chave, []).append(proposta)
+    return [{"nome": key, "propostas": value} for key, value in agrupadas.items()]
+
+
+def _build_proposta_sections(user, cliente, tipo, status_filter, search_term=None):
+    cutoff = timezone.now() - timedelta(days=90)
+    tipo_qs = _proposta_status_annotations(_proposta_tipo_qs(user, cliente, tipo))
+    tipo_qs = _apply_search_filter(tipo_qs, search_term)
+    tipo_qs = tipo_qs.order_by("-criado_em")
+    para_aprovar = Proposta.objects.none()
+    aguardando_aprovacao = Proposta.objects.none()
+    executando = Proposta.objects.none()
+    rascunhos = Proposta.objects.none()
+    if cliente:
+        para_aprovar = tipo_qs.filter(
+            aprovada__isnull=True,
+            valor__gt=0,
+            cliente__usuario=user,
+            finalizada=False,
+        ).order_by("-criado_em")
+    aguardando_aprovacao = tipo_qs.filter(
+        aprovada__isnull=True,
+        valor__gt=0,
+        finalizada=False,
+    ).order_by("-criado_em")
+    rascunhos = tipo_qs.filter(valor__isnull=True, finalizada=False).order_by("-criado_em")
+    if tipo == "recebidas":
+        executando = tipo_qs.filter(andamento="EXECUTANDO", finalizada=False).order_by("-criado_em")
+    todas = _apply_status_filter(tipo_qs, status_filter)
+    todas = todas.exclude(
+        Q(finalizada=True) & Q(finalizada_em__lt=cutoff)
+    )
+    finalizadas_90 = tipo_qs.filter(finalizada=True, finalizada_em__gte=cutoff).order_by("-finalizada_em")
+    return {
+        "para_aprovar": para_aprovar,
+        "aguardando_aprovacao": aguardando_aprovacao,
+        "executando": executando,
+        "rascunhos": rascunhos,
+        "todas": _group_propostas(todas, tipo),
+        "finalizadas_90": _group_propostas(finalizadas_90, tipo),
+    }
+
+
+def _proposta_quick_stats(user, cliente, tipo):
+    cutoff = timezone.now() - timedelta(days=90)
+    base = _proposta_tipo_qs(user, cliente, tipo)
+    return {
+        "pendentes": base.filter(
+            aprovada__isnull=True,
+            valor__gt=0,
+            finalizada=False,
+        ).count(),
+        "em_execucao": base.filter(andamento="EXECUTANDO", finalizada=False).count(),
+        "finalizadas_90": base.filter(finalizada=True, finalizada_em__gte=cutoff).count(),
+        "total": base.count(),
+    }
+
+
 @login_required
 def proposta_list(request):
     cliente = _get_cliente(request.user)
-    propostas = Proposta.objects.none()
-    if cliente:
-        propostas = (
-            Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
-            .distinct()
-            .order_by("-criado_em")
-        )
-    else:
-        propostas = Proposta.objects.filter(criada_por=request.user).order_by("-criado_em")
-    status = request.GET.get("status")
-    if status == "pendente":
-        propostas = propostas.filter(aprovada__isnull=True).exclude(valor=0)
-    elif status == "levantamento":
-        propostas = propostas.filter(aprovada__isnull=True, valor=0)
-    elif status == "aprovada":
-        propostas = propostas.filter(aprovada=True)
-    elif status == "reprovada":
-        propostas = propostas.filter(aprovada=False)
-    elif status == "finalizada":
-        propostas = propostas.filter(finalizada=True)
-    else:
-        propostas = propostas.exclude(aprovada=False).exclude(finalizada=True)
-    propostas = propostas.annotate(
-        status_order=Case(
-            When(finalizada=True, then=Value(6)),
-            When(andamento="EXECUTANDO", then=Value(4)),
-            When(aprovada=True, then=Value(3)),
-            When(aprovada=False, then=Value(5)),
-            When(aprovada__isnull=True, valor=0, then=Value(1)),
-            default=Value(2),
-            output_field=IntegerField(),
-        )
-    ).order_by("status_order", "-criado_em")
-    propostas = propostas.annotate(
-        status_label=Case(
-            When(andamento="EXECUTANDO", then=Value("Executando")),
-            When(aprovada__isnull=True, valor=0, then=Value("Levantamento")),
-            When(aprovada=True, then=Value("Aprovada")),
-            When(aprovada=False, then=Value("Reprovada")),
-            default=Value("Pendente"),
-        )
-    )
-    propostas_para_aprovar = Proposta.objects.none()
-    propostas_restantes = propostas
-    if not status:
-        propostas_para_aprovar = propostas.filter(
-            aprovada__isnull=True,
-            valor__gt=0,
-            cliente__usuario=request.user,
-        )
-        propostas_restantes = propostas.exclude(pk__in=propostas_para_aprovar.values("pk"))
-    pendencias_total = propostas_para_aprovar.count()
-    propostas_recebidas = []
-    propostas_enviadas = []
-    recebidas_map = {}
-    enviadas_map = {}
-    for proposta in propostas_restantes:
-        if proposta.criada_por_id == request.user.id:
-            destinatario = proposta.cliente.nome if proposta.cliente else ""
-            if not destinatario:
-                destinatario = proposta.cliente.email if proposta.cliente else "Destino"
-            if destinatario not in enviadas_map:
-                enviadas_map[destinatario] = []
-            enviadas_map[destinatario].append(proposta)
-        else:
-            remetente = proposta.criada_por.username if proposta.criada_por else "Sistema"
-            if remetente not in recebidas_map:
-                recebidas_map[remetente] = []
-            recebidas_map[remetente].append(proposta)
-    propostas_recebidas = [{"nome": key, "propostas": value} for key, value in recebidas_map.items()]
-    propostas_enviadas = [{"nome": key, "propostas": value} for key, value in enviadas_map.items()]
+    status_filter = request.GET.get("status", "").strip().lower() or None
+    tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
+    search_term = request.GET.get("q", "").strip()
+    pendencias_total = _pendencias_total(request.user, cliente)
+    sections = _build_proposta_sections(request.user, cliente, tipo_ativo, status_filter, search_term=search_term)
+    status_label_map = {
+        "pendente": "Pendentes",
+        "levantamento": "Levantamento",
+        "aprovada": "Aprovadas",
+        "reprovada": "Reprovadas",
+        "finalizada": "Finalizadas (90 dias)",
+    }
+    status_filter_label = status_label_map.get(status_filter)
+    quick_stats = _proposta_quick_stats(request.user, cliente, tipo_ativo)
     return render(
         request,
         "core/proposta_list.html",
         {
             "cliente": cliente,
-            "propostas": propostas,
-            "propostas_para_aprovar": propostas_para_aprovar,
-            "propostas_restantes": propostas_restantes,
-            "propostas_recebidas": propostas_recebidas,
-            "propostas_enviadas": propostas_enviadas,
+            "propostas_para_aprovar": sections["para_aprovar"],
+            "propostas_aguardando": sections["aguardando_aprovacao"],
+            "propostas_executando": sections["executando"],
+            "propostas_rascunhos": sections["rascunhos"],
+            "propostas_todas": sections["todas"],
+            "propostas_finalizadas": sections["finalizadas_90"],
             "pendencias_total": pendencias_total,
-            "status_filter": status,
+            "status_filter": status_filter,
+            "status_filter_label": status_filter_label,
+            "tipo_ativo": tipo_ativo,
+            "search_term": search_term,
+            "quick_stats": quick_stats,
             "is_vendedor": True,
             "current_user_id": request.user.id,
+        },
+    )
+
+
+@login_required
+def proposta_data(request):
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    cliente = _get_cliente(request.user)
+    tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
+    status_filter = request.GET.get("status", "").strip().lower() or None
+    search_term = request.GET.get("q", "").strip()
+    sections = _build_proposta_sections(request.user, cliente, tipo_ativo, status_filter, search_term=search_term)
+    status_label_map = {
+        "pendente": "Pendentes",
+        "levantamento": "Levantamento",
+        "aprovada": "Aprovadas",
+        "reprovada": "Reprovadas",
+        "finalizada": "Finalizadas (90 dias)",
+    }
+    html = render_to_string(
+        "core/propostas/_sections.html",
+        {
+            "cliente": cliente,
+            "propostas_para_aprovar": sections["para_aprovar"],
+            "propostas_aguardando": sections["aguardando_aprovacao"],
+            "propostas_executando": sections["executando"],
+            "propostas_rascunhos": sections["rascunhos"],
+            "propostas_todas": sections["todas"],
+            "propostas_finalizadas": sections["finalizadas_90"],
+            "status_filter": status_filter,
+            "status_filter_label": status_label_map.get(status_filter),
+            "tipo_ativo": tipo_ativo,
+            "search_term": search_term,
+            "current_user_id": request.user.id,
+        },
+        request=request,
+    )
+    summary = _proposta_quick_stats(request.user, cliente, tipo_ativo)
+    return JsonResponse({"ok": True, "mode": tipo_ativo, "summary": summary, "html": html})
+
+
+@login_required
+def proposta_finalizadas_arquivo(request):
+    cliente = _get_cliente(request.user)
+    tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
+    cutoff = timezone.now() - timedelta(days=90)
+    base = _proposta_tipo_qs(request.user, cliente, tipo_ativo)
+    finalizadas = (
+        _proposta_status_annotations(base.filter(finalizada=True, finalizada_em__lt=cutoff))
+        .order_by("-finalizada_em")
+    )
+    paginator = Paginator(finalizadas, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(
+        request,
+        "core/proposta_finalizadas_arquivo.html",
+        {
+            "cliente": cliente,
+            "page_obj": page_obj,
+            "cutoff": cutoff,
+            "tipo_ativo": tipo_ativo,
         },
     )
 
@@ -3195,11 +3367,13 @@ def proposta_detail(request, pk):
                 message = "Nao e possivel alterar o valor apos aprovacao."
             else:
                 valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
-                try:
-                    valor = Decimal(valor_raw)
-                except (InvalidOperation, ValueError):
-                    valor = None
-                if valor is None:
+                valor = None
+                if valor_raw:
+                    try:
+                        valor = Decimal(valor_raw)
+                    except (InvalidOperation, ValueError):
+                        valor = None
+                if valor_raw and valor is None:
                     message = "Informe um valor valido."
                 else:
                     proposta.valor = valor
@@ -3231,7 +3405,9 @@ def proposta_detail(request, pk):
                 message = "Aguardando aprovacao. Finalizacao so e possivel apos aprovacao."
             else:
                 proposta.finalizada = True
-                proposta.save(update_fields=["finalizada"])
+                if not proposta.finalizada_em:
+                    proposta.finalizada_em = timezone.now()
+                proposta.save(update_fields=["finalizada", "finalizada_em"])
                 return redirect("proposta_detail", pk=proposta.pk)
         if action == "set_executando":
             if proposta.criada_por_id != request.user.id:
@@ -3280,6 +3456,8 @@ def proposta_detail(request, pk):
         status_label = "Aprovada"
     elif proposta.aprovada is False:
         status_label = "Reprovada"
+    elif proposta.valor is None:
+        status_label = "Rascunho"
     elif proposta.valor == 0:
         status_label = "Levantamento"
     else:
@@ -3299,36 +3477,54 @@ def proposta_detail(request, pk):
 @login_required
 def proposta_nova_vendedor(request):
     message = None
-    form_data = {"email": "", "nome": "", "descricao": "", "valor": "", "prioridade": "50"}
+    form_data = {
+        "email": "",
+        "nome": "",
+        "descricao": "",
+        "valor": "",
+        "prioridade": "50",
+        "codigo": "",
+        "observacao": "",
+    }
     if request.method == "POST":
         email = request.POST.get("email", "").strip().lower()
         nome = request.POST.get("nome", "").strip()
         descricao = request.POST.get("descricao", "").strip()
         valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
         prioridade_raw = request.POST.get("prioridade", "").strip()
+        codigo = request.POST.get("codigo", "").strip()
+        observacao = request.POST.get("observacao", "").strip()
+        anexo_tipo = request.POST.get("anexo_tipo") or PropostaAnexo.Tipo.OUTROS
+        anexo_arquivo = request.FILES.get("anexo_arquivo")
         form_data = {
             "email": email,
             "nome": nome,
             "descricao": descricao,
             "valor": valor_raw,
             "prioridade": prioridade_raw or "50",
+            "codigo": codigo,
+            "observacao": observacao,
         }
 
         destinatario = PerfilUsuario.objects.filter(email__iexact=email).first() if email else None
         if not destinatario:
             message = "Usuario nao encontrado para este email."
         else:
-            try:
-                valor = Decimal(valor_raw)
-            except (InvalidOperation, ValueError):
-                valor = None
+            valor = None
+            if valor_raw:
+                try:
+                    valor = Decimal(valor_raw)
+                except (InvalidOperation, ValueError):
+                    valor = None
             try:
                 prioridade = int(prioridade_raw) if prioridade_raw else 50
             except ValueError:
                 prioridade = 50
             prioridade = max(1, min(99, prioridade))
-            if not nome or not descricao or valor is None:
-                message = "Preencha nome, descricao e valor valido."
+            if not nome or not descricao:
+                message = "Preencha nome e descricao."
+            elif valor_raw and valor is None:
+                message = "Informe um valor valido ou deixe em branco para rascunho."
             else:
                 proposta = Proposta.objects.create(
                     cliente=destinatario,
@@ -3337,7 +3533,15 @@ def proposta_nova_vendedor(request):
                     descricao=descricao,
                     valor=valor,
                     prioridade=prioridade,
+                    codigo=codigo,
+                    observacao_cliente=observacao,
                 )
+                if anexo_arquivo:
+                    PropostaAnexo.objects.create(
+                        proposta=proposta,
+                        arquivo=anexo_arquivo,
+                        tipo=anexo_tipo,
+                    )
                 return redirect("proposta_detail", pk=proposta.pk)
 
     return render(
@@ -3346,6 +3550,7 @@ def proposta_nova_vendedor(request):
         {
             "message": message,
             "form_data": form_data,
+            "tipos_anexo": PropostaAnexo.Tipo.choices,
         },
     )
 
@@ -3357,8 +3562,8 @@ def aprovar_proposta(request, pk):
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
         return HttpResponseForbidden("Somente o destinatario pode aprovar.")
-    if proposta.valor == 0:
-        return HttpResponseForbidden("Proposta em levantamento.")
+    if proposta.valor is None or proposta.valor == 0:
+        return HttpResponseForbidden("Proposta sem valor definido.")
     if proposta.aprovada is None:
         proposta.aprovada = True
         proposta.decidido_em = timezone.now()

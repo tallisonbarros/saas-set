@@ -33,22 +33,64 @@
     {% if message %}
       <div class="alert alert-warning">{{ message }}</div>
     {% endif %}
-    <form class="stack" method="post">
+    <form class="stack" method="post" enctype="multipart/form-data">
       {% csrf_token %}
-      <label for="id_email">Destinatario</label>
-      <input id="id_email" type="email" name="email" value="{{ form_data.email }}" required>
+      <div class="proposal-form-card">
+        <div class="proposal-form-head">
+          <h2>Dados principais</h2>
+          <p class="muted">Informacoes essenciais da proposta.</p>
+        </div>
+        <div class="proposal-form-grid">
+          <div>
+            <label for="id_email">Destinatario</label>
+            <input id="id_email" type="email" name="email" value="{{ form_data.email }}" required>
+          </div>
+          <div>
+            <label for="id_codigo">Codigo</label>
+            <input id="id_codigo" type="text" name="codigo" value="{{ form_data.codigo }}" placeholder="Opcional">
+          </div>
+        </div>
+        <label for="id_nome">Nome</label>
+        <input id="id_nome" type="text" name="nome" value="{{ form_data.nome }}" required>
+        <label for="id_descricao">Descricao</label>
+        <textarea id="id_descricao" name="descricao" required>{{ form_data.descricao }}</textarea>
+        <div class="proposal-form-grid">
+          <div>
+            <label for="id_valor">Valor</label>
+            <input id="id_valor" type="text" name="valor" value="{{ form_data.valor }}" placeholder="Deixe em branco para rascunho">
+            <div class="field-help">Sem valor definido, a proposta fica em rascunho.</div>
+          </div>
+          <div>
+            <label for="id_prioridade">Prioridade</label>
+            <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ form_data.prioridade }}">
+          </div>
+        </div>
+      </div>
 
-      <label for="id_nome">Nome</label>
-      <input id="id_nome" type="text" name="nome" value="{{ form_data.nome }}" required>
+      <div class="proposal-form-card">
+        <div class="proposal-form-head">
+          <h2>Configuracoes</h2>
+          <p class="muted">Defina prioridade e observacoes.</p>
+        </div>
+        <label for="id_observacao">Observacao</label>
+        <textarea id="id_observacao" name="observacao" placeholder="Observacoes internas">{{ form_data.observacao }}</textarea>
+        <div class="field-help">Visivel no detalhe da proposta.</div>
+      </div>
 
-      <label for="id_descricao">Descricao</label>
-      <textarea id="id_descricao" name="descricao" required>{{ form_data.descricao }}</textarea>
-
-      <label for="id_valor">Valor</label>
-      <input id="id_valor" type="text" name="valor" value="{{ form_data.valor }}" required>
-
-      <label for="id_prioridade">Prioridade</label>
-      <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ form_data.prioridade }}">
+      <div class="proposal-form-card">
+        <div class="proposal-form-head">
+          <h2>Anexos</h2>
+          <p class="muted">Opcional. Voce pode anexar um arquivo na criacao.</p>
+        </div>
+        <label for="id_anexo_tipo">Tipo</label>
+        <select id="id_anexo_tipo" name="anexo_tipo">
+          {% for value, label in tipos_anexo %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <label for="id_anexo_arquivo">Arquivo</label>
+        <input id="id_anexo_arquivo" type="file" name="anexo_arquivo">
+      </div>
 
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Enviar proposta</button>

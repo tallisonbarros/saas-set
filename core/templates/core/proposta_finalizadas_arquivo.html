@@ -1,0 +1,81 @@
+{% extends "core/base.html" %}
+
+{% block title %}Finalizadas (Arquivo){% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'propostas' %}?mode={{ tipo_ativo }}">Propostas</a>
+    <span class="crumb-sep">/</span>
+    <span>Finalizadas (Arquivo)</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card stack">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Finalizadas (Arquivo)</div>
+        <div class="hud-pill">Arquivo historico</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">
+            {% if tipo_ativo == "enviadas" %}Finalizadas enviadas{% else %}Finalizadas recebidas{% endif %}
+          </h1>
+          <p class="page-subtitle">Itens finalizados ha mais de 90 dias.</p>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Proposta</th>
+            <th>Cliente/Origem</th>
+            <th>Valor</th>
+            <th>Finalizada em</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for proposta in page_obj %}
+            <tr>
+              <td>
+                {% if tipo_ativo == "enviadas" %}Enviada{% else %}Recebida{% endif %}
+              </td>
+              <td>{{ proposta.nome }}</td>
+              <td>
+                {% if tipo_ativo == "enviadas" %}
+                  {{ proposta.cliente.nome|default:"Sistema" }}
+                {% else %}
+                  {{ proposta.criada_por.username|default:"Sistema" }}
+                {% endif %}
+              </td>
+              <td>{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</td>
+              <td>{{ proposta.finalizada_em|date:"d/m/Y H:i" }}</td>
+              <td><a class="btn btn-ghost btn-compact" href="{% url 'proposta_detail' proposta.pk %}">Abrir</a></td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">Sem propostas finalizadas antigas.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-ghost btn-compact" href="?page={{ page_obj.previous_page_number }}&mode={{ tipo_ativo }}">Anterior</a>
+        {% endif %}
+        <span class="pagination-info">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a class="btn btn-ghost btn-compact" href="?page={{ page_obj.next_page_number }}&mode={{ tipo_ativo }}">Proxima</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

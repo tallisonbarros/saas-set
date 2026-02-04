@@ -13,233 +13,110 @@
 
 {% block content %}
   <section class="card stack">
-    <div class="page-hud">
+    <div class="page-hud proposal-hero">
       <div class="hud-top">
         <div class="hud-title">Painel de propostas</div>
         <div class="hud-pill">Carteira comercial</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill hud-menu-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
+        </div>
       </div>
       <div class="page-hud-head">
         <div>
-          <h1 class="page-title">Visao geral</h1>
-          <p class="page-subtitle">Acompanhe aprovacoes e andamento das propostas.</p>
+          <h1 class="page-title" data-proposta-title>
+            {% if tipo_ativo == "enviadas" %}Propostas enviadas{% else %}Propostas recebidas{% endif %}
+          </h1>
+          <p class="page-subtitle" data-proposta-subtitle>
+            {% if tipo_ativo == "enviadas" %}
+              Propostas que voce enviou para clientes e esta acompanhando o retorno.
+            {% else %}
+              Propostas que chegaram para voce aprovar, responder ou acompanhar.
+            {% endif %}
+          </p>
         </div>
       </div>
-      {% if pendencias_total and not status_filter %}
-        <div class="hud-alert">
-          <div><strong>{{ pendencias_total }}</strong> proposta{{ pendencias_total|pluralize:"s" }} aguardando sua aprovacao.</div>
-          <span class="chip chip-alert">Para aprovar</span>
-        </div>
-      {% endif %}
       <div class="hud-meta">
-        {% if pendencias_total and not status_filter %}
-          <span class="chip chip-alert">{{ pendencias_total }} para aprovar</span>
-        {% endif %}
         <strong>{{ cliente.nome }}</strong>{% if cliente.empresa %} - {{ cliente.empresa }}{% endif %} - {{ cliente.email }}
       </div>
     </div>
-    <div class="hud-bottom-actions">
-      <a class="btn btn-primary" href="{% url 'proposta_nova_vendedor' %}">Criar proposta</a>
-    </div>
-      {% if not cliente %}
-        <p>Usuario sem cliente associado. Fale com o administrador.</p>
-      {% else %}
-      <div class="filters">
-        <a href="{% url 'propostas' %}?status=pendente" class="filter-pill {% if status_filter == 'pendente' %}active{% endif %}">Pendentes</a>
-        <a href="{% url 'propostas' %}?status=levantamento" class="filter-pill {% if status_filter == 'levantamento' %}active{% endif %}">Levantamento</a>
-        <a href="{% url 'propostas' %}?status=aprovada" class="filter-pill {% if status_filter == 'aprovada' %}active{% endif %}">Aprovadas</a>
-        <a href="{% url 'propostas' %}?status=reprovada" class="filter-pill {% if status_filter == 'reprovada' %}active{% endif %}">Reprovadas</a>
-        <a href="{% url 'propostas' %}?status=finalizada" class="filter-pill {% if status_filter == 'finalizada' %}active{% endif %}">Finalizadas</a>
+    <div class="proposal-summary-grid" data-proposta-summary>
+      <div class="summary-card">
+        <div class="summary-label" data-summary-label="pendentes">
+          {% if tipo_ativo == "enviadas" %}Aguardando resposta{% else %}Pendentes para voce{% endif %}
+        </div>
+        <div class="summary-value" data-summary-value="pendentes">{{ quick_stats.pendentes|default:"0" }}</div>
       </div>
-      {% if propostas %}
-        {% if not status_filter %}
-          <div class="proposal-section">
-            <div class="proposal-section-head">
-              <div>
-                <div class="proposal-section-title">Propostas para aprovar</div>
-              </div>
-            </div>
-            <div class="proposal-grid">
-              {% if propostas_para_aprovar %}
-                {% for proposta in propostas_para_aprovar %}
-                  <div class="proposal-card proposal-card-action{% if proposta.status_label|lower == 'levantamento' %} proposal-card-standby{% endif %}">
-                    <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
-                    <div class="proposal-head">
-                      <div>
-                        <div class="proposal-origin received">
-                          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 5v12m0 0-4-4m4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-                          </svg>
-                          Recebida
-                        </div>
-                        <div class="proposal-title">{{ proposta.nome }}</div>
-                        <div class="proposal-meta">R$ {{ proposta.valor }}</div>
-                        <div class="proposal-meta">De: {{ proposta.criada_por.username|default:"Sistema" }}</div>
-                      </div>
-                    {% if not proposta.finalizada %}
-                      <span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span>
-                    {% else %}
-                      <span class="badge badge-finalizada">Finalizada</span>
-                    {% endif %}
-                  </div>
-                    <div class="proposal-actions">
-                      <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-                        {% csrf_token %}
-                        <button class="btn btn-primary" type="submit">Aprovar</button>
-                      </form>
-                      <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
-                        {% csrf_token %}
-                        <button class="btn btn-outline" type="submit">Reprovar</button>
-                      </form>
-                    </div>
-                    <div class="proposal-more" aria-hidden="true">...</div>
-                  </div>
-                {% endfor %}
-              {% else %}
-                <div class="proposal-card proposal-card-empty">
-                  <div class="proposal-title">Sem pendencias</div>
-                  <div class="proposal-meta">Nenhuma proposta aguardando aprovacao.</div>
-                </div>
-              {% endif %}
-            </div>
-          </div>
-        {% endif %}
-
-        <div class="proposal-section">
-          <div class="proposal-section-head">
-            <div>
-              <div class="proposal-section-title">Propostas recebidas</div>
-            </div>
-          </div>
-          <div class="proposal-grid">
-            {% if propostas_recebidas %}
-              {% for grupo in propostas_recebidas %}
-                <details class="proposal-card io-discrete">
-                  <summary class="io-discrete-summary">
-                    <span class="filter-pill">{{ grupo.nome }}</span>
-                    <span class="muted">{{ grupo.propostas|length }} proposta{{ grupo.propostas|length|pluralize:"s" }}</span>
-                  </summary>
-                  <div class="io-discrete-body">
-                    <div class="proposal-grid">
-                      {% for proposta in grupo.propostas %}
-                        <div class="proposal-card{% if proposta.status_label|lower == 'levantamento' %} proposal-card-standby{% endif %}">
-                          <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
-                          <div class="proposal-head">
-                            <div>
-                              <div class="proposal-origin received">
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                  <path d="M12 5v12m0 0-4-4m4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-                                </svg>
-                                Recebida
-                              </div>
-                              <div class="proposal-title">{{ proposta.nome }}</div>
-                              <div class="proposal-meta">R$ {{ proposta.valor }}</div>
-                              {% if proposta.criada_por %}
-                                <div class="proposal-meta">De: {{ proposta.criada_por.username }}</div>
-                              {% else %}
-                                <div class="proposal-meta">Origem: Sistema</div>
-                              {% endif %}
-                            </div>
-                            {% if not proposta.finalizada %}
-                              <span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span>
-                            {% else %}
-                              <span class="badge badge-finalizada">Finalizada</span>
-                            {% endif %}
-                          </div>
-                          <div class="proposal-actions">
-                            {% if proposta.aprovada == None and proposta.valor != 0 and proposta.cliente.usuario_id == request.user.id %}
-                              <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-                                {% csrf_token %}
-                                <button class="btn btn-primary" type="submit">Aprovar</button>
-                              </form>
-                            {% endif %}
-                          </div>
-                          <div class="proposal-more" aria-hidden="true">...</div>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  </div>
-                </details>
-              {% endfor %}
-            {% else %}
-              <div class="proposal-card proposal-card-empty">
-                <div class="proposal-title">Sem propostas recebidas</div>
-                <div class="proposal-meta">Nao ha propostas recebidas para os filtros atuais.</div>
-              </div>
-            {% endif %}
-          </div>
+      <div class="summary-card">
+        <div class="summary-label" data-summary-label="execucao">
+          {% if tipo_ativo == "enviadas" %}Em negociacao{% else %}Em analise{% endif %}
         </div>
-
-        <div class="proposal-section">
-          <div class="proposal-section-head">
-            <div>
-              <div class="proposal-section-title">Propostas enviadas</div>
-            </div>
-          </div>
-          <div class="proposal-grid">
-            {% if propostas_enviadas %}
-              {% for grupo in propostas_enviadas %}
-                <details class="proposal-card io-discrete">
-                  <summary class="io-discrete-summary">
-                    <span class="filter-pill">{{ grupo.nome }}</span>
-                    <span class="muted">{{ grupo.propostas|length }} proposta{{ grupo.propostas|length|pluralize:"s" }}</span>
-                  </summary>
-                  <div class="io-discrete-body">
-                    <div class="proposal-grid">
-                      {% for proposta in grupo.propostas %}
-                        <div class="proposal-card proposal-card-sent{% if proposta.status_label|lower == 'levantamento' %} proposal-card-standby{% endif %}">
-                          <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
-                          <div class="proposal-head">
-                            <div>
-                              <div class="proposal-origin sent">
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                  <path d="M5 12h12m0 0-4-4m4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-                                </svg>
-                                Enviada
-                              </div>
-                              <div class="proposal-title">{{ proposta.nome }}</div>
-                              <div class="proposal-meta">R$ {{ proposta.valor }}</div>
-                              {% if proposta.cliente %}
-                                <div class="proposal-meta">Para: {{ proposta.cliente.nome }}</div>
-                              {% else %}
-                                <div class="proposal-meta">Destino: Sistema</div>
-                              {% endif %}
-                            </div>
-                            {% if not proposta.finalizada %}
-                              <span class="badge badge-{{ proposta.status_label|lower }}">{{ proposta.status_label }}</span>
-                            {% else %}
-                              <span class="badge badge-finalizada">Finalizada</span>
-                            {% endif %}
-                          </div>
-                          <div class="proposal-actions">
-                            {% if proposta.aprovada == None and proposta.valor != 0 and proposta.cliente.usuario_id == request.user.id %}
-                              <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-                                {% csrf_token %}
-                                <button class="btn btn-primary" type="submit">Aprovar</button>
-                              </form>
-                            {% endif %}
-                          </div>
-                          <div class="proposal-more" aria-hidden="true">...</div>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  </div>
-                </details>
-              {% endfor %}
-            {% else %}
-              <div class="proposal-card proposal-card-empty">
-                <div class="proposal-title">Sem propostas enviadas</div>
-                <div class="proposal-meta">Nao ha propostas enviadas para os filtros atuais.</div>
-              </div>
-            {% endif %}
-          </div>
+        <div class="summary-value" data-summary-value="execucao">{{ quick_stats.em_execucao|default:"0" }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label" data-summary-label="total">
+          {% if tipo_ativo == "enviadas" %}Total enviadas{% else %}Total recebidas{% endif %}
         </div>
-      {% else %}
-        {% if status_filter %}
-          <p>Sem propostas para o filtro selecionado.</p>
-        {% else %}
-          <p>Sem propostas no momento.</p>
-        {% endif %}
-      {% endif %}
+        <div class="summary-value" data-summary-value="total">{{ quick_stats.total|default:"0" }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label" data-summary-label="finalizadas_90">Finalizadas (90 dias)</div>
+        <div class="summary-value" data-summary-value="finalizadas_90">{{ quick_stats.finalizadas_90|default:"0" }}</div>
+      </div>
+    </div>
+    {% if not cliente %}
+      <p>Usuario sem cliente associado. Fale com o administrador.</p>
+    {% else %}
+      <div class="proposal-tabs" role="tablist" aria-label="Tipo de propostas">
+        <div class="proposal-tabs-title">Modo</div>
+        <div class="proposal-tab-list">
+          <button
+            class="proposal-tab{% if tipo_ativo == 'recebidas' %} active{% endif %}"
+            type="button"
+            data-proposta-tab="recebidas"
+            aria-pressed="{% if tipo_ativo == 'recebidas' %}true{% else %}false{% endif %}"
+          >
+            Recebidas
+          </button>
+          <button
+            class="proposal-tab{% if tipo_ativo == 'enviadas' %} active{% endif %}"
+            type="button"
+            data-proposta-tab="enviadas"
+            aria-pressed="{% if tipo_ativo == 'enviadas' %}true{% else %}false{% endif %}"
+          >
+            Enviadas
+          </button>
+        </div>
+      </div>
+      <div class="proposal-filter-row">
+        <div class="filters" data-proposta-filters></div>
+        <form class="proposal-search" method="get">
+          <input type="hidden" name="mode" value="{{ tipo_ativo }}">
+          <input type="hidden" name="status" value="{{ status_filter|default:'' }}">
+          <input
+            type="search"
+            name="q"
+            value="{{ search_term }}"
+            data-proposta-search
+            placeholder="Buscar por codigo / nome / email"
+            aria-label="Buscar propostas"
+          >
+          <button class="btn btn-ghost btn-compact" type="submit">Buscar</button>
+        </form>
+      </div>
+      <div
+        id="proposal-listings"
+        class="proposal-listings"
+        data-propostas-url="{% url 'propostas_data' %}"
+        data-mode="{{ tipo_ativo }}"
+        data-status="{{ status_filter|default:'' }}"
+        data-search="{{ search_term|default:'' }}"
+      >
+        {% include "core/propostas/_sections.html" %}
+      </div>
     {% endif %}
   </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'core/propostas.js' %}"></script>
 {% endblock %}
