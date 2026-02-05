@@ -1000,27 +1000,31 @@ def ios_list(request):
     grouped = {}
     for rack in racks_ordered:
         rack.all_canais_comissionados = bool(rack.canais_total) and rack.canais_total == rack.canais_comissionados
-        local_key = rack.local_id or 0
-        grupo_key = rack.grupo_id or 0
-        grouped.setdefault(local_key, {}).setdefault(grupo_key, []).append(rack)
-    for local_key, groups in grouped.items():
-        local = None
-        if local_key:
-            local = next(iter(groups.values()))[0].local
-        group_rows = []
-        for grupo_key, items in groups.items():
-            grupo = None
-            if grupo_key:
-                grupo = items[0].grupo
-            group_rows.append(
-                {
-                    "grupo": grupo,
-                    "racks": items,
-                }
-            )
+        local_name = (rack.local.nome if rack.local_id and rack.local else "").strip()
+        grupo_name = (rack.grupo.nome if rack.grupo_id and rack.grupo else "").strip()
+        local_key = local_name.lower() if local_name else "__sem_local__"
+        grupo_key = grupo_name.lower() if grupo_name else "__sem_grupo__"
+        local_bucket = grouped.setdefault(
+            local_key,
+            {
+                "local": rack.local if rack.local_id else None,
+                "groups": {},
+            },
+        )
+        group_bucket = local_bucket["groups"].setdefault(
+            grupo_key,
+            {
+                "grupo": rack.grupo if rack.grupo_id else None,
+                "racks": [],
+            },
+        )
+        group_bucket["racks"].append(rack)
+
+    for _, local_data in grouped.items():
+        group_rows = list(local_data["groups"].values())
         rack_groups.append(
             {
-                "local": local,
+                "local": local_data["local"],
                 "groups": group_rows,
             }
         )
@@ -1257,7 +1261,7 @@ def ios_rack_detail(request, pk):
                                 module_channels.setdefault(channel.modulo_id, []).append(
                                     {
                                         "canal": f"{channel.indice:02d}",
-                                        "nome": channel.descricao or "-",
+                                        "tag": channel.tag or "-",
                                         "tipo": channel.tipo.nome if channel.tipo_id else "-",
                                     }
                                 )
@@ -1410,7 +1414,7 @@ def ios_rack_detail(request, pk):
             module_channels.setdefault(channel.modulo_id, []).append(
                 {
                     "canal": f"{channel.indice:02d}",
-                    "nome": channel.descricao or "-",
+                    "tag": channel.tag or "-",
                     "tipo": channel.tipo.nome if channel.tipo_id else "-",
                 }
             )

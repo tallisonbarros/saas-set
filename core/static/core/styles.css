@@ -585,6 +585,10 @@ body {
   margin-top: 4px;
 }
 
+.io-group-subtitle {
+  margin: 12px 0 8px;
+}
+
 .proposal-hero {
   gap: 10px;
 }

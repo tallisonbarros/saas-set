@@ -452,7 +452,7 @@
         rows.forEach((row) => {
           const rowEl = document.createElement("div");
           rowEl.className = "rack-channel-row";
-          rowEl.innerHTML = "<span>" + row.canal + "</span><span>" + row.nome + "</span><span>" + row.tipo + "</span>";
+          rowEl.innerHTML = "<span>" + row.canal + "</span><span>" + row.tag + "</span><span>" + row.tipo + "</span>";
           rowsContainer.appendChild(rowEl);
         });
         emptyState.classList.add("is-hidden");
