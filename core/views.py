@@ -1473,37 +1473,49 @@ def _render_rack_io_pdf(rack, canais):
     y = height - 42
 
     pdf.setTitle(f"IOs - {rack.nome}")
-    logo_path = os.path.join(os.path.dirname(__file__), "static", "core", "logoset.png")
-    if os.path.exists(logo_path):
-        try:
-            logo = ImageReader(logo_path)
-            pdf.drawImage(
-                logo,
-                right - 120,
-                y - 6,
-                width=100,
-                height=28,
-                preserveAspectRatio=True,
-                mask="auto",
-                anchor="e",
-            )
-        except Exception:
-            pass
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(left, y, rack.nome)
-    y -= 18
-    pdf.setFont("Helvetica", 10)
-    subtitle = "Lista completa de canais do rack"
-    if rack.descricao:
-        subtitle = f"{subtitle} - {rack.descricao}"
-    pdf.drawString(left, y, subtitle[:110])
-    y -= 18
+    icon_path = os.path.join(os.path.dirname(__file__), "static", "core", "FAVICON_PRETO.png")
+
+    def draw_header():
+        nonlocal y
+        y = height - 42
+        if os.path.exists(icon_path):
+            try:
+                icon = ImageReader(icon_path)
+                pdf.drawImage(
+                    icon,
+                    right - 26,
+                    y - 2,
+                    width=18,
+                    height=18,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:
+                pass
+        pdf.setFont("Helvetica-Bold", 16)
+        pdf.drawString(left, y, rack.nome)
+        y -= 16
+        pdf.setFont("Helvetica", 10)
+        subtitle = "Lista completa de canais do rack"
+        if rack.descricao:
+            subtitle = f"{subtitle} - {rack.descricao}"
+        pdf.drawString(left, y, subtitle[:100])
+        y -= 14
+        local_nome = rack.local.nome if getattr(rack, "local_id", None) and rack.local else "-"
+        grupo_nome = rack.grupo.nome if getattr(rack, "grupo_id", None) and rack.grupo else "-"
+        planta = rack.id_planta.codigo if rack.id_planta_id else "-"
+        rack_info = f"Local: {local_nome} | Grupo: {grupo_nome} | ID_PLANTA: {planta} | Slots: {rack.slots_total}"
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(left, y, rack_info[:130])
+        y -= 18
+
+    draw_header()
 
     def ensure_space(required=40):
         nonlocal y
         if y < required:
             pdf.showPage()
-            y = height - 42
+            draw_header()
 
     current_slot = None
     for canal in canais:
@@ -1525,14 +1537,13 @@ def _render_rack_io_pdf(rack, canais):
             y -= 12
 
         ensure_space(30)
-        modulo_nome = canal.modulo.nome or canal.modulo.modulo_modelo.nome
         descricao = canal.descricao or "-"
         tag = canal.tag or "-"
         tipo = canal.tipo.nome if canal.tipo_id else "-"
         pdf.setFont("Helvetica", 9)
         pdf.drawString(left + 8, y, f"CH{canal.indice:02d}")
         pdf.drawString(left + 80, y, str(tag)[:20])
-        pdf.drawString(left + 210, y, f"{modulo_nome} | {descricao}"[:46])
+        pdf.drawString(left + 210, y, str(descricao)[:46])
         pdf.drawString(left + 450, y, str(tipo)[:16])
         y -= 12
 

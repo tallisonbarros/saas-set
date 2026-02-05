@@ -140,6 +140,12 @@ body {
   height: 40px;
 }
 
+.header-favicon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .login-logo {
   height: 32px;
   margin: 0 auto;

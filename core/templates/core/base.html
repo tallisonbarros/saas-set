@@ -38,6 +38,7 @@
             {% endif %}
           </div>
           <a class="brand brand-centered" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
+            <img class="header-favicon" src="{% static 'core/FAVICON_PRETO.png' %}" alt="SET icon">
             <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
           </a>
           {% if request.user.is_authenticated %}
