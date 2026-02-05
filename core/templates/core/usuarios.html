@@ -105,7 +105,8 @@
         <h2 style="margin-top: 0;">Usuarios</h2>
         <form method="get" class="stack">
           <label for="id_user_filter">Buscar usuario</label>
-          <input id="id_user_filter" type="text" placeholder="Digite parte do email">
+          <input id="id_user_filter" name="q" type="text" value="{{ user_query }}" placeholder="Digite parte do email">
+          <button class="btn btn-ghost btn-compact" type="submit">Filtrar</button>
         </form>
         <div class="user-list">
           {% for user in users %}
@@ -120,21 +121,18 @@
             <p class="muted">Nenhum usuario cadastrado.</p>
           {% endfor %}
         </div>
+        {% if users.paginator.num_pages > 1 %}
+          <div class="pagination">
+            {% if users.has_previous %}
+              <a class="btn btn-ghost btn-compact" href="?q={{ user_query|urlencode }}&page={{ users.previous_page_number }}">Anterior</a>
+            {% endif %}
+            <span class="pagination-info">Pagina {{ users.number }} de {{ users.paginator.num_pages }}</span>
+            {% if users.has_next %}
+              <a class="btn btn-ghost btn-compact" href="?q={{ user_query|urlencode }}&page={{ users.next_page_number }}">Proxima</a>
+            {% endif %}
+          </div>
+        {% endif %}
       </div>
     </div>
   </section>
-  <script>
-    (function () {
-      var filter = document.getElementById("id_user_filter");
-      var rows = document.querySelectorAll(".user-row");
-      if (!filter || !rows.length) return;
-      filter.addEventListener("input", function () {
-        var term = filter.value.toLowerCase();
-        Array.prototype.forEach.call(rows, function (row) {
-          var text = row.textContent.toLowerCase();
-          row.style.display = !term || text.indexOf(term) !== -1 ? "" : "none";
-        });
-      });
-    })();
-  </script>
 {% endblock %}

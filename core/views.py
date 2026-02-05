@@ -3686,13 +3686,18 @@ def user_management(request):
                 return redirect("usuarios")
     else:
         form = UserCreateForm()
-    users = User.objects.order_by("username")
+    user_query = request.GET.get("q", "").strip()
+    users_qs = User.objects.order_by("username")
+    if user_query:
+        users_qs = users_qs.filter(username__icontains=user_query)
+    users = Paginator(users_qs, 15).get_page(request.GET.get("page"))
     return render(
         request,
         "core/usuarios.html",
         {
             "form": form,
             "users": users,
+            "user_query": user_query,
             "tipos": TipoPerfil.objects.order_by("nome"),
             "tipo_form": tipo_form,
             "message": message,
