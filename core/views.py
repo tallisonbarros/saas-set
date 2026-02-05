@@ -5,13 +5,14 @@ import logging
 import os
 import ipaddress
 import re
+from io import BytesIO
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -1454,6 +1455,92 @@ def ios_rack_detail(request, pk):
     )
 
 
+def _render_rack_io_pdf(rack, canais):
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.utils import ImageReader
+        from reportlab.pdfgen import canvas
+    except ImportError:
+        return None
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    left = 40
+    right = width - 40
+    y = height - 42
+
+    pdf.setTitle(f"IOs - {rack.nome}")
+    logo_path = os.path.join(os.path.dirname(__file__), "static", "core", "logoset.png")
+    if os.path.exists(logo_path):
+        try:
+            logo = ImageReader(logo_path)
+            pdf.drawImage(
+                logo,
+                right - 120,
+                y - 6,
+                width=100,
+                height=28,
+                preserveAspectRatio=True,
+                mask="auto",
+                anchor="e",
+            )
+        except Exception:
+            pass
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(left, y, rack.nome)
+    y -= 18
+    pdf.setFont("Helvetica", 10)
+    subtitle = "Lista completa de canais do rack"
+    if rack.descricao:
+        subtitle = f"{subtitle} - {rack.descricao}"
+    pdf.drawString(left, y, subtitle[:110])
+    y -= 18
+
+    def ensure_space(required=40):
+        nonlocal y
+        if y < required:
+            pdf.showPage()
+            y = height - 42
+
+    current_slot = None
+    for canal in canais:
+        slot_label = f"Slot {canal.slot_pos:02d}" if canal.slot_pos else "Sem slot"
+        if slot_label != current_slot:
+            ensure_space(70)
+            current_slot = slot_label
+            pdf.setFillColorRGB(1, 0.93, 0.87)
+            pdf.roundRect(left, y - 11, right - left, 18, 4, fill=1, stroke=0)
+            pdf.setFillColor(colors.black)
+            pdf.setFont("Helvetica-Bold", 11)
+            pdf.drawString(left + 8, y - 1, current_slot)
+            y -= 24
+            pdf.setFont("Helvetica-Bold", 9)
+            pdf.drawString(left + 8, y, "Canal")
+            pdf.drawString(left + 80, y, "TAG")
+            pdf.drawString(left + 210, y, "Descricao")
+            pdf.drawString(left + 450, y, "Tipo")
+            y -= 12
+
+        ensure_space(30)
+        modulo_nome = canal.modulo.nome or canal.modulo.modulo_modelo.nome
+        descricao = canal.descricao or "-"
+        tag = canal.tag or "-"
+        tipo = canal.tipo.nome if canal.tipo_id else "-"
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(left + 8, y, f"CH{canal.indice:02d}")
+        pdf.drawString(left + 80, y, str(tag)[:20])
+        pdf.drawString(left + 210, y, f"{modulo_nome} | {descricao}"[:46])
+        pdf.drawString(left + 450, y, str(tipo)[:16])
+        y -= 12
+
+    pdf.save()
+    buffer.seek(0)
+    return buffer
+
+
 @login_required
 def ios_rack_io_list(request, pk):
     cliente = _get_cliente(request.user)
@@ -1474,6 +1561,14 @@ def ios_rack_io_list(request, pk):
         .annotate(slot_pos=Subquery(slot_pos_subquery))
         .order_by("slot_pos", "indice")
     )
+    if request.GET.get("format") == "pdf":
+        pdf_buffer = _render_rack_io_pdf(rack, canais)
+        if not pdf_buffer:
+            return HttpResponse("Biblioteca de PDF indisponivel (reportlab).", status=500)
+        filename = f"ios_{rack.nome}".strip().replace(" ", "_")
+        response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}.pdf"'
+        return response
     return render(
         request,
         "core/ios_rack_io_list.html",

@@ -362,7 +362,7 @@
               return;
             }
             event.preventDefault();
-            var lines = text.split(/\r?\n/).filter(function (line) { return line.trim().length > 0; });
+            var lines = text.split(/\r?\n/);
             if (!lines.length) {
               return;
             }
@@ -374,6 +374,9 @@
             lines.forEach(function (line, idx) {
               var target = all[startIndex + idx];
               if (!target) {
+                return;
+              }
+              if ((line || "").trim().length === 0) {
                 return;
               }
               target.value = line;
@@ -394,7 +397,7 @@
               return;
             }
             event.preventDefault();
-            var rows = text.split(/\r?\n/).filter(function (line) { return line.trim().length > 0; });
+            var rows = text.split(/\r?\n/);
             if (!rows.length) {
               return;
             }
@@ -407,8 +410,12 @@
             var startCol = parseInt(input.getAttribute("data-col"), 10) || 0;
             rows.forEach(function (rowText, rowOffset) {
               var cols = rowText.split("\t");
+              var hasAnyValue = cols.some(function (cell) { return (cell || "").trim().length > 0; });
               var rowEl = allRows[startIndex + rowOffset];
               if (!rowEl) {
+                return;
+              }
+              if (!hasAnyValue) {
                 return;
               }
               var cells = [
