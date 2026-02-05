@@ -82,6 +82,9 @@
               <div><strong>De:</strong> {{ proposta.criada_por.username }}</div>
             {% endif %}
             <div><strong>Criada em:</strong> {{ proposta.criado_em|date:"d/m/Y H:i" }}</div>
+            {% if proposta.finalizada_em %}
+              <div><strong>Finalizada em:</strong> {{ proposta.finalizada_em|date:"d/m/Y H:i" }}</div>
+            {% endif %}
             {% if proposta.decidido_em %}
               <div><strong>Decidida em:</strong> {{ proposta.decidido_em|date:"d/m/Y H:i" }}</div>
             {% endif %}

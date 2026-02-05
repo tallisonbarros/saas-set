@@ -73,7 +73,7 @@
           <a
             href="?date={{ prev_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
             aria-label="Dia anterior"
-            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: #fff; text-decoration: none; color: inherit;"
+            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); text-decoration: none; color: inherit;"
           >&lt;</a>
         {% else %}
           <span aria-hidden="true" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); opacity: 0.35;">&lt;</span>
@@ -91,7 +91,7 @@
           <a
             href="?date={{ next_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
             aria-label="Dia seguinte"
-            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: #fff; text-decoration: none; color: inherit;"
+            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); text-decoration: none; color: inherit;"
           >&gt;</a>
         {% else %}
           <span aria-hidden="true" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); opacity: 0.35;">&gt;</span>

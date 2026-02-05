@@ -1,27 +1,73 @@
 #header {
-  background: #ff6600;
+  background: #1a2836;
+  border-bottom: 1px solid #2d4359;
 }
 
 #header #site-name a {
-  color: #fff;
+  color: #f3f8ff;
 }
 
 .module h2, .module caption, .inline-group h2 {
-  background: #ffe2d1;
-  color: #3b2a20;
+  background: #1f3041;
+  color: #dce8f5;
 }
 
 .button, input[type=submit], input[type=button], .submit-row input, a.button {
-  background: #ff6600;
-  border-color: #e65c00;
+  background: #ff7a1a;
+  border-color: #ff8f3d;
   color: #fff;
 }
 
 .button:hover, input[type=submit]:hover, input[type=button]:hover, .submit-row input:hover, a.button:hover {
-  background: #e65c00;
+  background: #e76807;
   color: #fff;
 }
 
 .breadcrumbs {
-  background: #fff4ed;
+  background: #101923;
+  border-bottom: 1px solid #223244;
+}
+
+body,
+#container,
+#content,
+.module,
+.results,
+table,
+input,
+select,
+textarea {
+  background-color: #0d151f;
+  color: #dce8f5;
+}
+
+a {
+  color: #ff9e57;
+}
+
+table thead th {
+  background: #172433;
+  color: #dce8f5;
+}
+
+table tbody tr:nth-child(odd) {
+  background: #111d2a;
+}
+
+table tbody tr:nth-child(even) {
+  background: #0d1823;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid #2b4055;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #ff8f3d;
+  box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.2);
 }
