@@ -319,15 +319,15 @@
           });
         });
       }
-      function bindGridPaste(tagInputs) {
-        tagInputs.forEach(function (input) {
+      function bindGridPaste(inputs) {
+        inputs.forEach(function (input) {
           input.addEventListener("paste", function (event) {
             var text = (event.clipboardData || window.clipboardData).getData("text");
             if (!text || text.indexOf("\t") === -1) {
               return;
             }
             event.preventDefault();
-            var rows = text.split(/\r?\n/).filter(function (line) { return line.length > 0; });
+            var rows = text.split(/\r?\n/).filter(function (line) { return line.trim().length > 0; });
             if (!rows.length) {
               return;
             }
@@ -337,6 +337,7 @@
             if (startIndex < 0) {
               return;
             }
+            var startInTag = input.classList.contains("channel-tag-input");
             rows.forEach(function (rowText, rowOffset) {
               var columns = rowText.split("\t");
               var rowEl = allRows[startIndex + rowOffset];
@@ -345,12 +346,17 @@
               }
               var tagInput = rowEl.querySelector(".channel-tag-input");
               var descInput = rowEl.querySelector(".channel-desc-input");
-              if (tagInput && columns[0] !== undefined) {
-                tagInput.value = normalizeTag(columns[0]);
-                markDirty(tagInput);
-              }
-              if (descInput && columns[1] !== undefined) {
-                descInput.value = columns[1];
+              if (startInTag) {
+                if (tagInput && columns[0] !== undefined) {
+                  tagInput.value = normalizeTag(columns[0]);
+                  markDirty(tagInput);
+                }
+                if (descInput && columns[1] !== undefined) {
+                  descInput.value = columns[1];
+                  markDirty(descInput);
+                }
+              } else if (descInput && columns[0] !== undefined) {
+                descInput.value = columns[0];
                 markDirty(descInput);
               }
             });
@@ -453,7 +459,7 @@
         bindEnterToSave(descInputs);
         bindPaste(tagInputs, normalizeTag);
         bindPaste(descInputs);
-        bindGridPaste(tagInputs);
+        bindGridPaste(Array.from(tagInputs).concat(Array.from(descInputs)));
         refreshDupes();
       }
       function ensureStyle() {

@@ -362,7 +362,7 @@
               return;
             }
             event.preventDefault();
-            var lines = text.split(/\r?\n/).filter(function (line) { return line.length > 0; });
+            var lines = text.split(/\r?\n/).filter(function (line) { return line.trim().length > 0; });
             if (!lines.length) {
               return;
             }
@@ -394,7 +394,7 @@
               return;
             }
             event.preventDefault();
-            var rows = text.split(/\r?\n/).filter(function (line) { return line.length > 0; });
+            var rows = text.split(/\r?\n/).filter(function (line) { return line.trim().length > 0; });
             if (!rows.length) {
               return;
             }
