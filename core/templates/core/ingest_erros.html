@@ -52,15 +52,22 @@
                 Status: {{ log.resolved|yesno:"Resolvido,Pendente" }}
               </div>
             </div>
-            <details class="io-discrete" style="min-width: 220px;">
-              <summary class="io-discrete-summary">
-                <span class="io-title">Ver payload</span>
-                <span class="muted">JSON bruto</span>
-              </summary>
-              <div class="io-discrete-body">
-                <pre style="white-space: pre-wrap; margin: 0;">{{ log.raw_payload|pprint }}</pre>
-              </div>
-            </details>
+            <div class="user-row" style="gap: 8px; justify-content: flex-end;">
+              {% if log.record_id %}
+                <a class="btn btn-ghost" href="{% url 'ingest_detail' log.record_id %}">Detalhes</a>
+              {% else %}
+                <a class="btn btn-ghost" href="{% url 'ingest_erro_detail' log.pk %}">Detalhes</a>
+              {% endif %}
+              <details class="io-discrete" style="min-width: 220px;">
+                <summary class="io-discrete-summary">
+                  <span class="io-title">Ver payload</span>
+                  <span class="muted">JSON bruto</span>
+                </summary>
+                <div class="io-discrete-body">
+                  <pre style="white-space: pre-wrap; margin: 0;">{{ log.raw_payload|pprint }}</pre>
+                </div>
+              </details>
+            </div>
           </div>
         {% endfor %}
       </div>

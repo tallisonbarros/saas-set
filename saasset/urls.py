@@ -31,6 +31,7 @@ urlpatterns = [
     path('painel/', views.painel, name="painel"),
     path('ingest-gerenciar/', views.planta_conectada, name="ingest_gerenciar"),
     path('ingest-gerenciar/erros/', views.ingest_error_logs, name="ingest_erros"),
+    path('ingest-gerenciar/erros/<int:pk>/', views.ingest_error_detail, name="ingest_erro_detail"),
     path('ingest-gerenciar/<int:pk>/', views.ingest_detail, name="ingest_detail"),
     path('planta-conectada/', views.planta_conectada_redirect, name="planta_conectada"),
     path('apps/gerenciar/', views.apps_gerenciar, name="apps_gerenciar"),
