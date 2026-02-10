@@ -26,8 +26,23 @@
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">Erros de ingest</h1>
-          <p class="page-subtitle">Ultimos erros rejeitados pelo endpoint.</p>
+          <p class="page-subtitle">Erros rejeitados. Aqui voce cria regras e libera novos sources.</p>
         </div>
+        <div class="hud-menu">
+          <span class="hud-pill">Pendentes: {{ pending_count }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="border-left: 4px solid #b32400;">
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">Fluxo sugerido</h2>
+        <p class="page-subtitle">
+          1. Abra o detalhe do erro. 2. Clique em “Criar source” para gerar a regra.
+          3. Volte e reprocessar erros para validar novamente.
+        </p>
       </div>
     </div>
   </section>
@@ -51,13 +66,12 @@
               <div class="proposal-meta">
                 Status: {{ log.resolved|yesno:"Resolvido,Pendente" }}
               </div>
+              <div class="proposal-meta">
+                <span class="hud-pill" style="background: #ffece6; color: #b32400;">ERRO</span>
+              </div>
             </div>
             <div class="user-row" style="gap: 8px; justify-content: flex-end;">
-              {% if log.record_id %}
-                <a class="btn btn-ghost" href="{% url 'ingest_detail' log.record_id %}">Detalhes</a>
-              {% else %}
-                <a class="btn btn-ghost" href="{% url 'ingest_erro_detail' log.pk %}">Detalhes</a>
-              {% endif %}
+              <a class="btn btn-ghost" href="{% url 'ingest_erro_detail' log.pk %}">Detalhes</a>
               <details class="io-discrete" style="min-width: 220px;">
                 <summary class="io-discrete-summary">
                   <span class="io-title">Ver payload</span>

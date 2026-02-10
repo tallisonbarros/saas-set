@@ -28,13 +28,47 @@
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">{{ log.source|default:"-" }}</h1>
-          <p class="page-subtitle">Detalhes completos do erro de ingest.</p>
+          <p class="page-subtitle">Erro de ingest. Aqui voce define regras e libera este source.</p>
+        </div>
+        <div class="user-row" style="gap: 8px;">
+          <form method="post" onsubmit="return confirm('Criar/atualizar regras com base neste payload?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_ingest_rule">
+            <button class="btn btn-primary" type="submit">Criar source</button>
+          </form>
+          <form method="post" action="{% url 'ingest_gerenciar' %}" onsubmit="return confirm('Reprocessar erros pendentes?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reprocess_ingest_errors">
+            <button class="btn btn-outline" type="submit">Reprocessar erros</button>
+          </form>
+          <span class="hud-pill">Pendentes: {{ pending_count }}</span>
         </div>
       </div>
     </div>
   </section>
 
+  <section class="card" style="border-left: 4px solid #b32400;">
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">Fluxo sugerido</h2>
+        <p class="page-subtitle">
+          1. Confirme se o payload esta completo. 2. Clique em “Criar source”.
+          3. Volte para a lista de erros e reprocessar.
+        </p>
+      </div>
+    </div>
+  </section>
+
   <section class="card">
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">O que significa</h2>
+        <p class="page-subtitle">
+          Este registro falhou nas regras atuais. Clique em “Criar source” para gerar
+          uma regra com as chaves do payload e permitir novos ingests desse tipo.
+        </p>
+      </div>
+    </div>
     <div class="user-list">
       <div class="user-row">
         <div>

@@ -718,17 +718,13 @@ def ingest_error_logs(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
     logs = IngestErrorLog.objects.all().order_by("-created_at")[:500]
-    source_ids = [log.source_id for log in logs if log.source_id]
-    records = IngestRecord.objects.filter(source_id__in=source_ids)
-    record_by_source = {record.source_id: record for record in records}
-    for log in logs:
-        record = record_by_source.get(log.source_id)
-        log.record_id = record.pk if record else None
+    pending_count = IngestErrorLog.objects.filter(resolved=False).count()
     return render(
         request,
         "core/ingest_erros.html",
         {
             "error_logs": logs,
+            "pending_count": pending_count,
         },
     )
 
@@ -738,11 +734,23 @@ def ingest_error_detail(request, pk):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
     log = get_object_or_404(IngestErrorLog, pk=pk)
+    pending_count = IngestErrorLog.objects.filter(resolved=False).count()
+    payload = log.raw_payload if isinstance(log.raw_payload, dict) else {}
+    if request.method == "POST" and request.POST.get("action") == "create_ingest_rule":
+        source = str(log.source or "").strip().lower()
+        if source and payload:
+            required_fields = _normalize_required_fields(list(payload.keys()))
+            IngestRule.objects.update_or_create(
+                source=source,
+                defaults={"required_fields": required_fields},
+            )
+        return redirect("ingest_erro_detail", pk=log.pk)
     return render(
         request,
         "core/ingest_error_detail.html",
         {
             "log": log,
+            "pending_count": pending_count,
         },
     )
 
@@ -753,14 +761,6 @@ def ingest_detail(request, pk):
         return HttpResponseForbidden("Sem permissao.")
     registro = get_object_or_404(IngestRecord, pk=pk)
     payload = registro.payload if isinstance(registro.payload, dict) else {}
-    if request.method == "POST" and request.POST.get("action") == "create_ingest_rule":
-        if registro.source:
-            required_fields = _normalize_required_fields(list(payload.keys()))
-            IngestRule.objects.update_or_create(
-                source=registro.source.strip().lower(),
-                defaults={"required_fields": required_fields},
-            )
-        return redirect("ingest_detail", pk=registro.pk)
     return render(
         request,
         "core/ingest_detail.html",

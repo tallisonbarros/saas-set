@@ -26,13 +26,8 @@
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">{{ registro.source_id }}</h1>
-          <p class="page-subtitle">Detalhes completos do ingest recebido.</p>
+          <p class="page-subtitle">Ingest valido. Este registro ja passou pelas regras.</p>
         </div>
-        <form method="post" onsubmit="return confirm('Criar/atualizar regras com base neste payload?');">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_ingest_rule">
-          <button class="btn btn-primary" type="submit">Criar source</button>
-        </form>
       </div>
     </div>
   </section>
