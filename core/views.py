@@ -685,6 +685,18 @@ def planta_conectada(request):
     if agent_id:
         registros_qs = registros_qs.filter(agent_id__icontains=agent_id)
     registros_qs = registros_qs.order_by("-created_at")
+    source_options = list(
+        IngestRecord.objects.exclude(source="").values_list("source", flat=True).distinct().order_by("source")[:200]
+    )
+    source_id_options = list(
+        IngestRecord.objects.exclude(source_id="").values_list("source_id", flat=True).distinct().order_by("source_id")[:200]
+    )
+    client_id_options = list(
+        IngestRecord.objects.exclude(client_id="").values_list("client_id", flat=True).distinct().order_by("client_id")[:200]
+    )
+    agent_id_options = list(
+        IngestRecord.objects.exclude(agent_id="").values_list("agent_id", flat=True).distinct().order_by("agent_id")[:200]
+    )
     page_obj = _paginate_queryset(request, registros_qs, per_page=15)
     page_query = request.GET.copy()
     page_query.pop("page", None)
@@ -696,6 +708,12 @@ def planta_conectada(request):
             "source_id": source_id,
             "client_id": client_id,
             "agent_id": agent_id,
+        },
+        "filter_options": {
+            "source": source_options,
+            "source_id": source_id_options,
+            "client_id": client_id_options,
+            "agent_id": agent_id_options,
         },
     }
     if _is_partial_request(request):
@@ -726,6 +744,18 @@ def ingest_error_logs(request):
     if status == "resolved":
         logs_qs = logs_qs.filter(resolved=True)
     logs_qs = logs_qs.order_by("-created_at")
+    source_options = list(
+        IngestErrorLog.objects.exclude(source="").values_list("source", flat=True).distinct().order_by("source")[:200]
+    )
+    source_id_options = list(
+        IngestErrorLog.objects.exclude(source_id="").values_list("source_id", flat=True).distinct().order_by("source_id")[:200]
+    )
+    client_id_options = list(
+        IngestErrorLog.objects.exclude(client_id="").values_list("client_id", flat=True).distinct().order_by("client_id")[:200]
+    )
+    agent_id_options = list(
+        IngestErrorLog.objects.exclude(agent_id="").values_list("agent_id", flat=True).distinct().order_by("agent_id")[:200]
+    )
     page_obj = _paginate_queryset(request, logs_qs, per_page=15)
     pending_count = IngestErrorLog.objects.filter(resolved=False).count()
     page_query = request.GET.copy()
@@ -740,6 +770,12 @@ def ingest_error_logs(request):
             "client_id": client_id,
             "agent_id": agent_id,
             "status": status,
+        },
+        "filter_options": {
+            "source": source_options,
+            "source_id": source_id_options,
+            "client_id": client_id_options,
+            "agent_id": agent_id_options,
         },
     }
     if _is_partial_request(request):
@@ -798,6 +834,9 @@ def ingest_sources(request):
     page_obj = _paginate_queryset(request, rules_qs, per_page=15)
     page_query = request.GET.copy()
     page_query.pop("page", None)
+    source_options = list(
+        IngestRule.objects.exclude(source="").values_list("source", flat=True).distinct().order_by("source")[:200]
+    )
     for rule in page_obj:
         rule.required_fields_json = json.dumps(rule.required_fields or [])
     return render(
@@ -807,6 +846,7 @@ def ingest_sources(request):
             "page_obj": page_obj,
             "page_query": page_query.urlencode(),
             "filters": {"source": source_q},
+            "filter_options": {"source": source_options},
         },
     )
 

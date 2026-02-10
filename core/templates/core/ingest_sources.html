@@ -39,12 +39,14 @@
         <h2 class="page-title">Filtros</h2>
       </div>
     </div>
-    <form method="get" class="user-row" style="gap: 12px; flex-wrap: wrap;">
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Source</span>
-        <input class="field-input" type="text" name="source" value="{{ filters.source }}">
-      </label>
-      <div class="user-row" style="gap: 8px; align-items: flex-end;">
+    <form method="get" class="user-row" style="gap: 10px; flex-wrap: wrap;">
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="source" list="source-filter-options" placeholder="Source" value="{{ filters.source }}">
+      <datalist id="source-filter-options">
+        {% for option in filter_options.source %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <div class="user-row" style="gap: 6px; align-items: center;">
         <button class="btn btn-primary" type="submit">Aplicar</button>
         <a class="btn btn-ghost" href="{% url 'ingest_sources' %}">Limpar</a>
       </div>

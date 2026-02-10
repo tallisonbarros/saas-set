@@ -56,86 +56,36 @@
   <section class="card">
     <div class="page-hud-head">
       <div>
-        <h2 class="page-title">Regras de payload por source</h2>
-        <p class="page-subtitle">Defina campos obrigatorios por tipo de source.</p>
-      </div>
-    </div>
-    <form method="post" class="user-row ingest-rule-form" style="gap: 16px;" id="ingest-rule-create">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="save_ingest_rule">
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Source</span>
-        <input class="field-input" type="text" name="source" placeholder="balanca" required>
-      </label>
-      <div class="field" style="flex: 1;">
-        <span class="field-label">Campos obrigatorios</span>
-        <input class="field-input" type="text" name="required_field_input" placeholder="Digite e pressione Enter">
-        <div class="user-row" style="gap: 6px; flex-wrap: wrap; margin-top: 6px;" data-role="chips"></div>
-        <input type="hidden" name="required_fields" value="[]">
-      </div>
-      <button class="btn btn-primary" type="submit">Salvar</button>
-    </form>
-    {% if ingest_rules %}
-      <div class="user-list">
-        {% for rule in ingest_rules %}
-          <div class="user-row" data-rule-row="true">
-            <div>
-              <div class="panel-title">{{ rule.source }}</div>
-              <form method="post" class="proposal-meta ingest-rule-form" style="margin-top: 6px;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="update_ingest_rule">
-                <input type="hidden" name="rule_id" value="{{ rule.id }}">
-                <div class="user-row" style="gap: 6px; align-items: center;">
-                  <input class="field-input" type="text" name="required_field_input" placeholder="Novo campo">
-                  <button class="btn btn-primary" type="submit">Salvar</button>
-                </div>
-                <div class="user-row" style="gap: 6px; flex-wrap: wrap; margin-top: 6px;" data-role="chips">
-                  {% for item in rule.required_fields %}
-                    <button class="btn btn-ghost" type="button" data-action="remove-field" data-value="{{ item }}">x {{ item }}</button>
-                  {% endfor %}
-                </div>
-                <input type="hidden" name="required_fields" value="{{ rule.required_fields_json|escapejs }}">
-              </form>
-            </div>
-            <form method="post" onsubmit="return confirm('Remover regra?');">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="delete_ingest_rule">
-              <input type="hidden" name="rule_id" value="{{ rule.id }}">
-              <button class="btn btn-ghost" type="submit">Remover</button>
-            </form>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="muted">Nenhuma regra cadastrada.</p>
-    {% endif %}
-  </section>
-
-  <section class="card">
-    <div class="page-hud-head">
-      <div>
         <h2 class="page-title">Filtros</h2>
         <p class="page-subtitle">Ordenado por mais recentes.</p>
       </div>
     </div>
-    <form method="get" id="ingest-filter-form" class="user-row" style="gap: 12px; flex-wrap: wrap;">
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Source</span>
-        <input class="field-input" type="text" name="source" value="{{ filters.source }}">
-      </label>
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Source ID</span>
-        <input class="field-input" type="text" name="source_id" value="{{ filters.source_id }}">
-      </label>
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Client ID</span>
-        <input class="field-input" type="text" name="client_id" value="{{ filters.client_id }}">
-      </label>
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Agent ID</span>
-        <input class="field-input" type="text" name="agent_id" value="{{ filters.agent_id }}">
-      </label>
-      <div class="user-row" style="gap: 8px; align-items: flex-end;">
+    <form method="get" id="ingest-filter-form" class="user-row" style="gap: 10px; flex-wrap: wrap;">
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="source" list="source-options" placeholder="Source" value="{{ filters.source }}">
+      <datalist id="source-options">
+        {% for option in filter_options.source %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="source_id" list="source-id-options" placeholder="Source ID" value="{{ filters.source_id }}">
+      <datalist id="source-id-options">
+        {% for option in filter_options.source_id %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="client_id" list="client-id-options" placeholder="Client ID" value="{{ filters.client_id }}">
+      <datalist id="client-id-options">
+        {% for option in filter_options.client_id %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="agent_id" list="agent-id-options" placeholder="Agent ID" value="{{ filters.agent_id }}">
+      <datalist id="agent-id-options">
+        {% for option in filter_options.agent_id %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <div class="user-row" style="gap: 6px; align-items: center;">
         <button class="btn btn-primary" type="submit">Aplicar</button>
         <a class="btn btn-ghost" href="{% url 'ingest_gerenciar' %}">Limpar</a>
       </div>

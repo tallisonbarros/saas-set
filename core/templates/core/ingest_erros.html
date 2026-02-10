@@ -55,32 +55,37 @@
         <p class="page-subtitle">Ordenado por mais recentes.</p>
       </div>
     </div>
-    <form method="get" id="ingest-error-filter-form" class="user-row" style="gap: 12px; flex-wrap: wrap;">
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Source</span>
-        <input class="field-input" type="text" name="source" value="{{ filters.source }}">
-      </label>
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Source ID</span>
-        <input class="field-input" type="text" name="source_id" value="{{ filters.source_id }}">
-      </label>
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Client ID</span>
-        <input class="field-input" type="text" name="client_id" value="{{ filters.client_id }}">
-      </label>
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Agent ID</span>
-        <input class="field-input" type="text" name="agent_id" value="{{ filters.agent_id }}">
-      </label>
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Status</span>
-        <select class="field-input" name="status">
-          <option value="" {% if not filters.status %}selected{% endif %}>Todos</option>
-          <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>Pendentes</option>
-          <option value="resolved" {% if filters.status == "resolved" %}selected{% endif %}>Resolvidos</option>
-        </select>
-      </label>
-      <div class="user-row" style="gap: 8px; align-items: flex-end;">
+    <form method="get" id="ingest-error-filter-form" class="user-row" style="gap: 10px; flex-wrap: wrap;">
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="source" list="error-source-options" placeholder="Source" value="{{ filters.source }}">
+      <datalist id="error-source-options">
+        {% for option in filter_options.source %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="source_id" list="error-source-id-options" placeholder="Source ID" value="{{ filters.source_id }}">
+      <datalist id="error-source-id-options">
+        {% for option in filter_options.source_id %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="client_id" list="error-client-id-options" placeholder="Client ID" value="{{ filters.client_id }}">
+      <datalist id="error-client-id-options">
+        {% for option in filter_options.client_id %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <input class="field-input" style="min-width: 160px; max-width: 200px;" type="text" name="agent_id" list="error-agent-id-options" placeholder="Agent ID" value="{{ filters.agent_id }}">
+      <datalist id="error-agent-id-options">
+        {% for option in filter_options.agent_id %}
+          <option value="{{ option }}"></option>
+        {% endfor %}
+      </datalist>
+      <select class="field-input" style="min-width: 140px; max-width: 160px;" name="status">
+        <option value="" {% if not filters.status %}selected{% endif %}>Status</option>
+        <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>Pendentes</option>
+        <option value="resolved" {% if filters.status == "resolved" %}selected{% endif %}>Resolvidos</option>
+      </select>
+      <div class="user-row" style="gap: 6px; align-items: center;">
         <button class="btn btn-primary" type="submit">Aplicar</button>
         <a class="btn btn-ghost" href="{% url 'ingest_erros' %}">Limpar</a>
       </div>
