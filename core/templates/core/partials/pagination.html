@@ -1,0 +1,15 @@
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <div class="user-row" style="gap: 8px; justify-content: space-between; margin-top: 12px;">
+    <div class="proposal-meta">
+      Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+    </div>
+    <div class="user-row" style="gap: 8px;">
+      {% if page_obj.has_previous %}
+        <a class="btn btn-ghost" data-page-link="true" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a class="btn btn-ghost" data-page-link="true" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ page_obj.next_page_number }}">Proxima</a>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}

@@ -154,6 +154,16 @@ def _upsert_ingest_items(items_by_source):
     return len(items_by_source)
 
 
+def _is_partial_request(request):
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.GET.get("partial") == "1"
+
+
+def _paginate_queryset(request, qs, per_page=15):
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(qs, per_page)
+    return paginator.get_page(page_number)
+
+
 def _clean_tag_prefix(value):
     value = re.sub(r"[^0-9A-Za-z]", "", (value or "").strip().upper())
     return value[:3] if value else ""
@@ -617,44 +627,6 @@ def planta_conectada(request):
         if action == "clear_ingest":
             IngestRecord.objects.all().delete()
             return redirect("planta_conectada")
-        if action == "save_ingest_rule":
-            source = request.POST.get("source", "").strip().lower()
-            required_raw = request.POST.get("required_fields", "").strip()
-            required_fields = []
-            if required_raw:
-                try:
-                    data = json.loads(required_raw)
-                    if isinstance(data, list):
-                        required_fields = [str(item).strip() for item in data if str(item).strip()]
-                except json.JSONDecodeError:
-                    required_fields = []
-            if source:
-                required_fields = _normalize_required_fields(required_fields)
-                IngestRule.objects.update_or_create(
-                    source=source,
-                    defaults={"required_fields": required_fields},
-                )
-            return redirect("planta_conectada")
-        if action == "update_ingest_rule":
-            rule_id = request.POST.get("rule_id")
-            required_raw = request.POST.get("required_fields", "").strip()
-            required_fields = []
-            if required_raw:
-                try:
-                    data = json.loads(required_raw)
-                    if isinstance(data, list):
-                        required_fields = [str(item).strip() for item in data if str(item).strip()]
-                except json.JSONDecodeError:
-                    required_fields = []
-            if rule_id:
-                required_fields = _normalize_required_fields(required_fields)
-                IngestRule.objects.filter(pk=rule_id).update(required_fields=required_fields)
-            return redirect("planta_conectada")
-        if action == "delete_ingest_rule":
-            rule_id = request.POST.get("rule_id")
-            if rule_id:
-                IngestRule.objects.filter(pk=rule_id).delete()
-            return redirect("planta_conectada")
         if action == "reprocess_ingest_errors":
             rules_by_source = {
                 rule.source.strip().lower(): (rule.required_fields or [])
@@ -699,32 +671,142 @@ def planta_conectada(request):
                     log.resolved_at = now
                 IngestErrorLog.objects.bulk_update(logs_to_resolve, ["resolved", "resolved_at"])
             return redirect("planta_conectada")
-    registros = IngestRecord.objects.all().order_by("-created_at")[:200]
-    ingest_rules = IngestRule.objects.all().order_by("source")
-    for rule in ingest_rules:
-        rule.required_fields_json = json.dumps(rule.required_fields or [])
-    return render(
-        request,
-        "core/ingest_gerenciar.html",
-        {
-            "registros": registros,
-            "ingest_rules": ingest_rules,
+    registros_qs = IngestRecord.objects.all()
+    source = request.GET.get("source", "").strip()
+    source_id = request.GET.get("source_id", "").strip()
+    client_id = request.GET.get("client_id", "").strip()
+    agent_id = request.GET.get("agent_id", "").strip()
+    if source:
+        registros_qs = registros_qs.filter(source__icontains=source)
+    if source_id:
+        registros_qs = registros_qs.filter(source_id__icontains=source_id)
+    if client_id:
+        registros_qs = registros_qs.filter(client_id__icontains=client_id)
+    if agent_id:
+        registros_qs = registros_qs.filter(agent_id__icontains=agent_id)
+    registros_qs = registros_qs.order_by("-created_at")
+    page_obj = _paginate_queryset(request, registros_qs, per_page=15)
+    page_query = request.GET.copy()
+    page_query.pop("page", None)
+    context = {
+        "page_obj": page_obj,
+        "page_query": page_query.urlencode(),
+        "filters": {
+            "source": source,
+            "source_id": source_id,
+            "client_id": client_id,
+            "agent_id": agent_id,
         },
-    )
+    }
+    if _is_partial_request(request):
+        return render(request, "core/partials/ingest_records_list.html", context)
+    return render(request, "core/ingest_gerenciar.html", context)
 
 
 @login_required
 def ingest_error_logs(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
-    logs = IngestErrorLog.objects.all().order_by("-created_at")[:500]
+    logs_qs = IngestErrorLog.objects.all()
+    source = request.GET.get("source", "").strip()
+    source_id = request.GET.get("source_id", "").strip()
+    client_id = request.GET.get("client_id", "").strip()
+    agent_id = request.GET.get("agent_id", "").strip()
+    status = request.GET.get("status", "").strip()
+    if source:
+        logs_qs = logs_qs.filter(source__icontains=source)
+    if source_id:
+        logs_qs = logs_qs.filter(source_id__icontains=source_id)
+    if client_id:
+        logs_qs = logs_qs.filter(client_id__icontains=client_id)
+    if agent_id:
+        logs_qs = logs_qs.filter(agent_id__icontains=agent_id)
+    if status == "pending":
+        logs_qs = logs_qs.filter(resolved=False)
+    if status == "resolved":
+        logs_qs = logs_qs.filter(resolved=True)
+    logs_qs = logs_qs.order_by("-created_at")
+    page_obj = _paginate_queryset(request, logs_qs, per_page=15)
     pending_count = IngestErrorLog.objects.filter(resolved=False).count()
+    page_query = request.GET.copy()
+    page_query.pop("page", None)
+    context = {
+        "page_obj": page_obj,
+        "pending_count": pending_count,
+        "page_query": page_query.urlencode(),
+        "filters": {
+            "source": source,
+            "source_id": source_id,
+            "client_id": client_id,
+            "agent_id": agent_id,
+            "status": status,
+        },
+    }
+    if _is_partial_request(request):
+        return render(request, "core/partials/ingest_errors_list.html", context)
+    return render(request, "core/ingest_erros.html", context)
+
+
+@login_required
+def ingest_sources(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "save_ingest_rule":
+            source = request.POST.get("source", "").strip().lower()
+            required_raw = request.POST.get("required_fields", "").strip()
+            required_fields = []
+            if required_raw:
+                try:
+                    data = json.loads(required_raw)
+                    if isinstance(data, list):
+                        required_fields = [str(item).strip() for item in data if str(item).strip()]
+                except json.JSONDecodeError:
+                    required_fields = []
+            if source:
+                required_fields = _normalize_required_fields(required_fields)
+                IngestRule.objects.update_or_create(
+                    source=source,
+                    defaults={"required_fields": required_fields},
+                )
+            return redirect("ingest_sources")
+        if action == "update_ingest_rule":
+            rule_id = request.POST.get("rule_id")
+            required_raw = request.POST.get("required_fields", "").strip()
+            required_fields = []
+            if required_raw:
+                try:
+                    data = json.loads(required_raw)
+                    if isinstance(data, list):
+                        required_fields = [str(item).strip() for item in data if str(item).strip()]
+                except json.JSONDecodeError:
+                    required_fields = []
+            if rule_id:
+                required_fields = _normalize_required_fields(required_fields)
+                IngestRule.objects.filter(pk=rule_id).update(required_fields=required_fields)
+            return redirect("ingest_sources")
+        if action == "delete_ingest_rule":
+            rule_id = request.POST.get("rule_id")
+            if rule_id:
+                IngestRule.objects.filter(pk=rule_id).delete()
+            return redirect("ingest_sources")
+    source_q = request.GET.get("source", "").strip()
+    rules_qs = IngestRule.objects.all().order_by("source")
+    if source_q:
+        rules_qs = rules_qs.filter(source__icontains=source_q)
+    page_obj = _paginate_queryset(request, rules_qs, per_page=15)
+    page_query = request.GET.copy()
+    page_query.pop("page", None)
+    for rule in page_obj:
+        rule.required_fields_json = json.dumps(rule.required_fields or [])
     return render(
         request,
-        "core/ingest_erros.html",
+        "core/ingest_sources.html",
         {
-            "error_logs": logs,
-            "pending_count": pending_count,
+            "page_obj": page_obj,
+            "page_query": page_query.urlencode(),
+            "filters": {"source": source_q},
         },
     )
 

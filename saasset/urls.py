@@ -33,6 +33,7 @@ urlpatterns = [
     path('ingest-gerenciar/erros/', views.ingest_error_logs, name="ingest_erros"),
     path('ingest-gerenciar/erros/<int:pk>/', views.ingest_error_detail, name="ingest_erro_detail"),
     path('ingest-gerenciar/<int:pk>/', views.ingest_detail, name="ingest_detail"),
+    path('ingest-sources/', views.ingest_sources, name="ingest_sources"),
     path('planta-conectada/', views.planta_conectada_redirect, name="planta_conectada"),
     path('apps/gerenciar/', views.apps_gerenciar, name="apps_gerenciar"),
     path('apps/appmilhaobla/', include('core.apps.app_milhao_bla.urls')),

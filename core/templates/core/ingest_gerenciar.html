@@ -20,24 +20,23 @@
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar ao painel</a>
           <a class="hud-menu-pill" href="{% url 'ingest_erros' %}">Erros de ingest</a>
+          <a class="hud-menu-pill" href="{% url 'ingest_sources' %}">Sources</a>
+          <form method="post" onsubmit="return confirm('Reprocessar erros pendentes?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reprocess_ingest_errors">
+            <button class="hud-menu-pill" type="submit">Reprocessar erros</button>
+          </form>
+          <form method="post" onsubmit="return confirm('Limpar todos os registros recebidos?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear_ingest">
+            <button class="hud-menu-pill" type="submit">Limpar registros</button>
+          </form>
         </div>
       </div>
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">Lotes recebidos</h1>
           <p class="page-subtitle">Registros validos. Para criar regras, use a pagina de erros.</p>
-        </div>
-        <div class="user-row" style="gap: 8px;">
-          <form method="post" onsubmit="return confirm('Reprocessar erros pendentes?');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="reprocess_ingest_errors">
-            <button class="btn btn-outline" type="submit">Reprocessar erros</button>
-          </form>
-          <form method="post" onsubmit="return confirm('Limpar todos os registros recebidos?');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="clear_ingest">
-            <button class="btn btn-outline" type="submit">Limpar registros</button>
-          </form>
         </div>
       </div>
     </div>
@@ -113,125 +112,86 @@
   </section>
 
   <section class="card">
-    {% if registros %}
-      <div class="user-list">
-        {% for registro in registros %}
-          <div class="user-row">
-            <div>
-              <div class="panel-title">{{ registro.source_id }}</div>
-              <div class="proposal-meta">
-                Cliente: {{ registro.client_id|default:"-" }} Â· Agente: {{ registro.agent_id|default:"-" }}
-              </div>
-              <div class="proposal-meta">
-                Origem: {{ registro.source|default:"-" }} Â· Recebido: {{ registro.created_at|date:"d/m/Y H:i" }}
-              </div>
-              <div class="proposal-meta">
-                <span class="hud-pill" style="background: #e6f5ec; color: #1f6b3a;">VALIDO</span>
-              </div>
-            </div>
-            <div class="user-row" style="gap: 8px; justify-content: flex-end;">
-              <a class="btn btn-ghost" href="{% url 'ingest_detail' registro.pk %}">Detalhes</a>
-              <details class="io-discrete" style="min-width: 220px;">
-                <summary class="io-discrete-summary">
-                  <span class="io-title">Ver payload</span>
-                  <span class="muted">JSON bruto</span>
-                </summary>
-                <div class="io-discrete-body">
-                  <pre style="white-space: pre-wrap; margin: 0;">{{ registro.payload|pprint }}</pre>
-                </div>
-              </details>
-            </div>
-          </div>
-        {% endfor %}
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">Filtros</h2>
+        <p class="page-subtitle">Ordenado por mais recentes.</p>
       </div>
-    {% else %}
-      <p class="muted">Nenhum dado recebido ainda.</p>
-    {% endif %}
+    </div>
+    <form method="get" id="ingest-filter-form" class="user-row" style="gap: 12px; flex-wrap: wrap;">
+      <label class="field" style="min-width: 180px;">
+        <span class="field-label">Source</span>
+        <input class="field-input" type="text" name="source" value="{{ filters.source }}">
+      </label>
+      <label class="field" style="min-width: 180px;">
+        <span class="field-label">Source ID</span>
+        <input class="field-input" type="text" name="source_id" value="{{ filters.source_id }}">
+      </label>
+      <label class="field" style="min-width: 180px;">
+        <span class="field-label">Client ID</span>
+        <input class="field-input" type="text" name="client_id" value="{{ filters.client_id }}">
+      </label>
+      <label class="field" style="min-width: 180px;">
+        <span class="field-label">Agent ID</span>
+        <input class="field-input" type="text" name="agent_id" value="{{ filters.agent_id }}">
+      </label>
+      <div class="user-row" style="gap: 8px; align-items: flex-end;">
+        <button class="btn btn-primary" type="submit">Aplicar</button>
+        <a class="btn btn-ghost" href="{% url 'ingest_gerenciar' %}">Limpar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" id="ingest-records">
+    {% include "core/partials/ingest_records_list.html" %}
   </section>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  function updateHiddenFields(container, hiddenInput) {
-    const values = Array.from(container.querySelectorAll("[data-action='remove-field']"))
-      .map((btn) => btn.dataset.value)
-      .filter((value) => value);
-    hiddenInput.value = JSON.stringify(values);
-  }
-
-  function bindRuleForm(form) {
-    const input = form.querySelector("input[name='required_field_input']");
-    const chips = form.querySelector("[data-role='chips']");
-    const hidden = form.querySelector("input[name='required_fields']");
-
-    if (!input || !chips || !hidden) {
+  (function () {
+    const form = document.getElementById("ingest-filter-form");
+    const container = document.getElementById("ingest-records");
+    if (!form || !container) {
       return;
     }
 
-    try {
-      const existing = JSON.parse(hidden.value || "[]");
-      if (Array.isArray(existing) && chips.childElementCount === 0) {
-        existing.forEach((value) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "btn btn-ghost";
-          btn.dataset.action = "remove-field";
-          btn.dataset.value = value;
-          btn.textContent = "x " + value;
-          chips.appendChild(btn);
+    function buildUrl(params) {
+      const url = new URL(window.location.href);
+      url.search = params.toString();
+      return url.toString();
+    }
+
+    function fetchPartial(url) {
+      const requestUrl = url.includes("?") ? url + "&partial=1" : url + "?partial=1";
+      return fetch(requestUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+        .then((res) => res.text())
+        .then((html) => {
+          container.innerHTML = html;
         });
-      }
-    } catch (err) {
-      hidden.value = "[]";
     }
 
-    function addChip(value) {
-      const trimmed = (value || "").trim();
-      if (!trimmed) {
-        return;
-      }
-      const exists = Array.from(chips.querySelectorAll("[data-action='remove-field']"))
-        .some((btn) => (btn.dataset.value || "").toLowerCase() === trimmed.toLowerCase());
-      if (exists) {
-        return;
-      }
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "btn btn-ghost";
-      btn.dataset.action = "remove-field";
-      btn.dataset.value = trimmed;
-      btn.textContent = "x " + trimmed;
-      chips.appendChild(btn);
-      updateHiddenFields(chips, hidden);
-    }
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const params = new URLSearchParams(new FormData(form));
+      const url = buildUrl(params);
+      fetchPartial(url);
+      window.history.replaceState({}, "", url);
+    });
 
-    input.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") {
+    container.addEventListener("click", (event) => {
+      const link = event.target.closest("[data-page-link]");
+      if (!link) {
         return;
       }
       event.preventDefault();
-      addChip(input.value);
-      input.value = "";
-    });
-
-    chips.addEventListener("click", (event) => {
-      const btn = event.target.closest("[data-action='remove-field']");
-      if (!btn) {
+      const url = link.getAttribute("href");
+      if (!url) {
         return;
       }
-      btn.remove();
-      updateHiddenFields(chips, hidden);
+      fetchPartial(url);
+      window.history.replaceState({}, "", url);
     });
-
-    form.addEventListener("submit", () => {
-      addChip(input.value);
-      input.value = "";
-      updateHiddenFields(chips, hidden);
-    });
-  }
-
-  document.querySelectorAll(".ingest-rule-form").forEach((form) => {
-    bindRuleForm(form);
-  });
+  })();
 </script>
 {% endblock %}

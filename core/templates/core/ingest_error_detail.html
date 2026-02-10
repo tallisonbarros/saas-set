@@ -23,25 +23,24 @@
         <div class="hud-pill">{{ log.error }}</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'ingest_erros' %}">Voltar</a>
+          <a class="hud-menu-pill" href="{% url 'ingest_sources' %}">Sources</a>
+          <form method="post" onsubmit="return confirm('Criar/atualizar regras com base neste payload?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_ingest_rule">
+            <button class="hud-menu-pill" type="submit">Criar source</button>
+          </form>
+          <form method="post" action="{% url 'ingest_gerenciar' %}" onsubmit="return confirm('Reprocessar erros pendentes?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reprocess_ingest_errors">
+            <button class="hud-menu-pill" type="submit">Reprocessar erros</button>
+          </form>
+          <span class="hud-pill">Pendentes: {{ pending_count }}</span>
         </div>
       </div>
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">{{ log.source|default:"-" }}</h1>
           <p class="page-subtitle">Erro de ingest. Aqui voce define regras e libera este source.</p>
-        </div>
-        <div class="user-row" style="gap: 8px;">
-          <form method="post" onsubmit="return confirm('Criar/atualizar regras com base neste payload?');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_ingest_rule">
-            <button class="btn btn-primary" type="submit">Criar source</button>
-          </form>
-          <form method="post" action="{% url 'ingest_gerenciar' %}" onsubmit="return confirm('Reprocessar erros pendentes?');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="reprocess_ingest_errors">
-            <button class="btn btn-outline" type="submit">Reprocessar erros</button>
-          </form>
-          <span class="hud-pill">Pendentes: {{ pending_count }}</span>
         </div>
       </div>
     </div>

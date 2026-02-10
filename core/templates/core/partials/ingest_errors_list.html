@@ -1,0 +1,41 @@
+{% if page_obj and page_obj.object_list %}
+  <div class="user-list">
+    {% for log in page_obj %}
+      <div class="user-row">
+        <div>
+          <div class="panel-title">{{ log.error }}</div>
+          <div class="proposal-meta">
+            Source: {{ log.source|default:"-" }} Â· Source ID: {{ log.source_id|default:"-" }}
+          </div>
+          <div class="proposal-meta">
+            Cliente: {{ log.client_id|default:"-" }} Â· Agente: {{ log.agent_id|default:"-" }}
+          </div>
+          <div class="proposal-meta">
+            Recebido: {{ log.created_at|date:"d/m/Y H:i" }}
+          </div>
+          <div class="proposal-meta">
+            Status: {{ log.resolved|yesno:"Resolvido,Pendente" }}
+          </div>
+          <div class="proposal-meta">
+            <span class="hud-pill" style="background: #ffece6; color: #b32400;">ERRO</span>
+          </div>
+        </div>
+        <div class="user-row" style="gap: 8px; justify-content: flex-end;">
+          <a class="btn btn-ghost" href="{% url 'ingest_erro_detail' log.pk %}">Detalhes</a>
+          <details class="io-discrete" style="min-width: 220px;">
+            <summary class="io-discrete-summary">
+              <span class="io-title">Ver payload</span>
+              <span class="muted">JSON bruto</span>
+            </summary>
+            <div class="io-discrete-body">
+              <pre style="white-space: pre-wrap; margin: 0;">{{ log.raw_payload|pprint }}</pre>
+            </div>
+          </details>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% include "core/partials/pagination.html" with page_obj=page_obj page_query=page_query %}
+{% else %}
+  <p class="muted">Nenhum erro registrado ainda.</p>
+{% endif %}

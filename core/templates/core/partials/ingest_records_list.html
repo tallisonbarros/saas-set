@@ -1,0 +1,35 @@
+{% if page_obj and page_obj.object_list %}
+  <div class="user-list">
+    {% for registro in page_obj %}
+      <div class="user-row">
+        <div>
+          <div class="panel-title">{{ registro.source_id }}</div>
+          <div class="proposal-meta">
+            Cliente: {{ registro.client_id|default:"-" }} Â· Agente: {{ registro.agent_id|default:"-" }}
+          </div>
+          <div class="proposal-meta">
+            Origem: {{ registro.source|default:"-" }} Â· Recebido: {{ registro.created_at|date:"d/m/Y H:i" }}
+          </div>
+          <div class="proposal-meta">
+            <span class="hud-pill" style="background: #e6f5ec; color: #1f6b3a;">VALIDO</span>
+          </div>
+        </div>
+        <div class="user-row" style="gap: 8px; justify-content: flex-end;">
+          <a class="btn btn-ghost" href="{% url 'ingest_detail' registro.pk %}">Detalhes</a>
+          <details class="io-discrete" style="min-width: 220px;">
+            <summary class="io-discrete-summary">
+              <span class="io-title">Ver payload</span>
+              <span class="muted">JSON bruto</span>
+            </summary>
+            <div class="io-discrete-body">
+              <pre style="white-space: pre-wrap; margin: 0;">{{ registro.payload|pprint }}</pre>
+            </div>
+          </details>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% include "core/partials/pagination.html" with page_obj=page_obj page_query=page_query %}
+{% else %}
+  <p class="muted">Nenhum dado recebido ainda.</p>
+{% endif %}
