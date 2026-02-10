@@ -809,6 +809,7 @@ def ingest_sources(request):
             return redirect("ingest_sources")
         if action == "update_ingest_rule":
             rule_id = request.POST.get("rule_id")
+            new_source = request.POST.get("source", "").strip().lower()
             required_raw = request.POST.get("required_fields", "").strip()
             required_fields = []
             if required_raw:
@@ -820,7 +821,10 @@ def ingest_sources(request):
                     required_fields = []
             if rule_id:
                 required_fields = _normalize_required_fields(required_fields)
-                IngestRule.objects.filter(pk=rule_id).update(required_fields=required_fields)
+                updates = {"required_fields": required_fields}
+                if new_source:
+                    updates["source"] = new_source
+                IngestRule.objects.filter(pk=rule_id).update(**updates)
             return redirect("ingest_sources")
         if action == "delete_ingest_rule":
             rule_id = request.POST.get("rule_id")
@@ -858,10 +862,20 @@ def ingest_error_detail(request, pk):
     log = get_object_or_404(IngestErrorLog, pk=pk)
     pending_count = IngestErrorLog.objects.filter(resolved=False).count()
     payload = log.raw_payload if isinstance(log.raw_payload, dict) else {}
+    payload_data = payload.get("payload") if isinstance(payload, dict) else None
+    payload_error = None
+    if isinstance(payload_data, str):
+        try:
+            payload_data = json.loads(payload_data)
+        except json.JSONDecodeError:
+            payload_error = "Payload e uma string JSON invalida."
+            payload_data = None
+    elif payload_data is not None and not isinstance(payload_data, dict):
+        payload_error = "Payload nao e um objeto JSON."
     if request.method == "POST" and request.POST.get("action") == "create_ingest_rule":
         source = str(log.source or "").strip().lower()
-        if source and payload:
-            required_fields = _normalize_required_fields(list(payload.keys()))
+        if source and isinstance(payload_data, dict):
+            required_fields = _normalize_required_fields(list(payload_data.keys()))
             IngestRule.objects.update_or_create(
                 source=source,
                 defaults={"required_fields": required_fields},
@@ -873,6 +887,8 @@ def ingest_error_detail(request, pk):
         {
             "log": log,
             "pending_count": pending_count,
+            "payload_keys": list(payload_data.keys()) if isinstance(payload_data, dict) else [],
+            "payload_error": payload_error,
         },
     )
 

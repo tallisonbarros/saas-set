@@ -84,6 +84,28 @@
   </section>
 
   <section class="card">
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">Campos que virarao regra</h2>
+        <p class="page-subtitle">Esses campos sao lidos de payload e serao salvos como obrigatorios.</p>
+      </div>
+    </div>
+    {% if payload_keys %}
+      <div class="user-row" style="gap: 6px; flex-wrap: wrap;">
+        {% for key in payload_keys %}
+          <span class="hud-pill" style="background: #e6f5ec; color: #1f6b3a;">{{ key }}</span>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% if payload_error %}
+        <p class="muted">{{ payload_error }}</p>
+      {% else %}
+        <p class="muted">Nenhum campo detectado no payload.</p>
+      {% endif %}
+    {% endif %}
+  </section>
+
+  <section class="card">
     <details class="io-discrete" open>
       <summary class="io-discrete-summary">
         <span class="io-title">Payload</span>

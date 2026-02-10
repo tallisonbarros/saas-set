@@ -56,23 +56,19 @@
   <section class="card">
     <div class="page-hud-head">
       <div>
-        <h2 class="page-title">Cadastrar regra</h2>
+        <h2 class="page-title">Nova regra</h2>
       </div>
     </div>
-    <form method="post" class="user-row ingest-rule-form" style="gap: 16px;" id="ingest-rule-create">
+    <form method="post" class="user-row ingest-rule-form" style="gap: 12px; align-items: flex-end;" id="ingest-rule-create">
       {% csrf_token %}
       <input type="hidden" name="action" value="save_ingest_rule">
-      <label class="field" style="min-width: 180px;">
-        <span class="field-label">Source</span>
-        <input class="field-input" type="text" name="source" placeholder="balanca" required>
-      </label>
+      <input class="field-input" style="min-width: 180px; max-width: 220px;" type="text" name="source" placeholder="Nome do source" required>
       <div class="field" style="flex: 1;">
-        <span class="field-label">Campos obrigatorios</span>
-        <input class="field-input" type="text" name="required_field_input" placeholder="Digite e pressione Enter">
+        <input class="field-input" type="text" name="required_field_input" placeholder="Adicionar campo obrigatorio (Enter)">
         <div class="user-row" style="gap: 6px; flex-wrap: wrap; margin-top: 6px;" data-role="chips"></div>
         <input type="hidden" name="required_fields" value="[]">
       </div>
-      <button class="btn btn-primary" type="submit">Salvar</button>
+      <button class="btn btn-primary" type="submit">Criar</button>
     </form>
   </section>
 
@@ -81,29 +77,26 @@
       <div class="user-list">
         {% for rule in page_obj %}
           <div class="user-row" data-rule-row="true">
-            <div>
-              <div class="panel-title">{{ rule.source }}</div>
-              <form method="post" class="proposal-meta ingest-rule-form" style="margin-top: 6px;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="update_ingest_rule">
-                <input type="hidden" name="rule_id" value="{{ rule.id }}">
-                <div class="user-row" style="gap: 6px; align-items: center;">
-                  <input class="field-input" type="text" name="required_field_input" placeholder="Novo campo">
-                  <button class="btn btn-primary" type="submit">Salvar</button>
-                </div>
-                <div class="user-row" style="gap: 6px; flex-wrap: wrap; margin-top: 6px;" data-role="chips">
-                  {% for item in rule.required_fields %}
-                    <button class="btn btn-ghost" type="button" data-action="remove-field" data-value="{{ item }}">x {{ item }}</button>
-                  {% endfor %}
-                </div>
-                <input type="hidden" name="required_fields" value="{{ rule.required_fields_json|escapejs }}">
-              </form>
-            </div>
-            <form method="post" onsubmit="return confirm('Remover regra?');">
+            <form method="post" class="ingest-rule-form" style="display: grid; gap: 8px; width: 100%;">
               {% csrf_token %}
-              <input type="hidden" name="action" value="delete_ingest_rule">
+              <input type="hidden" name="action" value="update_ingest_rule">
               <input type="hidden" name="rule_id" value="{{ rule.id }}">
-              <button class="btn btn-ghost" type="submit">Remover</button>
+              <div class="user-row" style="gap: 8px; align-items: center; justify-content: space-between;">
+                <input class="field-input" style="max-width: 240px;" type="text" name="source" value="{{ rule.source }}" placeholder="Nome do source">
+                <div class="user-row" style="gap: 6px;">
+                  <button class="btn btn-primary" type="submit">Salvar</button>
+                  <button class="btn btn-ghost" type="submit" name="action" value="delete_ingest_rule" onclick="return confirm('Remover regra?');">Remover</button>
+                </div>
+              </div>
+              <div class="user-row" style="gap: 6px; align-items: center;">
+                <input class="field-input" type="text" name="required_field_input" placeholder="Adicionar campo obrigatorio (Enter)">
+              </div>
+              <div class="user-row" style="gap: 6px; flex-wrap: wrap;" data-role="chips">
+                {% for item in rule.required_fields %}
+                  <button class="btn btn-ghost" type="button" data-action="remove-field" data-value="{{ item }}">x {{ item }}</button>
+                {% endfor %}
+              </div>
+              <input type="hidden" name="required_fields" value="{{ rule.required_fields_json|escapejs }}">
             </form>
           </div>
         {% endfor %}
@@ -116,6 +109,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ block.super }}
 <script>
   function updateHiddenFields(container, hiddenInput) {
     const values = Array.from(container.querySelectorAll("[data-action='remove-field']"))
@@ -197,6 +191,19 @@
 
   document.querySelectorAll(".ingest-rule-form").forEach((form) => {
     bindRuleForm(form);
+  });
+
+  document.querySelectorAll("form.ingest-rule-form").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      const actionInput = form.querySelector("input[name='action']");
+      if (!actionInput) {
+        return;
+      }
+      const isDelete = form.querySelector("button[name='action'][value='delete_ingest_rule']:focus");
+      if (isDelete) {
+        actionInput.value = "delete_ingest_rule";
+      }
+    });
   });
 </script>
 {% endblock %}
