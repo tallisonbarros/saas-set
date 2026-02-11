@@ -1,7 +1,7 @@
 {% if cards %}
   <div class="rotas-grid" id="rotas-grid">
     {% for rota in cards %}
-      <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?dia={{ selected_day|date:'Y-m-d' }}&at={{ selected_at_iso }}" data-prefix="{{ rota.prefixo }}" draggable="true">
+      <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %} {% if not lifebit_connected %}is-comm-down{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?dia={{ selected_day|date:'Y-m-d' }}&at={{ selected_at_iso }}" data-prefix="{{ rota.prefixo }}" draggable="true">
         <div class="panel-card-top">
           <div>
             <div class="panel-title">{{ rota.titulo }}</div>
@@ -13,9 +13,14 @@
         </div>
         <div class="rota-main">{{ rota.origem_display }} &gt; {{ rota.destino_display }}</div>
         <div class="rota-status">
-          <span class="status-chip {% if rota.play_blink %}is-active is-blink{% elif rota.play_on %}is-active{% endif %}">Play</span>
+          <span class="status-chip {% if rota.play_blink %}is-blink{% elif rota.play_on %}is-active{% endif %}">Play</span>
           <span class="status-chip {% if rota.pause_on %}is-active pause{% endif %}">Pause</span>
         </div>
+        {% if not lifebit_connected %}
+          <div class="rota-comm-overlay" aria-hidden="true">
+            <span class="rota-comm-icon">⛓</span>
+          </div>
+        {% endif %}
       </a>
     {% endfor %}
   </div>

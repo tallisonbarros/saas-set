@@ -43,6 +43,11 @@
     <section class="card">
       <div class="io-card-head timeline-global-head">
         <h2 class="io-title">Linha do tempo global</h2>
+        <span
+          id="lifebit-badge"
+          class="panel-tag comm-pill {% if lifebit_connected %}comm-on{% else %}comm-off{% endif %}"
+          title="Ultimo LIFEBIT: {{ lifebit_last_seen }}"
+        >{{ lifebit_label }}</span>
       </div>
       <p class="muted timeline-note">Nota: estado aplicado em {{ selected_at_label }} ({{ total_events }} eventos processados, limite {{ max_records }} registros).</p>
     </section>
@@ -166,6 +171,17 @@
     }
     .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
     .timeline-global-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .comm-pill { font-weight: 700; letter-spacing: .02em; }
+    .comm-pill.comm-on {
+      background: rgba(22, 101, 52, 0.55);
+      border-color: #22c55e;
+      color: #bbf7d0;
+    }
+    .comm-pill.comm-off {
+      background: rgba(127, 29, 29, 0.55);
+      border-color: #ef4444;
+      color: #fecaca;
+    }
     @media (max-width: 760px) {
       .io-card-head { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
       .day-nav-form.in-section { margin-left: 0; align-self: center; width: 100%; justify-content: center; }
@@ -175,6 +191,48 @@
     .rota-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 10px; }
     .rota-card { cursor: grab; }
     .rota-card.is-dragging { opacity: .62; cursor: grabbing; }
+    .rota-card.is-comm-down {
+      position: relative;
+      filter: saturate(.55) brightness(.58);
+      pointer-events: none;
+      user-select: none;
+    }
+    .rota-card.is-comm-down .rota-status .status-chip {
+      opacity: .6;
+    }
+    .rota-comm-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 14, 24, 0.42);
+      border-radius: inherit;
+      z-index: 2;
+    }
+    .rota-comm-icon {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      color: #fca5a5;
+      font-size: 2.4rem;
+      line-height: 1;
+      opacity: .92;
+      text-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+    }
+    .rota-comm-icon::after {
+      content: "";
+      position: absolute;
+      width: 82%;
+      height: 4px;
+      background: #ef4444;
+      transform: rotate(-35deg);
+      border-radius: 99px;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.48);
+    }
     .rota-main { font-weight: 700; font-size: 1rem; }
     .rota-prefix { font-size: .76rem; margin-top: 2px; }
     .rota-drag-hint { font-weight: 700; opacity: .55; letter-spacing: 1px; align-self: center; }
@@ -304,6 +362,12 @@
               var eventsContainer = document.getElementById("recent-events-container");
               if (cardsContainer) { cardsContainer.innerHTML = data.cards_html; }
               if (eventsContainer) { eventsContainer.innerHTML = data.events_html; }
+              var lifebitBadge = document.getElementById("lifebit-badge");
+              if (lifebitBadge && typeof data.lifebit_connected !== "undefined") {
+                lifebitBadge.textContent = data.lifebit_label || (data.lifebit_connected ? "Conectado" : "Desconectado");
+                lifebitBadge.classList.toggle("comm-on", !!data.lifebit_connected);
+                lifebitBadge.classList.toggle("comm-off", !data.lifebit_connected);
+              }
               if (data.selected_at_label) {
                 readLabel.textContent = data.selected_at_label;
               }

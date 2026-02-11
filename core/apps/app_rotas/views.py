@@ -33,6 +33,8 @@ RECENT_EVENTS_PAGE_SIZE = 10
 ROUTE_EVENTS_PAGE_SIZE = 12
 TIMELINE_STEP_MINUTES = 5
 AVAILABLE_DAYS_LIMIT = 45
+LIFEBIT_TAG_NAME = "LIFEBIT"
+LIFEBIT_TIMEOUT_SECONDS = 30
 
 
 def _get_rotas_app():
@@ -291,6 +293,28 @@ def _records_before(app, cutoff, limit):
     return qs.only("source_id", "payload", "created_at", "updated_at").order_by("-updated_at", "-created_at")[:limit]
 
 
+def _lifebit_status(app):
+    lookup = Q()
+    for key in TAG_KEYS:
+        lookup |= Q(**{f"payload__{key}__iexact": LIFEBIT_TAG_NAME})
+    record = (
+        _base_records_queryset(app)
+        .filter(lookup)
+        .only("payload", "created_at", "updated_at")
+        .order_by("-updated_at", "-created_at")
+        .first()
+    )
+    if not record:
+        return False, None
+    last_seen = record.updated_at or record.created_at
+    if not last_seen:
+        return False, None
+    now_local = timezone.localtime(timezone.now())
+    last_seen_local = timezone.localtime(last_seen)
+    delta = (now_local - last_seen_local).total_seconds()
+    return delta <= LIFEBIT_TIMEOUT_SECONDS, last_seen_local
+
+
 def _events_from_records(records, start=None, end_exclusive=None, prefix=None):
     events = []
     prefix_upper = (prefix or "").strip().upper()
@@ -546,6 +570,10 @@ def dashboard(request):
         return HttpResponseForbidden("Sem permissao.")
 
     config_missing = not app.ingest_client_id or not app.ingest_agent_id
+    lifebit_connected = False
+    lifebit_last_seen = None
+    if not config_missing:
+        lifebit_connected, lifebit_last_seen = _lifebit_status(app)
     available_days = [] if config_missing else _available_days(app)
     selected_day = _parse_query_date(request.GET.get("dia"))
     if not selected_day:
@@ -633,6 +661,7 @@ def dashboard(request):
                 "cards": cards,
                 "selected_day": selected_day,
                 "selected_at_iso": selected_at.isoformat() if selected_at else "",
+                "lifebit_connected": lifebit_connected,
             },
             request=request,
         )
@@ -651,6 +680,8 @@ def dashboard(request):
                 "showing_now": showing_now,
                 "now_day": now_day.strftime("%Y-%m-%d"),
                 "now_at_iso": now_target.isoformat() if now_target else "",
+                "lifebit_connected": lifebit_connected,
+                "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
                 "cards_html": cards_html,
                 "events_html": events_html,
             }
@@ -685,6 +716,11 @@ def dashboard(request):
             "total_events": len(events_today),
             "max_records": MAX_DASHBOARD_RECORDS,
             "global_ligada_gradient": global_ligada_gradient,
+            "lifebit_connected": lifebit_connected,
+            "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
+            "lifebit_last_seen": (
+                timezone.localtime(lifebit_last_seen).strftime("%d/%m/%Y %H:%M:%S") if lifebit_last_seen else "-"
+            ),
         },
     )
 
