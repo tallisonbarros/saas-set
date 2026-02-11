@@ -44,7 +44,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Linha do tempo global</h2>
-          <p class="muted">Estado aplicado em {{ selected_at_label }} ({{ total_events }} eventos processados, limite {{ max_records }} registros).</p>
+          <p class="muted">Navegue na linha do tempo e veja os status da hora desejada.</p>
         </div>
       </div>
       {% if timeline %}
@@ -68,6 +68,7 @@
       {% else %}
         <p class="muted">Sem eventos no dia selecionado.</p>
       {% endif %}
+      <p class="muted timeline-note">Nota: estado aplicado em {{ selected_at_label }} ({{ total_events }} eventos processados, limite {{ max_records }} registros).</p>
     </section>
 
     <section class="card">
@@ -201,6 +202,7 @@
     .timeline-read { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .timeline-back-now { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
     .timeline-back-now.is-hidden { display: none; }
+    .timeline-note { margin-top: 10px; font-size: .82rem; opacity: .88; }
     @keyframes rotaBlink {
       0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.62); }
       50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
