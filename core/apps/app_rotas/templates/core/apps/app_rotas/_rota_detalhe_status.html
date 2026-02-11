@@ -1,0 +1,7 @@
+<div class="panel-card detail-status-card">
+  <div class="panel-title">Status</div>
+  <div class="rota-status">
+    <span class="status-chip {% if status.play_blink %}is-active is-blink{% elif status.play_on %}is-active{% endif %}">Play</span>
+    <span class="status-chip {% if status.pause_on %}is-active pause{% endif %}">Pause</span>
+  </div>
+</div>

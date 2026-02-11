@@ -484,6 +484,36 @@ def _build_ligada_intervals(day_events, day_start, day_end, initial_ligada_on):
     return intervals
 
 
+def _build_global_ligada_intervals(day_events, day_start, day_end, initial_ligada_prefixes=None):
+    intervals = []
+    ligada_prefixes = set(initial_ligada_prefixes or set())
+    current_start = day_start if ligada_prefixes else None
+
+    for event in day_events:
+        if event["atributo"] != "LIGADA":
+            continue
+        ev_time = event["timestamp"]
+        if ev_time < day_start or ev_time > day_end:
+            continue
+        prefixo = event["prefixo"]
+        was_any = bool(ligada_prefixes)
+        new_on = _is_active(event["valor"])
+        if new_on:
+            ligada_prefixes.add(prefixo)
+        else:
+            ligada_prefixes.discard(prefixo)
+        is_any = bool(ligada_prefixes)
+        if not was_any and is_any:
+            current_start = ev_time
+        elif was_any and not is_any and current_start is not None:
+            intervals.append((current_start, ev_time))
+            current_start = None
+
+    if ligada_prefixes and current_start is not None and current_start < day_end:
+        intervals.append((current_start, day_end))
+    return intervals
+
+
 def _ligada_gradient(intervals, day_start, day_end):
     total_seconds = (day_end - day_start).total_seconds()
     if total_seconds <= 0:
@@ -564,6 +594,16 @@ def dashboard(request):
         known_prefixes=day_prefixes,
         route_configs=route_configs,
     )
+    initial_ligada_prefixes = {
+        prefixo for prefixo, state in seed_states.items() if _is_active(state["attrs"].get("LIGADA"))
+    }
+    global_ligada_intervals = _build_global_ligada_intervals(
+        events_today,
+        day_start,
+        timeline_end_point,
+        initial_ligada_prefixes=initial_ligada_prefixes,
+    )
+    global_ligada_gradient = _ligada_gradient(global_ligada_intervals, day_start, timeline_end_point)
 
     recent_events = [event for event in reversed(events_today) if event["timestamp"] <= selected_at][:200]
     events_page_num = request.GET.get("events_page", "1")
@@ -644,6 +684,7 @@ def dashboard(request):
             "config_missing": config_missing,
             "total_events": len(events_today),
             "max_records": MAX_DASHBOARD_RECORDS,
+            "global_ligada_gradient": global_ligada_gradient,
         },
     )
 
@@ -814,6 +855,13 @@ def rota_detalhe(request, prefixo):
             },
             request=request,
         )
+        status_html = render_to_string(
+            "core/apps/app_rotas/_rota_detalhe_status.html",
+            {
+                "status": status,
+            },
+            request=request,
+        )
         events_html = render_to_string(
             "core/apps/app_rotas/_rota_detalhe_eventos.html",
             {
@@ -832,6 +880,7 @@ def rota_detalhe(request, prefixo):
                 "now_day": now_day.strftime("%Y-%m-%d"),
                 "now_at_iso": now_target.isoformat() if now_target else "",
                 "attrs_html": attrs_html,
+                "status_html": status_html,
                 "events_html": events_html,
             }
         )
