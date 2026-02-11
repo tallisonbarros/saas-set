@@ -145,13 +145,23 @@
     .rota-status { display: flex; gap: 8px; align-items: center; }
     .rota-updated { font-size: .82rem; }
     .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
-    .status-chip.is-active { background: rgba(16, 185, 129, 0.18); border-color: rgba(16, 185, 129, 0.45); }
-    .status-chip.pause.is-active { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.45); }
-    .status-chip.is-blink { animation: rotaBlink 1.15s ease-in-out infinite; }
+    .status-chip.is-active { background: rgba(22, 101, 52, 0.55); border-color: #22c55e; color: #bbf7d0; font-weight: 700; }
+    .status-chip.pause.is-active { background: rgba(127, 29, 29, 0.55); border-color: #ef4444; color: #fecaca; font-weight: 700; }
+    .status-chip.is-blink {
+      animation: rotaBlink 0.9s ease-in-out infinite;
+      background: rgba(22, 101, 52, 0.75);
+      border-color: #22c55e;
+      color: #dcfce7;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+    }
     .timeline-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
     .timeline-controls input[type="range"] { width: 100%; }
     .timeline-points { display: flex; flex-wrap: wrap; gap: 6px; }
-    @keyframes rotaBlink { 0% { opacity: .25; } 50% { opacity: 1; } 100% { opacity: .25; } }
+    @keyframes rotaBlink {
+      0% { opacity: .55; transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
+      50% { opacity: 1; transform: scale(1.04); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+      100% { opacity: .55; transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
   </style>
   <script>
     (function () {
