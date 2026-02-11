@@ -451,6 +451,17 @@ def _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
     return showing_now, now_target, timezone.localdate()
 
 
+def _timeline_end_for_day(selected_day, day_start, day_end_exclusive):
+    day_end_point = day_end_exclusive - timedelta(seconds=1)
+    if selected_day != timezone.localdate():
+        return day_end_point
+    now_local = timezone.localtime(timezone.now())
+    now_clamped = _clamp_datetime(now_local, day_start, day_end_exclusive)
+    if now_clamped is None:
+        return day_end_point
+    return min(day_end_point, now_clamped)
+
+
 def _build_ligada_intervals(day_events, day_start, day_end, initial_ligada_on):
     intervals = []
     ligada_on = bool(initial_ligada_on)
@@ -512,7 +523,7 @@ def dashboard(request):
         selected_day = today if today in available_days else (available_days[0] if available_days else today)
 
     day_start, day_end_exclusive = _day_bounds(selected_day)
-    day_end_point = day_end_exclusive - timedelta(seconds=1)
+    timeline_end_point = _timeline_end_for_day(selected_day, day_start, day_end_exclusive)
 
     events_today = []
     seed_states = {}
@@ -527,12 +538,14 @@ def dashboard(request):
             baseline_events = [event for event in baseline_events if event["prefixo"] in day_prefixes]
             seed_states = _seed_states_from_events(baseline_events)
 
-    timeline = _build_timeline_with_events(day_start, day_end_point, events_today)
+    timeline = _build_timeline_with_events(day_start, timeline_end_point, events_today)
     selected_at = _parse_query_datetime(request.GET.get("at"))
     if not selected_at:
         now = timezone.localtime(timezone.now())
-        selected_at = now if selected_day == timezone.localdate() else day_end_point
+        selected_at = now if selected_day == timezone.localdate() else timeline_end_point
     selected_at = _clamp_datetime(selected_at, day_start, day_end_exclusive)
+    if selected_at and selected_at > timeline_end_point:
+        selected_at = timeline_end_point
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
         selected_at = selected_point["timestamp"]
@@ -685,7 +698,7 @@ def rota_detalhe(request, prefixo):
         selected_day = today if today in available_days else (available_days[0] if available_days else today)
 
     day_start, day_end_exclusive = _day_bounds(selected_day)
-    day_end_point = day_end_exclusive - timedelta(seconds=1)
+    timeline_end_point = _timeline_end_for_day(selected_day, day_start, day_end_exclusive)
 
     day_events = []
     baseline_seed = {}
@@ -697,12 +710,14 @@ def rota_detalhe(request, prefixo):
         baseline_events = _events_from_records(records_before, prefix=prefix_norm)
         baseline_seed = _seed_states_from_events(baseline_events)
 
-    timeline = _build_timeline_with_events(day_start, day_end_point, day_events)
+    timeline = _build_timeline_with_events(day_start, timeline_end_point, day_events)
     selected_at = _parse_query_datetime(request.GET.get("at"))
     if not selected_at:
         now = timezone.localtime(timezone.now())
-        selected_at = now if selected_day == timezone.localdate() else day_end_point
+        selected_at = now if selected_day == timezone.localdate() else timeline_end_point
     selected_at = _clamp_datetime(selected_at, day_start, day_end_exclusive)
+    if selected_at and selected_at > timeline_end_point:
+        selected_at = timeline_end_point
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
         selected_at = selected_point["timestamp"]
@@ -780,8 +795,8 @@ def rota_detalhe(request, prefixo):
     detail_events_page = detail_events_paginator.get_page(detail_events_page_num)
 
     initial_ligada_on = _is_active(seed_attrs.get("LIGADA"))
-    ligada_intervals = _build_ligada_intervals(day_events, day_start, day_end_point, initial_ligada_on)
-    ligada_gradient = _ligada_gradient(ligada_intervals, day_start, day_end_point)
+    ligada_intervals = _build_ligada_intervals(day_events, day_start, timeline_end_point, initial_ligada_on)
+    ligada_gradient = _ligada_gradient(ligada_intervals, day_start, timeline_end_point)
 
     prev_day, next_day = _day_navigation(available_days, selected_day)
     route_config = AppRotaConfig.objects.filter(app=app, prefixo=prefix_norm).first()
