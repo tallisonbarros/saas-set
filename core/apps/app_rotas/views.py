@@ -1,9 +1,11 @@
-import json
-from datetime import timedelta, timezone as dt_timezone
+﻿import json
+from datetime import datetime, time, timedelta, timezone as dt_timezone
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import IntegrityError
+from django.db.models import Q
+from django.db.models.functions import TruncDate
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -23,11 +25,12 @@ ROTA_SUFFIXES = (
     ("_DESTINO", "DESTINO"),
     ("_DESTIN", "DESTINO"),
 )
-MAX_DASHBOARD_RECORDS = 6000
-MAX_ROUTE_RECORDS = 12000
-GLOBAL_TIMELINE_LIMIT = 180
-ROUTE_TIMELINE_LIMIT = 240
+MAX_DASHBOARD_RECORDS = 8000
+MAX_ROUTE_RECORDS = 16000
+BASELINE_RECORDS_LIMIT = 12000
 RECENT_EVENTS_PAGE_SIZE = 10
+TIMELINE_STEP_MINUTES = 5
+AVAILABLE_DAYS_LIMIT = 45
 
 
 def _get_rotas_app():
@@ -53,11 +56,14 @@ def _parse_query_datetime(value):
     return parsed
 
 
-def _fmt_input_datetime(value):
-    if not value:
-        return ""
-    localized = timezone.localtime(value)
-    return localized.strftime("%Y-%m-%dT%H:%M")
+def _parse_query_date(value):
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 def _coerce_value(value):
@@ -166,33 +172,84 @@ def _build_event(record):
         "atributo": attr,
         "tag": tag_name,
         "valor": _extract_value(payload),
-        "timestamp": timestamp,
+        "timestamp": timezone.localtime(timestamp),
         "ingest_timestamp": record.updated_at or record.created_at,
         "source_id": record.source_id,
     }
 
 
-def _timeline_points(events, limit):
-    by_dt = {}
+def _day_bounds(day):
+    tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(day, time.min), tz)
+    end = start + timedelta(days=1)
+    return start, end
+
+
+def _clamp_datetime(value, start, end_exclusive):
+    if value is None:
+        return None
+    if value < start:
+        return start
+    max_value = end_exclusive - timedelta(seconds=1)
+    if value > max_value:
+        return max_value
+    return value
+
+
+def _build_fixed_timeline(day_start, day_end):
+    points = []
+    current = day_start
+    idx = 0
+    while current <= day_end:
+        points.append(
+            {
+                "idx": idx,
+                "timestamp": current,
+                "iso": current.isoformat(),
+                "label": timezone.localtime(current).strftime("%d/%m/%Y %H:%M:%S"),
+                "hour_label": timezone.localtime(current).strftime("%H:%M"),
+            }
+        )
+        current = current + timedelta(minutes=TIMELINE_STEP_MINUTES)
+        idx += 1
+    if points[-1]["timestamp"] != day_end:
+        points.append(
+            {
+                "idx": idx,
+                "timestamp": day_end,
+                "iso": day_end.isoformat(),
+                "label": timezone.localtime(day_end).strftime("%d/%m/%Y %H:%M:%S"),
+                "hour_label": timezone.localtime(day_end).strftime("%H:%M"),
+            }
+        )
+    return points
+
+
+def _build_timeline_with_events(day_start, day_end, events):
+    points_by_iso = {}
+    for point in _build_fixed_timeline(day_start, day_end):
+        points_by_iso[point["iso"]] = point
+
     for event in events:
-        dt = event["timestamp"]
-        by_dt[dt] = by_dt.get(dt, 0) + 1
-    points = [
-        {
-            "timestamp": dt,
-            "iso": dt.isoformat(),
-            "label": timezone.localtime(dt).strftime("%d/%m/%Y %H:%M:%S"),
-            "count": count,
+        ts = event["timestamp"]
+        if ts < day_start:
+            ts = day_start
+        if ts > day_end:
+            ts = day_end
+        iso = ts.isoformat()
+        if iso in points_by_iso:
+            continue
+        points_by_iso[iso] = {
+            "timestamp": ts,
+            "iso": iso,
+            "label": timezone.localtime(ts).strftime("%d/%m/%Y %H:%M:%S"),
+            "hour_label": timezone.localtime(ts).strftime("%H:%M"),
         }
-        for dt, count in sorted(by_dt.items(), key=lambda item: item[0])
-    ]
-    if len(points) <= limit:
-        return points
-    step = max(1, len(points) // limit)
-    sampled = points[::step]
-    if sampled[-1]["iso"] != points[-1]["iso"]:
-        sampled.append(points[-1])
-    return sampled
+
+    timeline = sorted(points_by_iso.values(), key=lambda item: item["timestamp"])
+    for idx, point in enumerate(timeline):
+        point["idx"] = idx
+    return timeline
 
 
 def _selected_timeline_point(points, selected_at):
@@ -207,9 +264,82 @@ def _selected_timeline_point(points, selected_at):
     return points[best_index], best_index
 
 
-def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""):
+def _base_records_queryset(app):
+    qs = IngestRecord.objects.filter(
+        client_id=app.ingest_client_id,
+        agent_id=app.ingest_agent_id,
+    )
+    if app.ingest_source:
+        qs = qs.filter(source=app.ingest_source)
+    return qs
+
+
+def _records_in_window(app, start, end_exclusive, limit):
+    qs = _base_records_queryset(app).filter(
+        Q(updated_at__gte=start, updated_at__lt=end_exclusive)
+        | Q(updated_at__isnull=True, created_at__gte=start, created_at__lt=end_exclusive)
+    )
+    return qs.only("source_id", "payload", "created_at", "updated_at").order_by("-updated_at", "-created_at")[:limit]
+
+
+def _records_before(app, cutoff, limit):
+    qs = _base_records_queryset(app).filter(
+        Q(updated_at__lt=cutoff) | Q(updated_at__isnull=True, created_at__lt=cutoff)
+    )
+    return qs.only("source_id", "payload", "created_at", "updated_at").order_by("-updated_at", "-created_at")[:limit]
+
+
+def _events_from_records(records, start=None, end_exclusive=None, prefix=None):
+    events = []
+    prefix_upper = (prefix or "").strip().upper()
+    for record in records:
+        event = _build_event(record)
+        if not event:
+            continue
+        if prefix_upper and event["prefixo"] != prefix_upper:
+            continue
+        if start and event["timestamp"] < start:
+            continue
+        if end_exclusive and event["timestamp"] >= end_exclusive:
+            continue
+        events.append(event)
+    events.sort(key=lambda item: (item["timestamp"], item["prefixo"], item["atributo"]))
+    return events
+
+
+def _seed_states_from_events(events_before):
     states = {}
-    known_prefixes = sorted({event["prefixo"] for event in events})
+    for event in events_before:
+        prefixo = event["prefixo"]
+        state = states.setdefault(
+            prefixo,
+            {
+                "prefixo": prefixo,
+                "attrs": {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None},
+                "last_update": None,
+            },
+        )
+        state["attrs"][event["atributo"]] = event["valor"]
+        state["last_update"] = event["timestamp"]
+    return states
+
+
+def _clone_state(state):
+    return {
+        "prefixo": state["prefixo"],
+        "attrs": dict(state["attrs"]),
+        "last_update": state.get("last_update"),
+    }
+
+
+def _build_route_cards(events, selected_at, origem_maps, destino_maps, initial_states=None, known_prefixes=None):
+    states = {}
+    for prefixo, state in (initial_states or {}).items():
+        states[prefixo] = _clone_state(state)
+
+    prefixes_from_events = {event["prefixo"] for event in events}
+    active_prefixes = sorted(set(known_prefixes or set()) | prefixes_from_events)
+
     for event in events:
         if event["timestamp"] > selected_at:
             break
@@ -226,8 +356,7 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""
         state["last_update"] = event["timestamp"]
 
     cards = []
-    search_terms = [term.strip().lower() for term in str(search or "").replace(";", ",").split(",") if term.strip()]
-    for prefixo in known_prefixes:
+    for prefixo in active_prefixes:
         state = states.get(
             prefixo,
             {
@@ -240,8 +369,8 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""
         ligar_on = _is_active(attrs.get("LIGAR"))
         desligar_on = _is_active(attrs.get("DESLIGAR"))
         ligada_on = _is_active(attrs.get("LIGADA"))
-        play_blink = ligar_on and not ligada_on
-        play_on = ligar_on and ligada_on
+        play_blink = ligar_on and not ligada_on and not desligar_on
+        play_on = ligar_on and ligada_on and not desligar_on
         pause_on = desligar_on
         origem_codigo = _value_to_int(attrs.get("ORIGEM"))
         destino_codigo = _value_to_int(attrs.get("DESTINO"))
@@ -250,10 +379,6 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""
         origem_display = origem_nome or (str(origem_codigo) if origem_codigo is not None else "--")
         destino_display = destino_nome or (str(destino_codigo) if destino_codigo is not None else "--")
         is_inactive = not (play_blink or play_on or pause_on)
-
-        haystack = " ".join([prefixo, origem_display, destino_display]).lower()
-        if search_terms and not any(term in haystack for term in search_terms):
-            continue
         cards.append(
             {
                 "prefixo": prefixo,
@@ -275,29 +400,75 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""
     return cards
 
 
-def _query_window(request, default_hours=24):
-    now = timezone.now()
-    start = _parse_query_datetime(request.GET.get("inicio"))
-    end = _parse_query_datetime(request.GET.get("fim"))
-    if not end:
-        end = now
-    if not start:
-        start = end - timedelta(hours=default_hours)
-    if start > end:
-        start, end = end, start
-    return start, end
-
-
-def _base_records_queryset(app, start, end):
-    qs = IngestRecord.objects.filter(
-        client_id=app.ingest_client_id,
-        agent_id=app.ingest_agent_id,
-        created_at__gte=start,
-        created_at__lte=end,
+def _available_days(app):
+    days = list(
+        _base_records_queryset(app)
+        .exclude(updated_at__isnull=True)
+        .annotate(day=TruncDate("updated_at"))
+        .values_list("day", flat=True)
+        .distinct()
+        .order_by("-day")[:AVAILABLE_DAYS_LIMIT]
     )
-    if app.ingest_source:
-        qs = qs.filter(source=app.ingest_source)
-    return qs
+    return [day for day in days if day]
+
+
+def _day_navigation(available_days, selected_day):
+    prev_day = None
+    next_day = None
+    if selected_day in available_days:
+        idx = available_days.index(selected_day)
+        if idx < len(available_days) - 1:
+            prev_day = available_days[idx + 1]
+        if idx > 0:
+            next_day = available_days[idx - 1]
+    return prev_day, next_day
+
+
+def _build_ligada_intervals(day_events, day_start, day_end, initial_ligada_on):
+    intervals = []
+    ligada_on = bool(initial_ligada_on)
+    current_start = day_start if ligada_on else None
+    for event in day_events:
+        if event["atributo"] != "LIGADA":
+            continue
+        ev_time = event["timestamp"]
+        if ev_time < day_start or ev_time > day_end:
+            continue
+        new_on = _is_active(event["valor"])
+        if ligada_on and not new_on and current_start is not None:
+            intervals.append((current_start, ev_time))
+            current_start = None
+        elif not ligada_on and new_on:
+            current_start = ev_time
+        ligada_on = new_on
+    if ligada_on and current_start is not None and current_start < day_end:
+        intervals.append((current_start, day_end))
+    return intervals
+
+
+def _ligada_gradient(intervals, day_start, day_end):
+    total_seconds = (day_end - day_start).total_seconds()
+    if total_seconds <= 0:
+        return "linear-gradient(to right, rgba(148,163,184,0.28) 0%, rgba(148,163,184,0.28) 100%)"
+
+    def pct(dt):
+        return max(0.0, min(100.0, ((dt - day_start).total_seconds() / total_seconds) * 100.0))
+
+    parts = []
+    cursor = 0.0
+    for start, end in intervals:
+        start_pct = pct(start)
+        end_pct = pct(end)
+        if start_pct > cursor:
+            parts.append(f"rgba(148,163,184,0.28) {cursor:.3f}% {start_pct:.3f}%")
+        if end_pct > start_pct:
+            parts.append(f"rgba(34,197,94,0.65) {start_pct:.3f}% {end_pct:.3f}%")
+        cursor = max(cursor, end_pct)
+    if cursor < 100.0:
+        parts.append(f"rgba(148,163,184,0.28) {cursor:.3f}% 100%")
+    if not parts:
+        parts = ["rgba(148,163,184,0.28) 0% 100%"]
+    return "linear-gradient(to right, " + ", ".join(parts) + ")"
 
 
 @login_required
@@ -306,27 +477,35 @@ def dashboard(request):
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
 
-    start, end = _query_window(request, default_hours=24)
-    search = (request.GET.get("busca") or "").strip()
     config_missing = not app.ingest_client_id or not app.ingest_agent_id
+    available_days = [] if config_missing else _available_days(app)
+    selected_day = _parse_query_date(request.GET.get("dia"))
+    if not selected_day:
+        today = timezone.localdate()
+        selected_day = today if today in available_days else (available_days[0] if available_days else today)
 
-    events = []
+    day_start, day_end_exclusive = _day_bounds(selected_day)
+    day_end_point = day_end_exclusive - timedelta(seconds=1)
+
+    events_today = []
+    seed_states = {}
+    day_prefixes = set()
     if not config_missing:
-        records = (
-            _base_records_queryset(app, start, end)
-            .only("source_id", "payload", "created_at", "updated_at")
-            .order_by("-created_at")[:MAX_DASHBOARD_RECORDS]
-        )
-        for record in records:
-            event = _build_event(record)
-            if event:
-                events.append(event)
-        events.sort(key=lambda item: (item["timestamp"], item["prefixo"], item["atributo"]))
+        today_records = _records_in_window(app, day_start, day_end_exclusive, MAX_DASHBOARD_RECORDS)
+        events_today = _events_from_records(today_records)
+        day_prefixes = {event["prefixo"] for event in events_today}
+        if day_prefixes:
+            baseline_records = _records_before(app, day_start, BASELINE_RECORDS_LIMIT)
+            baseline_events = _events_from_records(baseline_records)
+            baseline_events = [event for event in baseline_events if event["prefixo"] in day_prefixes]
+            seed_states = _seed_states_from_events(baseline_events)
 
-    timeline = _timeline_points(events, GLOBAL_TIMELINE_LIMIT)
+    timeline = _build_timeline_with_events(day_start, day_end_point, events_today)
     selected_at = _parse_query_datetime(request.GET.get("at"))
     if not selected_at:
-        selected_at = timeline[-1]["timestamp"] if timeline else end
+        now = timezone.localtime(timezone.now())
+        selected_at = now if selected_day == timezone.localdate() else day_end_point
+    selected_at = _clamp_datetime(selected_at, day_start, day_end_exclusive)
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
         selected_at = selected_point["timestamp"]
@@ -334,13 +513,16 @@ def dashboard(request):
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
     origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
     destino_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.DESTINO}
-    cards = _build_route_cards(events, selected_at, origem_maps, destino_maps, search=search)
+    cards = _build_route_cards(
+        events_today,
+        selected_at,
+        origem_maps,
+        destino_maps,
+        initial_states=seed_states,
+        known_prefixes=day_prefixes,
+    )
 
-    recent_events = [
-        event
-        for event in reversed(events)
-        if event["timestamp"] <= selected_at
-    ][:200]
+    recent_events = [event for event in reversed(events_today) if event["timestamp"] <= selected_at][:200]
     events_page_num = request.GET.get("events_page", "1")
     recent_events_paginator = Paginator(recent_events, RECENT_EVENTS_PAGE_SIZE)
     recent_events_page = recent_events_paginator.get_page(events_page_num)
@@ -361,15 +543,18 @@ def dashboard(request):
             },
         )
 
+    prev_day, next_day = _day_navigation(available_days, selected_day)
+
     return render(
         request,
         "core/apps/app_rotas/dashboard.html",
         {
             "app": app,
             "cards": cards,
-            "inicio": _fmt_input_datetime(start),
-            "fim": _fmt_input_datetime(end),
-            "busca": search,
+            "selected_day": selected_day,
+            "available_days": available_days,
+            "prev_day": prev_day,
+            "next_day": next_day,
             "timeline": timeline,
             "timeline_total": len(timeline),
             "timeline_json": json.dumps([{"iso": point["iso"], "label": point["label"]} for point in timeline]),
@@ -380,7 +565,7 @@ def dashboard(request):
             "eventos_recentes": recent_events_page.object_list,
             "recent_events_page": recent_events_page,
             "config_missing": config_missing,
-            "total_events": len(events),
+            "total_events": len(events_today),
             "max_records": MAX_DASHBOARD_RECORDS,
         },
     )
@@ -392,39 +577,53 @@ def rota_detalhe(request, prefixo):
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
 
-    start, end = _query_window(request, default_hours=24 * 7)
     config_missing = not app.ingest_client_id or not app.ingest_agent_id
+    prefix_norm = (prefixo or "").strip().upper()
 
-    events = []
+    available_days = [] if config_missing else _available_days(app)
+    selected_day = _parse_query_date(request.GET.get("dia"))
+    if not selected_day:
+        today = timezone.localdate()
+        selected_day = today if today in available_days else (available_days[0] if available_days else today)
+
+    day_start, day_end_exclusive = _day_bounds(selected_day)
+    day_end_point = day_end_exclusive - timedelta(seconds=1)
+
+    day_events = []
+    baseline_seed = {}
     if not config_missing:
-        records = (
-            _base_records_queryset(app, start, end)
-            .only("source_id", "payload", "created_at", "updated_at")
-            .order_by("-created_at")[:MAX_ROUTE_RECORDS]
-        )
-        prefix_norm = (prefixo or "").strip().upper()
-        for record in records:
-            event = _build_event(record)
-            if event and event["prefixo"] == prefix_norm:
-                events.append(event)
-        events.sort(key=lambda item: (item["timestamp"], item["atributo"]))
-    else:
-        prefix_norm = (prefixo or "").strip().upper()
+        records_today = _records_in_window(app, day_start, day_end_exclusive, MAX_ROUTE_RECORDS)
+        day_events = _events_from_records(records_today, prefix=prefix_norm)
 
-    timeline = _timeline_points(events, ROUTE_TIMELINE_LIMIT)
+        records_before = _records_before(app, day_start, BASELINE_RECORDS_LIMIT)
+        baseline_events = _events_from_records(records_before, prefix=prefix_norm)
+        baseline_seed = _seed_states_from_events(baseline_events)
+
+    timeline = _build_timeline_with_events(day_start, day_end_point, day_events)
     selected_at = _parse_query_datetime(request.GET.get("at"))
     if not selected_at:
-        selected_at = timeline[-1]["timestamp"] if timeline else end
+        now = timezone.localtime(timezone.now())
+        selected_at = now if selected_day == timezone.localdate() else day_end_point
+    selected_at = _clamp_datetime(selected_at, day_start, day_end_exclusive)
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
         selected_at = selected_point["timestamp"]
 
-    maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
-    origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
-    destino_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.DESTINO}
-
-    attrs = {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None}
-    for event in events:
+    seed_attrs = baseline_seed.get(
+        prefix_norm,
+        {
+            "attrs": {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None},
+            "last_update": None,
+        },
+    )["attrs"]
+    attrs = {
+        "LIGAR": seed_attrs.get("LIGAR"),
+        "DESLIGAR": seed_attrs.get("DESLIGAR"),
+        "LIGADA": seed_attrs.get("LIGADA"),
+        "ORIGEM": seed_attrs.get("ORIGEM"),
+        "DESTINO": seed_attrs.get("DESTINO"),
+    }
+    for event in day_events:
         if event["timestamp"] > selected_at:
             break
         attrs[event["atributo"]] = event["valor"]
@@ -433,11 +632,14 @@ def rota_detalhe(request, prefixo):
     desligar_on = _is_active(attrs.get("DESLIGAR"))
     ligada_on = _is_active(attrs.get("LIGADA"))
     status = {
-        "play_blink": ligar_on and not ligada_on,
-        "play_on": ligar_on and ligada_on,
+        "play_blink": ligar_on and not ligada_on and not desligar_on,
+        "play_on": ligar_on and ligada_on and not desligar_on,
         "pause_on": desligar_on,
     }
 
+    maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
+    origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
+    destino_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.DESTINO}
     origem_codigo = _value_to_int(attrs.get("ORIGEM"))
     destino_codigo = _value_to_int(attrs.get("DESTINO"))
     origem_nome = origem_maps.get(origem_codigo) if origem_codigo is not None else None
@@ -445,7 +647,7 @@ def rota_detalhe(request, prefixo):
 
     timeline_events = []
     previous_values = {}
-    for event in reversed(events):
+    for event in reversed(day_events):
         if event["timestamp"] > selected_at:
             continue
         attr = event["atributo"]
@@ -475,14 +677,22 @@ def rota_detalhe(request, prefixo):
         if len(timeline_events) >= 120:
             break
 
+    initial_ligada_on = _is_active(seed_attrs.get("LIGADA"))
+    ligada_intervals = _build_ligada_intervals(day_events, day_start, day_end_point, initial_ligada_on)
+    ligada_gradient = _ligada_gradient(ligada_intervals, day_start, day_end_point)
+
+    prev_day, next_day = _day_navigation(available_days, selected_day)
+
     return render(
         request,
         "core/apps/app_rotas/rota_detalhe.html",
         {
             "app": app,
             "prefixo": prefix_norm,
-            "inicio": _fmt_input_datetime(start),
-            "fim": _fmt_input_datetime(end),
+            "selected_day": selected_day,
+            "available_days": available_days,
+            "prev_day": prev_day,
+            "next_day": next_day,
             "timeline": timeline,
             "timeline_json": json.dumps([{"iso": point["iso"], "label": point["label"]} for point in timeline]),
             "selected_index": selected_index,
@@ -496,6 +706,7 @@ def rota_detalhe(request, prefixo):
             "origem_display": origem_nome or (str(origem_codigo) if origem_codigo is not None else "--"),
             "destino_display": destino_nome or (str(destino_codigo) if destino_codigo is not None else "--"),
             "timeline_events": timeline_events,
+            "ligada_gradient": ligada_gradient,
             "config_missing": config_missing,
         },
     )
