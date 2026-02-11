@@ -62,6 +62,7 @@ TEMPLATES = [
         'DIRS': [
             BASE_DIR / "core" / "apps",
             BASE_DIR / "core" / "apps" / "app_milhao_bla" / "templates",
+            BASE_DIR / "core" / "apps" / "app_rotas" / "templates",
         ],
         'APP_DIRS': True,
         'OPTIONS': {

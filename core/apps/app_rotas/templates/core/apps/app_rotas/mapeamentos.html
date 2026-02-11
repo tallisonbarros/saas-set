@@ -1,0 +1,144 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ app.nome }} - Mapeamentos{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_rotas_dashboard' %}">{{ app.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>Mapeamentos</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card app-accent" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">{{ app.nome }}</div>
+        <div class="hud-pill">Mapeamentos</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'app_rotas_dashboard' %}">Dashboard</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Origem e destino</h1>
+          <p class="page-subtitle">Associacao de codigo numerico para nome amigavel por app.</p>
+        </div>
+      </div>
+    </div>
+    {% if message %}
+      <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <details class="io-card io-discrete" open>
+      <summary class="io-discrete-summary">
+        <span class="io-title">{% if edit_item %}Editar mapeamento{% else %}Novo mapeamento{% endif %}</span>
+        <span class="muted">Tipo + codigo + nome.</span>
+      </summary>
+      <div class="io-discrete-body">
+        <form class="io-form" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_map">
+          {% if edit_item %}
+            <input type="hidden" name="map_id" value="{{ edit_item.id }}">
+          {% endif %}
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Tipo</span>
+              <select name="tipo" required>
+                <option value="ORIGEM" {% if edit_item and edit_item.tipo == "ORIGEM" %}selected{% endif %}>ORIGEM</option>
+                <option value="DESTINO" {% if edit_item and edit_item.tipo == "DESTINO" %}selected{% endif %}>DESTINO</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Codigo numerico</span>
+              <input type="number" name="codigo" value="{% if edit_item %}{{ edit_item.codigo }}{% endif %}" required>
+            </label>
+            <label class="field">
+              <span>Nome amigavel</span>
+              <input type="text" name="nome" value="{% if edit_item %}{{ edit_item.nome }}{% endif %}" required>
+            </label>
+            <label class="field">
+              <span>Ativo</span>
+              <input type="checkbox" name="ativo" {% if not edit_item or edit_item.ativo %}checked{% endif %}>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar</button>
+            {% if edit_item %}
+              <a class="btn btn-ghost" href="{% url 'app_rotas_mapeamentos' %}">Cancelar</a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
+    <form class="io-form" method="get">
+      <div class="io-form-grid">
+        <label class="field">
+          <span>Filtro tipo</span>
+          <select name="tipo">
+            <option value="" {% if not tipo_filtro %}selected{% endif %}>Todos</option>
+            <option value="ORIGEM" {% if tipo_filtro == "ORIGEM" %}selected{% endif %}>ORIGEM</option>
+            <option value="DESTINO" {% if tipo_filtro == "DESTINO" %}selected{% endif %}>DESTINO</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Filtrar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Mapeamentos cadastrados</h2>
+      </div>
+    </div>
+    {% if maps %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Codigo</th>
+              <th>Nome</th>
+              <th>Status</th>
+              <th>Acoes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in maps %}
+              <tr>
+                <td>{{ item.tipo }}</td>
+                <td>{{ item.codigo }}</td>
+                <td>{{ item.nome }}</td>
+                <td>{% if item.ativo %}Ativo{% else %}Inativo{% endif %}</td>
+                <td>
+                  <a class="btn btn-ghost" href="{% url 'app_rotas_mapeamentos' %}?edit={{ item.id }}">Editar</a>
+                  <form method="post" style="display: inline;" onsubmit="return confirm('Remover mapeamento?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_map">
+                    <input type="hidden" name="map_id" value="{{ item.id }}">
+                    <button class="btn btn-outline" type="submit">Remover</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nenhum mapeamento cadastrado.</p>
+    {% endif %}
+  </section>
+{% endblock %}
+

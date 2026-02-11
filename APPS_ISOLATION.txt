@@ -1,0 +1,36 @@
+﻿ISOLAMENTO DE APPS - Guia para novos agentes
+Data: 10/02/2026
+
+Visao geral
+- Cada app e um registro em App (core/models.py) com slug, nome, descricao, icon, theme_color e ativo.
+- Acesso por usuario via PerfilUsuario.apps (ManyToMany com App).
+- Cada app vive em core/apps/<pasta_do_app>/ com views.py, urls.py e templates/core/apps/<pasta_do_app>/.
+- Roteamento separado em saasset/urls.py: rota explicita do app e fallback apps/<slug>/ para core.views.app_home.
+- app_home valida permissao e redireciona para o app isolado quando o slug e conhecido.
+
+Como garantir isolamento
+- Nenhuma regra/consulta especifica do app deve ficar em core/views.py ou templates globais.
+- Cada app deve ter seu proprio views.py, urls.py e templates. Se precisar de estaticos, mantenha-os no app.
+- Proteja views do app com login_required e checagem de permissao (is_staff ou cliente.apps).
+- Use o slug do App para buscar dados e renderizar UI; nao use hardcodes fora do app.
+- Evite importar codigo do app no core. O core so conhece os slugs na app_home e as rotas em urls.py.
+
+Checklist para novo app
+1) Criar registro App (painel/admin) com slug unico e ativo.
+2) Criar pasta: core/apps/<app_pasta>/ com __init__.py, views.py, urls.py.
+3) Templates em core/apps/<app_pasta>/templates/core/apps/<app_pasta>/.
+4) Rotas: adicionar path('apps/<slug>/', include(...)) em saasset/urls.py.
+5) Redirecionamento em core.views.app_home para o slug, apontando para o nome da rota do app.
+6) Permissao: usar _get_cliente e validar apps em views do app.
+7) Liberar acesso ao usuario em PerfilUsuario.apps.
+
+Exemplo atual: app_milhao_bla
+- Pasta core/apps/app_milhao_bla.
+- Rota apps/appmilhaobla/.
+- Redirect em app_home para app_milhao_bla_dashboard.
+- Acesso validado em core/apps/app_milhao_bla/views.py.
+
+Manutencao
+- Ao alterar slug, atualize App no banco, saasset/urls.py e core.views.app_home.
+- Ao desativar app (ativo=False), app_home bloqueia; views do app tambem devem buscar App ativo.
+- Documente cada app novo em APPS_ISOLATION.md e atualize este arquivo se o fluxo mudar.

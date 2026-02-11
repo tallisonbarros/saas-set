@@ -1,0 +1,213 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ app.nome }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_home' app.slug %}">{{ app.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>Dashboard</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card app-accent" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">{{ app.nome }}</div>
+        <div class="hud-pill">Rotas</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar ao painel</a>
+          <a class="hud-menu-pill" href="{% url 'app_rotas_mapeamentos' %}">Mapeamentos</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Status de rotas por ingest</h1>
+          <p class="page-subtitle">Cliente {{ app.ingest_client_id|default:"-" }} - Agente {{ app.ingest_agent_id|default:"-" }}{% if app.ingest_source %} - Fonte {{ app.ingest_source }}{% endif %}</p>
+        </div>
+      </div>
+      <div class="hud-meta">Janela aplicada e agregacao por prefixo/sufixo de tags.</div>
+    </div>
+  </section>
+
+  {% if config_missing %}
+    <section class="card">
+      <p class="notice notice-error">Configure `ingest_client_id` e `ingest_agent_id` no gerenciamento de apps para usar o dashboard de rotas.</p>
+    </section>
+  {% endif %}
+
+  <section class="card">
+    <form class="io-form" method="get">
+      <div class="io-form-grid">
+        <label class="field">
+          <span>Inicio</span>
+          <input type="datetime-local" name="inicio" value="{{ inicio }}">
+        </label>
+        <label class="field">
+          <span>Fim</span>
+          <input type="datetime-local" name="fim" value="{{ fim }}">
+        </label>
+        <label class="field">
+          <span>Buscar rota/origem/destino</span>
+          <input type="text" name="busca" value="{{ busca }}" placeholder="REC_RT01, ENS01, 12, SILO A">
+        </label>
+        <label class="field">
+          <span>Mostrar inativas</span>
+          <select name="mostrar_inativas">
+            <option value="0" {% if not mostrar_inativas %}selected{% endif %}>Nao</option>
+            <option value="1" {% if mostrar_inativas %}selected{% endif %}>Sim</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Aplicar filtros</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Linha do tempo global</h2>
+        <p class="muted">Estado aplicado em {{ selected_at_label }} ({{ total_events }} eventos processados, limite {{ max_records }} registros).</p>
+      </div>
+    </div>
+    {% if timeline %}
+      <form method="get" class="io-form" id="timeline-form">
+        <input type="hidden" name="inicio" value="{{ inicio }}">
+        <input type="hidden" name="fim" value="{{ fim }}">
+        <input type="hidden" name="busca" value="{{ busca }}">
+        <input type="hidden" name="mostrar_inativas" value="{% if mostrar_inativas %}1{% else %}0{% endif %}">
+        <input type="hidden" name="at" id="timeline-at" value="{{ selected_at_iso }}">
+        <div class="timeline-controls">
+          <input id="timeline-range" type="range" min="0" max="{{ timeline_total|add:'-1' }}" value="{{ selected_index }}" {% if timeline_total < 2 %}disabled{% endif %}>
+          <div class="panel-tag active" id="timeline-label">{{ selected_at_label }}</div>
+        </div>
+        <div class="timeline-points">
+          {% for point in timeline|slice:"-18:" %}
+            <span class="panel-tag {% if selected_point and point.iso == selected_point.iso %}active{% endif %}">{{ point.label }}</span>
+          {% endfor %}
+        </div>
+      </form>
+    {% else %}
+      <p class="muted">Sem eventos na janela selecionada.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Rotas detectadas</h2>
+        <p class="muted">{{ cards|length }} cards renderizados dinamicamente por prefixo.</p>
+      </div>
+    </div>
+    {% if cards %}
+      <div class="rotas-grid">
+        {% for rota in cards %}
+          <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?inicio={{ inicio }}&fim={{ fim }}&at={{ selected_at_iso }}">
+            <div class="panel-card-top">
+              <div class="panel-title">{{ rota.prefixo }}</div>
+              <div class="panel-tag {% if rota.is_inactive %}warn{% else %}active{% endif %}">
+                {% if rota.is_inactive %}Inativa{% else %}Ativa{% endif %}
+              </div>
+            </div>
+            <div class="rota-main">{{ rota.origem_display }} &gt; {{ rota.destino_display }}</div>
+            <div class="rota-status">
+              <span class="status-chip {% if rota.play_blink %}is-active is-blink{% elif rota.play_on %}is-active{% endif %}">Play</span>
+              <span class="status-chip {% if rota.pause_on %}is-active pause{% endif %}">Pause</span>
+            </div>
+            <div class="muted rota-updated">Ultima atualizacao: {{ rota.last_update_display }}</div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhuma rota encontrada com os filtros atuais.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Eventos recentes</h2>
+        <p class="muted">Leituras usadas para compor o estado ate o ponto selecionado.</p>
+      </div>
+    </div>
+    {% if eventos_recentes %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Rota</th>
+              <th>Atributo</th>
+              <th>Valor</th>
+              <th>Tag</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for evento in eventos_recentes %}
+              <tr>
+                <td>{{ evento.timestamp_display }}</td>
+                <td>{{ evento.prefixo }}</td>
+                <td>{{ evento.atributo }}</td>
+                <td>{{ evento.valor_display }}</td>
+                <td><code>{{ evento.tag }}</code></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Sem eventos para listar.</p>
+    {% endif %}
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <style>
+    .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .rota-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 10px; }
+    .rota-main { font-weight: 700; font-size: 1rem; }
+    .rota-status { display: flex; gap: 8px; align-items: center; }
+    .rota-updated { font-size: .82rem; }
+    .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
+    .status-chip.is-active { background: rgba(16, 185, 129, 0.18); border-color: rgba(16, 185, 129, 0.45); }
+    .status-chip.pause.is-active { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.45); }
+    .status-chip.is-blink { animation: rotaBlink 1.15s ease-in-out infinite; }
+    .timeline-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .timeline-controls input[type="range"] { width: 100%; }
+    .timeline-points { display: flex; flex-wrap: wrap; gap: 6px; }
+    @keyframes rotaBlink { 0% { opacity: .25; } 50% { opacity: 1; } 100% { opacity: .25; } }
+  </style>
+  <script>
+    (function () {
+      var timeline = {{ timeline_json|safe }};
+      var range = document.getElementById("timeline-range");
+      var atField = document.getElementById("timeline-at");
+      var form = document.getElementById("timeline-form");
+      var label = document.getElementById("timeline-label");
+      if (!range || !atField || !form || !label || !timeline.length) {
+        return;
+      }
+      var timer = null;
+      range.addEventListener("input", function () {
+        var index = Number(range.value);
+        var point = timeline[index];
+        if (!point) {
+          return;
+        }
+        atField.value = point.iso;
+        label.textContent = point.label;
+        if (timer) {
+          clearTimeout(timer);
+        }
+        timer = setTimeout(function () {
+          form.submit();
+        }, 180);
+      });
+    })();
+  </script>
+{% endblock %}

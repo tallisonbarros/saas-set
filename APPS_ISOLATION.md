@@ -1,101 +1,42 @@
-# Isolamento de Apps (visao geral)
+﻿# Isolamento de Apps (guia para novos agentes)
 
-Este documento descreve como o sistema organiza **apps isolados** e como criar novos apps sem misturar o core.
+Data: 10/02/2026
 
-## Conceito
+## Visao geral
 
-- Cada app tem um **registro no banco** (`App`), com `slug`, `nome`, `descricao`, `icon`, `theme_color` e `ativo`.
-- Cada usuario recebe acesso via `PerfilUsuario.apps` (ManyToMany).
-- Cada app possui **pasta propria** com `views.py`, `urls.py` e `templates/`.
-- O painel mostra **apenas os apps liberados** para o usuario.
+- Cada app e um registro em `App` (`core/models.py`) com `slug`, `nome`, `descricao`, `icon`, `theme_color` e `ativo`.
+- Acesso por usuario via `PerfilUsuario.apps` (ManyToMany com `App`).
+- Cada app vive em `core/apps/<pasta_do_app>/` com `views.py`, `urls.py` e `templates/core/apps/<pasta_do_app>/`.
+- Roteamento separado em `saasset/urls.py`: rota explicita do app e fallback `apps/<slug>/` para `core.views.app_home`.
+- `app_home` valida permissao e redireciona para o app isolado quando o `slug` e conhecido.
 
-## Estrutura de pastas
+## Como garantir isolamento
 
-Cada app vive em:
+- Nenhuma regra/consulta especifica do app deve ficar em `core/views.py` ou templates globais.
+- Cada app deve ter seu proprio `views.py`, `urls.py` e `templates`. Se precisar de estaticos, mantenha-os no app.
+- Proteja views do app com `login_required` e checagem de permissao (`is_staff` ou `cliente.apps`).
+- Use o `slug` do `App` para buscar dados e renderizar UI; nao use hardcodes fora do app.
+- Evite importar codigo do app no core. O core so conhece os slugs na `app_home` e as rotas em `urls.py`.
 
-```
-core/
-  apps/
-    app_milhao_bla/
-      __init__.py
-      views.py
-      urls.py
-      templates/
-        core/
-          apps/
-            app_milhao_bla/
-              dashboard.html
-```
+## Checklist para novo app
 
-## Roteamento
+1. Criar registro `App` (painel/admin) com `slug` unico e `ativo`.
+2. Criar pasta: `core/apps/<app_pasta>/` com `__init__.py`, `views.py`, `urls.py`.
+3. Templates em `core/apps/<app_pasta>/templates/core/apps/<app_pasta>/`.
+4. Rotas: adicionar `path('apps/<slug>/', include(...))` em `saasset/urls.py`.
+5. Redirecionamento em `core.views.app_home` para o `slug`, apontando para o nome da rota do app.
+6. Permissao: usar `_get_cliente` e validar apps em views do app.
+7. Liberar acesso ao usuario em `PerfilUsuario.apps`.
 
-No arquivo `saasset/urls.py`:
+## Exemplo atual: `app_milhao_bla`
 
-- Rota do app isolado:
-  - `/apps/appmilhaobla/` -> `core/apps/app_milhao_bla/urls.py`
-- Rota generica:
-  - `/apps/<slug>/` -> `core.views.app_home`
+- Pasta `core/apps/app_milhao_bla`.
+- Rota `apps/appmilhaobla/`.
+- Redirect em `app_home` para `app_milhao_bla_dashboard`.
+- Acesso validado em `core/apps/app_milhao_bla/views.py`.
 
-Na `app_home`, se o `slug` for conhecido, redireciona para o app isolado. Assim:
-- `/apps/appmilhaobla/` resolve direto
-- `/apps/<slug>/` funciona como fallback
+## Manutencao
 
-## Controle de acesso
-
-Em cada `views.py` do app isolado:
-
-- Busca o `App` pelo `slug`
-- Verifica se o usuario tem permissao:
-  - `request.user.is_staff` **ou**
-  - usuario tem o app em `PerfilUsuario.apps`
-- Se nao tiver permissao, retorna `HttpResponseForbidden`.
-
-## Como criar um novo app
-
-1. **Criar registro do App (admin ou painel "Aplicativos")**
-   - Nome: `AppNutrien`
-   - Slug: `appnutrien`
-   - Icone: `NU`
-   - Tema: `#6c8cff`
-
-2. **Criar pasta do app**
-
-```
-core/apps/app_nutrien/
-  __init__.py
-  views.py
-  urls.py
-  templates/core/apps/app_nutrien/dashboard.html
-```
-
-3. **Adicionar rota em `saasset/urls.py`**
-
-```
-path('apps/appnutrien/', include('core.apps.app_nutrien.urls')),
-```
-
-4. **Adicionar redirecionamento na `app_home`**
-
-```
-if app.slug == "appnutrien":
-    return redirect("app_nutrien_dashboard")
-```
-
-5. **Liberar acesso ao usuario**
-
-- Em `Usuarios > Gerenciar`, preencher o campo `APPS` com o slug:
-  - `appnutrien`
-
-## Observacoes importantes
-
-- Cada app pode ter **template, layout e logica totalmente diferentes**.
-- Nenhuma regra do app precisa ficar no core.
-- O app pode consumir dados de ingestao ou outras tabelas sem afetar o restante do sistema.
-
-## Dica para evolucao futura (modo "sub-site")
-
-Quando quiser isolar ainda mais:
-
-- Crie um `base.html` exclusivo por app (ex: `core/apps/app_nutrien/templates/base_app.html`)
-- Mantenha URLs do app fora do menu principal
-- Posteriormente, pode mover para outro projeto sem quebrar o core, pois o app ja tem seu modulo.
+- Ao alterar `slug`, atualize `App` no banco, `saasset/urls.py` e `core.views.app_home`.
+- Ao desativar app (`ativo=False`), `app_home` bloqueia; views do app tambem devem buscar `App` ativo.
+- Documente cada app novo aqui e mantenha `APPS_ISOLATION.txt` sincronizado se o fluxo mudar.

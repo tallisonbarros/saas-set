@@ -175,6 +175,14 @@ def _clean_app_slug(value):
     return value[:60]
 
 
+def _extract_app_ingest_fields(data):
+    return {
+        "ingest_client_id": (data.get("ingest_client_id", "") or "").strip(),
+        "ingest_agent_id": (data.get("ingest_agent_id", "") or "").strip(),
+        "ingest_source": (data.get("ingest_source", "") or "").strip(),
+    }
+
+
 def _tipo_prefix(tipo, fallback=None):
     if hasattr(tipo, "codigo") and tipo.codigo:
         cleaned = _clean_tag_prefix(tipo.codigo)
@@ -926,6 +934,8 @@ def app_home(request, slug):
         return HttpResponseForbidden("Sem permissao.")
     if app.slug == "appmilhaobla":
         return redirect("app_milhao_bla_dashboard")
+    if app.slug == "approtas":
+        return redirect("app_rotas_dashboard")
     return render(request, "core/app_home.html", {"app": app})
 
 
@@ -943,9 +953,13 @@ def apps_gerenciar(request):
             descricao = request.POST.get("descricao", "").strip()
             icon = request.POST.get("icon", "").strip()
             theme_color = request.POST.get("theme_color", "").strip()
+            ingest_fields = _extract_app_ingest_fields(request.POST)
             slug = _clean_app_slug(slug_raw or nome)
             if not nome or not slug:
                 message = "Informe nome e slug valido."
+                message_level = "error"
+            elif slug == "approtas" and (not ingest_fields["ingest_client_id"] or not ingest_fields["ingest_agent_id"]):
+                message = "Para o app Rotas, informe client_id e agent_id da ingest."
                 message_level = "error"
             else:
                 app, created = App.objects.get_or_create(
@@ -955,6 +969,9 @@ def apps_gerenciar(request):
                         "descricao": descricao,
                         "icon": icon,
                         "theme_color": theme_color,
+                        "ingest_client_id": ingest_fields["ingest_client_id"],
+                        "ingest_agent_id": ingest_fields["ingest_agent_id"],
+                        "ingest_source": ingest_fields["ingest_source"],
                         "ativo": True,
                     },
                 )
@@ -963,7 +980,20 @@ def apps_gerenciar(request):
                     app.descricao = descricao
                     app.icon = icon
                     app.theme_color = theme_color
-                    app.save(update_fields=["nome", "descricao", "icon", "theme_color"])
+                    app.ingest_client_id = ingest_fields["ingest_client_id"]
+                    app.ingest_agent_id = ingest_fields["ingest_agent_id"]
+                    app.ingest_source = ingest_fields["ingest_source"]
+                    app.save(
+                        update_fields=[
+                            "nome",
+                            "descricao",
+                            "icon",
+                            "theme_color",
+                            "ingest_client_id",
+                            "ingest_agent_id",
+                            "ingest_source",
+                        ]
+                    )
                 return redirect("apps_gerenciar")
         if action == "update_app":
             app_id = request.POST.get("app_id")
@@ -973,12 +1003,39 @@ def apps_gerenciar(request):
                 descricao = request.POST.get("descricao", "").strip()
                 icon = request.POST.get("icon", "").strip()
                 theme_color = request.POST.get("theme_color", "").strip()
+                ingest_fields = _extract_app_ingest_fields(request.POST)
+                if app.slug == "approtas" and (not ingest_fields["ingest_client_id"] or not ingest_fields["ingest_agent_id"]):
+                    message = "Para o app Rotas, informe client_id e agent_id da ingest."
+                    message_level = "error"
+                    apps = App.objects.all().order_by("nome")
+                    return render(
+                        request,
+                        "core/apps_gerenciar.html",
+                        {
+                            "apps": apps,
+                            "message": message,
+                            "message_level": message_level,
+                        },
+                    )
                 if nome:
                     app.nome = nome
                 app.descricao = descricao
                 app.icon = icon
                 app.theme_color = theme_color
-                app.save(update_fields=["nome", "descricao", "icon", "theme_color"])
+                app.ingest_client_id = ingest_fields["ingest_client_id"]
+                app.ingest_agent_id = ingest_fields["ingest_agent_id"]
+                app.ingest_source = ingest_fields["ingest_source"]
+                app.save(
+                    update_fields=[
+                        "nome",
+                        "descricao",
+                        "icon",
+                        "theme_color",
+                        "ingest_client_id",
+                        "ingest_agent_id",
+                        "ingest_source",
+                    ]
+                )
                 return redirect("apps_gerenciar")
         if action == "toggle_app":
             app_id = request.POST.get("app_id")
@@ -1641,10 +1698,10 @@ def _render_rack_io_pdf(rack, canais):
                 icon = ImageReader(icon_path)
                 pdf.drawImage(
                     icon,
-                    right - 26,
-                    y - 2,
-                    width=18,
-                    height=18,
+                    right - 38,
+                    y - 6,
+                    width=36,
+                    height=36,
                     preserveAspectRatio=True,
                     mask="auto",
                 )

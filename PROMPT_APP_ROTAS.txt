@@ -1,0 +1,255 @@
+OBJETIVO
+Implementar um novo app isolado chamado "Rotas" no projeto Django existente, seguindo o mesmo padrao de isolamento do app atual `app_milhao_bla`, mas com funcionalidades especificas para monitoramento de status de rotas via ingest.
+
+CONTEXTO REAL DO PROJETO (usar como base)
+- Projeto Django com app principal `core`.
+- Apps isolados vivem em `core/apps/<nome_app>/`.
+- App existente de referencia: `core/apps/app_milhao_bla/`.
+- Roteamento atual:
+  - `saasset/urls.py` possui rota dedicada para `app_milhao_bla`.
+  - Fallback `apps/<slug>/` chama `core.views.app_home`.
+- Controle de acesso:
+  - `core.views.app_home` usa `App` + `PerfilUsuario.apps`.
+  - `is_staff` tem acesso.
+- Ingest:
+  - Modelo `IngestRecord` em `core/models.py` com `client_id`, `agent_id`, `source`, `payload`.
+  - Endpoint `core.views.api_ingest` faz upsert por `source_id`.
+- Gerenciamento de apps:
+  - View: `core.views.apps_gerenciar`.
+  - Template: `core/templates/core/apps_gerenciar.html`.
+  - Hoje cria/edita metadados basicos de `App`.
+
+ESCOPO FUNCIONAL DO NOVO APP
+1) Criar app isolado "Rotas" com slug `approtas`.
+2) Consumir dados de ingest filtrando por `client_id` e `agent_id` configurados no cadastro do app (`/apps/gerenciar/`).
+3) Ler variaveis de rota em formato dinamico por prefixo e sufixo:
+   - Prefixo identifica a rota (ex.: `REC_RT01`, `BEN`, `SEC01`, `ENS01` etc.).
+   - Sufixos:
+     - `_LIGAR`
+     - `_DESLIGAR`
+     - `_LIGADA`
+     - `_ORIGEM`
+     - `_DESTINO` (aceitar tambem typo `_DESTIN` para robustez)
+4) Tela principal em cards:
+   - 1 card por rota (gerado dinamicamente, sem hardcode de prefixos).
+   - Mostrar status visual:
+     - Play piscando quando somente comando LIGAR estiver ativo e LIGADA ainda nao.
+     - Play verde quando LIGAR + LIGADA.
+     - Icone de pause para DESLIGAR.
+   - Mostrar `ORIGEM > DESTINO` usando nomes resolvidos por mapeamento (fallback para numero bruto).
+5) Clique no card abre detalhe da rota.
+6) Na tela de detalhe, ter menu HUD com botao para abrir tela de mapeamentos (origem/destino numero -> nome).
+7) Tela de mapeamento:
+   - Permitir criar/editar/remover associacoes de numeros para texto por app.
+8) Linha do tempo navegavel e intuitiva para consultar mudancas de status ao longo do tempo.
+
+REQUISITOS DE ARQUITETURA E ISOLAMENTO
+- Nao misturar regra de negocio de Rotas em templates globais.
+- Implementar em modulo dedicado:
+  - `core/apps/app_rotas/__init__.py`
+  - `core/apps/app_rotas/urls.py`
+  - `core/apps/app_rotas/views.py`
+  - `core/apps/app_rotas/templates/core/apps/app_rotas/...`
+  - `core/apps/app_rotas/static/core/apps/app_rotas/...` (se necessario)
+- Core deve conhecer apenas:
+  - include da URL do app em `saasset/urls.py`
+  - redirecionamento de slug em `core.views.app_home`
+  - campos/configuracoes de cadastro em `apps_gerenciar`
+
+MODELAGEM DE DADOS (OBRIGATORIA)
+Implementar migracoes para suportar configuracao de ingest e mapeamentos.
+
+1) Configuracao de ingest por App
+Opcao preferencial (simples e alinhada ao sistema atual): adicionar campos em `App`:
+- `ingest_client_id = models.CharField(max_length=120, blank=True, default="")`
+- `ingest_agent_id = models.CharField(max_length=120, blank=True, default="")`
+- `ingest_source = models.CharField(max_length=120, blank=True, default="")`
+Regra:
+- Para `approtas`, `ingest_client_id` e `ingest_agent_id` sao obrigatorios no gerenciamento.
+- `ingest_source` pode ser opcional; se preenchido, aplicar filtro adicional em `IngestRecord.source`.
+
+2) Mapeamentos de origem/destino por app
+Criar novo modelo em `core/models.py`, ex. `AppRotasMap`:
+- `app = models.ForeignKey(App, on_delete=models.CASCADE, related_name="rotas_maps")`
+- `tipo = models.CharField(max_length=20, choices=[("ORIGEM","ORIGEM"), ("DESTINO","DESTINO")])`
+- `codigo = models.IntegerField()`
+- `nome = models.CharField(max_length=120)`
+- `ativo = models.BooleanField(default=True)`
+- `criado_em = models.DateTimeField(auto_now_add=True)`
+Restricao unica recomendada: (`app`, `tipo`, `codigo`).
+
+3) (Opcional recomendado) Persistencia de rotas desativadas/manual
+Se precisar permitir "remover rota da visualizacao" mesmo ainda havendo dado no ingest, criar `AppRotaConfig`:
+- `app`, `prefixo`, `nome_exibicao`, `ativo`, `ordem`.
+Se nao criar esse modelo, aceite comportamento dinamico puro (rota aparece se houver dado no periodo filtrado).
+
+ALTERACOES EM /APPS/GERENCIAR (OBRIGATORIO)
+Editar `core.views.apps_gerenciar` e `core/templates/core/apps_gerenciar.html` para incluir:
+- Campos no cadastro/edicao de app:
+  - `ingest_client_id`
+  - `ingest_agent_id`
+  - `ingest_source` (opcional)
+- Validacao:
+  - Se slug for `approtas`, exigir `ingest_client_id` e `ingest_agent_id`.
+- Persistir campos em create/update.
+
+ROTAS E NAVEGACAO (OBRIGATORIO)
+1) Em `saasset/urls.py`, adicionar:
+   - `path('apps/approtas/', include('core.apps.app_rotas.urls'))`
+2) Em `core.views.app_home`, adicionar redirecionamento:
+   - `if app.slug == "approtas": return redirect("app_rotas_dashboard")`
+3) Em `core/apps/app_rotas/urls.py`, criar rotas nomeadas:
+   - dashboard
+   - detalhe da rota por prefixo
+   - gerenciamento de mapeamentos
+
+CONTRATO DE PARSING DOS DADOS (OBRIGATORIO)
+Implementar parser robusto para extrair `tag` e `valor` do `payload`:
+- Tag:
+  - priorizar `Name` (formato observado no ingest real).
+  - tentar chaves `TagName`, `tagname`, `tag`, `nome_tag`.
+- Valor:
+  - priorizar `Value` (normalmente string numerica, ex.: `"0"`).
+  - tentar `Value`, `value`, `valor`, `status`.
+  - converter para numero (int/float) quando possivel.
+- Timestamp da leitura:
+  - priorizar `TimestampUtc` (formato ISO UTC observado).
+  - priorizar no payload (`Hora`, `DataHoraBase`, `datahora`, `timestamp`).
+  - fallback em `record.updated_at` ou `record.created_at`.
+- Metadados uteis:
+  - `Id` pode ser usado como identificador tecnico do ponto, sem substituir o `prefixo` derivado de `Name`.
+  - `DataType` pode orientar coercao de tipo (`INT`, etc.), mas `Value` deve sempre passar por parse defensivo.
+
+Formato observado no ambiente (usar como referencia real):
+- `IngestRecord.client_id`: `UBS3-UN1`
+- `IngestRecord.agent_id`: `VMSCADA`
+- `IngestRecord.source`: `ROTA`
+- `payload` exemplo:
+  - `{'DataType': 'INT', 'Id': 57, 'Name': 'ENS01_DESTIN', 'TimestampUtc': '2026-02-11T17:18:19.771361', 'Value': '0'}`
+
+Filtro recomendado para o app Rotas:
+- sempre por `client_id` e `agent_id` configurados no App.
+- se `ingest_source` estiver preenchido, filtrar tambem por ele (para seu caso padrao: `ROTA`).
+
+Regra de classificacao da tag:
+- Identificar sufixo entre `_LIGAR`, `_DESLIGAR`, `_LIGADA`, `_ORIGEM`, `_DESTINO`, `_DESTIN`.
+- Prefixo = parte antes do sufixo.
+- Normalizar `_DESTIN` para `DESTINO`.
+- Descartar tags fora desse padrao.
+
+Logica de agregacao por rota:
+- Para cada prefixo, considerar ultimo valor de cada atributo (LIGAR, DESLIGAR, LIGADA, ORIGEM, DESTINO) dentro da janela filtrada.
+- Definir estados computados:
+  - `play_blink`: LIGAR ativo e LIGADA inativa.
+  - `play_on`: LIGAR ativo e LIGADA ativa.
+  - `pause_on`: DESLIGAR ativo.
+- Resolver `origem_nome` e `destino_nome` via `AppRotasMap`; fallback para codigo numerico.
+
+TELA PRINCIPAL (DASHBOARD) - UX
+Seguir linguagem visual do app BLA (HUD, cards, tokens), mas com conteudo especifico de rotas.
+
+Elementos minimos:
+1) HUD superior com:
+   - nome do app
+   - cliente/agente configurados
+   - botoes: voltar painel, mapeamentos
+2) Filtros:
+   - periodo (inicio/fim)
+   - busca por prefixo/nome da rota
+   - opcao mostrar rotas inativas
+3) Grid de cards de rota:
+   - titulo: nome da rota (prefixo ou nome configurado)
+   - linha principal: `ORIGEM > DESTINO`
+   - icones de status (play/pause) com estados visuais
+   - indicador "ultima atualizacao"
+   - clique abre detalhe
+4) Linha do tempo navegavel (global):
+   - slider + marcadores de eventos, ou lista temporal com paginacao por janela.
+   - a navegacao deve atualizar estado dos cards no tempo selecionado.
+
+TELA DE DETALHE DA ROTA
+1) Cabecalho com prefixo e status atual.
+2) Cards de atributos atuais: ligar, desligar, ligada, origem, destino.
+3) Timeline da rota:
+   - eventos ordenados por tempo.
+   - destacar transicoes importantes:
+     - comando ligar
+     - comando desligar
+     - ligada on/off
+     - mudanca de origem/destino
+4) Atalho no HUD para "Mapeamentos".
+
+TELA DE MAPEAMENTOS
+CRUD simples por app:
+- Filtros por `tipo` (origem/destino).
+- Formulario para criar/editar:
+  - tipo
+  - codigo numerico
+  - nome amigavel
+  - ativo
+- Lista em tabela/card com acoes editar/remover.
+- Validar unicidade (`app`, `tipo`, `codigo`).
+
+PERMISSAO E SEGURANCA
+- Todas as views do app Rotas devem usar:
+  - `@login_required`
+  - validacao de acesso igual ao padrao: staff OU usuario com app liberado.
+- Se app inativo ou sem permissao:
+  - retornar `HttpResponseForbidden` ou 404 consistente com padrao existente.
+
+PERFORMANCE (OBRIGATORIO)
+- Evitar scan desnecessario em `IngestRecord`.
+- Filtrar por `client_id` e `agent_id` sempre no banco.
+- Aplicar janela temporal (padrao ultimas 24h ou 7 dias, definivel por querystring).
+- Limitar volume maximo para dashboard (ex.: top N registros recentes) e usar agregacao em memoria so apos filtro forte.
+- Se necessario, adicionar indice em migracao para consulta:
+  - indice composto sugerido em `IngestRecord`: (`client_id`, `agent_id`, `source`, `created_at`)
+  - manter compatibilidade com dados atuais.
+
+LAYOUT E INTERACAO (OBRIGATORIO)
+- Reutilizar classes globais existentes (`card`, `page-hud`, `hud-menu`, `panel-card`, etc.).
+- Adicionar CSS especifico apenas para componentes novos de Rotas (arquivo local do app ou bloco dedicado).
+- Animacao de play piscando deve ser discreta, acessivel e sem excesso.
+- Responsivo mobile e desktop.
+- Sem quebrar visual dos outros modulos.
+
+TESTES E VALIDACAO
+Entregar com validacoes minimas:
+1) Teste/manual de permissao:
+   - user sem app nao acessa.
+   - user com app acessa.
+2) Teste/manual de parsing:
+   - tags com `_DESTINO` e `_DESTIN`.
+   - prefixos novos aparecem automaticamente.
+3) Teste/manual de mapeamento:
+   - criar mapa e refletir no card (`ORIGEM > DESTINO` com nomes).
+4) Teste/manual de timeline:
+   - navegar no tempo altera status exibido.
+5) Validacao de `apps_gerenciar`:
+   - salvar/editar `ingest_client_id` e `ingest_agent_id`.
+
+CRITERIOS DE ACEITE (DONE)
+- App `Rotas` criado e isolado em `core/apps/app_rotas`.
+- Rota `/apps/approtas/` funcional e protegida por permissao.
+- `apps/gerenciar` permite configurar `client_id` e `agent_id` por app.
+- Dashboard renderiza cards dinamicos por prefixo detectado no ingest.
+- Status play/pause e estados visuais implementados.
+- Card mostra `ORIGEM > DESTINO` com nomes mapeados.
+- Tela de detalhe e tela de mapeamentos implementadas.
+- Timeline navegavel funcionando.
+- Codigo sem regressao no app `app_milhao_bla`.
+
+ENTREGAVEIS ESPERADOS
+- Codigo completo (models/views/urls/templates/css/js).
+- Migracoes novas em `core/migrations/`.
+- Ajustes no `saasset/urls.py` e `core/views.py`.
+- Ajustes em `core/templates/core/apps_gerenciar.html`.
+- Resumo final com:
+  - arquivos alterados
+  - decisoes tecnicas
+  - como testar rapidamente no ambiente local
+
+OBSERVACOES IMPORTANTES
+- Nao remover nem refatorar pesado o `app_milhao_bla`; usar como referencia de padrao.
+- Nao hardcodar lista de prefixos.
+- Tratar ausencia de dados de forma elegante (estado vazio com mensagem clara).

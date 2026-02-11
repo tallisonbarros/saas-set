@@ -60,6 +60,18 @@
               <span>Cor tema</span>
               <input type="text" name="theme_color" placeholder="#ff7a18">
             </label>
+            <label class="field">
+              <span>Ingest client_id</span>
+              <input type="text" name="ingest_client_id" placeholder="UBS3-UN1">
+            </label>
+            <label class="field">
+              <span>Ingest agent_id</span>
+              <input type="text" name="ingest_agent_id" placeholder="VMSCADA">
+            </label>
+            <label class="field">
+              <span>Ingest source (opcional)</span>
+              <input type="text" name="ingest_source" placeholder="ROTA">
+            </label>
             <label class="field" style="grid-column: 1 / -1;">
               <span>Descricao</span>
               <textarea name="descricao" rows="3"></textarea>
@@ -88,6 +100,9 @@
               <div class="panel-title">{{ app.nome }}</div>
               <div class="proposal-meta">Slug: {{ app.slug }}</div>
               <div class="proposal-meta">Status: {% if app.ativo %}Ativo{% else %}Inativo{% endif %}</div>
+              <div class="proposal-meta">Ingest client_id: {{ app.ingest_client_id|default:"-" }}</div>
+              <div class="proposal-meta">Ingest agent_id: {{ app.ingest_agent_id|default:"-" }}</div>
+              <div class="proposal-meta">Ingest source: {{ app.ingest_source|default:"-" }}</div>
             </div>
             <details class="io-discrete" style="min-width: 280px;">
               <summary class="io-discrete-summary">
@@ -111,6 +126,18 @@
                     <label class="field">
                       <span>Cor tema</span>
                       <input type="text" name="theme_color" value="{{ app.theme_color }}">
+                    </label>
+                    <label class="field">
+                      <span>Ingest client_id</span>
+                      <input type="text" name="ingest_client_id" value="{{ app.ingest_client_id }}">
+                    </label>
+                    <label class="field">
+                      <span>Ingest agent_id</span>
+                      <input type="text" name="ingest_agent_id" value="{{ app.ingest_agent_id }}">
+                    </label>
+                    <label class="field">
+                      <span>Ingest source (opcional)</span>
+                      <input type="text" name="ingest_source" value="{{ app.ingest_source }}">
                     </label>
                     <label class="field" style="grid-column: 1 / -1;">
                       <span>Descricao</span>

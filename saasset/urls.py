@@ -37,6 +37,7 @@ urlpatterns = [
     path('planta-conectada/', views.planta_conectada_redirect, name="planta_conectada"),
     path('apps/gerenciar/', views.apps_gerenciar, name="apps_gerenciar"),
     path('apps/appmilhaobla/', include('core.apps.app_milhao_bla.urls')),
+    path('apps/approtas/', include('core.apps.app_rotas.urls')),
     path('apps/<slug:slug>/', views.app_home, name="app_home"),
     path('login/', auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
     path('logout/', auth_views.LogoutView.as_view(), name="logout"),

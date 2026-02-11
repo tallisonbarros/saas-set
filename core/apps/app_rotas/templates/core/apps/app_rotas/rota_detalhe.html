@@ -1,0 +1,201 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ app.nome }} - {{ prefixo }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_rotas_dashboard' %}">{{ app.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ prefixo }}</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card app-accent" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Rota {{ prefixo }}</div>
+        <div class="hud-pill">Detalhe</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'app_rotas_dashboard' %}">Dashboard</a>
+          <a class="hud-menu-pill" href="{% url 'app_rotas_mapeamentos' %}">Mapeamentos</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">{{ origem_display }} &gt; {{ destino_display }}</h1>
+          <p class="page-subtitle">Estado em {{ selected_at_label }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if config_missing %}
+    <section class="card">
+      <p class="notice notice-error">Configure `ingest_client_id` e `ingest_agent_id` para visualizar dados desta rota.</p>
+    </section>
+  {% endif %}
+
+  <section class="card">
+    <form class="io-form" method="get">
+      <div class="io-form-grid">
+        <label class="field">
+          <span>Inicio</span>
+          <input type="datetime-local" name="inicio" value="{{ inicio }}">
+        </label>
+        <label class="field">
+          <span>Fim</span>
+          <input type="datetime-local" name="fim" value="{{ fim }}">
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Aplicar janela</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Linha do tempo da rota</h2>
+        <p class="muted">Navegacao temporal para atualizar os cards de atributos.</p>
+      </div>
+    </div>
+    {% if timeline %}
+      <form method="get" class="io-form" id="timeline-form">
+        <input type="hidden" name="inicio" value="{{ inicio }}">
+        <input type="hidden" name="fim" value="{{ fim }}">
+        <input type="hidden" name="at" id="timeline-at" value="{{ selected_at_iso }}">
+        <div class="timeline-controls">
+          <input id="timeline-range" type="range" min="0" max="{{ timeline|length|add:'-1' }}" value="{{ selected_index }}" {% if timeline|length < 2 %}disabled{% endif %}>
+          <div class="panel-tag active" id="timeline-label">{{ selected_at_label }}</div>
+        </div>
+      </form>
+    {% else %}
+      <p class="muted">Sem eventos desta rota na janela informada.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Atributos atuais</h2>
+        <p class="muted">Ultimos valores encontrados ate o ponto da timeline.</p>
+      </div>
+    </div>
+    <div class="rotas-grid">
+      <div class="panel-card">
+        <div class="panel-title">LIGAR</div>
+        <div class="metric-value">{{ attrs.LIGAR|default:"-" }}</div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-title">DESLIGAR</div>
+        <div class="metric-value">{{ attrs.DESLIGAR|default:"-" }}</div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-title">LIGADA</div>
+        <div class="metric-value">{{ attrs.LIGADA|default:"-" }}</div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-title">ORIGEM</div>
+        <div class="metric-value">{{ origem_display }}</div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-title">DESTINO</div>
+        <div class="metric-value">{{ destino_display }}</div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-title">Status</div>
+        <div class="rota-status">
+          <span class="status-chip {% if status.play_blink %}is-active is-blink{% elif status.play_on %}is-active{% endif %}">Play</span>
+          <span class="status-chip {% if status.pause_on %}is-active pause{% endif %}">Pause</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Eventos da rota</h2>
+        <p class="muted">Transicoes de comando, status e mudancas de origem/destino.</p>
+      </div>
+    </div>
+    {% if timeline_events %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Atributo</th>
+              <th>Valor</th>
+              <th>Transicao</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for evento in timeline_events %}
+              <tr>
+                <td>{{ evento.timestamp_display }}</td>
+                <td>{{ evento.atributo }}</td>
+                <td>{{ evento.valor_display }}</td>
+                <td>
+                  {% if evento.changed %}
+                    <span class="panel-tag active">Mudou</span>
+                  {% else %}
+                    <span class="panel-tag">Sem mudanca</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Sem eventos para exibir.</p>
+    {% endif %}
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <style>
+    .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
+    .status-chip.is-active { background: rgba(16, 185, 129, 0.18); border-color: rgba(16, 185, 129, 0.45); }
+    .status-chip.pause.is-active { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.45); }
+    .status-chip.is-blink { animation: rotaBlink 1.15s ease-in-out infinite; }
+    .timeline-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .timeline-controls input[type="range"] { width: 100%; }
+    @keyframes rotaBlink { 0% { opacity: .25; } 50% { opacity: 1; } 100% { opacity: .25; } }
+  </style>
+  <script>
+    (function () {
+      var timeline = {{ timeline_json|safe }};
+      var range = document.getElementById("timeline-range");
+      var atField = document.getElementById("timeline-at");
+      var form = document.getElementById("timeline-form");
+      var label = document.getElementById("timeline-label");
+      if (!range || !atField || !form || !label || !timeline.length) {
+        return;
+      }
+      var timer = null;
+      range.addEventListener("input", function () {
+        var index = Number(range.value);
+        var point = timeline[index];
+        if (!point) {
+          return;
+        }
+        atField.value = point.iso;
+        label.textContent = point.label;
+        if (timer) {
+          clearTimeout(timer);
+        }
+        timer = setTimeout(function () {
+          form.submit();
+        }, 180);
+      });
+    })();
+  </script>
+{% endblock %}
+

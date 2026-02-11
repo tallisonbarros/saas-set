@@ -38,6 +38,9 @@ class App(models.Model):
     icon = models.CharField(max_length=80, blank=True)
     logo = models.ImageField(upload_to="apps/logos/", blank=True, null=True)
     theme_color = models.CharField(max_length=30, blank=True)
+    ingest_client_id = models.CharField(max_length=120, blank=True, default="")
+    ingest_agent_id = models.CharField(max_length=120, blank=True, default="")
+    ingest_source = models.CharField(max_length=120, blank=True, default="")
     ativo = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
@@ -69,6 +72,28 @@ class Caderno(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+class AppRotasMap(models.Model):
+    class Tipo(models.TextChoices):
+        ORIGEM = "ORIGEM", "ORIGEM"
+        DESTINO = "DESTINO", "DESTINO"
+
+    app = models.ForeignKey(App, on_delete=models.CASCADE, related_name="rotas_maps")
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    codigo = models.IntegerField()
+    nome = models.CharField(max_length=120)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["app_id", "tipo", "codigo"]
+        constraints = [
+            models.UniqueConstraint(fields=["app", "tipo", "codigo"], name="unique_app_rotas_map"),
+        ]
+
+    def __str__(self):
+        return f"{self.app.slug} - {self.tipo} {self.codigo}: {self.nome}"
 
 
 class CategoriaCompra(models.Model):
@@ -772,6 +797,9 @@ class IngestRecord(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["client_id", "agent_id", "source", "created_at"]),
+        ]
 
     def __str__(self):
         return self.source_id

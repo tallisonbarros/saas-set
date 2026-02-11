@@ -9,6 +9,19 @@ from core.models import App, IngestRecord
 from core.views import _get_cliente
 
 
+DEFAULT_CLIENT_ID = "clienteA"
+DEFAULT_AGENT_ID = "agente01"
+DEFAULT_SOURCES = ("balanca_acumulado_hora", "balanca_acumulado")
+
+
+def _normalize_sources(raw_source):
+    text = str(raw_source or "").strip()
+    if not text:
+        return list(DEFAULT_SOURCES)
+    parts = [item.strip() for item in text.replace(";", ",").split(",") if item.strip()]
+    return parts or list(DEFAULT_SOURCES)
+
+
 def _parse_iso_datetime(value):
     if not value:
         return None
@@ -51,10 +64,13 @@ def dashboard(request):
         if not cliente or not cliente.apps.filter(pk=app.pk).exists():
             return HttpResponseForbidden("Sem permissao.")
 
+    ingest_client_id = (app.ingest_client_id or "").strip() or DEFAULT_CLIENT_ID
+    ingest_agent_id = (app.ingest_agent_id or "").strip() or DEFAULT_AGENT_ID
+    ingest_sources = _normalize_sources(app.ingest_source)
     records = IngestRecord.objects.filter(
-        client_id="clienteA",
-        agent_id="agente01",
-        source__in=["balanca_acumulado_hora", "balanca_acumulado"],
+        client_id=ingest_client_id,
+        agent_id=ingest_agent_id,
+        source__in=ingest_sources,
     ).order_by("-created_at")[:2000]
 
     balance_labels = {
@@ -275,5 +291,8 @@ def dashboard(request):
             "prev_date": prev_date,
             "next_date": next_date,
             "last_ingests": last_ingests,
+            "ingest_client_id": ingest_client_id,
+            "ingest_agent_id": ingest_agent_id,
+            "ingest_sources_display": ", ".join(ingest_sources),
         },
     )

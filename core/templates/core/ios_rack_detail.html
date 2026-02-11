@@ -21,6 +21,8 @@
         <div class="hud-pill">Mapa do rack</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
+          <a class="hud-menu-pill" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
+          <a class="hud-menu-pill" href="{% url 'ios_rack_io_list' rack.id %}?format=pdf">Exportar PDF</a>
         </div>
       </div>
       <div class="page-hud-head">
@@ -75,9 +77,6 @@
           {% endif %}
         </div>
       </div>
-    </div>
-    <div class="hud-bottom-actions">
-      <a class="btn btn-outline btn-compact" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
     </div>
   </section>
 
