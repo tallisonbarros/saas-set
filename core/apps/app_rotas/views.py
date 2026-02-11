@@ -2,6 +2,7 @@ import json
 from datetime import timedelta, timezone as dt_timezone
 
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -26,6 +27,7 @@ MAX_DASHBOARD_RECORDS = 6000
 MAX_ROUTE_RECORDS = 12000
 GLOBAL_TIMELINE_LIMIT = 180
 ROUTE_TIMELINE_LIMIT = 240
+RECENT_EVENTS_PAGE_SIZE = 10
 
 
 def _get_rotas_app():
@@ -205,7 +207,7 @@ def _selected_timeline_point(points, selected_at):
     return points[best_index], best_index
 
 
-def _build_route_cards(events, selected_at, origem_maps, destino_maps, search="", show_inactive=False):
+def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""):
     states = {}
     known_prefixes = sorted({event["prefixo"] for event in events})
     for event in events:
@@ -224,7 +226,7 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""
         state["last_update"] = event["timestamp"]
 
     cards = []
-    search_norm = (search or "").strip().lower()
+    search_terms = [term.strip().lower() for term in str(search or "").replace(";", ",").split(",") if term.strip()]
     for prefixo in known_prefixes:
         state = states.get(
             prefixo,
@@ -250,9 +252,7 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, search=""
         is_inactive = not (play_blink or play_on or pause_on)
 
         haystack = " ".join([prefixo, origem_display, destino_display]).lower()
-        if search_norm and search_norm not in haystack:
-            continue
-        if is_inactive and not show_inactive:
+        if search_terms and not any(term in haystack for term in search_terms):
             continue
         cards.append(
             {
@@ -307,7 +307,6 @@ def dashboard(request):
         return HttpResponseForbidden("Sem permissao.")
 
     start, end = _query_window(request, default_hours=24)
-    show_inactive = request.GET.get("mostrar_inativas") == "1"
     search = (request.GET.get("busca") or "").strip()
     config_missing = not app.ingest_client_id or not app.ingest_agent_id
 
@@ -335,19 +334,32 @@ def dashboard(request):
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
     origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
     destino_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.DESTINO}
-    cards = _build_route_cards(events, selected_at, origem_maps, destino_maps, search=search, show_inactive=show_inactive)
+    cards = _build_route_cards(events, selected_at, origem_maps, destino_maps, search=search)
 
     recent_events = [
         event
         for event in reversed(events)
         if event["timestamp"] <= selected_at
-    ][:40]
-    for event in recent_events:
+    ][:200]
+    events_page_num = request.GET.get("events_page", "1")
+    recent_events_paginator = Paginator(recent_events, RECENT_EVENTS_PAGE_SIZE)
+    recent_events_page = recent_events_paginator.get_page(events_page_num)
+    for event in recent_events_page.object_list:
         event["timestamp_display"] = timezone.localtime(event["timestamp"]).strftime("%d/%m %H:%M:%S")
         value_display = event["valor"]
         if isinstance(value_display, float):
             value_display = f"{value_display:.3f}".rstrip("0").rstrip(".")
         event["valor_display"] = value_display
+
+    if request.GET.get("partial") == "recent_events" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render(
+            request,
+            "core/apps/app_rotas/_eventos_recentes.html",
+            {
+                "eventos_recentes": recent_events_page.object_list,
+                "recent_events_page": recent_events_page,
+            },
+        )
 
     return render(
         request,
@@ -358,7 +370,6 @@ def dashboard(request):
             "inicio": _fmt_input_datetime(start),
             "fim": _fmt_input_datetime(end),
             "busca": search,
-            "mostrar_inativas": show_inactive,
             "timeline": timeline,
             "timeline_total": len(timeline),
             "timeline_json": json.dumps([{"iso": point["iso"], "label": point["label"]} for point in timeline]),
@@ -366,7 +377,8 @@ def dashboard(request):
             "selected_point": selected_point,
             "selected_at_iso": selected_at.isoformat() if selected_at else "",
             "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
-            "eventos_recentes": recent_events,
+            "eventos_recentes": recent_events_page.object_list,
+            "recent_events_page": recent_events_page,
             "config_missing": config_missing,
             "total_events": len(events),
             "max_records": MAX_DASHBOARD_RECORDS,

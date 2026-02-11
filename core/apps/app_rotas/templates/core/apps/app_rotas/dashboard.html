@@ -13,6 +13,7 @@
 {% endblock %}
 
 {% block content %}
+  <div class="app-rotas-stack">
   <section class="card app-accent" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>
     <div class="page-hud">
       <div class="hud-top">
@@ -54,13 +55,6 @@
           <span>Buscar rota/origem/destino</span>
           <input type="text" name="busca" value="{{ busca }}" placeholder="REC_RT01, ENS01, 12, SILO A">
         </label>
-        <label class="field">
-          <span>Mostrar inativas</span>
-          <select name="mostrar_inativas">
-            <option value="0" {% if not mostrar_inativas %}selected{% endif %}>Nao</option>
-            <option value="1" {% if mostrar_inativas %}selected{% endif %}>Sim</option>
-          </select>
-        </label>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Aplicar filtros</button>
@@ -80,7 +74,6 @@
         <input type="hidden" name="inicio" value="{{ inicio }}">
         <input type="hidden" name="fim" value="{{ fim }}">
         <input type="hidden" name="busca" value="{{ busca }}">
-        <input type="hidden" name="mostrar_inativas" value="{% if mostrar_inativas %}1{% else %}0{% endif %}">
         <input type="hidden" name="at" id="timeline-at" value="{{ selected_at_iso }}">
         <div class="timeline-controls">
           <input id="timeline-range" type="range" min="0" max="{{ timeline_total|add:'-1' }}" value="{{ selected_index }}" {% if timeline_total < 2 %}disabled{% endif %}>
@@ -111,7 +104,7 @@
             <div class="panel-card-top">
               <div class="panel-title">{{ rota.prefixo }}</div>
               <div class="panel-tag {% if rota.is_inactive %}warn{% else %}active{% endif %}">
-                {% if rota.is_inactive %}Inativa{% else %}Ativa{% endif %}
+                {% if rota.is_inactive %}Desligada{% else %}Ativa{% endif %}
               </div>
             </div>
             <div class="rota-main">{{ rota.origem_display }} &gt; {{ rota.destino_display }}</div>
@@ -132,42 +125,20 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Eventos recentes</h2>
-        <p class="muted">Leituras usadas para compor o estado ate o ponto selecionado.</p>
+        <p class="muted">Leituras usadas para compor o estado ate o ponto selecionado (10 por pagina).</p>
       </div>
     </div>
-    {% if eventos_recentes %}
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Rota</th>
-              <th>Atributo</th>
-              <th>Valor</th>
-              <th>Tag</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for evento in eventos_recentes %}
-              <tr>
-                <td>{{ evento.timestamp_display }}</td>
-                <td>{{ evento.prefixo }}</td>
-                <td>{{ evento.atributo }}</td>
-                <td>{{ evento.valor_display }}</td>
-                <td><code>{{ evento.tag }}</code></td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <p class="muted">Sem eventos para listar.</p>
-    {% endif %}
+    <div id="recent-events-container">
+      {% include "core/apps/app_rotas/_eventos_recentes.html" %}
+    </div>
   </section>
+  </div>
 {% endblock %}
 
 {% block scripts %}
   <style>
+    .app-rotas-stack > .card { margin-bottom: 10px; }
+    .app-rotas-stack > .card:last-child { margin-bottom: 0; }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .rota-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 10px; }
     .rota-main { font-weight: 700; font-size: 1rem; }
@@ -207,6 +178,40 @@
         timer = setTimeout(function () {
           form.submit();
         }, 180);
+      });
+    })();
+
+    (function () {
+      var container = document.getElementById("recent-events-container");
+      if (!container) {
+        return;
+      }
+      container.addEventListener("click", function (event) {
+        var target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        var button = target.closest("[data-events-page]");
+        if (!button) {
+          return;
+        }
+        event.preventDefault();
+        var page = button.getAttribute("data-events-page");
+        if (!page || button.hasAttribute("disabled")) {
+          return;
+        }
+        var params = new URLSearchParams(window.location.search);
+        params.set("events_page", page);
+        params.set("partial", "recent_events");
+        fetch(window.location.pathname + "?" + params.toString(), {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+          .then(function (response) { return response.text(); })
+          .then(function (html) {
+            container.innerHTML = html;
+            params.delete("partial");
+            history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+          });
       });
     })();
   </script>

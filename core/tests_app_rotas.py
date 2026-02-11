@@ -93,3 +93,52 @@ class AppRotasTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "informe client_id e agent_id", status_code=200)
 
+    def test_dashboard_search_accepts_comma_separated_terms(self):
+        self.perfil.apps.add(self.app)
+        now_iso = timezone.now().isoformat()
+        IngestRecord.objects.create(
+            source_id="rotas-s-1",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="ROTA",
+            payload={"Name": "BEN_ORIGEM", "TimestampUtc": now_iso, "Value": "1"},
+        )
+        IngestRecord.objects.create(
+            source_id="rotas-s-2",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="ROTA",
+            payload={"Name": "BEN_DESTINO", "TimestampUtc": now_iso, "Value": "2"},
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("app_rotas_dashboard"), {"busca": "XPT01, BEN, SILO A", "mostrar_inativas": "1"})
+        self.assertEqual(response.status_code, 200)
+        cards = response.context["cards"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["prefixo"], "BEN")
+
+    def test_dashboard_recent_events_is_paginated_with_10_items(self):
+        self.perfil.apps.add(self.app)
+        for idx in range(15):
+            IngestRecord.objects.create(
+                source_id=f"rotas-p-{idx}",
+                client_id="UBS3-UN1",
+                agent_id="VMSCADA",
+                source="ROTA",
+                payload={
+                    "Name": f"SEC01_ORIGEM",
+                    "TimestampUtc": timezone.now().isoformat(),
+                    "Value": str(idx),
+                },
+            )
+        self.client.force_login(self.user)
+        response_page1 = self.client.get(reverse("app_rotas_dashboard"))
+        self.assertEqual(response_page1.status_code, 200)
+        self.assertEqual(len(response_page1.context["eventos_recentes"]), 10)
+        self.assertEqual(response_page1.context["recent_events_page"].number, 1)
+
+        response_page2 = self.client.get(reverse("app_rotas_dashboard"), {"events_page": "2"})
+        self.assertEqual(response_page2.status_code, 200)
+        self.assertEqual(len(response_page2.context["eventos_recentes"]), 5)
+        self.assertEqual(response_page2.context["recent_events_page"].number, 2)
