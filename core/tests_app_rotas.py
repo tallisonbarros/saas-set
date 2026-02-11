@@ -3,7 +3,9 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import App, AppRotasMap, IngestRecord, PerfilUsuario
+import json
+
+from core.models import App, AppRotaConfig, AppRotasMap, IngestRecord, PerfilUsuario
 
 
 class AppRotasTests(TestCase):
@@ -142,3 +144,74 @@ class AppRotasTests(TestCase):
         self.assertEqual(response_page2.status_code, 200)
         self.assertEqual(len(response_page2.context["eventos_recentes"]), 5)
         self.assertEqual(response_page2.context["recent_events_page"].number, 2)
+
+    def test_dashboard_applies_route_display_name_and_order(self):
+        self.perfil.apps.add(self.app)
+        now_iso = timezone.now().isoformat()
+        IngestRecord.objects.create(
+            source_id="rotas-o-1",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="ROTA",
+            payload={"Name": "SEC02_ORIGEM", "TimestampUtc": now_iso, "Value": "1"},
+        )
+        IngestRecord.objects.create(
+            source_id="rotas-o-2",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="ROTA",
+            payload={"Name": "SEC01_ORIGEM", "TimestampUtc": now_iso, "Value": "2"},
+        )
+        AppRotaConfig.objects.create(app=self.app, prefixo="SEC02", nome_exibicao="Rota Secagem", ordem=1, ativo=True)
+        AppRotaConfig.objects.create(app=self.app, prefixo="SEC01", nome_exibicao="", ordem=2, ativo=True)
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("app_rotas_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        cards = response.context["cards"]
+        self.assertEqual(cards[0]["prefixo"], "SEC02")
+        self.assertEqual(cards[0]["titulo"], "Rota Secagem")
+        self.assertEqual(cards[1]["prefixo"], "SEC01")
+
+    def test_rota_detalhe_updates_route_config(self):
+        self.perfil.apps.add(self.app)
+        now_iso = timezone.now().isoformat()
+        IngestRecord.objects.create(
+            source_id="rotas-d-1",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="ROTA",
+            payload={"Name": "ENS01_ORIGEM", "TimestampUtc": now_iso, "Value": "1"},
+        )
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_rotas_detalhe", args=["ENS01"]) + "?dia=" + timezone.localdate().strftime("%Y-%m-%d"),
+            data={
+                "action": "save_rota_config",
+                "dia": timezone.localdate().strftime("%Y-%m-%d"),
+                "at": timezone.now().isoformat(),
+                "nome_exibicao": "Rota ENS Principal",
+                "ordem": "7",
+                "ativo": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        cfg = AppRotaConfig.objects.get(app=self.app, prefixo="ENS01")
+        self.assertEqual(cfg.nome_exibicao, "Rota ENS Principal")
+        self.assertEqual(cfg.ordem, 7)
+
+    def test_ordenar_rotas_updates_global_order(self):
+        self.perfil.apps.add(self.app)
+        AppRotaConfig.objects.create(app=self.app, prefixo="SEC01", ordem=9, ativo=True)
+        AppRotaConfig.objects.create(app=self.app, prefixo="SEC02", ordem=8, ativo=True)
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_rotas_ordenar"),
+            data=json.dumps({"prefixos": ["SEC02", "SEC01", "ENS01"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["ok"], True)
+        self.assertEqual(AppRotaConfig.objects.get(app=self.app, prefixo="SEC02").ordem, 1)
+        self.assertEqual(AppRotaConfig.objects.get(app=self.app, prefixo="SEC01").ordem, 2)
+        self.assertEqual(AppRotaConfig.objects.get(app=self.app, prefixo="ENS01").ordem, 3)

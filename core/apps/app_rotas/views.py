@@ -6,12 +6,12 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Q
 from django.db.models.functions import TruncDate
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from core.models import App, AppRotasMap, IngestRecord
+from core.models import App, AppRotaConfig, AppRotasMap, IngestRecord
 from core.views import _get_cliente
 
 TAG_KEYS = ("Name", "TagName", "tagname", "tag", "nome_tag")
@@ -332,7 +332,15 @@ def _clone_state(state):
     }
 
 
-def _build_route_cards(events, selected_at, origem_maps, destino_maps, initial_states=None, known_prefixes=None):
+def _build_route_cards(
+    events,
+    selected_at,
+    origem_maps,
+    destino_maps,
+    initial_states=None,
+    known_prefixes=None,
+    route_configs=None,
+):
     states = {}
     for prefixo, state in (initial_states or {}).items():
         states[prefixo] = _clone_state(state)
@@ -356,7 +364,11 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, initial_s
         state["last_update"] = event["timestamp"]
 
     cards = []
+    route_configs = route_configs or {}
     for prefixo in active_prefixes:
+        cfg = route_configs.get(prefixo)
+        if cfg and not cfg.ativo:
+            continue
         state = states.get(
             prefixo,
             {
@@ -379,9 +391,14 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, initial_s
         origem_display = origem_nome or (str(origem_codigo) if origem_codigo is not None else "--")
         destino_display = destino_nome or (str(destino_codigo) if destino_codigo is not None else "--")
         is_inactive = not (play_blink or play_on or pause_on)
+        nome_exibicao = (cfg.nome_exibicao or "").strip() if cfg else ""
+        ordem = cfg.ordem if cfg else 0
         cards.append(
             {
                 "prefixo": prefixo,
+                "nome_exibicao": nome_exibicao,
+                "titulo": nome_exibicao or prefixo,
+                "ordem": ordem,
                 "origem_display": origem_display,
                 "destino_display": destino_display,
                 "origem_codigo": origem_codigo,
@@ -396,7 +413,7 @@ def _build_route_cards(events, selected_at, origem_maps, destino_maps, initial_s
                 ),
             }
         )
-    cards.sort(key=lambda item: item["prefixo"])
+    cards.sort(key=lambda item: ((item["ordem"] if item["ordem"] > 0 else 999999), item["prefixo"]))
     return cards
 
 
@@ -513,6 +530,8 @@ def dashboard(request):
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
     origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
     destino_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.DESTINO}
+    configs_qs = AppRotaConfig.objects.filter(app=app)
+    route_configs = {item.prefixo.strip().upper(): item for item in configs_qs}
     cards = _build_route_cards(
         events_today,
         selected_at,
@@ -520,6 +539,7 @@ def dashboard(request):
         destino_maps,
         initial_states=seed_states,
         known_prefixes=day_prefixes,
+        route_configs=route_configs,
     )
 
     recent_events = [event for event in reversed(events_today) if event["timestamp"] <= selected_at][:200]
@@ -579,6 +599,40 @@ def rota_detalhe(request, prefixo):
 
     config_missing = not app.ingest_client_id or not app.ingest_agent_id
     prefix_norm = (prefixo or "").strip().upper()
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "save_rota_config":
+            nome_exibicao = (request.POST.get("nome_exibicao") or "").strip()
+            ordem_raw = (request.POST.get("ordem") or "").strip()
+            ativo = request.POST.get("ativo") == "on"
+            try:
+                ordem = int(ordem_raw) if ordem_raw else 0
+            except ValueError:
+                ordem = 0
+            config, _ = AppRotaConfig.objects.get_or_create(
+                app=app,
+                prefixo=prefix_norm,
+                defaults={
+                    "nome_exibicao": nome_exibicao,
+                    "ordem": ordem,
+                    "ativo": ativo,
+                },
+            )
+            if config.nome_exibicao != nome_exibicao or config.ordem != ordem or config.ativo != ativo:
+                config.nome_exibicao = nome_exibicao
+                config.ordem = ordem
+                config.ativo = ativo
+                config.save(update_fields=["nome_exibicao", "ordem", "ativo", "atualizado_em"])
+            dia = (request.GET.get("dia") or request.POST.get("dia") or "").strip()
+            at = (request.GET.get("at") or request.POST.get("at") or "").strip()
+            query = []
+            if dia:
+                query.append(f"dia={dia}")
+            if at:
+                query.append(f"at={at}")
+            suffix = f"?{'&'.join(query)}" if query else ""
+            return redirect(f"{request.path}{suffix}")
 
     available_days = [] if config_missing else _available_days(app)
     selected_day = _parse_query_date(request.GET.get("dia"))
@@ -682,6 +736,8 @@ def rota_detalhe(request, prefixo):
     ligada_gradient = _ligada_gradient(ligada_intervals, day_start, day_end_point)
 
     prev_day, next_day = _day_navigation(available_days, selected_day)
+    route_config = AppRotaConfig.objects.filter(app=app, prefixo=prefix_norm).first()
+    route_display_name = (route_config.nome_exibicao.strip() if route_config and route_config.nome_exibicao else "") or prefix_norm
 
     return render(
         request,
@@ -689,6 +745,8 @@ def rota_detalhe(request, prefixo):
         {
             "app": app,
             "prefixo": prefix_norm,
+            "route_config": route_config,
+            "route_display_name": route_display_name,
             "selected_day": selected_day,
             "available_days": available_days,
             "prev_day": prev_day,
@@ -796,3 +854,45 @@ def mapeamentos(request):
             "message_level": message_level,
         },
     )
+
+
+@login_required
+def ordenar_rotas(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "method_not_allowed"}, status=405)
+    app = _get_rotas_app()
+    if not _has_access(request.user, app):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+    prefixos = payload.get("prefixos", [])
+    if not isinstance(prefixos, list):
+        return JsonResponse({"ok": False, "error": "invalid_prefix_list"}, status=400)
+
+    cleaned = []
+    seen = set()
+    for item in prefixos:
+        prefixo = str(item or "").strip().upper()
+        if not prefixo or prefixo in seen:
+            continue
+        seen.add(prefixo)
+        cleaned.append(prefixo)
+    if not cleaned:
+        return JsonResponse({"ok": False, "error": "empty_prefix_list"}, status=400)
+
+    existing = {cfg.prefixo: cfg for cfg in AppRotaConfig.objects.filter(app=app, prefixo__in=cleaned)}
+    changed = 0
+    for idx, prefixo in enumerate(cleaned, start=1):
+        cfg = existing.get(prefixo)
+        if not cfg:
+            AppRotaConfig.objects.create(app=app, prefixo=prefixo, ordem=idx, ativo=True)
+            changed += 1
+            continue
+        if cfg.ordem != idx:
+            cfg.ordem = idx
+            cfg.save(update_fields=["ordem", "atualizado_em"])
+            changed += 1
+
+    return JsonResponse({"ok": True, "updated": changed})

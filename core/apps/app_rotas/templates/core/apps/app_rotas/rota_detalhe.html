@@ -25,7 +25,8 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <h1 class="page-title">{{ origem_display }} &gt; {{ destino_display }}</h1>
+          <h1 class="page-title">{{ route_display_name }}</h1>
+          <p class="page-subtitle">Prefixo tecnico: {{ prefixo }}</p>
           <p class="page-subtitle">Estado em {{ selected_at_label }}</p>
         </div>
       </div>
@@ -37,6 +38,38 @@
       <p class="notice notice-error">Configure `ingest_client_id` e `ingest_agent_id` para visualizar dados desta rota.</p>
     </section>
   {% endif %}
+
+  <section class="card">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Configuracao da rota</h2>
+        <p class="muted">Nome e ordem global para todos os usuarios do app.</p>
+      </div>
+    </div>
+    <form method="post" class="io-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_rota_config">
+      <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
+      <input type="hidden" name="at" value="{{ selected_at_iso }}">
+      <div class="io-form-grid">
+        <label class="field">
+          <span>Nome da rota</span>
+          <input type="text" name="nome_exibicao" value="{% if route_config %}{{ route_config.nome_exibicao }}{% endif %}" placeholder="{{ prefixo }}">
+        </label>
+        <label class="field">
+          <span>Ordem no dashboard</span>
+          <input type="number" name="ordem" value="{% if route_config %}{{ route_config.ordem }}{% else %}0{% endif %}" min="0">
+        </label>
+        <label class="field field-checkbox">
+          <span>Ativa no dashboard</span>
+          <input type="checkbox" name="ativo" {% if not route_config or route_config.ativo %}checked{% endif %}>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Salvar configuracao</button>
+      </div>
+    </form>
+  </section>
 
   <section class="card">
     <div class="io-card-head">

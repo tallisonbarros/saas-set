@@ -26,7 +26,7 @@
         </div>
         <div class="page-hud-head">
           <div>
-            <h1 class="page-title">Status de rotas por ingest</h1>
+            <h1 class="page-title">Monitoramento de rotas</h1>
             <p class="page-subtitle">Cliente {{ app.ingest_client_id|default:"-" }} - Agente {{ app.ingest_agent_id|default:"-" }}{% if app.ingest_source %} - Fonte {{ app.ingest_source }}{% endif %}</p>
           </div>
         </div>
@@ -41,22 +41,15 @@
     {% endif %}
 
     <section class="card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Dia de analise</h2>
-          <p class="muted">Escolha o dia e arraste a barra para voltar no tempo.</p>
-        </div>
-      </div>
       <form method="get" class="io-form day-nav-form" id="day-nav-form">
         <input type="hidden" name="at" value="{{ selected_at_iso }}">
-        <div class="day-nav-controls">
+        <div class="day-nav-capsule">
           {% if prev_day %}
-            <button class="btn btn-ghost" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}">Dia anterior</button>
+            <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
           {% else %}
-            <button class="btn btn-ghost" type="button" disabled>Dia anterior</button>
+            <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
           {% endif %}
           <label class="field day-picker-field">
-            <span>Dia</span>
             <select name="dia" onchange="this.form.submit()">
               {% for day in available_days %}
                 <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
@@ -66,9 +59,9 @@
             </select>
           </label>
           {% if next_day %}
-            <button class="btn btn-ghost" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}">Dia seguinte</button>
+            <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
           {% else %}
-            <button class="btn btn-ghost" type="button" disabled>Dia seguinte</button>
+            <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
           {% endif %}
         </div>
       </form>
@@ -107,14 +100,21 @@
         <div>
           <h2 class="io-title">Rotas detectadas</h2>
           <p class="muted">{{ cards|length }} cards renderizados dinamicamente por prefixo.</p>
+          <p class="muted">Arraste os cards para reordenar. A ordem salva vale para todos os usuarios.</p>
         </div>
       </div>
       {% if cards %}
-        <div class="rotas-grid">
+        <div class="rotas-grid" id="rotas-grid">
           {% for rota in cards %}
-            <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?dia={{ selected_day|date:'Y-m-d' }}&at={{ selected_at_iso }}">
+            <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?dia={{ selected_day|date:'Y-m-d' }}&at={{ selected_at_iso }}" data-prefix="{{ rota.prefixo }}" draggable="true">
               <div class="panel-card-top">
-                <div class="panel-title">{{ rota.prefixo }}</div>
+                <div>
+                  <div class="panel-title">{{ rota.titulo }}</div>
+                  {% if rota.nome_exibicao %}
+                    <div class="muted rota-prefix">{{ rota.prefixo }}</div>
+                  {% endif %}
+                </div>
+                <div class="rota-drag-hint" aria-hidden="true">::</div>
                 <div class="panel-tag {% if rota.is_inactive %}warn{% else %}active{% endif %}">
                   {% if rota.is_inactive %}Desligada{% else %}Ativa{% endif %}
                 </div>
@@ -131,6 +131,7 @@
       {% else %}
         <p class="muted">Nenhuma rota encontrada para o dia selecionado.</p>
       {% endif %}
+      <p class="muted" id="rotas-order-status" style="min-height: 16px;"></p>
     </section>
 
     <section class="card">
@@ -151,11 +152,45 @@
   <style>
     .app-rotas-stack > .card { margin-bottom: 10px; }
     .app-rotas-stack > .card:last-child { margin-bottom: 0; }
-    .day-nav-controls { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
-    .day-picker-field { min-width: 180px; }
+    .day-nav-form { display: flex; justify-content: center; }
+    .day-nav-capsule {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(31, 41, 55, 0.42), rgba(17, 24, 39, 0.42));
+      border-radius: 999px;
+      padding: 8px;
+    }
+    .day-picker-field { min-width: 170px; margin: 0; }
+    .day-picker-field select {
+      border-radius: 999px;
+      text-align: center;
+      font-weight: 700;
+      min-width: 170px;
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .day-arrow {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .rota-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 10px; }
+    .rota-card { cursor: grab; }
+    .rota-card.is-dragging { opacity: .62; cursor: grabbing; }
     .rota-main { font-weight: 700; font-size: 1rem; }
+    .rota-prefix { font-size: .76rem; margin-top: 2px; }
+    .rota-drag-hint { font-weight: 700; opacity: .55; letter-spacing: 1px; align-self: center; }
     .rota-status { display: flex; gap: 8px; align-items: center; }
     .rota-updated { font-size: .82rem; }
     .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
@@ -247,6 +282,111 @@
             history.replaceState(null, "", window.location.pathname + "?" + params.toString());
           });
       });
+    })();
+
+    (function () {
+      var grid = document.getElementById("rotas-grid");
+      var status = document.getElementById("rotas-order-status");
+      if (!grid) {
+        return;
+      }
+      var dragged = null;
+      var moved = false;
+      var suppressClick = false;
+
+      function getCsrfToken() {
+        var match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function cardList() {
+        return Array.prototype.slice.call(grid.querySelectorAll(".rota-card[data-prefix]"));
+      }
+
+      function persistOrder() {
+        var prefixos = cardList().map(function (el) { return el.getAttribute("data-prefix"); });
+        fetch("{% url 'app_rotas_ordenar' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          },
+          body: JSON.stringify({ prefixos: prefixos })
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (!status) { return; }
+            if (data && data.ok) {
+              status.textContent = "Ordem salva.";
+            } else {
+              status.textContent = "Falha ao salvar a ordem.";
+            }
+            setTimeout(function () { status.textContent = ""; }, 1800);
+          })
+          .catch(function () {
+            if (!status) { return; }
+            status.textContent = "Falha ao salvar a ordem.";
+            setTimeout(function () { status.textContent = ""; }, 1800);
+          });
+      }
+
+      grid.addEventListener("dragstart", function (event) {
+        var card = event.target.closest(".rota-card[data-prefix]");
+        if (!card) {
+          return;
+        }
+        dragged = card;
+        moved = false;
+        suppressClick = false;
+        card.classList.add("is-dragging");
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+        }
+      });
+
+      grid.addEventListener("dragover", function (event) {
+        if (!dragged) {
+          return;
+        }
+        event.preventDefault();
+        var target = event.target.closest(".rota-card[data-prefix]");
+        if (!target || target === dragged) {
+          return;
+        }
+        var rect = target.getBoundingClientRect();
+        var after = event.clientY > rect.top + rect.height / 2;
+        grid.insertBefore(dragged, after ? target.nextSibling : target);
+        moved = true;
+      });
+
+      grid.addEventListener("drop", function (event) {
+        if (!dragged) {
+          return;
+        }
+        event.preventDefault();
+      });
+
+      grid.addEventListener("dragend", function () {
+        if (!dragged) {
+          return;
+        }
+        dragged.classList.remove("is-dragging");
+        dragged = null;
+        if (moved) {
+          suppressClick = true;
+          persistOrder();
+          setTimeout(function () { suppressClick = false; }, 120);
+        }
+      });
+
+      grid.addEventListener("click", function (event) {
+        if (!suppressClick) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
     })();
   </script>
 {% endblock %}

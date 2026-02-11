@@ -96,6 +96,25 @@ class AppRotasMap(models.Model):
         return f"{self.app.slug} - {self.tipo} {self.codigo}: {self.nome}"
 
 
+class AppRotaConfig(models.Model):
+    app = models.ForeignKey(App, on_delete=models.CASCADE, related_name="rotas_configs")
+    prefixo = models.CharField(max_length=80)
+    nome_exibicao = models.CharField(max_length=120, blank=True, default="")
+    ordem = models.IntegerField(default=0)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["app_id", "ordem", "prefixo"]
+        constraints = [
+            models.UniqueConstraint(fields=["app", "prefixo"], name="unique_app_rota_config"),
+        ]
+
+    def __str__(self):
+        return f"{self.app.slug} - {self.prefixo}"
+
+
 class CategoriaCompra(models.Model):
     nome = models.CharField(max_length=80, unique=True)
 
