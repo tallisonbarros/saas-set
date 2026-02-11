@@ -1,0 +1,33 @@
+{% if timeline_events %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Data/Hora</th>
+          <th>Atributo</th>
+          <th>Valor</th>
+          <th>Transicao</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for evento in timeline_events %}
+          <tr>
+            <td>{{ evento.timestamp_display }}</td>
+            <td>{{ evento.atributo }}</td>
+            <td>{{ evento.valor_display }}</td>
+            <td>
+              {% if evento.changed %}
+                <span class="panel-tag active">Mudou</span>
+              {% else %}
+                <span class="panel-tag">Sem mudanca</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="muted">Sem eventos para exibir.</p>
+{% endif %}
+

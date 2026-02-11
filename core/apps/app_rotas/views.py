@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.db.models.functions import TruncDate
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -441,6 +442,14 @@ def _day_navigation(available_days, selected_day):
     return prev_day, next_day
 
 
+def _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive):
+    now_local = timezone.localtime(timezone.now())
+    now_target = _clamp_datetime(now_local, day_start, day_end_exclusive)
+    tolerance_seconds = TIMELINE_STEP_MINUTES * 60 + 1
+    showing_now = selected_day == timezone.localdate() and abs((selected_at - now_target).total_seconds()) <= tolerance_seconds
+    return showing_now, now_target, timezone.localdate()
+
+
 def _build_ligada_intervals(day_events, day_start, day_end, initial_ligada_on):
     intervals = []
     ligada_on = bool(initial_ligada_on)
@@ -562,8 +571,39 @@ def dashboard(request):
                 "recent_events_page": recent_events_page,
             },
         )
+    if request.GET.get("partial") == "timeline" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
+        cards_html = render_to_string(
+            "core/apps/app_rotas/_rotas_cards.html",
+            {
+                "cards": cards,
+                "selected_day": selected_day,
+                "selected_at_iso": selected_at.isoformat() if selected_at else "",
+            },
+            request=request,
+        )
+        events_html = render_to_string(
+            "core/apps/app_rotas/_eventos_recentes.html",
+            {
+                "eventos_recentes": recent_events_page.object_list,
+                "recent_events_page": recent_events_page,
+            },
+            request=request,
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
+                "showing_now": showing_now,
+                "now_day": now_day.strftime("%Y-%m-%d"),
+                "now_at_iso": now_target.isoformat() if now_target else "",
+                "cards_html": cards_html,
+                "events_html": events_html,
+            }
+        )
 
     prev_day, next_day = _day_navigation(available_days, selected_day)
+    showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
 
     return render(
         request,
@@ -582,6 +622,9 @@ def dashboard(request):
             "selected_point": selected_point,
             "selected_at_iso": selected_at.isoformat() if selected_at else "",
             "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
+            "showing_now": showing_now,
+            "now_day": now_day,
+            "now_at_iso": now_target.isoformat() if now_target else "",
             "eventos_recentes": recent_events_page.object_list,
             "recent_events_page": recent_events_page,
             "config_missing": config_missing,
@@ -739,6 +782,39 @@ def rota_detalhe(request, prefixo):
     route_config = AppRotaConfig.objects.filter(app=app, prefixo=prefix_norm).first()
     route_display_name = (route_config.nome_exibicao.strip() if route_config and route_config.nome_exibicao else "") or prefix_norm
 
+    if request.GET.get("partial") == "timeline" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
+        attrs_html = render_to_string(
+            "core/apps/app_rotas/_rota_detalhe_attrs.html",
+            {
+                "attrs": attrs,
+                "status": status,
+                "origem_display": origem_nome or (str(origem_codigo) if origem_codigo is not None else "--"),
+                "destino_display": destino_nome or (str(destino_codigo) if destino_codigo is not None else "--"),
+            },
+            request=request,
+        )
+        events_html = render_to_string(
+            "core/apps/app_rotas/_rota_detalhe_eventos.html",
+            {
+                "timeline_events": timeline_events,
+            },
+            request=request,
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
+                "showing_now": showing_now,
+                "now_day": now_day.strftime("%Y-%m-%d"),
+                "now_at_iso": now_target.isoformat() if now_target else "",
+                "attrs_html": attrs_html,
+                "events_html": events_html,
+            }
+        )
+
+    showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
+
     return render(
         request,
         "core/apps/app_rotas/rota_detalhe.html",
@@ -757,6 +833,9 @@ def rota_detalhe(request, prefixo):
             "selected_point": selected_point,
             "selected_at_iso": selected_at.isoformat() if selected_at else "",
             "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
+            "showing_now": showing_now,
+            "now_day": now_day,
+            "now_at_iso": now_target.isoformat() if now_target else "",
             "attrs": attrs,
             "status": status,
             "origem_codigo": origem_codigo,

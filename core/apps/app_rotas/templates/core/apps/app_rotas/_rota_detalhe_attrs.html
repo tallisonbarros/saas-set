@@ -1,0 +1,30 @@
+<div class="rotas-grid">
+  <div class="panel-card">
+    <div class="panel-title">LIGAR</div>
+    <div class="metric-value">{{ attrs.LIGAR|default:"-" }}</div>
+  </div>
+  <div class="panel-card">
+    <div class="panel-title">DESLIGAR</div>
+    <div class="metric-value">{{ attrs.DESLIGAR|default:"-" }}</div>
+  </div>
+  <div class="panel-card">
+    <div class="panel-title">LIGADA</div>
+    <div class="metric-value">{{ attrs.LIGADA|default:"-" }}</div>
+  </div>
+  <div class="panel-card">
+    <div class="panel-title">ORIGEM</div>
+    <div class="metric-value">{{ origem_display }}</div>
+  </div>
+  <div class="panel-card">
+    <div class="panel-title">DESTINO</div>
+    <div class="metric-value">{{ destino_display }}</div>
+  </div>
+  <div class="panel-card">
+    <div class="panel-title">Status</div>
+    <div class="rota-status">
+      <span class="status-chip {% if status.play_blink %}is-active is-blink{% elif status.play_on %}is-active{% endif %}">Play</span>
+      <span class="status-chip {% if status.pause_on %}is-active pause{% endif %}">Pause</span>
+    </div>
+  </div>
+</div>
+

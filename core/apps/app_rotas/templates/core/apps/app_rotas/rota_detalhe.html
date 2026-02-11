@@ -27,7 +27,7 @@
         <div>
           <h1 class="page-title">{{ route_display_name }}</h1>
           <p class="page-subtitle">Prefixo tecnico: {{ prefixo }}</p>
-          <p class="page-subtitle">Estado em {{ selected_at_label }}</p>
+          <p class="page-subtitle">Estado em <span class="detail-selected-at">{{ selected_at_label }}</span></p>
         </div>
       </div>
     </div>
@@ -40,54 +40,15 @@
   {% endif %}
 
   <section class="card">
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Configuracao da rota</h2>
-        <p class="muted">Nome e ordem global para todos os usuarios do app.</p>
-      </div>
-    </div>
-    <form method="post" class="io-form">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="save_rota_config">
-      <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
-      <input type="hidden" name="at" value="{{ selected_at_iso }}">
-      <div class="io-form-grid">
-        <label class="field">
-          <span>Nome da rota</span>
-          <input type="text" name="nome_exibicao" value="{% if route_config %}{{ route_config.nome_exibicao }}{% endif %}" placeholder="{{ prefixo }}">
-        </label>
-        <label class="field">
-          <span>Ordem no dashboard</span>
-          <input type="number" name="ordem" value="{% if route_config %}{{ route_config.ordem }}{% else %}0{% endif %}" min="0">
-        </label>
-        <label class="field field-checkbox">
-          <span>Ativa no dashboard</span>
-          <input type="checkbox" name="ativo" {% if not route_config or route_config.ativo %}checked{% endif %}>
-        </label>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Salvar configuracao</button>
-      </div>
-    </form>
-  </section>
-
-  <section class="card">
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Dia da rota</h2>
-        <p class="muted">Navegue o histórico por dia e depois arraste a timeline.</p>
-      </div>
-    </div>
     <form method="get" class="io-form day-nav-form" id="day-nav-form">
       <input type="hidden" name="at" value="{{ selected_at_iso }}">
-      <div class="day-nav-controls">
+      <div class="day-nav-capsule">
         {% if prev_day %}
-          <button class="btn btn-ghost" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}">Dia anterior</button>
+          <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
         {% else %}
-          <button class="btn btn-ghost" type="button" disabled>Dia anterior</button>
+          <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
         {% endif %}
         <label class="field day-picker-field">
-          <span>Dia</span>
           <select name="dia" onchange="this.form.submit()">
             {% for day in available_days %}
               <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
@@ -97,9 +58,9 @@
           </select>
         </label>
         {% if next_day %}
-          <button class="btn btn-ghost" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}">Dia seguinte</button>
+          <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
         {% else %}
-          <button class="btn btn-ghost" type="button" disabled>Dia seguinte</button>
+          <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
         {% endif %}
       </div>
     </form>
@@ -120,15 +81,17 @@
           <div class="ligada-track" style="background: {{ ligada_gradient }};"></div>
           <div class="timeline-controls">
             <input id="timeline-range" type="range" min="0" max="{{ timeline|length|add:'-1' }}" value="{{ selected_index }}" {% if timeline|length < 2 %}disabled{% endif %}>
-            <div class="panel-tag active" id="timeline-label">{{ selected_at_label }}</div>
           </div>
         </div>
-        <div class="timeline-hours">
-          {% for point in timeline %}
-            {% if forloop.counter0|divisibleby:24 %}
-              <span class="panel-tag {% if selected_point and point.iso == selected_point.iso %}active{% endif %}">{{ point.hour_label }}</span>
-            {% endif %}
-          {% endfor %}
+        <div class="timeline-read">
+          <span class="panel-tag">Hora lida: <strong id="timeline-read-label">{{ selected_at_label }}</strong></span>
+          <a
+            id="timeline-back-now"
+            class="day-arrow timeline-back-now {% if showing_now %}is-hidden{% endif %}"
+            href="?dia={{ now_day|date:'Y-m-d' }}&at={{ now_at_iso }}"
+            aria-label="Voltar para agora"
+            title="Voltar para agora"
+          >↩</a>
         </div>
       </form>
     {% else %}
@@ -140,37 +103,11 @@
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Atributos atuais</h2>
-        <p class="muted">Ultimos valores encontrados ate o ponto da timeline.</p>
+        <p class="muted">Status na hora <span class="detail-selected-at">{{ selected_at_label }}</span>.</p>
       </div>
     </div>
-    <div class="rotas-grid">
-      <div class="panel-card">
-        <div class="panel-title">LIGAR</div>
-        <div class="metric-value">{{ attrs.LIGAR|default:"-" }}</div>
-      </div>
-      <div class="panel-card">
-        <div class="panel-title">DESLIGAR</div>
-        <div class="metric-value">{{ attrs.DESLIGAR|default:"-" }}</div>
-      </div>
-      <div class="panel-card">
-        <div class="panel-title">LIGADA</div>
-        <div class="metric-value">{{ attrs.LIGADA|default:"-" }}</div>
-      </div>
-      <div class="panel-card">
-        <div class="panel-title">ORIGEM</div>
-        <div class="metric-value">{{ origem_display }}</div>
-      </div>
-      <div class="panel-card">
-        <div class="panel-title">DESTINO</div>
-        <div class="metric-value">{{ destino_display }}</div>
-      </div>
-      <div class="panel-card">
-        <div class="panel-title">Status</div>
-        <div class="rota-status">
-          <span class="status-chip {% if status.play_blink %}is-active is-blink{% elif status.play_on %}is-active{% endif %}">Play</span>
-          <span class="status-chip {% if status.pause_on %}is-active pause{% endif %}">Pause</span>
-        </div>
-      </div>
+    <div id="detail-attrs-container">
+      {% include "core/apps/app_rotas/_rota_detalhe_attrs.html" %}
     </div>
   </section>
 
@@ -181,45 +118,80 @@
         <p class="muted">Transicoes de comando, status e mudancas de origem/destino.</p>
       </div>
     </div>
-    {% if timeline_events %}
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Atributo</th>
-              <th>Valor</th>
-              <th>Transicao</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for evento in timeline_events %}
-              <tr>
-                <td>{{ evento.timestamp_display }}</td>
-                <td>{{ evento.atributo }}</td>
-                <td>{{ evento.valor_display }}</td>
-                <td>
-                  {% if evento.changed %}
-                    <span class="panel-tag active">Mudou</span>
-                  {% else %}
-                    <span class="panel-tag">Sem mudanca</span>
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <div id="detail-events-container">
+      {% include "core/apps/app_rotas/_rota_detalhe_eventos.html" %}
+    </div>
+  </section>
+
+  <section class="card">
+    <details class="io-card io-discrete">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Configuracao da rota</span>
+        <span class="muted">Nome, ordem e exibicao no dashboard.</span>
+      </summary>
+      <div class="io-discrete-body">
+        <form method="post" class="io-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_rota_config">
+          <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
+          <input type="hidden" name="at" value="{{ selected_at_iso }}">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Nome da rota</span>
+              <input type="text" name="nome_exibicao" value="{% if route_config %}{{ route_config.nome_exibicao }}{% endif %}" placeholder="{{ prefixo }}">
+            </label>
+            <label class="field">
+              <span>Ordem no dashboard</span>
+              <input type="number" name="ordem" value="{% if route_config %}{{ route_config.ordem }}{% else %}0{% endif %}" min="0">
+            </label>
+            <label class="field field-checkbox">
+              <span>Ativa no dashboard</span>
+              <input type="checkbox" name="ativo" {% if not route_config or route_config.ativo %}checked{% endif %}>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar configuracao</button>
+          </div>
+        </form>
       </div>
-    {% else %}
-      <p class="muted">Sem eventos para exibir.</p>
-    {% endif %}
+    </details>
   </section>
 {% endblock %}
 
 {% block scripts %}
   <style>
-    .day-nav-controls { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
-    .day-picker-field { min-width: 180px; }
+    .day-nav-form { display: flex; justify-content: center; }
+    .day-nav-capsule {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(31, 41, 55, 0.42), rgba(17, 24, 39, 0.42));
+      border-radius: 999px;
+      padding: 8px;
+    }
+    .day-picker-field { min-width: 170px; margin: 0; }
+    .day-picker-field select {
+      border-radius: 999px;
+      text-align: center;
+      font-weight: 700;
+      min-width: 170px;
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .day-arrow {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
     .rota-status .status-chip.is-active {
@@ -250,7 +222,9 @@
     }
     .timeline-controls { display: flex; align-items: center; gap: 12px; margin-top: -16px; position: relative; z-index: 2; }
     .timeline-controls input[type="range"] { width: 100%; background: transparent; }
-    .timeline-hours { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .timeline-read { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .timeline-back-now { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+    .timeline-back-now.is-hidden { display: none; }
     @keyframes rotaBlink {
       0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.62); }
       50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
@@ -263,11 +237,14 @@
       var range = document.getElementById("timeline-range");
       var atField = document.getElementById("timeline-at");
       var form = document.getElementById("timeline-form");
-      var label = document.getElementById("timeline-label");
-      if (!range || !atField || !form || !label || !timeline.length) {
+      var readLabel = document.getElementById("timeline-read-label");
+      var selectedAtLabels = document.querySelectorAll(".detail-selected-at");
+      var backNow = document.getElementById("timeline-back-now");
+      if (!range || !atField || !form || !readLabel || !timeline.length) {
         return;
       }
       var timer = null;
+      var controller = null;
       range.addEventListener("input", function () {
         var index = Number(range.value);
         var point = timeline[index];
@@ -275,13 +252,47 @@
           return;
         }
         atField.value = point.iso;
-        label.textContent = point.label;
-        if (timer) {
-          clearTimeout(timer);
-        }
+        readLabel.textContent = point.label;
+        if (timer) { clearTimeout(timer); }
         timer = setTimeout(function () {
-          form.submit();
-        }, 150);
+          if (controller) { controller.abort(); }
+          controller = new AbortController();
+          var params = new URLSearchParams(window.location.search);
+          params.set("dia", "{{ selected_day|date:'Y-m-d' }}");
+          params.set("at", point.iso);
+          params.set("partial", "timeline");
+          fetch(window.location.pathname + "?" + params.toString(), {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            signal: controller.signal
+          })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+              if (!data || !data.ok) { return; }
+              var attrs = document.getElementById("detail-attrs-container");
+              var events = document.getElementById("detail-events-container");
+              if (attrs) { attrs.innerHTML = data.attrs_html; }
+              if (events) { events.innerHTML = data.events_html; }
+              if (data.selected_at_label) {
+                readLabel.textContent = data.selected_at_label;
+                selectedAtLabels.forEach(function (el) { el.textContent = data.selected_at_label; });
+              }
+              if (backNow) {
+                if (data.now_day && data.now_at_iso) {
+                  backNow.setAttribute("href", "?dia=" + data.now_day + "&at=" + encodeURIComponent(data.now_at_iso));
+                }
+                if (data.showing_now) {
+                  backNow.classList.add("is-hidden");
+                } else {
+                  backNow.classList.remove("is-hidden");
+                }
+              }
+              params.delete("partial");
+              history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+            })
+            .catch(function (err) {
+              if (err && err.name === "AbortError") { return; }
+            });
+        }, 110);
       });
     })();
   </script>
