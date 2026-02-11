@@ -40,36 +40,48 @@
   {% endif %}
 
   <section class="card">
-    <div class="io-card-head">
+    <div class="io-card-head timeline-route-head">
       <div>
         <h2 class="io-title">Linha do tempo da rota</h2>
-        <p class="muted">Faixa verde indica periodos em que o status LIGADA esteve ativo.</p>
       </div>
-      <form method="get" class="io-form day-nav-form in-section" id="day-nav-form">
-        <input type="hidden" name="at" value="{{ selected_at_iso }}">
-        <div class="day-nav-capsule">
-          {% if prev_day %}
-            <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
-          {% else %}
-            <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
-          {% endif %}
-          <label class="field day-picker-field">
-            <select name="dia" onchange="this.form.submit()">
-              {% for day in available_days %}
-                <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
-              {% empty %}
-                <option value="{{ selected_day|date:'Y-m-d' }}">{{ selected_day|date:"d/m/Y" }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          {% if next_day %}
-            <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
-          {% else %}
-            <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
-          {% endif %}
+      <div class="timeline-route-tools">
+        <form method="get" class="io-form day-nav-form in-section" id="day-nav-form">
+          <input type="hidden" name="at" value="{{ selected_at_iso }}">
+          <div class="day-nav-capsule">
+            {% if prev_day %}
+              <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
+            {% else %}
+              <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
+            {% endif %}
+            <label class="field day-picker-field">
+              <select name="dia" onchange="this.form.submit()">
+                {% for day in available_days %}
+                  <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
+                {% empty %}
+                  <option value="{{ selected_day|date:'Y-m-d' }}">{{ selected_day|date:"d/m/Y" }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% if next_day %}
+              <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
+            {% else %}
+              <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
+            {% endif %}
+          </div>
+        </form>
+        <div class="timeline-global-read">
+          <span class="panel-tag">Hora lida: <strong id="timeline-read-label">{{ selected_at_label }}</strong></span>
+          <a
+            id="timeline-back-now"
+            class="day-arrow timeline-back-now {% if showing_now %}is-hidden{% endif %}"
+            href="?dia={{ now_day|date:'Y-m-d' }}&at={{ now_at_iso }}"
+            aria-label="Voltar para agora"
+            title="Voltar para agora"
+          >↩</a>
         </div>
-      </form>
+      </div>
     </div>
+    <p class="muted">Navegue na linha do tempo e veja os status da hora desejada.</p>
     {% if timeline %}
       <form method="get" class="io-form" id="timeline-form">
         <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
@@ -79,16 +91,6 @@
           <div class="timeline-controls">
             <input id="timeline-range" type="range" min="0" max="{{ timeline|length|add:'-1' }}" value="{{ selected_index }}" {% if timeline|length < 2 %}disabled{% endif %}>
           </div>
-        </div>
-        <div class="timeline-read">
-          <span class="panel-tag">Hora lida: <strong id="timeline-read-label">{{ selected_at_label }}</strong></span>
-          <a
-            id="timeline-back-now"
-            class="day-arrow timeline-back-now {% if showing_now %}is-hidden{% endif %}"
-            href="?dia={{ now_day|date:'Y-m-d' }}&at={{ now_at_iso }}"
-            aria-label="Voltar para agora"
-            title="Voltar para agora"
-          >↩</a>
         </div>
       </form>
     {% else %}
@@ -190,9 +192,14 @@
       cursor: pointer;
     }
     .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
+    .timeline-route-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .timeline-route-tools { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+    .timeline-global-read { display: inline-flex; align-items: center; gap: 8px; }
     @media (max-width: 760px) {
       .io-card-head { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
       .day-nav-form.in-section { margin-left: 0; align-self: center; width: 100%; justify-content: center; }
+      .timeline-route-tools { flex-direction: column; margin-left: 0; align-items: center; }
+      .timeline-global-read { justify-content: flex-end; }
     }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
@@ -223,8 +230,51 @@
       margin: 16px 4px 0;
     }
     .timeline-controls { display: flex; align-items: center; gap: 12px; margin-top: -16px; position: relative; z-index: 2; }
-    .timeline-controls input[type="range"] { width: 100%; background: transparent; }
-    .timeline-read { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .timeline-controls input[type="range"] {
+      width: 100%;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.18));
+      border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+    .timeline-controls input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 999px;
+      background: transparent;
+    }
+    .timeline-controls input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 32px;
+      height: 20px;
+      margin-top: -7px;
+      border: 0;
+      border-radius: 999px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20' viewBox='0 0 32 20'%3E%3Crect x='0.5' y='0.5' width='31' height='19' rx='9.5' fill='%23131c2b' stroke='%23475a74'/%3E%3Cpath d='M13 6 L9 10 L13 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 6 L23 10 L19 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-size: cover;
+      background-repeat: no-repeat;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      cursor: ew-resize;
+    }
+    .timeline-controls input[type="range"]::-moz-range-track {
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.18));
+      border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+    .timeline-controls input[type="range"]::-moz-range-thumb {
+      width: 32px;
+      height: 20px;
+      border: 0;
+      border-radius: 999px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20' viewBox='0 0 32 20'%3E%3Crect x='0.5' y='0.5' width='31' height='19' rx='9.5' fill='%23131c2b' stroke='%23475a74'/%3E%3Cpath d='M13 6 L9 10 L13 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 6 L23 10 L19 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-size: cover;
+      background-repeat: no-repeat;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      cursor: ew-resize;
+    }
     .timeline-back-now { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
     .timeline-back-now.is-hidden { display: none; }
     @keyframes rotaBlink {

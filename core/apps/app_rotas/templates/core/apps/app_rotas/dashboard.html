@@ -41,20 +41,9 @@
     {% endif %}
 
     <section class="card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Linha do tempo global</h2>
-          <p class="muted">Navegue na linha do tempo e veja os status da hora desejada.</p>
-        </div>
-      </div>
-      {% if timeline %}
-        <form method="get" class="io-form" id="timeline-form">
-          <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
-          <input type="hidden" name="at" id="timeline-at" value="{{ selected_at_iso }}">
-        <div class="timeline-controls">
-          <input id="timeline-range" type="range" min="0" max="{{ timeline_total|add:'-1' }}" value="{{ selected_index }}" {% if timeline_total < 2 %}disabled{% endif %}>
-        </div>
-        <div class="timeline-read">
+      <div class="io-card-head timeline-global-head">
+        <h2 class="io-title">Linha do tempo global</h2>
+        <div class="timeline-global-read">
           <span class="panel-tag">Hora lida: <strong id="timeline-read-label">{{ selected_at_label }}</strong></span>
           <a
             id="timeline-back-now"
@@ -64,10 +53,7 @@
             title="Voltar para agora"
           >↩</a>
         </div>
-      </form>
-      {% else %}
-        <p class="muted">Sem eventos no dia selecionado.</p>
-      {% endif %}
+      </div>
       <p class="muted timeline-note">Nota: estado aplicado em {{ selected_at_label }} ({{ total_events }} eventos processados, limite {{ max_records }} registros).</p>
     </section>
 
@@ -101,6 +87,18 @@
           </div>
         </form>
       </div>
+      <p class="muted">Navegue na linha do tempo e veja os status da hora desejada.</p>
+      {% if timeline %}
+        <form method="get" class="io-form" id="timeline-form">
+          <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
+          <input type="hidden" name="at" id="timeline-at" value="{{ selected_at_iso }}">
+          <div class="timeline-controls">
+            <input id="timeline-range" type="range" min="0" max="{{ timeline_total|add:'-1' }}" value="{{ selected_index }}" {% if timeline_total < 2 %}disabled{% endif %}>
+          </div>
+        </form>
+      {% else %}
+        <p class="muted">Sem eventos no dia selecionado.</p>
+      {% endif %}
       <div id="rotas-cards-container">
         {% include "core/apps/app_rotas/_rotas_cards.html" %}
       </div>
@@ -164,9 +162,13 @@
       cursor: pointer;
     }
     .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
+    .timeline-global-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .timeline-global-read { display: inline-flex; align-items: center; gap: 8px; }
     @media (max-width: 760px) {
       .io-card-head { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
       .day-nav-form.in-section { margin-left: 0; align-self: center; width: 100%; justify-content: center; }
+      .timeline-global-head { align-items: stretch; }
+      .timeline-global-read { justify-content: flex-end; }
     }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .rota-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 10px; }
@@ -197,9 +199,51 @@
       color: var(--text) !important;
       box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
     }
-    .timeline-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-    .timeline-controls input[type="range"] { width: 100%; }
-    .timeline-read { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .timeline-controls { display: flex; align-items: center; gap: 12px; margin: 10px 0 10px; }
+    .timeline-controls input[type="range"] {
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.18));
+      border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+    .timeline-controls input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 999px;
+      background: transparent;
+    }
+    .timeline-controls input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 32px;
+      height: 20px;
+      margin-top: -7px;
+      border: 0;
+      border-radius: 999px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20' viewBox='0 0 32 20'%3E%3Crect x='0.5' y='0.5' width='31' height='19' rx='9.5' fill='%23131c2b' stroke='%23475a74'/%3E%3Cpath d='M13 6 L9 10 L13 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 6 L23 10 L19 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-size: cover;
+      background-repeat: no-repeat;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      cursor: ew-resize;
+    }
+    .timeline-controls input[type="range"]::-moz-range-track {
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.18));
+      border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+    .timeline-controls input[type="range"]::-moz-range-thumb {
+      width: 32px;
+      height: 20px;
+      border: 0;
+      border-radius: 999px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20' viewBox='0 0 32 20'%3E%3Crect x='0.5' y='0.5' width='31' height='19' rx='9.5' fill='%23131c2b' stroke='%23475a74'/%3E%3Cpath d='M13 6 L9 10 L13 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 6 L23 10 L19 14' stroke='%23dbe4f0' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-size: cover;
+      background-repeat: no-repeat;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      cursor: ew-resize;
+    }
     .timeline-back-now { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
     .timeline-back-now.is-hidden { display: none; }
     .timeline-note { margin-top: 10px; font-size: .82rem; opacity: .88; }
