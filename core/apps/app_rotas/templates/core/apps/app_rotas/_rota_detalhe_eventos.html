@@ -27,7 +27,21 @@
       </tbody>
     </table>
   </div>
+  {% if detail_events_page and detail_events_page.paginator.num_pages > 1 %}
+    <div class="events-pagination" style="display: flex; gap: 8px; align-items: center; margin-top: 10px;">
+      {% if detail_events_page.has_previous %}
+        <button class="btn btn-ghost" type="button" data-detail-events-page="{{ detail_events_page.previous_page_number }}">Anterior</button>
+      {% else %}
+        <button class="btn btn-ghost" type="button" disabled>Anterior</button>
+      {% endif %}
+      <span class="panel-tag">Pagina {{ detail_events_page.number }} de {{ detail_events_page.paginator.num_pages }}</span>
+      {% if detail_events_page.has_next %}
+        <button class="btn btn-ghost" type="button" data-detail-events-page="{{ detail_events_page.next_page_number }}">Proxima</button>
+      {% else %}
+        <button class="btn btn-ghost" type="button" disabled>Proxima</button>
+      {% endif %}
+    </div>
+  {% endif %}
 {% else %}
   <p class="muted">Sem eventos para exibir.</p>
 {% endif %}
-

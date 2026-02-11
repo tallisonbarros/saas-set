@@ -215,3 +215,24 @@ class AppRotasTests(TestCase):
         self.assertEqual(AppRotaConfig.objects.get(app=self.app, prefixo="SEC02").ordem, 1)
         self.assertEqual(AppRotaConfig.objects.get(app=self.app, prefixo="SEC01").ordem, 2)
         self.assertEqual(AppRotaConfig.objects.get(app=self.app, prefixo="ENS01").ordem, 3)
+
+    def test_rota_detalhe_events_are_paginated(self):
+        self.perfil.apps.add(self.app)
+        for idx in range(20):
+            IngestRecord.objects.create(
+                source_id=f"rotas-e-{idx}",
+                client_id="UBS3-UN1",
+                agent_id="VMSCADA",
+                source="ROTA",
+                payload={"Name": "ENS01_LIGAR", "TimestampUtc": timezone.now().isoformat(), "Value": str(idx % 2)},
+            )
+        self.client.force_login(self.user)
+        response_page1 = self.client.get(reverse("app_rotas_detalhe", args=["ENS01"]))
+        self.assertEqual(response_page1.status_code, 200)
+        self.assertEqual(len(response_page1.context["timeline_events"]), 12)
+        self.assertEqual(response_page1.context["detail_events_page"].number, 1)
+
+        response_page2 = self.client.get(reverse("app_rotas_detalhe", args=["ENS01"]), {"detail_events_page": "2"})
+        self.assertEqual(response_page2.status_code, 200)
+        self.assertEqual(len(response_page2.context["timeline_events"]), 8)
+        self.assertEqual(response_page2.context["detail_events_page"].number, 2)

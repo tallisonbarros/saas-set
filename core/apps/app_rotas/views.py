@@ -30,6 +30,7 @@ MAX_DASHBOARD_RECORDS = 8000
 MAX_ROUTE_RECORDS = 16000
 BASELINE_RECORDS_LIMIT = 12000
 RECENT_EVENTS_PAGE_SIZE = 10
+ROUTE_EVENTS_PAGE_SIZE = 12
 TIMELINE_STEP_MINUTES = 5
 AVAILABLE_DAYS_LIMIT = 45
 
@@ -774,6 +775,10 @@ def rota_detalhe(request, prefixo):
         if len(timeline_events) >= 120:
             break
 
+    detail_events_page_num = request.GET.get("detail_events_page", "1")
+    detail_events_paginator = Paginator(timeline_events, ROUTE_EVENTS_PAGE_SIZE)
+    detail_events_page = detail_events_paginator.get_page(detail_events_page_num)
+
     initial_ligada_on = _is_active(seed_attrs.get("LIGADA"))
     ligada_intervals = _build_ligada_intervals(day_events, day_start, day_end_point, initial_ligada_on)
     ligada_gradient = _ligada_gradient(ligada_intervals, day_start, day_end_point)
@@ -797,7 +802,10 @@ def rota_detalhe(request, prefixo):
         events_html = render_to_string(
             "core/apps/app_rotas/_rota_detalhe_eventos.html",
             {
-                "timeline_events": timeline_events,
+                "timeline_events": detail_events_page.object_list,
+                "detail_events_page": detail_events_page,
+                "selected_day": selected_day,
+                "selected_at_iso": selected_at.isoformat() if selected_at else "",
             },
             request=request,
         )
@@ -811,6 +819,17 @@ def rota_detalhe(request, prefixo):
                 "attrs_html": attrs_html,
                 "events_html": events_html,
             }
+        )
+    if request.GET.get("partial") == "detail_events" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return render(
+            request,
+            "core/apps/app_rotas/_rota_detalhe_eventos.html",
+            {
+                "timeline_events": detail_events_page.object_list,
+                "detail_events_page": detail_events_page,
+                "selected_day": selected_day,
+                "selected_at_iso": selected_at.isoformat() if selected_at else "",
+            },
         )
 
     showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
@@ -842,7 +861,8 @@ def rota_detalhe(request, prefixo):
             "destino_codigo": destino_codigo,
             "origem_display": origem_nome or (str(origem_codigo) if origem_codigo is not None else "--"),
             "destino_display": destino_nome or (str(destino_codigo) if destino_codigo is not None else "--"),
-            "timeline_events": timeline_events,
+            "timeline_events": detail_events_page.object_list,
+            "detail_events_page": detail_events_page,
             "ligada_gradient": ligada_gradient,
             "config_missing": config_missing,
         },

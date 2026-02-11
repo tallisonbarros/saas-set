@@ -40,38 +40,35 @@
   {% endif %}
 
   <section class="card">
-    <form method="get" class="io-form day-nav-form" id="day-nav-form">
-      <input type="hidden" name="at" value="{{ selected_at_iso }}">
-      <div class="day-nav-capsule">
-        {% if prev_day %}
-          <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
-        {% else %}
-          <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
-        {% endif %}
-        <label class="field day-picker-field">
-          <select name="dia" onchange="this.form.submit()">
-            {% for day in available_days %}
-              <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
-            {% empty %}
-              <option value="{{ selected_day|date:'Y-m-d' }}">{{ selected_day|date:"d/m/Y" }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        {% if next_day %}
-          <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
-        {% else %}
-          <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
-        {% endif %}
-      </div>
-    </form>
-  </section>
-
-  <section class="card">
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Linha do tempo da rota</h2>
         <p class="muted">Faixa verde indica periodos em que o status LIGADA esteve ativo.</p>
       </div>
+      <form method="get" class="io-form day-nav-form in-section" id="day-nav-form">
+        <input type="hidden" name="at" value="{{ selected_at_iso }}">
+        <div class="day-nav-capsule">
+          {% if prev_day %}
+            <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
+          {% else %}
+            <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
+          {% endif %}
+          <label class="field day-picker-field">
+            <select name="dia" onchange="this.form.submit()">
+              {% for day in available_days %}
+                <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
+              {% empty %}
+                <option value="{{ selected_day|date:'Y-m-d' }}">{{ selected_day|date:"d/m/Y" }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% if next_day %}
+            <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
+          {% else %}
+            <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
+          {% endif %}
+        </div>
+      </form>
     </div>
     {% if timeline %}
       <form method="get" class="io-form" id="timeline-form">
@@ -161,6 +158,7 @@
 {% block scripts %}
   <style>
     .day-nav-form { display: flex; justify-content: center; }
+    .day-nav-form.in-section { margin-left: auto; align-self: flex-start; }
     .day-nav-capsule {
       display: inline-flex;
       align-items: center;
@@ -192,6 +190,10 @@
       cursor: pointer;
     }
     .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
+    @media (max-width: 760px) {
+      .io-card-head { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+      .day-nav-form.in-section { margin-left: 0; align-self: center; width: 100%; justify-content: center; }
+    }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
     .rota-status .status-chip.is-active {
@@ -293,6 +295,40 @@
               if (err && err.name === "AbortError") { return; }
             });
         }, 110);
+      });
+    })();
+
+    (function () {
+      var container = document.getElementById("detail-events-container");
+      if (!container) {
+        return;
+      }
+      container.addEventListener("click", function (event) {
+        var target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        var button = target.closest("[data-detail-events-page]");
+        if (!button) {
+          return;
+        }
+        event.preventDefault();
+        var page = button.getAttribute("data-detail-events-page");
+        if (!page || button.hasAttribute("disabled")) {
+          return;
+        }
+        var params = new URLSearchParams(window.location.search);
+        params.set("detail_events_page", page);
+        params.set("partial", "detail_events");
+        fetch(window.location.pathname + "?" + params.toString(), {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+          .then(function (response) { return response.text(); })
+          .then(function (html) {
+            container.innerHTML = html;
+            params.delete("partial");
+            history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+          });
       });
     })();
   </script>

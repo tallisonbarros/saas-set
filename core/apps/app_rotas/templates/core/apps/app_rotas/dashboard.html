@@ -41,33 +41,6 @@
     {% endif %}
 
     <section class="card">
-      <form method="get" class="io-form day-nav-form" id="day-nav-form">
-        <input type="hidden" name="at" value="{{ selected_at_iso }}">
-        <div class="day-nav-capsule">
-          {% if prev_day %}
-            <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
-          {% else %}
-            <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
-          {% endif %}
-          <label class="field day-picker-field">
-            <select name="dia" onchange="this.form.submit()">
-              {% for day in available_days %}
-                <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
-              {% empty %}
-                <option value="{{ selected_day|date:'Y-m-d' }}">{{ selected_day|date:"d/m/Y" }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          {% if next_day %}
-            <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
-          {% else %}
-            <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
-          {% endif %}
-        </div>
-      </form>
-    </section>
-
-    <section class="card">
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Linha do tempo global</h2>
@@ -100,10 +73,32 @@
     <section class="card">
       <div class="io-card-head">
         <div>
-          <h2 class="io-title">Rotas detectadas</h2>
-          <p class="muted">{{ cards|length }} cards renderizados dinamicamente por prefixo.</p>
-          <p class="muted">Arraste os cards para reordenar. A ordem salva vale para todos os usuarios.</p>
+          <h2 class="io-title rotas-title">ROTAS</h2>
         </div>
+        <form method="get" class="io-form day-nav-form in-section" id="day-nav-form">
+          <input type="hidden" name="at" value="{{ selected_at_iso }}">
+          <div class="day-nav-capsule">
+            {% if prev_day %}
+              <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
+            {% else %}
+              <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
+            {% endif %}
+            <label class="field day-picker-field">
+              <select name="dia" onchange="this.form.submit()">
+                {% for day in available_days %}
+                  <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
+                {% empty %}
+                  <option value="{{ selected_day|date:'Y-m-d' }}">{{ selected_day|date:"d/m/Y" }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% if next_day %}
+              <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
+            {% else %}
+              <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
+            {% endif %}
+          </div>
+        </form>
       </div>
       <div id="rotas-cards-container">
         {% include "core/apps/app_rotas/_rotas_cards.html" %}
@@ -127,9 +122,16 @@
 
 {% block scripts %}
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Audiowide&display=swap');
     .app-rotas-stack > .card { margin-bottom: 10px; }
     .app-rotas-stack > .card:last-child { margin-bottom: 0; }
+    .rotas-title {
+      font-family: "Audiowide", sans-serif;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
     .day-nav-form { display: flex; justify-content: center; }
+    .day-nav-form.in-section { margin-left: auto; align-self: flex-start; }
     .day-nav-capsule {
       display: inline-flex;
       align-items: center;
@@ -161,6 +163,10 @@
       cursor: pointer;
     }
     .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
+    @media (max-width: 760px) {
+      .io-card-head { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+      .day-nav-form.in-section { margin-left: 0; align-self: center; width: 100%; justify-content: center; }
+    }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .rota-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 10px; }
     .rota-card { cursor: grab; }
