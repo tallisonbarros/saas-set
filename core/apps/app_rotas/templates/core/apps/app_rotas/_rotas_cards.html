@@ -16,11 +16,9 @@
           <span class="status-chip {% if rota.play_blink %}is-active is-blink{% elif rota.play_on %}is-active{% endif %}">Play</span>
           <span class="status-chip {% if rota.pause_on %}is-active pause{% endif %}">Pause</span>
         </div>
-        <div class="muted rota-updated">Ultima atualizacao: {{ rota.last_update_display }}</div>
       </a>
     {% endfor %}
   </div>
 {% else %}
   <p class="muted">Nenhuma rota encontrada para o dia selecionado.</p>
 {% endif %}
-
