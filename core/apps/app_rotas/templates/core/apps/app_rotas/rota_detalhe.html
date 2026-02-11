@@ -162,13 +162,23 @@
   <style>
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .status-chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
-    .status-chip.is-active { background: rgba(22, 101, 52, 0.55); border-color: #22c55e; color: #bbf7d0; font-weight: 700; }
-    .status-chip.pause.is-active { background: rgba(127, 29, 29, 0.55); border-color: #ef4444; color: #fecaca; font-weight: 700; }
+    .rota-status .status-chip.is-active {
+      background: rgba(22, 101, 52, 0.55) !important;
+      border-color: #22c55e !important;
+      color: #bbf7d0 !important;
+      font-weight: 700;
+    }
+    .rota-status .status-chip.pause.is-active {
+      background: rgba(127, 29, 29, 0.55) !important;
+      border-color: #ef4444 !important;
+      color: #fecaca !important;
+      font-weight: 700;
+    }
     .status-chip.is-blink {
       animation: rotaBlink 0.9s ease-in-out infinite;
-      background: rgba(22, 101, 52, 0.75);
-      border-color: #22c55e;
-      color: #dcfce7;
+      background: rgba(22, 101, 52, 0.75) !important;
+      border-color: #22c55e !important;
+      color: #dcfce7 !important;
       box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
     }
     .timeline-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
