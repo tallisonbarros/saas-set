@@ -56,7 +56,7 @@
           </span>
         </div>
       </div>
-      <p class="muted timeline-note">Nota: estado aplicado em {{ selected_at_label }} ({{ total_events }} eventos processados, limite {{ max_records }} registros).</p>
+      <p class="muted timeline-note" id="timeline-global-note">Nota: estado aplicado em <span id="selected-at-note">{{ selected_at_label }}</span> (<span id="total-events-note">{{ total_events }}</span> eventos processados, limite {{ max_records }} registros).</p>
     </section>
 
     <section class="card">
@@ -95,7 +95,7 @@
           <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
           <input type="hidden" name="at" id="timeline-at" value="{{ selected_at_iso }}">
           <div class="timeline-track-wrap">
-            <div class="ligada-track" style="background: {{ global_ligada_gradient }};"></div>
+            <div class="ligada-track" id="global-ligada-track" style="background: {{ global_ligada_gradient }};"></div>
             <div class="timeline-controls">
               <input id="timeline-range" type="range" min="0" max="{{ timeline_total|add:'-1' }}" value="{{ selected_index }}" {% if timeline_total < 2 %}disabled{% endif %}>
             </div>
@@ -356,11 +356,97 @@
       var form = document.getElementById("timeline-form");
       var readLabel = document.getElementById("timeline-read-label");
       var backNow = document.getElementById("timeline-back-now");
+      var totalEventsNote = document.getElementById("total-events-note");
+      var selectedAtNote = document.getElementById("selected-at-note");
+      var ligadaTrack = document.getElementById("global-ligada-track");
+      var refreshTimer = null;
+      var RANGE_DEBOUNCE_MS = 110;
+      var LIVE_REFRESH_MS = 2500;
       if (!range || !atField || !form || !readLabel || !timeline.length) {
         return;
       }
-      var timer = null;
       var controller = null;
+
+      function applyPartialResponse(data, params) {
+        if (!data || !data.ok) { return; }
+        var cardsContainer = document.getElementById("rotas-cards-container");
+        var eventsContainer = document.getElementById("recent-events-container");
+        if (cardsContainer) { cardsContainer.innerHTML = data.cards_html; }
+        if (eventsContainer) { eventsContainer.innerHTML = data.events_html; }
+        var lifebitBadge = document.getElementById("lifebit-badge");
+        var lifebitLastSeen = document.getElementById("lifebit-last-seen");
+        if (lifebitBadge && typeof data.lifebit_connected !== "undefined") {
+          lifebitBadge.textContent = data.lifebit_label || (data.lifebit_connected ? "Conectado" : "Desconectado");
+          lifebitBadge.classList.toggle("comm-on", !!data.lifebit_connected);
+          lifebitBadge.classList.toggle("comm-off", !data.lifebit_connected);
+        }
+        if (lifebitLastSeen && typeof data.lifebit_connected !== "undefined") {
+          var lastSeenText = "Ultima conexao lida: " + (data.lifebit_last_seen || "-");
+          lifebitLastSeen.textContent = lastSeenText;
+          lifebitLastSeen.classList.toggle("is-hidden", !!data.lifebit_connected);
+        }
+        if (data.selected_at_label) {
+          readLabel.textContent = data.selected_at_label;
+          if (selectedAtNote) { selectedAtNote.textContent = data.selected_at_label; }
+        }
+        if (typeof data.total_events !== "undefined" && totalEventsNote) {
+          totalEventsNote.textContent = String(data.total_events);
+        }
+        if (data.global_ligada_gradient && ligadaTrack) {
+          ligadaTrack.style.background = data.global_ligada_gradient;
+        }
+        if (typeof data.timeline_total !== "undefined" && typeof data.selected_index !== "undefined" && range) {
+          var nextMax = Math.max(0, Number(data.timeline_total) - 1);
+          range.max = String(nextMax);
+          range.disabled = nextMax < 1;
+          if (Number(data.selected_index) >= 0) {
+            range.value = String(data.selected_index);
+          }
+        }
+        if (data.selected_at_iso) {
+          atField.value = data.selected_at_iso;
+          params.set("at", data.selected_at_iso);
+        }
+        if (backNow) {
+          if (data.now_day && data.now_at_iso) {
+            backNow.setAttribute("href", "?dia=" + data.now_day + "&at=" + encodeURIComponent(data.now_at_iso));
+          }
+          if (data.showing_now) {
+            backNow.classList.add("is-hidden");
+          } else {
+            backNow.classList.remove("is-hidden");
+          }
+        }
+        params.delete("partial");
+        params.delete("follow_now");
+        history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+        initDragDrop();
+      }
+
+      function fetchDashboardPartial(mode) {
+        var params = new URLSearchParams(window.location.search);
+        params.set("dia", "{{ selected_day|date:'Y-m-d' }}");
+        params.set("at", atField.value || "{{ selected_at_iso }}");
+        params.set("partial", mode || "timeline");
+        if (backNow && backNow.classList.contains("is-hidden")) {
+          params.set("follow_now", "1");
+        }
+        if (controller && mode === "timeline") { controller.abort(); }
+        var localController = new AbortController();
+        if (mode === "timeline") { controller = localController; }
+        return fetch(window.location.pathname + "?" + params.toString(), {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          signal: localController.signal
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            applyPartialResponse(data, params);
+          })
+          .catch(function (err) {
+            if (err && err.name === "AbortError") { return; }
+          });
+      }
+
       range.addEventListener("input", function () {
         var index = Number(range.value);
         var point = timeline[index];
@@ -369,60 +455,15 @@
         }
         atField.value = point.iso;
         readLabel.textContent = point.label;
-        if (timer) { clearTimeout(timer); }
-        timer = setTimeout(function () {
-          if (controller) { controller.abort(); }
-          controller = new AbortController();
-          var params = new URLSearchParams(window.location.search);
-          params.set("dia", "{{ selected_day|date:'Y-m-d' }}");
-          params.set("at", point.iso);
-          params.set("partial", "timeline");
-          fetch(window.location.pathname + "?" + params.toString(), {
-            headers: { "X-Requested-With": "XMLHttpRequest" },
-            signal: controller.signal
-          })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-              if (!data || !data.ok) { return; }
-              var cardsContainer = document.getElementById("rotas-cards-container");
-              var eventsContainer = document.getElementById("recent-events-container");
-              if (cardsContainer) { cardsContainer.innerHTML = data.cards_html; }
-              if (eventsContainer) { eventsContainer.innerHTML = data.events_html; }
-              var lifebitBadge = document.getElementById("lifebit-badge");
-              var lifebitLastSeen = document.getElementById("lifebit-last-seen");
-              if (lifebitBadge && typeof data.lifebit_connected !== "undefined") {
-                lifebitBadge.textContent = data.lifebit_label || (data.lifebit_connected ? "Conectado" : "Desconectado");
-                lifebitBadge.classList.toggle("comm-on", !!data.lifebit_connected);
-                lifebitBadge.classList.toggle("comm-off", !data.lifebit_connected);
-              }
-              if (lifebitLastSeen && typeof data.lifebit_connected !== "undefined") {
-                var lastSeenText = "Ultima conexao lida: " + (data.lifebit_last_seen || "-");
-                lifebitLastSeen.textContent = lastSeenText;
-                lifebitLastSeen.classList.toggle("is-hidden", !!data.lifebit_connected);
-              }
-              if (data.selected_at_label) {
-                readLabel.textContent = data.selected_at_label;
-              }
-              if (backNow) {
-                if (data.now_day && data.now_at_iso) {
-                  backNow.setAttribute("href", "?dia=" + data.now_day + "&at=" + encodeURIComponent(data.now_at_iso));
-                }
-                if (data.showing_now) {
-                  backNow.classList.add("is-hidden");
-                } else {
-                  backNow.classList.remove("is-hidden");
-                }
-              }
-              params.delete("partial");
-              params.delete("events_page");
-              history.replaceState(null, "", window.location.pathname + "?" + params.toString());
-              initDragDrop();
-            })
-            .catch(function (err) {
-              if (err && err.name === "AbortError") { return; }
-            });
-        }, 110);
+        if (refreshTimer) { clearTimeout(refreshTimer); }
+        refreshTimer = setTimeout(function () {
+          fetchDashboardPartial("timeline");
+        }, RANGE_DEBOUNCE_MS);
       });
+
+      setInterval(function () {
+        fetchDashboardPartial("live");
+      }, LIVE_REFRESH_MS);
     })();
 
     (function () {

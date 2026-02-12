@@ -34,7 +34,7 @@ ROUTE_EVENTS_PAGE_SIZE = 12
 TIMELINE_STEP_MINUTES = 5
 AVAILABLE_DAYS_LIMIT = 45
 LIFEBIT_TAG_NAME = "LIFEBIT"
-LIFEBIT_TIMEOUT_SECONDS = 30
+LIFEBIT_TIMEOUT_SECONDS = 45
 PAYLOAD_WINDOW_MARGIN_DAYS = 1
 AVAILABLE_DAYS_SCAN_LIMIT = 40000
 
@@ -656,6 +656,11 @@ def dashboard(request):
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
         selected_at = selected_point["timestamp"]
+    follow_now = request.GET.get("follow_now") == "1"
+    if follow_now and selected_day == timezone.localdate():
+        selected_point, selected_index = _selected_timeline_point(timeline, timeline_end_point)
+        if selected_point:
+            selected_at = selected_point["timestamp"]
 
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
     origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
@@ -693,7 +698,8 @@ def dashboard(request):
             value_display = f"{value_display:.3f}".rstrip("0").rstrip(".")
         event["valor_display"] = value_display
 
-    if request.GET.get("partial") == "recent_events" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+    partial_mode = request.GET.get("partial")
+    if partial_mode == "recent_events" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return render(
             request,
             "core/apps/app_rotas/_eventos_recentes.html",
@@ -702,7 +708,7 @@ def dashboard(request):
                 "recent_events_page": recent_events_page,
             },
         )
-    if request.GET.get("partial") == "timeline" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+    if partial_mode in {"timeline", "live"} and request.headers.get("X-Requested-With") == "XMLHttpRequest":
         showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
         cards_html = render_to_string(
             "core/apps/app_rotas/_rotas_cards.html",
@@ -739,6 +745,11 @@ def dashboard(request):
                 ),
                 "cards_html": cards_html,
                 "events_html": events_html,
+                "total_events": len(events_today),
+                "selected_at_iso": selected_at.isoformat() if selected_at else "",
+                "timeline_total": len(timeline),
+                "selected_index": selected_index,
+                "global_ligada_gradient": global_ligada_gradient,
             }
         )
 
