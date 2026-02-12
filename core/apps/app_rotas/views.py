@@ -7,6 +7,7 @@ from django.db import IntegrityError
 from django.db.models import Q
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -1178,6 +1179,7 @@ def dados(request):
     valor_q = (request.GET.get("valor") or "").strip()
     prefixo_q = (request.GET.get("prefixo") or "").strip().upper()
     atributo_q = (request.GET.get("atributo") or "").strip().upper()
+    deleted_q = (request.GET.get("deleted") or "").strip()
 
     if not config_missing:
         base_qs = IngestRecord.objects.filter(
@@ -1259,6 +1261,7 @@ def dados(request):
         {
             "app": app,
             "config_missing": config_missing,
+            "deleted": deleted_q == "1",
             "total_client_agent": total_client_agent,
             "total_with_source": total_with_source,
             "sample_size": sample_size,
@@ -1286,6 +1289,13 @@ def dados_registro(request, pk):
     record = get_object_or_404(IngestRecord, pk=pk)
     if record.client_id != app.ingest_client_id or record.agent_id != app.ingest_agent_id:
         return HttpResponseForbidden("Registro fora do escopo do app.")
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip().lower()
+        if action == "delete":
+            record.delete()
+            return redirect(f"{reverse('app_rotas_dados')}?deleted=1")
+        return HttpResponseForbidden("Acao invalida.")
 
     return render(
         request,

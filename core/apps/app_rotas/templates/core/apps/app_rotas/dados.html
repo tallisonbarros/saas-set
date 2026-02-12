@@ -41,6 +41,11 @@
       <p class="notice notice-error">Configure ingest_client_id e ingest_agent_id no app para visualizar os dados.</p>
     </section>
   {% else %}
+    {% if deleted %}
+      <section class="card">
+        <p class="notice notice-success">Payload excluido com sucesso.</p>
+      </section>
+    {% endif %}
     <section class="card">
       <div class="table-wrap">
         <table class="table">

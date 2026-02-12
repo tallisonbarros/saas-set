@@ -21,6 +21,11 @@
         <div class="hud-title">{{ app.nome }}</div>
         <div class="hud-pill">Payload</div>
         <div class="hud-menu" aria-label="Menu do modulo">
+          <form method="post" action="{% url 'app_rotas_dados_registro' registro.id %}" onsubmit="return confirm('Confirma excluir este payload? Esta acao nao pode ser desfeita.');" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <button type="submit" class="hud-menu-pill" style="background: rgba(127,29,29,.12); border-color: #ef4444; color: #7f1d1d;">EXCLUIR</button>
+          </form>
           <a class="hud-menu-pill" href="{% url 'app_rotas_dados' %}">Voltar para Dados</a>
           <a class="hud-menu-pill" href="{% url 'app_rotas_dashboard' %}">Dashboard</a>
         </div>
