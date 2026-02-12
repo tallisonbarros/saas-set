@@ -5287,17 +5287,24 @@ def admin_db_monitor(request):
     return render(request, "core/admin_db_monitor.html", context)
 
 
-def _admin_db_public_tables():
+def _admin_db_public_tables(ingest_only=False):
     with connections["default"].cursor() as cursor:
+        params = []
+        ingest_clause = ""
+        if ingest_only:
+            ingest_clause = " AND t.table_name ILIKE %s"
+            params.append("%ingest%")
         cursor.execute(
-            """
+            f"""
             SELECT t.table_name, COALESCE(s.n_live_tup::bigint, 0)
             FROM information_schema.tables t
             LEFT JOIN pg_stat_user_tables s ON s.relname = t.table_name
             WHERE t.table_schema = 'public'
               AND t.table_type = 'BASE TABLE'
+              {ingest_clause}
             ORDER BY t.table_name
-            """
+            """,
+            params,
         )
         rows = cursor.fetchall() or []
     return [{"name": row[0], "estimated_rows": int(row[1] or 0)} for row in rows]
@@ -5331,12 +5338,38 @@ def _admin_db_to_int(value, default_value, min_value=None, max_value=None):
     return number
 
 
+def _admin_db_ingest_payload_keys(table_name, max_keys=80):
+    qn = connections["default"].ops.quote_name
+    table_sql = qn(table_name)
+    payload_sql = qn("payload")
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT key
+                FROM (
+                    SELECT DISTINCT jsonb_object_keys({payload_sql}) AS key
+                    FROM {table_sql}
+                    WHERE {payload_sql} IS NOT NULL
+                      AND jsonb_typeof({payload_sql}) = 'object'
+                ) payload_keys
+                ORDER BY key
+                LIMIT %s
+                """,
+                [max_keys],
+            )
+            rows = cursor.fetchall() or []
+    except DatabaseError:
+        return []
+    return [row[0] for row in rows if row and row[0]]
+
+
 @login_required
 def admin_db_table(request):
     if not request.user.is_staff:
         return HttpResponseForbidden("Sem permissao.")
 
-    tables = _admin_db_public_tables()
+    tables = _admin_db_public_tables(ingest_only=True)
     selected_table = request.GET.get("table", "").strip()
     available_names = {item["name"] for item in tables}
     if not selected_table or selected_table not in available_names:
@@ -5366,17 +5399,25 @@ def admin_db_table_data(request):
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "asc"
 
-    tables = _admin_db_public_tables()
+    tables = _admin_db_public_tables(ingest_only=True)
     available_names = {item["name"] for item in tables}
     if table_name not in available_names:
         return JsonResponse({"ok": False, "error": "invalid_table"}, status=400)
 
-    columns = _admin_db_table_columns(table_name)
-    if not columns:
+    base_columns = _admin_db_table_columns(table_name)
+    if not base_columns:
         return JsonResponse({"ok": False, "error": "no_columns"}, status=400)
 
+    is_ingest_record = table_name == "core_ingestrecord"
+    payload_keys = []
+    virtual_columns = []
+    if is_ingest_record and "payload" in base_columns:
+        payload_keys = _admin_db_ingest_payload_keys(table_name, max_keys=120)
+        virtual_columns = ["client", *[f"payload.{key}" for key in payload_keys]]
+    columns = [*base_columns, *virtual_columns]
+
     if sort_by not in columns:
-        sort_by = columns[0]
+        sort_by = "id" if "id" in columns else columns[0]
 
     raw_filters = request.GET.get("filters", "").strip()
     parsed_filters = {}
@@ -5391,8 +5432,25 @@ def admin_db_table_data(request):
     where_parts = []
     where_params = []
     qn = connections["default"].ops.quote_name
+
+    def resolve_column_sql(col_name):
+        if col_name in base_columns:
+            return qn(col_name), []
+        if is_ingest_record and col_name == "client":
+            client_id_sql = qn("client_id")
+            source_id_sql = qn("source_id")
+            return f"COALESCE(NULLIF({client_id_sql}, ''), split_part({source_id_sql}, ':', 1))", []
+        if is_ingest_record and col_name.startswith("payload."):
+            payload_key = col_name.split(".", 1)[1]
+            if payload_key in payload_keys:
+                return f"{qn('payload')} ->> %s", [payload_key]
+        return "", []
+
     for col_name, values in parsed_filters.items():
-        if col_name not in columns or not isinstance(values, list):
+        if not isinstance(values, list):
+            continue
+        col_sql, col_expr_params = resolve_column_sql(col_name)
+        if not col_sql:
             continue
         clean_values = []
         include_null = False
@@ -5403,15 +5461,18 @@ def admin_db_table_data(request):
             clean_values.append(value)
         if not clean_values and not include_null:
             continue
-        col_sql = qn(col_name)
         parts = []
+        clause_params = []
         if clean_values:
             placeholders = ", ".join(["%s"] * len(clean_values))
-            parts.append(f"{col_sql} IN ({placeholders})")
-            where_params.extend(clean_values)
+            parts.append(f"({col_sql}) IN ({placeholders})")
+            clause_params.extend(col_expr_params)
+            clause_params.extend(clean_values)
         if include_null:
-            parts.append(f"{col_sql} IS NULL")
+            parts.append(f"({col_sql}) IS NULL")
+            clause_params.extend(col_expr_params)
         where_parts.append("(" + " OR ".join(parts) + ")")
+        where_params.extend(clause_params)
 
     where_sql = ""
     if where_parts:
@@ -5419,7 +5480,10 @@ def admin_db_table_data(request):
 
     offset = (page - 1) * page_size
     table_sql = qn(table_name)
-    sort_sql = qn(sort_by)
+    sort_sql, sort_params = resolve_column_sql(sort_by)
+    if not sort_sql:
+        sort_by = "id" if "id" in columns else columns[0]
+        sort_sql, sort_params = resolve_column_sql(sort_by)
     order_sql = "DESC" if sort_dir == "desc" else "ASC"
 
     try:
@@ -5435,10 +5499,10 @@ def admin_db_table_data(request):
                 SELECT *
                 FROM {table_sql}
                 {where_sql}
-                ORDER BY {sort_sql} {order_sql}
+                ORDER BY ({sort_sql}) {order_sql} NULLS LAST
                 LIMIT %s OFFSET %s
                 """,
-                [*where_params, page_size, offset],
+                [*where_params, *sort_params, page_size, offset],
             )
             db_rows = cursor.fetchall() or []
     except DatabaseError as exc:
@@ -5469,8 +5533,19 @@ def admin_db_table_data(request):
     rows = []
     for raw_row in db_rows:
         row_dict = {}
-        for index, col_name in enumerate(columns):
+        for index, col_name in enumerate(base_columns):
             row_dict[col_name] = raw_row[index]
+        if is_ingest_record:
+            source_id_value = row_dict.get("source_id")
+            client_id_value = row_dict.get("client_id")
+            client_value = client_id_value if client_id_value else ""
+            if not client_value and isinstance(source_id_value, str) and ":" in source_id_value:
+                client_value = source_id_value.split(":", 1)[0]
+            row_dict["client"] = client_value
+            payload_value = row_dict.get("payload")
+            payload_obj = payload_value if isinstance(payload_value, dict) else {}
+            for payload_key in payload_keys:
+                row_dict[f"payload.{payload_key}"] = payload_obj.get(payload_key)
         rows.append(row_dict)
 
     return JsonResponse(
@@ -5500,38 +5575,58 @@ def admin_db_table_values(request):
     q = request.GET.get("q", "").strip()
     limit = _admin_db_to_int(request.GET.get("limit"), 200, min_value=20, max_value=500)
 
-    tables = _admin_db_public_tables()
+    tables = _admin_db_public_tables(ingest_only=True)
     available_names = {item["name"] for item in tables}
     if table_name not in available_names:
         return JsonResponse({"ok": False, "error": "invalid_table"}, status=400)
 
-    columns = _admin_db_table_columns(table_name)
+    base_columns = _admin_db_table_columns(table_name)
+    is_ingest_record = table_name == "core_ingestrecord"
+    payload_keys = []
+    virtual_columns = []
+    if is_ingest_record and "payload" in base_columns:
+        payload_keys = _admin_db_ingest_payload_keys(table_name, max_keys=120)
+        virtual_columns = ["client", *[f"payload.{key}" for key in payload_keys]]
+    columns = [*base_columns, *virtual_columns]
     if column_name not in columns:
         return JsonResponse({"ok": False, "error": "invalid_column"}, status=400)
 
     qn = connections["default"].ops.quote_name
     table_sql = qn(table_name)
-    col_sql = qn(column_name)
-    search_sql = ""
-    params = []
-    if q:
-        search_sql = f" AND CAST({col_sql} AS TEXT) ILIKE %s"
-        params.append(f"%{q}%")
+
+    if column_name in base_columns:
+        col_sql = qn(column_name)
+        col_params = []
+    elif column_name == "client":
+        col_sql = f"COALESCE(NULLIF({qn('client_id')}, ''), split_part({qn('source_id')}, ':', 1))"
+        col_params = []
+    elif column_name.startswith("payload.") and is_ingest_record:
+        payload_key = column_name.split(".", 1)[1]
+        if payload_key not in payload_keys:
+            return JsonResponse({"ok": False, "error": "invalid_column"}, status=400)
+        col_sql = f"{qn('payload')} ->> %s"
+        col_params = [payload_key]
+    else:
+        return JsonResponse({"ok": False, "error": "invalid_column"}, status=400)
 
     values = []
     try:
         with connections["default"].cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT {col_sql}, COUNT(*)
-                FROM {table_sql}
-                WHERE {col_sql} IS NOT NULL
-                {search_sql}
-                GROUP BY {col_sql}
-                ORDER BY COUNT(*) DESC, CAST({col_sql} AS TEXT) ASC
+                WITH base AS (
+                    SELECT ({col_sql}) AS col_value
+                    FROM {table_sql}
+                )
+                SELECT col_value, COUNT(*)
+                FROM base
+                WHERE col_value IS NOT NULL
+                {"AND CAST(col_value AS TEXT) ILIKE %s" if q else ""}
+                GROUP BY col_value
+                ORDER BY COUNT(*) DESC, CAST(col_value AS TEXT) ASC
                 LIMIT %s
                 """,
-                [*params, limit],
+                [*col_params, *([f"%{q}%"] if q else []), limit],
             )
             rows = cursor.fetchall() or []
             for value, count in rows:
@@ -5545,7 +5640,16 @@ def admin_db_table_values(request):
 
             if not q:
                 cursor.execute(
-                    f"SELECT COUNT(*) FROM {table_sql} WHERE {col_sql} IS NULL"
+                    f"""
+                    WITH base AS (
+                        SELECT ({col_sql}) AS col_value
+                        FROM {table_sql}
+                    )
+                    SELECT COUNT(*)
+                    FROM base
+                    WHERE col_value IS NULL
+                    """,
+                    col_params,
                 )
                 null_count = int((cursor.fetchone() or [0])[0] or 0)
                 if null_count > 0:

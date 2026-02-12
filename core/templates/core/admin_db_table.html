@@ -26,9 +26,9 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <div class="page-kicker">Inspecao e debug</div>
-          <h1 class="page-title">Tabela PostgreSQL</h1>
-          <p class="page-subtitle">Visao paginada dos dados com filtros por coluna no estilo planilha, sem recarregar a pagina.</p>
+          <div class="page-kicker">Inspecao e debug do ingest</div>
+          <h1 class="page-title">Tabela PostgreSQL (Ingest)</h1>
+          <p class="page-subtitle">Visao paginada apenas das tabelas de ingest, com filtros por coluna no estilo planilha, sem recarregar a pagina.</p>
         </div>
       </div>
       <div class="hud-meta">Sessao iniciada em {{ started_at|date:"d/m/Y H:i:s" }}</div>
@@ -160,23 +160,25 @@
     .grid-wrap {
       max-height: 62vh;
       overflow: auto;
-      border: 1px solid var(--border);
+      border: 1px solid #334155;
       border-radius: 12px;
-      background: rgba(255, 255, 255, 0.75);
+      background: #020617;
     }
     .db-grid-table {
       width: max-content;
       min-width: 100%;
       table-layout: fixed;
+      color: #e2e8f0;
     }
     .db-grid-table thead th {
       position: sticky;
       top: 0;
       z-index: 2;
-      background: #fff1e7;
-      border-bottom: 1px solid var(--border);
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
       min-width: 180px;
       max-width: 300px;
+      color: #f8fafc !important;
     }
     .db-grid-table td {
       min-width: 180px;
@@ -186,6 +188,17 @@
       text-overflow: ellipsis;
       font-family: "JetBrains Mono", "Fira Code", monospace;
       font-size: 12px;
+      color: #e2e8f0 !important;
+      border-top: 1px solid #334155 !important;
+    }
+    .db-grid-table tbody tr:nth-child(odd) {
+      background: #0b1220 !important;
+    }
+    .db-grid-table tbody tr:nth-child(even) {
+      background: #111827 !important;
+    }
+    .db-grid-table tbody tr:hover {
+      background: #1f2937 !important;
     }
     .col-head-btn {
       display: flex;
@@ -197,7 +210,7 @@
       border: none;
       text-align: left;
       cursor: pointer;
-      color: var(--text);
+      color: #f8fafc;
     }
     .col-head-name {
       overflow: hidden;
@@ -213,10 +226,10 @@
       align-items: center;
       gap: 4px;
       font-size: 11px;
-      color: var(--muted);
+      color: #cbd5e1;
     }
     .is-filtered {
-      color: #9f1239;
+      color: #fbbf24;
       font-weight: 700;
     }
     .grid-footer {
@@ -359,7 +372,30 @@
       }
 
       function setDefaultVisibleColumns() {
-        state.visibleColumns = state.columns.slice();
+        const isIngestRecord = state.table === "core_ingestrecord";
+        if (!isIngestRecord) {
+          state.visibleColumns = state.columns.slice();
+          return;
+        }
+        const preferred = [
+          "id",
+          "created_at",
+          "updated_at",
+          "client",
+          "client_id",
+          "agent_id",
+          "source",
+          "source_id",
+        ].filter((name) => state.columns.includes(name));
+        const payloadColumns = state.columns.filter((name) => name.startsWith("payload."));
+        const firstPayloadColumns = payloadColumns.slice(0, 12);
+        const rest = state.columns.filter((name) => {
+          if (name === "payload") {
+            return false;
+          }
+          return !preferred.includes(name) && !firstPayloadColumns.includes(name);
+        });
+        state.visibleColumns = [...preferred, ...firstPayloadColumns, ...rest];
       }
 
       async function loadData(options = {}) {
@@ -461,7 +497,7 @@
           const stateSpan = document.createElement("span");
           stateSpan.className = "col-head-state";
           const filterEnabled = Array.isArray(state.filters[columnName]) && state.filters[columnName].length > 0;
-          const sortSymbol = state.sortBy === columnName ? (state.sortDir === "asc" ? "A-Z" : "Z-A") : "";
+          const sortSymbol = state.sortBy === columnName ? (state.sortDir === "asc" ? "ASC" : "DESC") : "";
           stateSpan.textContent = sortSymbol;
 
           const filterBadge = document.createElement("span");
