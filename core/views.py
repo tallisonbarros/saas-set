@@ -5543,7 +5543,16 @@ def admin_db_table_data(request):
                 client_value = source_id_value.split(":", 1)[0]
             row_dict["client"] = client_value
             payload_value = row_dict.get("payload")
-            payload_obj = payload_value if isinstance(payload_value, dict) else {}
+            payload_obj = {}
+            if isinstance(payload_value, dict):
+                payload_obj = payload_value
+            elif isinstance(payload_value, (str, bytes, bytearray)):
+                try:
+                    payload_obj = json.loads(payload_value)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    payload_obj = {}
+            if not isinstance(payload_obj, dict):
+                payload_obj = {}
             for payload_key in payload_keys:
                 row_dict[f"payload.{payload_key}"] = payload_obj.get(payload_key)
         rows.append(row_dict)
