@@ -109,7 +109,8 @@
         <table class="table">
           <thead>
             <tr>
-              <th>Data/Hora</th>
+              <th>Hora ingest</th>
+              <th>Hora payload</th>
               <th>Source</th>
               <th>Source ID</th>
               <th>Tag</th>
@@ -121,7 +122,8 @@
           <tbody>
             {% for row in rows %}
               <tr>
-                <td>{{ row.timestamp_display }}</td>
+                <td>{{ row.ingest_timestamp_display }}</td>
+                <td>{{ row.payload_timestamp_display }}</td>
                 <td>{{ row.source|default:"-" }}</td>
                 <td>{{ row.source_id|default:"-" }}</td>
                 <td>{{ row.tag|default:"-" }}</td>
@@ -131,7 +133,7 @@
               </tr>
             {% empty %}
               <tr>
-                <td colspan="7" class="muted">Sem registros para os filtros do app.</td>
+                <td colspan="8" class="muted">Sem registros para os filtros do app.</td>
               </tr>
             {% endfor %}
           </tbody>

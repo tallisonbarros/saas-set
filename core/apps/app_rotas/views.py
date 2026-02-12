@@ -350,7 +350,18 @@ def _events_from_records(records, start=None, end_exclusive=None, prefix=None):
         if end_exclusive and event["timestamp"] >= end_exclusive:
             continue
         events.append(event)
-    events.sort(key=lambda item: (item["timestamp"], item["prefixo"], item["atributo"]))
+    # Keep payload timestamp as primary timeline axis, but when multiple readings share
+    # the same payload timestamp, use ingest timestamp as tie-breaker to preserve
+    # the real arrival/update order.
+    events.sort(
+        key=lambda item: (
+            item["timestamp"],
+            item.get("ingest_timestamp") or item["timestamp"],
+            item["prefixo"],
+            item["atributo"],
+            item.get("source_id") or "",
+        )
+    )
     return events
 
 
@@ -1207,10 +1218,16 @@ def dados(request):
         for rec in page_obj.object_list:
             payload = rec.payload if isinstance(rec.payload, dict) else {}
             event = _build_event(rec)
-            timestamp = rec.updated_at or rec.created_at
+            ingest_ts = rec.updated_at or rec.created_at
+            payload_ts = event["timestamp"] if event else _extract_timestamp(payload, rec)
+            if payload_ts and timezone.is_naive(payload_ts):
+                payload_ts = timezone.make_aware(payload_ts, timezone.get_current_timezone())
             rows.append(
                 {
-                    "timestamp_display": timezone.localtime(timestamp).strftime("%d/%m/%Y %H:%M:%S") if timestamp else "-",
+                    "ingest_timestamp_display": timezone.localtime(ingest_ts).strftime("%d/%m/%Y %H:%M:%S") if ingest_ts else "-",
+                    "payload_timestamp_display": (
+                        timezone.localtime(payload_ts).strftime("%d/%m/%Y %H:%M:%S") if payload_ts else "-"
+                    ),
                     "source": rec.source,
                     "source_id": rec.source_id,
                     "tag": _extract_tag(payload),
