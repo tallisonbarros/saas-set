@@ -1,0 +1,125 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Monitoramento de banco{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <span>Monitoramento de banco</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card stack">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Modulo administrativo</div>
+        <div class="hud-pill">Banco de dados</div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Diagnostico em tempo real</div>
+          <h1 class="page-title">Monitoramento PostgreSQL</h1>
+          <p class="page-subtitle">Use esta tela para validar disponibilidade e parametros basicos da conexao.</p>
+        </div>
+      </div>
+      <div class="hud-meta">Atualizado em {{ started_at|date:"d/m/Y H:i:s" }}</div>
+    </div>
+
+    <div class="panel-grid panel-grid-spaced">
+      <div class="panel-card">
+        <div class="panel-card-top">
+          <div class="panel-title">Status da conexao</div>
+          {% if db_ok %}
+            <span class="panel-tag" style="background: rgba(22, 101, 52, 0.55); border-color: #22c55e; color: #bbf7d0;">ONLINE</span>
+          {% else %}
+            <span class="panel-tag" style="background: rgba(127, 29, 29, 0.55); border-color: #ef4444; color: #fecaca;">OFFLINE</span>
+          {% endif %}
+        </div>
+        {% if db_ok %}
+          <div class="muted">Consulta de verificacao (`SELECT 1`) executada com sucesso.</div>
+        {% else %}
+          <div class="muted">Falha na conexao com o banco.</div>
+          {% if db_error %}
+            <pre class="code-block">{{ db_error }}</pre>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-title">Configuracao atual</div>
+        <div class="muted">Engine: <strong>{{ db_config.engine|default:"-" }}</strong></div>
+        <div class="muted">Host: <strong>{{ db_config.host|default:"-" }}</strong></div>
+        <div class="muted">Porta: <strong>{{ db_config.port|default:"-" }}</strong></div>
+        <div class="muted">Database: <strong>{{ db_config.name|default:"-" }}</strong></div>
+      </div>
+    </div>
+
+    <div class="card compact-card">
+      <div class="panel-title">Detalhes do servidor</div>
+      <div class="table-wrap">
+        <table class="table">
+          <tbody>
+            <tr>
+              <th>Banco atual</th>
+              <td>{{ db_info.name|default:"-" }}</td>
+            </tr>
+            <tr>
+              <th>Usuario atual</th>
+              <td>{{ db_info.user|default:"-" }}</td>
+            </tr>
+            <tr>
+              <th>Hora do servidor</th>
+              <td>{% if db_info.server_time %}{{ db_info.server_time|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</td>
+            </tr>
+            <tr>
+              <th>PostgreSQL em recovery</th>
+              <td>
+                {% if db_info.in_recovery is None %}
+                  -
+                {% elif db_info.in_recovery %}
+                  Sim
+                {% else %}
+                  Nao
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <th>Inicio do postmaster</th>
+              <td>{% if db_info.postmaster_start %}{{ db_info.postmaster_start|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</td>
+            </tr>
+            <tr>
+              <th>Conexoes ativas</th>
+              <td>{{ db_info.active_connections|default:"-" }}</td>
+            </tr>
+            <tr>
+              <th>Versao</th>
+              <td>{{ db_info.version|default:"-" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-primary" href="{% url 'admin_db_monitor' %}">Atualizar</a>
+        <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <style>
+    .code-block {
+      margin-top: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: .82rem;
+    }
+  </style>
+{% endblock %}

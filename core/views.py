@@ -23,6 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 
 from django.contrib.auth.models import User
+from django.db import DatabaseError, connections
 from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
 from django.db.models.expressions import ExpressionWrapper
 
@@ -5210,6 +5211,73 @@ def admin_logs(request):
             "module_q": module_q,
         },
     )
+
+
+@login_required
+def admin_db_monitor(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+
+    started_at = timezone.localtime(timezone.now())
+    db_ok = False
+    db_error = ""
+    db_info = {
+        "name": "",
+        "user": "",
+        "server_time": None,
+        "version": "",
+        "in_recovery": None,
+        "postmaster_start": None,
+        "active_connections": None,
+    }
+    cfg = connections["default"].settings_dict
+
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT 1")
+            db_ok = cursor.fetchone()[0] == 1
+
+            cursor.execute("SELECT current_database(), current_user, now(), version()")
+            row = cursor.fetchone()
+            if row:
+                db_info["name"] = row[0] or ""
+                db_info["user"] = row[1] or ""
+                db_info["server_time"] = row[2]
+                db_info["version"] = row[3] or ""
+
+            try:
+                cursor.execute("SELECT pg_is_in_recovery(), pg_postmaster_start_time()")
+                row = cursor.fetchone()
+                if row:
+                    db_info["in_recovery"] = row[0]
+                    db_info["postmaster_start"] = row[1]
+            except DatabaseError:
+                pass
+
+            try:
+                cursor.execute("SELECT count(*) FROM pg_stat_activity")
+                row = cursor.fetchone()
+                if row:
+                    db_info["active_connections"] = row[0]
+            except DatabaseError:
+                pass
+    except Exception as exc:
+        db_ok = False
+        db_error = str(exc)
+
+    context = {
+        "started_at": started_at,
+        "db_ok": db_ok,
+        "db_error": db_error,
+        "db_info": db_info,
+        "db_config": {
+            "engine": cfg.get("ENGINE", ""),
+            "host": cfg.get("HOST", ""),
+            "port": cfg.get("PORT", ""),
+            "name": cfg.get("NAME", ""),
+        },
+    }
+    return render(request, "core/admin_db_monitor.html", context)
 
 
 @login_required
