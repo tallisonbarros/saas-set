@@ -310,13 +310,17 @@ def _records_before(app, cutoff, limit):
     return qs.only("source_id", "payload", "created_at", "updated_at").order_by("-updated_at", "-created_at")[:limit]
 
 
-def _lifebit_status(app):
+def _lifebit_lookup_q():
     lookup = Q()
     for key in TAG_KEYS:
         lookup |= Q(**{f"payload__{key}__iexact": LIFEBIT_TAG_NAME})
+    return lookup
+
+
+def _lifebit_status(app):
     record = (
         _base_records_queryset(app)
-        .filter(lookup)
+        .filter(_lifebit_lookup_q())
         .only("payload", "created_at", "updated_at")
         .order_by("-updated_at", "-created_at")
         .first()
@@ -680,6 +684,9 @@ def dashboard(request):
                 "selected_day": selected_day,
                 "selected_at_iso": selected_at.isoformat() if selected_at else "",
                 "lifebit_connected": lifebit_connected,
+                "lifebit_last_seen": (
+                    timezone.localtime(lifebit_last_seen).strftime("%d/%m/%Y %H:%M:%S") if lifebit_last_seen else "-"
+                ),
             },
             request=request,
         )
@@ -700,6 +707,9 @@ def dashboard(request):
                 "now_at_iso": now_target.isoformat() if now_target else "",
                 "lifebit_connected": lifebit_connected,
                 "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
+                "lifebit_last_seen": (
+                    timezone.localtime(lifebit_last_seen).strftime("%d/%m/%Y %H:%M:%S") if lifebit_last_seen else "-"
+                ),
                 "cards_html": cards_html,
                 "events_html": events_html,
             }
@@ -1070,6 +1080,54 @@ def mapeamentos(request):
             "tipo_filtro": tipo_filtro,
             "message": message,
             "message_level": message_level,
+        },
+    )
+
+
+@login_required
+def conexao(request):
+    app = _get_rotas_app()
+    if not _has_access(request.user, app):
+        return HttpResponseForbidden("Sem permissao.")
+
+    config_missing = not app.ingest_client_id or not app.ingest_agent_id
+    lifebit_connected = False
+    lifebit_last_seen = None
+    eventos = []
+    if not config_missing:
+        lifebit_connected, lifebit_last_seen = _lifebit_status(app)
+        rows = (
+            _base_records_queryset(app)
+            .filter(_lifebit_lookup_q())
+            .only("payload", "created_at", "updated_at")
+            .order_by("-updated_at", "-created_at")[:30]
+        )
+        for row in rows:
+            payload = row.payload if isinstance(row.payload, dict) else {}
+            ts = _extract_timestamp(payload, row)
+            if ts and timezone.is_naive(ts):
+                ts = timezone.make_aware(ts, timezone.get_current_timezone())
+            val = _extract_value(payload)
+            eventos.append(
+                {
+                    "timestamp_display": timezone.localtime(ts).strftime("%d/%m/%Y %H:%M:%S") if ts else "-",
+                    "valor_display": str(val if val is not None else "-"),
+                }
+            )
+
+    return render(
+        request,
+        "core/apps/app_rotas/conexao.html",
+        {
+            "app": app,
+            "config_missing": config_missing,
+            "lifebit_connected": lifebit_connected,
+            "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
+            "lifebit_last_seen": (
+                timezone.localtime(lifebit_last_seen).strftime("%d/%m/%Y %H:%M:%S") if lifebit_last_seen else "-"
+            ),
+            "lifebit_timeout_seconds": LIFEBIT_TIMEOUT_SECONDS,
+            "eventos": eventos,
         },
     )
 

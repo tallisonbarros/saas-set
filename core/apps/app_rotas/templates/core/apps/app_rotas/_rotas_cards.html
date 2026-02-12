@@ -20,6 +20,7 @@
         {% if not lifebit_connected %}
           <div class="rota-comm-overlay" aria-hidden="true">
             <span class="rota-comm-icon">⛓</span>
+            <span class="rota-comm-last-seen">Ultima conexao lida: {{ lifebit_last_seen }}</span>
           </div>
         {% endif %}
       </a>

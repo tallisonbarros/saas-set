@@ -1,0 +1,86 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ app.nome }} - Conexao{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_rotas_dashboard' %}">{{ app.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>Conexao</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card app-accent" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">{{ app.nome }}</div>
+        <div class="hud-pill">Conexao</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'app_rotas_dashboard' %}">Dashboard</a>
+          <a class="hud-menu-pill" href="{% url 'app_rotas_mapeamentos' %}">Mapeamentos</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Monitor de conexao</h1>
+          <p class="page-subtitle">Tag monitorada: LIFEBIT (timeout {{ lifebit_timeout_seconds }}s)</p>
+        </div>
+        <span class="panel-tag comm-pill {% if lifebit_connected %}comm-on{% else %}comm-off{% endif %}">{{ lifebit_label }}</span>
+      </div>
+      <div class="hud-meta">Ultima conexao lida: {{ lifebit_last_seen }}</div>
+    </div>
+  </section>
+
+  {% if config_missing %}
+    <section class="card">
+      <p class="notice notice-error">Configure `ingest_client_id` e `ingest_agent_id` para monitorar a conexao.</p>
+    </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="io-card-head">
+      <h2 class="io-title">Ultimos eventos LIFEBIT</h2>
+    </div>
+    {% if eventos %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in eventos %}
+              <tr>
+                <td>{{ item.timestamp_display }}</td>
+                <td>{{ item.valor_display }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Sem eventos LIFEBIT encontrados.</p>
+    {% endif %}
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <style>
+    .comm-pill { font-weight: 700; letter-spacing: .02em; }
+    .comm-pill.comm-on {
+      background: rgba(22, 101, 52, 0.55);
+      border-color: #22c55e;
+      color: #bbf7d0;
+    }
+    .comm-pill.comm-off {
+      background: rgba(127, 29, 29, 0.55);
+      border-color: #ef4444;
+      color: #fecaca;
+    }
+  </style>
+{% endblock %}
