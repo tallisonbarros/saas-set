@@ -5287,6 +5287,285 @@ def admin_db_monitor(request):
     return render(request, "core/admin_db_monitor.html", context)
 
 
+def _admin_db_public_tables():
+    with connections["default"].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT t.table_name, COALESCE(s.n_live_tup::bigint, 0)
+            FROM information_schema.tables t
+            LEFT JOIN pg_stat_user_tables s ON s.relname = t.table_name
+            WHERE t.table_schema = 'public'
+              AND t.table_type = 'BASE TABLE'
+            ORDER BY t.table_name
+            """
+        )
+        rows = cursor.fetchall() or []
+    return [{"name": row[0], "estimated_rows": int(row[1] or 0)} for row in rows]
+
+
+def _admin_db_table_columns(table_name):
+    with connections["default"].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = %s
+            ORDER BY ordinal_position
+            """,
+            [table_name],
+        )
+        rows = cursor.fetchall() or []
+    return [row[0] for row in rows]
+
+
+def _admin_db_to_int(value, default_value, min_value=None, max_value=None):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = default_value
+    if min_value is not None and number < min_value:
+        number = min_value
+    if max_value is not None and number > max_value:
+        number = max_value
+    return number
+
+
+@login_required
+def admin_db_table(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+
+    tables = _admin_db_public_tables()
+    selected_table = request.GET.get("table", "").strip()
+    available_names = {item["name"] for item in tables}
+    if not selected_table or selected_table not in available_names:
+        selected_table = tables[0]["name"] if tables else ""
+
+    return render(
+        request,
+        "core/admin_db_table.html",
+        {
+            "tables": tables,
+            "selected_table": selected_table,
+            "started_at": timezone.localtime(timezone.now()),
+        },
+    )
+
+
+@login_required
+def admin_db_table_data(request):
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    table_name = request.GET.get("table", "").strip()
+    page = _admin_db_to_int(request.GET.get("page"), 1, min_value=1, max_value=100000)
+    page_size = _admin_db_to_int(request.GET.get("page_size"), 50, min_value=10, max_value=200)
+    sort_by = request.GET.get("sort_by", "").strip()
+    sort_dir = request.GET.get("sort_dir", "asc").strip().lower()
+    if sort_dir not in {"asc", "desc"}:
+        sort_dir = "asc"
+
+    tables = _admin_db_public_tables()
+    available_names = {item["name"] for item in tables}
+    if table_name not in available_names:
+        return JsonResponse({"ok": False, "error": "invalid_table"}, status=400)
+
+    columns = _admin_db_table_columns(table_name)
+    if not columns:
+        return JsonResponse({"ok": False, "error": "no_columns"}, status=400)
+
+    if sort_by not in columns:
+        sort_by = columns[0]
+
+    raw_filters = request.GET.get("filters", "").strip()
+    parsed_filters = {}
+    if raw_filters:
+        try:
+            payload = json.loads(raw_filters)
+            if isinstance(payload, dict):
+                parsed_filters = payload
+        except json.JSONDecodeError:
+            return JsonResponse({"ok": False, "error": "invalid_filters"}, status=400)
+
+    where_parts = []
+    where_params = []
+    qn = connections["default"].ops.quote_name
+    for col_name, values in parsed_filters.items():
+        if col_name not in columns or not isinstance(values, list):
+            continue
+        clean_values = []
+        include_null = False
+        for value in values[:500]:
+            if value == "__NULL__":
+                include_null = True
+                continue
+            clean_values.append(value)
+        if not clean_values and not include_null:
+            continue
+        col_sql = qn(col_name)
+        parts = []
+        if clean_values:
+            placeholders = ", ".join(["%s"] * len(clean_values))
+            parts.append(f"{col_sql} IN ({placeholders})")
+            where_params.extend(clean_values)
+        if include_null:
+            parts.append(f"{col_sql} IS NULL")
+        where_parts.append("(" + " OR ".join(parts) + ")")
+
+    where_sql = ""
+    if where_parts:
+        where_sql = " WHERE " + " AND ".join(where_parts)
+
+    offset = (page - 1) * page_size
+    table_sql = qn(table_name)
+    sort_sql = qn(sort_by)
+    order_sql = "DESC" if sort_dir == "desc" else "ASC"
+
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {table_sql}{where_sql}",
+                where_params,
+            )
+            total_rows = int((cursor.fetchone() or [0])[0] or 0)
+
+            cursor.execute(
+                f"""
+                SELECT *
+                FROM {table_sql}
+                {where_sql}
+                ORDER BY {sort_sql} {order_sql}
+                LIMIT %s OFFSET %s
+                """,
+                [*where_params, page_size, offset],
+            )
+            db_rows = cursor.fetchall() or []
+    except DatabaseError as exc:
+        return JsonResponse(
+            {"ok": False, "error": "query_failed", "detail": str(exc)},
+            status=400,
+        )
+
+    total_pages = max(1, (total_rows + page_size - 1) // page_size)
+    normalized_page = page if page <= total_pages else total_pages
+    if normalized_page != page:
+        return JsonResponse(
+            {
+                "ok": True,
+                "table": table_name,
+                "columns": columns,
+                "rows": [],
+                "page": normalized_page,
+                "page_size": page_size,
+                "total_rows": total_rows,
+                "total_pages": total_pages,
+                "sort_by": sort_by,
+                "sort_dir": sort_dir,
+                "filters": parsed_filters,
+            }
+        )
+
+    rows = []
+    for raw_row in db_rows:
+        row_dict = {}
+        for index, col_name in enumerate(columns):
+            row_dict[col_name] = raw_row[index]
+        rows.append(row_dict)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "table": table_name,
+            "columns": columns,
+            "rows": rows,
+            "page": normalized_page,
+            "page_size": page_size,
+            "total_rows": total_rows,
+            "total_pages": total_pages,
+            "sort_by": sort_by,
+            "sort_dir": sort_dir,
+            "filters": parsed_filters,
+        }
+    )
+
+
+@login_required
+def admin_db_table_values(request):
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    table_name = request.GET.get("table", "").strip()
+    column_name = request.GET.get("column", "").strip()
+    q = request.GET.get("q", "").strip()
+    limit = _admin_db_to_int(request.GET.get("limit"), 200, min_value=20, max_value=500)
+
+    tables = _admin_db_public_tables()
+    available_names = {item["name"] for item in tables}
+    if table_name not in available_names:
+        return JsonResponse({"ok": False, "error": "invalid_table"}, status=400)
+
+    columns = _admin_db_table_columns(table_name)
+    if column_name not in columns:
+        return JsonResponse({"ok": False, "error": "invalid_column"}, status=400)
+
+    qn = connections["default"].ops.quote_name
+    table_sql = qn(table_name)
+    col_sql = qn(column_name)
+    search_sql = ""
+    params = []
+    if q:
+        search_sql = f" AND CAST({col_sql} AS TEXT) ILIKE %s"
+        params.append(f"%{q}%")
+
+    values = []
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT {col_sql}, COUNT(*)
+                FROM {table_sql}
+                WHERE {col_sql} IS NOT NULL
+                {search_sql}
+                GROUP BY {col_sql}
+                ORDER BY COUNT(*) DESC, CAST({col_sql} AS TEXT) ASC
+                LIMIT %s
+                """,
+                [*params, limit],
+            )
+            rows = cursor.fetchall() or []
+            for value, count in rows:
+                values.append(
+                    {
+                        "value": value,
+                        "label": str(value),
+                        "count": int(count or 0),
+                    }
+                )
+
+            if not q:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {table_sql} WHERE {col_sql} IS NULL"
+                )
+                null_count = int((cursor.fetchone() or [0])[0] or 0)
+                if null_count > 0:
+                    values.insert(
+                        0,
+                        {
+                            "value": "__NULL__",
+                            "label": "(vazio)",
+                            "count": null_count,
+                        },
+                    )
+    except DatabaseError as exc:
+        return JsonResponse(
+            {"ok": False, "error": "query_failed", "detail": str(exc)},
+            status=400,
+        )
+
+    return JsonResponse({"ok": True, "table": table_name, "column": column_name, "values": values})
+
+
 @login_required
 def ajustes_sistema(request):
     if not request.user.is_staff:

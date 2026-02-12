@@ -17,6 +17,11 @@
       <div class="hud-top">
         <div class="hud-title">Modulo administrativo</div>
         <div class="hud-pill">Banco de dados</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'painel' %}">Painel</a>
+          <a class="hud-menu-pill" href="{% url 'admin_db_monitor' %}">Monitor</a>
+          <a class="hud-menu-pill" href="{% url 'admin_db_table' %}">Tabela</a>
+        </div>
       </div>
       <div class="page-hud-head">
         <div>
@@ -103,6 +108,7 @@
       </div>
       <div class="page-actions">
         <a class="btn btn-primary" href="{% url 'admin_db_monitor' %}">Atualizar</a>
+        <a class="btn btn-ghost" href="{% url 'admin_db_table' %}">Abrir tabela</a>
         <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
       </div>
     </div>

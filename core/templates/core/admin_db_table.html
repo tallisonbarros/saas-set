@@ -1,0 +1,803 @@
+{% extends "core/base.html" %}
+
+{% block title %}Tabela de monitoramento{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'admin_db_monitor' %}">Monitoramento de banco</a>
+    <span class="crumb-sep">/</span>
+    <span>Tabela</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card stack">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Modulo administrativo</div>
+        <div class="hud-pill">Tabela</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'painel' %}">Painel</a>
+          <a class="hud-menu-pill" href="{% url 'admin_db_monitor' %}">Monitor</a>
+          <a class="hud-menu-pill" href="{% url 'admin_db_table' %}">Tabela</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Inspecao e debug</div>
+          <h1 class="page-title">Tabela PostgreSQL</h1>
+          <p class="page-subtitle">Visao paginada dos dados com filtros por coluna no estilo planilha, sem recarregar a pagina.</p>
+        </div>
+      </div>
+      <div class="hud-meta">Sessao iniciada em {{ started_at|date:"d/m/Y H:i:s" }}</div>
+    </div>
+
+    <div class="panel-card">
+      <div class="db-toolbar">
+        <label class="db-label">
+          <span>Tabela</span>
+          <select id="tableSelect" class="input">
+            {% for table in tables %}
+              <option value="{{ table.name }}" {% if table.name == selected_table %}selected{% endif %}>
+                {{ table.name }} ({{ table.estimated_rows }})
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="db-label">
+          <span>Linhas por pagina</span>
+          <select id="pageSizeSelect" class="input">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        </label>
+        <button type="button" class="btn btn-ghost" id="columnsBtn">Colunas</button>
+        <button type="button" class="btn btn-primary" id="reloadBtn">Atualizar</button>
+      </div>
+
+      <div class="columns-panel" id="columnsPanel" hidden>
+        <div class="columns-panel-actions">
+          <button type="button" class="btn btn-ghost btn-mini" id="showAllColsBtn">Mostrar todas</button>
+          <button type="button" class="btn btn-ghost btn-mini" id="hideAllColsBtn">Ocultar todas</button>
+        </div>
+        <div id="columnsList" class="columns-list"></div>
+      </div>
+    </div>
+
+    <div class="panel-card table-panel">
+      <div class="table-metrics">
+        <div id="tableStatus" class="muted">Carregando...</div>
+        <div id="filterStatus" class="muted"></div>
+      </div>
+      <div class="table-wrap grid-wrap">
+        <table class="table db-grid-table">
+          <thead id="gridHead"></thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+      </div>
+      <div class="grid-footer">
+        <div class="pager-left">
+          <button type="button" class="btn btn-ghost btn-mini" id="prevPageBtn">Anterior</button>
+          <button type="button" class="btn btn-ghost btn-mini" id="nextPageBtn">Proxima</button>
+          <span id="pageInfo" class="muted">Pagina 0/0</span>
+        </div>
+        <div class="pager-right">
+          <label class="db-label-inline">
+            <span>Ir para</span>
+            <input id="gotoInput" type="number" min="1" step="1" class="input input-small" />
+          </label>
+          <button type="button" class="btn btn-ghost btn-mini" id="gotoBtn">Ir</button>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <style>
+    .db-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 10px;
+    }
+    .db-label, .db-label-inline {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .db-label-inline {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+    .input-small {
+      width: 92px;
+    }
+    .columns-panel {
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fffaf6;
+      padding: 10px;
+    }
+    .columns-panel-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .columns-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 6px 10px;
+      max-height: 220px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .columns-list label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .table-panel {
+      position: relative;
+      overflow: visible;
+    }
+    .table-metrics {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .grid-wrap {
+      max-height: 62vh;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.75);
+    }
+    .db-grid-table {
+      width: max-content;
+      min-width: 100%;
+      table-layout: fixed;
+    }
+    .db-grid-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #fff1e7;
+      border-bottom: 1px solid var(--border);
+      min-width: 180px;
+      max-width: 300px;
+    }
+    .db-grid-table td {
+      min-width: 180px;
+      max-width: 300px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 12px;
+    }
+    .col-head-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 4px 2px;
+      background: transparent;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .col-head-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.35px;
+    }
+    .col-head-state {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .is-filtered {
+      color: #9f1239;
+      font-weight: 700;
+    }
+    .grid-footer {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .pager-left, .pager-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn-mini {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+    .menu-popover {
+      position: fixed;
+      z-index: 110;
+      width: 320px;
+      max-width: 92vw;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fffaf6;
+      box-shadow: 0 16px 44px rgba(15, 23, 42, 0.24);
+      padding: 10px;
+    }
+    .menu-popover-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .menu-popover-search {
+      margin-bottom: 8px;
+    }
+    .menu-popover-list {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      max-height: 220px;
+      overflow: auto;
+      padding: 6px;
+      display: grid;
+      gap: 4px;
+    }
+    .menu-popover-list label {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .menu-popover-empty {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px 4px;
+    }
+    .menu-popover-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 860px) {
+      .db-grid-table thead th,
+      .db-grid-table td {
+        min-width: 145px;
+      }
+    }
+  </style>
+
+  <script>
+    (() => {
+      const endpoints = {
+        data: "{% url 'admin_db_table_data' %}",
+        values: "{% url 'admin_db_table_values' %}",
+      };
+
+      const tableSelect = document.getElementById("tableSelect");
+      const pageSizeSelect = document.getElementById("pageSizeSelect");
+      const columnsBtn = document.getElementById("columnsBtn");
+      const columnsPanel = document.getElementById("columnsPanel");
+      const columnsList = document.getElementById("columnsList");
+      const showAllColsBtn = document.getElementById("showAllColsBtn");
+      const hideAllColsBtn = document.getElementById("hideAllColsBtn");
+      const reloadBtn = document.getElementById("reloadBtn");
+      const prevPageBtn = document.getElementById("prevPageBtn");
+      const nextPageBtn = document.getElementById("nextPageBtn");
+      const gotoInput = document.getElementById("gotoInput");
+      const gotoBtn = document.getElementById("gotoBtn");
+      const tableStatus = document.getElementById("tableStatus");
+      const filterStatus = document.getElementById("filterStatus");
+      const pageInfo = document.getElementById("pageInfo");
+      const gridHead = document.getElementById("gridHead");
+      const gridBody = document.getElementById("gridBody");
+
+      const state = {
+        table: tableSelect.value,
+        page: 1,
+        pageSize: Number(pageSizeSelect.value || 50),
+        sortBy: "",
+        sortDir: "asc",
+        totalRows: 0,
+        totalPages: 1,
+        columns: [],
+        rows: [],
+        visibleColumns: [],
+        filters: {},
+      };
+
+      let currentMenu = null;
+
+      function toFilterKey(value) {
+        return JSON.stringify(value);
+      }
+
+      function sanitizeFilters() {
+        const output = {};
+        Object.keys(state.filters).forEach((col) => {
+          const values = state.filters[col];
+          if (!Array.isArray(values) || !values.length) {
+            return;
+          }
+          output[col] = values;
+        });
+        return output;
+      }
+
+      function isColumnVisible(columnName) {
+        return state.visibleColumns.includes(columnName);
+      }
+
+      function setDefaultVisibleColumns() {
+        state.visibleColumns = state.columns.slice();
+      }
+
+      async function loadData(options = {}) {
+        if (options.resetPage) {
+          state.page = 1;
+        }
+
+        const params = new URLSearchParams();
+        params.set("table", state.table);
+        params.set("page", String(state.page));
+        params.set("page_size", String(state.pageSize));
+        if (state.sortBy) {
+          params.set("sort_by", state.sortBy);
+          params.set("sort_dir", state.sortDir);
+        }
+        params.set("filters", JSON.stringify(sanitizeFilters()));
+
+        tableStatus.textContent = "Carregando dados...";
+
+        const response = await fetch(`${endpoints.data}?${params.toString()}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "erro_na_consulta");
+        }
+
+        const oldColumns = state.columns.join("|");
+        state.columns = Array.isArray(payload.columns) ? payload.columns : [];
+        state.rows = Array.isArray(payload.rows) ? payload.rows : [];
+        state.page = Number(payload.page || 1);
+        state.totalRows = Number(payload.total_rows || 0);
+        state.totalPages = Number(payload.total_pages || 1);
+        state.sortBy = payload.sort_by || state.columns[0] || "";
+        state.sortDir = payload.sort_dir || "asc";
+
+        if (oldColumns !== state.columns.join("|")) {
+          setDefaultVisibleColumns();
+          state.filters = {};
+        } else {
+          state.visibleColumns = state.visibleColumns.filter((name) => state.columns.includes(name));
+          if (!state.visibleColumns.length) {
+            state.visibleColumns = state.columns.slice();
+          }
+        }
+
+        renderColumnChooser();
+        renderTable();
+        renderStatus();
+      }
+
+      function renderStatus() {
+        const filteredCount = Object.keys(sanitizeFilters()).length;
+        tableStatus.textContent = `${state.totalRows} linhas na tabela ${state.table}`;
+        filterStatus.textContent = filteredCount ? `${filteredCount} coluna(s) com filtro ativo` : "Sem filtros ativos";
+        pageInfo.textContent = `Pagina ${state.page}/${state.totalPages}`;
+        gotoInput.value = String(state.page);
+        prevPageBtn.disabled = state.page <= 1;
+        nextPageBtn.disabled = state.page >= state.totalPages;
+      }
+
+      function formatCellValue(value) {
+        if (value === null || value === undefined) {
+          return "";
+        }
+        if (typeof value === "object") {
+          try {
+            return JSON.stringify(value);
+          } catch (error) {
+            return String(value);
+          }
+        }
+        return String(value);
+      }
+
+      function renderTable() {
+        closeFilterMenu();
+
+        const visible = state.columns.filter((column) => isColumnVisible(column));
+        if (!visible.length) {
+          gridHead.innerHTML = "<tr><th>Nenhuma coluna visivel</th></tr>";
+          gridBody.innerHTML = `<tr><td class="muted">Ative pelo menos uma coluna no painel "Colunas".</td></tr>`;
+          return;
+        }
+
+        const headRow = document.createElement("tr");
+        visible.forEach((columnName) => {
+          const th = document.createElement("th");
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "col-head-btn";
+          button.dataset.column = columnName;
+
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "col-head-name";
+          nameSpan.textContent = columnName;
+
+          const stateSpan = document.createElement("span");
+          stateSpan.className = "col-head-state";
+          const filterEnabled = Array.isArray(state.filters[columnName]) && state.filters[columnName].length > 0;
+          const sortSymbol = state.sortBy === columnName ? (state.sortDir === "asc" ? "A-Z" : "Z-A") : "";
+          stateSpan.textContent = sortSymbol;
+
+          const filterBadge = document.createElement("span");
+          filterBadge.textContent = filterEnabled ? "F" : "";
+          filterBadge.className = filterEnabled ? "is-filtered" : "";
+          stateSpan.appendChild(filterBadge);
+
+          button.appendChild(nameSpan);
+          button.appendChild(stateSpan);
+          button.addEventListener("click", (event) => openFilterMenu(columnName, event.currentTarget));
+          th.appendChild(button);
+          headRow.appendChild(th);
+        });
+
+        gridHead.innerHTML = "";
+        gridHead.appendChild(headRow);
+
+        if (!state.rows.length) {
+          gridBody.innerHTML = `<tr><td class="muted" colspan="${visible.length}">Nenhum registro encontrado para os filtros aplicados.</td></tr>`;
+          return;
+        }
+
+        const rowsHtml = state.rows
+          .map((row) => {
+            const cols = visible
+              .map((col) => `<td title="${escapeHtml(formatCellValue(row[col]))}">${escapeHtml(formatCellValue(row[col]))}</td>`)
+              .join("");
+            return `<tr>${cols}</tr>`;
+          })
+          .join("");
+        gridBody.innerHTML = rowsHtml;
+      }
+
+      function renderColumnChooser() {
+        const html = state.columns
+          .map((columnName) => {
+            const checked = isColumnVisible(columnName) ? "checked" : "";
+            return `<label><input type="checkbox" data-col="${escapeHtml(columnName)}" ${checked} /> <span>${escapeHtml(columnName)}</span></label>`;
+          })
+          .join("");
+        columnsList.innerHTML = html || `<div class="muted">Sem colunas disponiveis.</div>`;
+
+        columnsList.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+          checkbox.addEventListener("change", (event) => {
+            const col = event.target.getAttribute("data-col");
+            if (!col) {
+              return;
+            }
+            if (event.target.checked) {
+              if (!state.visibleColumns.includes(col)) {
+                state.visibleColumns.push(col);
+              }
+            } else {
+              state.visibleColumns = state.visibleColumns.filter((name) => name !== col);
+            }
+            renderTable();
+          });
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      async function fetchColumnValues(columnName, searchTerm) {
+        const params = new URLSearchParams();
+        params.set("table", state.table);
+        params.set("column", columnName);
+        params.set("limit", "200");
+        if (searchTerm) {
+          params.set("q", searchTerm);
+        }
+        const response = await fetch(`${endpoints.values}?${params.toString()}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "erro_valores_coluna");
+        }
+        return Array.isArray(payload.values) ? payload.values : [];
+      }
+
+      function closeFilterMenu() {
+        if (!currentMenu) {
+          return;
+        }
+        currentMenu.remove();
+        currentMenu = null;
+      }
+
+      function applySort(columnName) {
+        if (state.sortBy === columnName) {
+          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.sortBy = columnName;
+          state.sortDir = "asc";
+        }
+      }
+
+      function openFilterMenu(columnName, anchorEl) {
+        if (!anchorEl) {
+          return;
+        }
+        if (currentMenu && currentMenu.dataset.column === columnName) {
+          closeFilterMenu();
+          return;
+        }
+        closeFilterMenu();
+
+        const activeValues = Array.isArray(state.filters[columnName]) ? state.filters[columnName].slice() : [];
+        const selectedByKey = new Map(activeValues.map((value) => [toFilterKey(value), value]));
+        let loadedValues = [];
+
+        const menu = document.createElement("div");
+        menu.className = "menu-popover";
+        menu.dataset.column = columnName;
+        menu.innerHTML = `
+          <div class="menu-popover-top">
+            <strong>${escapeHtml(columnName)}</strong>
+            <label><input type="checkbox" id="toggleColumnVisible" ${isColumnVisible(columnName) ? "checked" : ""} /> Exibir coluna</label>
+          </div>
+          <div class="menu-popover-search">
+            <input id="filterSearchInput" class="input" type="text" placeholder="Buscar valor..." />
+          </div>
+          <div class="menu-popover-list" id="filterValuesList">
+            <div class="menu-popover-empty">Carregando valores...</div>
+          </div>
+          <div class="menu-popover-actions">
+            <button type="button" class="btn btn-ghost btn-mini" id="toggleSortBtn">Ordenar</button>
+            <button type="button" class="btn btn-ghost btn-mini" id="markAllBtn">Marcar todos</button>
+            <button type="button" class="btn btn-ghost btn-mini" id="clearBtn">Limpar</button>
+            <button type="button" class="btn btn-primary btn-mini" id="applyBtn">Aplicar</button>
+          </div>
+        `;
+
+        document.body.appendChild(menu);
+        currentMenu = menu;
+
+        const rect = anchorEl.getBoundingClientRect();
+        const top = Math.min(window.innerHeight - 20, rect.bottom + 8);
+        const left = Math.max(8, Math.min(window.innerWidth - 340, rect.left));
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+
+        const valuesListEl = menu.querySelector("#filterValuesList");
+        const searchInputEl = menu.querySelector("#filterSearchInput");
+        const toggleColumnVisibleEl = menu.querySelector("#toggleColumnVisible");
+        const markAllBtnEl = menu.querySelector("#markAllBtn");
+        const clearBtnEl = menu.querySelector("#clearBtn");
+        const applyBtnEl = menu.querySelector("#applyBtn");
+        const toggleSortBtnEl = menu.querySelector("#toggleSortBtn");
+
+        async function renderValues(searchTerm) {
+          valuesListEl.innerHTML = `<div class="menu-popover-empty">Carregando...</div>`;
+          loadedValues = await fetchColumnValues(columnName, searchTerm);
+          if (!loadedValues.length) {
+            valuesListEl.innerHTML = `<div class="menu-popover-empty">Nenhum valor para este filtro.</div>`;
+            return;
+          }
+          const valuesHtml = loadedValues
+            .map((item, index) => {
+              const key = toFilterKey(item.value);
+              const checked = selectedByKey.has(key) ? "checked" : "";
+              return `
+                <label>
+                  <input type="checkbox" data-index="${index}" ${checked} />
+                  <span>${escapeHtml(item.label)}</span>
+                  <small class="muted">${item.count}</small>
+                </label>
+              `;
+            })
+            .join("");
+          valuesListEl.innerHTML = valuesHtml;
+          valuesListEl.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+            checkbox.addEventListener("change", (event) => {
+              const idx = Number(event.target.getAttribute("data-index"));
+              const item = loadedValues[idx];
+              if (!item) {
+                return;
+              }
+              const key = toFilterKey(item.value);
+              if (event.target.checked) {
+                selectedByKey.set(key, item.value);
+              } else {
+                selectedByKey.delete(key);
+              }
+            });
+          });
+        }
+
+        let searchTimer = null;
+        searchInputEl.addEventListener("input", () => {
+          clearTimeout(searchTimer);
+          searchTimer = setTimeout(() => {
+            renderValues(searchInputEl.value.trim()).catch((error) => {
+              valuesListEl.innerHTML = `<div class="menu-popover-empty">Erro: ${escapeHtml(error.message)}</div>`;
+            });
+          }, 180);
+        });
+
+        toggleColumnVisibleEl.addEventListener("change", (event) => {
+          if (event.target.checked) {
+            if (!state.visibleColumns.includes(columnName)) {
+              state.visibleColumns.push(columnName);
+            }
+          } else {
+            state.visibleColumns = state.visibleColumns.filter((name) => name !== columnName);
+          }
+          renderColumnChooser();
+          renderTable();
+        });
+
+        markAllBtnEl.addEventListener("click", () => {
+          loadedValues.forEach((item) => {
+            selectedByKey.set(toFilterKey(item.value), item.value);
+          });
+          valuesListEl.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+            checkbox.checked = true;
+          });
+        });
+
+        clearBtnEl.addEventListener("click", () => {
+          selectedByKey.clear();
+          valuesListEl.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+            checkbox.checked = false;
+          });
+        });
+
+        toggleSortBtnEl.addEventListener("click", async () => {
+          applySort(columnName);
+          closeFilterMenu();
+          await safeLoadData({ resetPage: false });
+        });
+
+        applyBtnEl.addEventListener("click", async () => {
+          const selected = Array.from(selectedByKey.values());
+          if (selected.length) {
+            state.filters[columnName] = selected;
+          } else {
+            delete state.filters[columnName];
+          }
+          closeFilterMenu();
+          await safeLoadData({ resetPage: true });
+        });
+
+        renderValues("").catch((error) => {
+          valuesListEl.innerHTML = `<div class="menu-popover-empty">Erro: ${escapeHtml(error.message)}</div>`;
+        });
+      }
+
+      async function safeLoadData(options) {
+        try {
+          await loadData(options);
+        } catch (error) {
+          tableStatus.textContent = `Falha ao carregar: ${error.message}`;
+          gridHead.innerHTML = "";
+          gridBody.innerHTML = `<tr><td class="muted">Nao foi possivel consultar os dados.</td></tr>`;
+        }
+      }
+
+      document.addEventListener("click", (event) => {
+        if (!currentMenu) {
+          return;
+        }
+        const target = event.target;
+        if (currentMenu.contains(target) || target.closest(".col-head-btn")) {
+          return;
+        }
+        closeFilterMenu();
+      });
+
+      columnsBtn.addEventListener("click", () => {
+        columnsPanel.hidden = !columnsPanel.hidden;
+      });
+
+      showAllColsBtn.addEventListener("click", () => {
+        state.visibleColumns = state.columns.slice();
+        renderColumnChooser();
+        renderTable();
+      });
+
+      hideAllColsBtn.addEventListener("click", () => {
+        state.visibleColumns = [];
+        renderColumnChooser();
+        renderTable();
+      });
+
+      tableSelect.addEventListener("change", async () => {
+        state.table = tableSelect.value;
+        state.page = 1;
+        state.sortBy = "";
+        state.sortDir = "asc";
+        state.filters = {};
+        await safeLoadData({ resetPage: true });
+      });
+
+      pageSizeSelect.addEventListener("change", async () => {
+        state.pageSize = Number(pageSizeSelect.value || 50);
+        await safeLoadData({ resetPage: true });
+      });
+
+      reloadBtn.addEventListener("click", async () => {
+        await safeLoadData({ resetPage: false });
+      });
+
+      prevPageBtn.addEventListener("click", async () => {
+        if (state.page <= 1) {
+          return;
+        }
+        state.page -= 1;
+        await safeLoadData({ resetPage: false });
+      });
+
+      nextPageBtn.addEventListener("click", async () => {
+        if (state.page >= state.totalPages) {
+          return;
+        }
+        state.page += 1;
+        await safeLoadData({ resetPage: false });
+      });
+
+      gotoBtn.addEventListener("click", async () => {
+        const targetPage = Number(gotoInput.value || 1);
+        if (!Number.isFinite(targetPage)) {
+          return;
+        }
+        state.page = Math.min(Math.max(1, targetPage), state.totalPages || 1);
+        await safeLoadData({ resetPage: false });
+      });
+
+      safeLoadData({ resetPage: true });
+    })();
+  </script>
+{% endblock %}
