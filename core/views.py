@@ -24,8 +24,9 @@ from django.utils import timezone
 
 from django.contrib.auth.models import User
 from django.db import DatabaseError, connections
-from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
+from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, TextField, Value, When
 from django.db.models.expressions import ExpressionWrapper
+from django.db.models.functions import Cast
 
 from .forms import RegisterForm, TipoPerfilCreateForm, UserCreateForm
 from .models import (
@@ -685,6 +686,7 @@ def planta_conectada(request):
     source_id = request.GET.get("source_id", "").strip()
     client_id = request.GET.get("client_id", "").strip()
     agent_id = request.GET.get("agent_id", "").strip()
+    payload_q = request.GET.get("payload_q", "").strip()
     if source:
         registros_qs = registros_qs.filter(source__icontains=source)
     if source_id:
@@ -693,6 +695,10 @@ def planta_conectada(request):
         registros_qs = registros_qs.filter(client_id__icontains=client_id)
     if agent_id:
         registros_qs = registros_qs.filter(agent_id__icontains=agent_id)
+    if payload_q:
+        registros_qs = registros_qs.annotate(payload_text=Cast("payload", output_field=TextField())).filter(
+            payload_text__icontains=payload_q
+        )
     registros_qs = registros_qs.order_by("-created_at")
     source_options = list(
         IngestRecord.objects.exclude(source="").values_list("source", flat=True).distinct().order_by("source")[:200]
@@ -717,6 +723,7 @@ def planta_conectada(request):
             "source_id": source_id,
             "client_id": client_id,
             "agent_id": agent_id,
+            "payload_q": payload_q,
         },
         "filter_options": {
             "source": source_options,

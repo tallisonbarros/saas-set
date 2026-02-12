@@ -85,6 +85,7 @@
           <option value="{{ option }}"></option>
         {% endfor %}
       </datalist>
+      <input class="field-input" style="min-width: 220px; max-width: 340px;" type="text" name="payload_q" placeholder="Conteudo do payload" value="{{ filters.payload_q }}">
       <div class="user-row" style="gap: 6px; align-items: center;">
         <button class="btn btn-primary" type="submit">Aplicar</button>
         <a class="btn btn-ghost" href="{% url 'ingest_gerenciar' %}">Limpar</a>
