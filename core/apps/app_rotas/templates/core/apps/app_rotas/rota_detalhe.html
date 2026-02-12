@@ -49,7 +49,7 @@
           <input type="hidden" name="at" value="{{ selected_at_iso }}">
           <div class="day-nav-capsule">
             {% if prev_day %}
-              <button class="day-arrow" type="submit" name="dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
+              <button class="day-arrow" type="submit" name="nav_dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
             {% else %}
               <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
             {% endif %}
@@ -63,7 +63,7 @@
               </select>
             </label>
             {% if next_day %}
-              <button class="day-arrow" type="submit" name="dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
+              <button class="day-arrow" type="submit" name="nav_dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
             {% else %}
               <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
             {% endif %}

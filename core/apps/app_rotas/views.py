@@ -597,7 +597,7 @@ def dashboard(request):
     if not config_missing:
         lifebit_connected, lifebit_last_seen = _lifebit_status(app)
     available_days = [] if config_missing else _available_days(app)
-    selected_day = _parse_query_date(request.GET.get("dia"))
+    selected_day = _parse_query_date(request.GET.get("nav_dia")) or _parse_query_date(request.GET.get("dia"))
     if not selected_day:
         today = timezone.localdate()
         selected_day = today if today in available_days else (available_days[0] if available_days else today)
@@ -608,15 +608,15 @@ def dashboard(request):
     events_today = []
     seed_states = {}
     day_prefixes = set()
+    known_prefixes = set()
     if not config_missing:
         today_records = _records_in_window(app, day_start, day_end_exclusive, MAX_DASHBOARD_RECORDS)
         events_today = _events_from_records(today_records)
         day_prefixes = {event["prefixo"] for event in events_today}
-        if day_prefixes:
-            baseline_records = _records_before(app, day_start, BASELINE_RECORDS_LIMIT)
-            baseline_events = _events_from_records(baseline_records)
-            baseline_events = [event for event in baseline_events if event["prefixo"] in day_prefixes]
-            seed_states = _seed_states_from_events(baseline_events)
+        baseline_records = _records_before(app, day_start, BASELINE_RECORDS_LIMIT)
+        baseline_events = _events_from_records(baseline_records)
+        seed_states = _seed_states_from_events(baseline_events)
+        known_prefixes = set(seed_states.keys()) | day_prefixes
 
     timeline = _build_timeline_with_events(day_start, timeline_end_point, events_today)
     selected_at = _parse_query_datetime(request.GET.get("at"))
@@ -641,7 +641,7 @@ def dashboard(request):
         origem_maps,
         destino_maps,
         initial_states=seed_states,
-        known_prefixes=day_prefixes,
+        known_prefixes=known_prefixes,
         route_configs=route_configs,
     )
     initial_ligada_prefixes = {
@@ -797,7 +797,7 @@ def rota_detalhe(request, prefixo):
             return redirect(f"{request.path}{suffix}")
 
     available_days = [] if config_missing else _available_days(app)
-    selected_day = _parse_query_date(request.GET.get("dia"))
+    selected_day = _parse_query_date(request.GET.get("nav_dia")) or _parse_query_date(request.GET.get("dia"))
     if not selected_day:
         today = timezone.localdate()
         selected_day = today if today in available_days else (available_days[0] if available_days else today)
