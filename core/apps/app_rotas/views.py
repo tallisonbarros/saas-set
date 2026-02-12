@@ -5,7 +5,6 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Q
-from django.db.models.functions import TruncDate
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -35,6 +34,8 @@ TIMELINE_STEP_MINUTES = 5
 AVAILABLE_DAYS_LIMIT = 45
 LIFEBIT_TAG_NAME = "LIFEBIT"
 LIFEBIT_TIMEOUT_SECONDS = 30
+PAYLOAD_WINDOW_MARGIN_DAYS = 1
+AVAILABLE_DAYS_SCAN_LIMIT = 40000
 
 
 def _get_rotas_app():
@@ -303,16 +304,21 @@ def _base_records_queryset(app):
 
 
 def _records_in_window(app, start, end_exclusive, limit):
+    margin = timedelta(days=PAYLOAD_WINDOW_MARGIN_DAYS)
+    lookup_start = start - margin
+    lookup_end = end_exclusive + margin
     qs = _base_records_queryset(app).filter(
-        Q(updated_at__gte=start, updated_at__lt=end_exclusive)
-        | Q(updated_at__isnull=True, created_at__gte=start, created_at__lt=end_exclusive)
+        Q(updated_at__gte=lookup_start, updated_at__lt=lookup_end)
+        | Q(updated_at__isnull=True, created_at__gte=lookup_start, created_at__lt=lookup_end)
     )
     return qs.only("source_id", "payload", "created_at", "updated_at").order_by("-updated_at", "-created_at")[:limit]
 
 
 def _records_before(app, cutoff, limit):
+    margin = timedelta(days=PAYLOAD_WINDOW_MARGIN_DAYS)
+    lookup_cutoff = cutoff + margin
     qs = _base_records_queryset(app).filter(
-        Q(updated_at__lt=cutoff) | Q(updated_at__isnull=True, created_at__lt=cutoff)
+        Q(updated_at__lt=lookup_cutoff) | Q(updated_at__isnull=True, created_at__lt=lookup_cutoff)
     )
     return qs.only("source_id", "payload", "created_at", "updated_at").order_by("-updated_at", "-created_at")[:limit]
 
@@ -334,9 +340,12 @@ def _lifebit_status(app):
     )
     if not record:
         return False, None
-    last_seen = record.updated_at or record.created_at
+    payload = record.payload if isinstance(record.payload, dict) else {}
+    last_seen = _extract_timestamp(payload, record)
     if not last_seen:
         return False, None
+    if timezone.is_naive(last_seen):
+        last_seen = timezone.make_aware(last_seen, timezone.get_current_timezone())
     now_local = timezone.localtime(timezone.now())
     last_seen_local = timezone.localtime(last_seen)
     delta = (now_local - last_seen_local).total_seconds()
@@ -484,15 +493,14 @@ def _build_route_cards(
 
 
 def _available_days(app):
-    days = list(
+    records = list(
         _base_records_queryset(app)
-        .exclude(updated_at__isnull=True)
-        .annotate(day=TruncDate("updated_at"))
-        .values_list("day", flat=True)
-        .distinct()
-        .order_by("-day")[:AVAILABLE_DAYS_LIMIT]
+        .only("payload", "created_at", "updated_at")
+        .order_by("-updated_at", "-created_at")[:AVAILABLE_DAYS_SCAN_LIMIT]
     )
-    return [day for day in days if day]
+    events = _events_from_records(records)
+    days = sorted({timezone.localtime(ev["timestamp"]).date() for ev in events if ev.get("timestamp")}, reverse=True)
+    return days[:AVAILABLE_DAYS_LIMIT]
 
 
 def _day_navigation(available_days, selected_day):
@@ -629,10 +637,10 @@ def dashboard(request):
     known_prefixes = set()
     if not config_missing:
         today_records = _records_in_window(app, day_start, day_end_exclusive, MAX_DASHBOARD_RECORDS)
-        events_today = _events_from_records(today_records)
+        events_today = _events_from_records(today_records, start=day_start, end_exclusive=day_end_exclusive)
         day_prefixes = {event["prefixo"] for event in events_today}
         baseline_records = _records_before(app, day_start, BASELINE_RECORDS_LIMIT)
-        baseline_events = _events_from_records(baseline_records)
+        baseline_events = _events_from_records(baseline_records, end_exclusive=day_start)
         seed_states = _seed_states_from_events(baseline_events)
         known_prefixes = set(seed_states.keys()) | day_prefixes
 
@@ -827,10 +835,10 @@ def rota_detalhe(request, prefixo):
     baseline_seed = {}
     if not config_missing:
         records_today = _records_in_window(app, day_start, day_end_exclusive, MAX_ROUTE_RECORDS)
-        day_events = _events_from_records(records_today, prefix=prefix_norm)
+        day_events = _events_from_records(records_today, start=day_start, end_exclusive=day_end_exclusive, prefix=prefix_norm)
 
         records_before = _records_before(app, day_start, BASELINE_RECORDS_LIMIT)
-        baseline_events = _events_from_records(records_before, prefix=prefix_norm)
+        baseline_events = _events_from_records(records_before, end_exclusive=day_start, prefix=prefix_norm)
         baseline_seed = _seed_states_from_events(baseline_events)
 
     timeline = _build_timeline_with_events(day_start, timeline_end_point, day_events)
