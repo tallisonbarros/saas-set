@@ -16,6 +16,7 @@
           <span class="status-chip {% if rota.play_blink %}is-blink{% elif rota.play_on %}is-active{% endif %}">Play</span>
           <span class="status-chip {% if rota.pause_on %}is-active pause{% endif %}">Pause</span>
         </div>
+        <div class="muted rota-context-status">{{ rota.context_status }}</div>
         {% if not lifebit_connected %}
           <div class="rota-comm-overlay" aria-hidden="true">
             <span class="rota-comm-icon">⛓</span>

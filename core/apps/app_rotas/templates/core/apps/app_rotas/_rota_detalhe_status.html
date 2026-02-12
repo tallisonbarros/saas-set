@@ -4,4 +4,5 @@
     <span class="status-chip {% if status.play_blink %}is-blink{% elif status.play_on %}is-active{% endif %}">Play</span>
     <span class="status-chip {% if status.pause_on %}is-active pause{% endif %}">Pause</span>
   </div>
+  <div class="muted rota-context-status">{{ status.context_label }}</div>
 </div>

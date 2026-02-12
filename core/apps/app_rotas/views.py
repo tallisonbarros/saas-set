@@ -115,6 +115,23 @@ def _value_to_int(value):
         return None
 
 
+def _binary_state(value):
+    if value is None:
+        return None
+    return 1 if _is_active(value) else 0
+
+
+def _context_status_label(ligar_value, desligar_value, ligada_value):
+    key = (_binary_state(ligar_value), _binary_state(desligar_value), _binary_state(ligada_value))
+    mapping = {
+        (0, 0, 0): "Linha parada",
+        (1, 0, 0): "Linha ligando",
+        (1, 0, 1): "Linha ligada",
+        (1, 1, 0): "Linha desligando",
+    }
+    return mapping.get(key, "Estado indefinido")
+
+
 def _extract_tag(payload):
     for key in TAG_KEYS:
         value = payload.get(key)
@@ -432,6 +449,7 @@ def _build_route_cards(
                 "play_blink": play_blink,
                 "play_on": play_on,
                 "pause_on": pause_on,
+                "context_status": _context_status_label(attrs.get("LIGAR"), attrs.get("DESLIGAR"), attrs.get("LIGADA")),
                 "is_inactive": is_inactive,
                 "last_update": state["last_update"],
                 "last_update_display": (
@@ -825,6 +843,7 @@ def rota_detalhe(request, prefixo):
         "play_blink": ligar_on and not ligada_on and not desligar_on,
         "play_on": ligar_on and ligada_on and not desligar_on,
         "pause_on": desligar_on,
+        "context_label": _context_status_label(attrs.get("LIGAR"), attrs.get("DESLIGAR"), attrs.get("LIGADA")),
     }
 
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
