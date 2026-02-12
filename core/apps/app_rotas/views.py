@@ -152,12 +152,19 @@ def _extract_timestamp(payload, record):
         raw = payload.get(key)
         if not raw:
             continue
-        parsed = parse_datetime(str(raw).strip())
+        raw_text = str(raw).strip()
+        parsed = parse_datetime(raw_text)
         if not parsed:
             continue
         if timezone.is_naive(parsed):
             if key == "TimestampUtc":
-                return parsed.replace(tzinfo=dt_timezone.utc)
+                # Some agents send TimestampUtc without timezone suffix.
+                # Only force UTC when timezone is explicit in the raw value.
+                upper = raw_text.upper()
+                has_explicit_tz = upper.endswith("Z") or "+" in raw_text[10:] or "-" in raw_text[10:]
+                if has_explicit_tz:
+                    return parsed.replace(tzinfo=dt_timezone.utc)
+                return timezone.make_aware(parsed, timezone.get_current_timezone())
             return timezone.make_aware(parsed, timezone.get_current_timezone())
         return parsed
     return record.updated_at or record.created_at

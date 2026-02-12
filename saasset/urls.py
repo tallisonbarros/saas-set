@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/ingest/rules', views.api_ingest_rules, name="api_ingest_rules"),
     path('painel/', views.painel, name="painel"),
     path('ingest-gerenciar/', views.planta_conectada, name="ingest_gerenciar"),
+    path('ingest-gerenciar/limpar/', views.ingest_limpar, name="ingest_limpar"),
     path('ingest-gerenciar/erros/', views.ingest_error_logs, name="ingest_erros"),
     path('ingest-gerenciar/erros/<int:pk>/', views.ingest_error_detail, name="ingest_erro_detail"),
     path('ingest-gerenciar/<int:pk>/', views.ingest_detail, name="ingest_detail"),

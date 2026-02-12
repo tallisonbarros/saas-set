@@ -635,8 +635,7 @@ def planta_conectada(request):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "clear_ingest":
-            IngestRecord.objects.all().delete()
-            return redirect("planta_conectada")
+            return redirect("ingest_limpar")
         if action == "reprocess_ingest_errors":
             rules_by_source = {
                 rule.source.strip().lower(): (rule.required_fields or [])
@@ -735,6 +734,71 @@ def planta_conectada(request):
     if _is_partial_request(request):
         return render(request, "core/partials/ingest_records_list.html", context)
     return render(request, "core/ingest_gerenciar.html", context)
+
+
+@login_required
+def ingest_limpar(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Sem permissao.")
+
+    message = None
+    message_level = "info"
+    removed_count = None
+    selected = {
+        "client_id": (request.POST.get("client_id") if request.method == "POST" else request.GET.get("client_id") or "").strip(),
+        "agent_id": (request.POST.get("agent_id") if request.method == "POST" else request.GET.get("agent_id") or "").strip(),
+        "source": (request.POST.get("source") if request.method == "POST" else request.GET.get("source") or "").strip(),
+    }
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "delete_filtered_ingest":
+            if not selected["client_id"] or not selected["agent_id"] or not selected["source"]:
+                message = "Informe client_id, agent_id e source para limpar."
+                message_level = "error"
+            else:
+                qs = IngestRecord.objects.filter(
+                    client_id=selected["client_id"],
+                    agent_id=selected["agent_id"],
+                    source=selected["source"],
+                )
+                removed_count, _ = qs.delete()
+                message = f"{removed_count} registro(s) removido(s) para o filtro informado."
+                message_level = "success"
+
+    preview_qs = IngestRecord.objects.all()
+    if selected["client_id"]:
+        preview_qs = preview_qs.filter(client_id=selected["client_id"])
+    if selected["agent_id"]:
+        preview_qs = preview_qs.filter(agent_id=selected["agent_id"])
+    if selected["source"]:
+        preview_qs = preview_qs.filter(source=selected["source"])
+    preview_count = preview_qs.count() if any(selected.values()) else 0
+
+    client_id_options = list(
+        IngestRecord.objects.exclude(client_id="").values_list("client_id", flat=True).distinct().order_by("client_id")[:400]
+    )
+    agent_id_options = list(
+        IngestRecord.objects.exclude(agent_id="").values_list("agent_id", flat=True).distinct().order_by("agent_id")[:400]
+    )
+    source_options = list(
+        IngestRecord.objects.exclude(source="").values_list("source", flat=True).distinct().order_by("source")[:400]
+    )
+
+    return render(
+        request,
+        "core/ingest_limpar.html",
+        {
+            "message": message,
+            "message_level": message_level,
+            "removed_count": removed_count,
+            "selected": selected,
+            "preview_count": preview_count,
+            "client_id_options": client_id_options,
+            "agent_id_options": agent_id_options,
+            "source_options": source_options,
+        },
+    )
 
 
 @login_required

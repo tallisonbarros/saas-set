@@ -1,0 +1,82 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}INGEST_LIMPAR{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'ingest_gerenciar' %}">INGEST_GERENCIAR</a>
+    <span class="crumb-sep">/</span>
+    <span>LIMPAR</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">INGEST_LIMPAR</div>
+        <div class="hud-pill">Administracao</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'ingest_gerenciar' %}">Voltar</a>
+          <a class="hud-menu-pill" href="{% url 'ingest_erros' %}">Erros de ingest</a>
+          <a class="hud-menu-pill" href="{% url 'ingest_sources' %}">Sources</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Limpeza segmentada de registros</h1>
+          <p class="page-subtitle">Remove somente o conjunto de registros que casar exatamente com client_id + agent_id + source.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if message %}
+    <section class="card">
+      <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
+    </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="page-hud-head">
+      <div>
+        <h2 class="page-title">Filtro de limpeza</h2>
+        <p class="page-subtitle">Preencha os 3 campos para habilitar a exclusao.</p>
+      </div>
+    </div>
+    <form method="post" class="stack" onsubmit="return confirm('Confirmar exclusao apenas para esse filtro?');">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_filtered_ingest">
+      <div class="user-row" style="gap: 10px; flex-wrap: wrap;">
+        <input class="field-input" style="min-width: 180px; max-width: 260px;" type="text" name="client_id" list="client-id-options" placeholder="Client ID" value="{{ selected.client_id }}" required>
+        <datalist id="client-id-options">
+          {% for option in client_id_options %}
+            <option value="{{ option }}"></option>
+          {% endfor %}
+        </datalist>
+        <input class="field-input" style="min-width: 180px; max-width: 260px;" type="text" name="agent_id" list="agent-id-options" placeholder="Agent ID" value="{{ selected.agent_id }}" required>
+        <datalist id="agent-id-options">
+          {% for option in agent_id_options %}
+            <option value="{{ option }}"></option>
+          {% endfor %}
+        </datalist>
+        <input class="field-input" style="min-width: 180px; max-width: 260px;" type="text" name="source" list="source-options" placeholder="Source" value="{{ selected.source }}" required>
+        <datalist id="source-options">
+          {% for option in source_options %}
+            <option value="{{ option }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-primary" type="submit">Limpar somente filtro informado</button>
+        <a class="btn btn-ghost" href="{% url 'ingest_limpar' %}">Limpar campos</a>
+      </div>
+    </form>
+    <div class="muted" style="margin-top: 10px;">
+      Registros que seriam afetados com os filtros atuais: <strong>{{ preview_count }}</strong>
+    </div>
+  </section>
+{% endblock %}
