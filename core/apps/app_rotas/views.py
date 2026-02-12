@@ -1224,6 +1224,7 @@ def dados(request):
                 payload_ts = timezone.make_aware(payload_ts, timezone.get_current_timezone())
             rows.append(
                 {
+                    "id": rec.id,
                     "ingest_timestamp_display": timezone.localtime(ingest_ts).strftime("%d/%m/%Y %H:%M:%S") if ingest_ts else "-",
                     "payload_timestamp_display": (
                         timezone.localtime(payload_ts).strftime("%d/%m/%Y %H:%M:%S") if payload_ts else "-"
@@ -1257,6 +1258,27 @@ def dados(request):
                 "prefixo": prefixo_q,
                 "atributo": atributo_q,
             },
+        },
+    )
+
+
+@login_required
+def dados_registro(request, pk):
+    app = _get_rotas_app()
+    if not _has_access(request.user, app):
+        return HttpResponseForbidden("Sem permissao.")
+
+    record = get_object_or_404(IngestRecord, pk=pk)
+    if record.client_id != app.ingest_client_id or record.agent_id != app.ingest_agent_id:
+        return HttpResponseForbidden("Registro fora do escopo do app.")
+
+    return render(
+        request,
+        "core/apps/app_rotas/dados_registro.html",
+        {
+            "app": app,
+            "registro": record,
+            "payload": record.payload if isinstance(record.payload, dict) else {},
         },
     )
 

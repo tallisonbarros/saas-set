@@ -1,0 +1,48 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ app.nome }} - Payload{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_rotas_dashboard' %}">{{ app.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_rotas_dados' %}">Dados</a>
+    <span class="crumb-sep">/</span>
+    <span>Payload</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card app-accent" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">{{ app.nome }}</div>
+        <div class="hud-pill">Payload</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'app_rotas_dados' %}">Voltar para Dados</a>
+          <a class="hud-menu-pill" href="{% url 'app_rotas_dashboard' %}">Dashboard</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">{{ registro.source_id }}</h1>
+          <p class="page-subtitle">Source {{ registro.source|default:"-" }} - Cliente {{ registro.client_id|default:"-" }} - Agente {{ registro.agent_id|default:"-" }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <details class="io-discrete" open>
+      <summary class="io-discrete-summary">
+        <span class="io-title">Payload bruto</span>
+        <span class="muted">JSON recebido da ingest</span>
+      </summary>
+      <div class="io-discrete-body">
+        <pre style="white-space: pre-wrap; margin: 0;">{{ payload|pprint }}</pre>
+      </div>
+    </details>
+  </section>
+{% endblock %}

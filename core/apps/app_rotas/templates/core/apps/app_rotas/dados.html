@@ -117,6 +117,7 @@
               <th>Valor</th>
               <th>Prefixo</th>
               <th>Atributo</th>
+              <th>Acoes</th>
             </tr>
           </thead>
           <tbody>
@@ -130,10 +131,11 @@
                 <td>{{ row.value|default:"-" }}</td>
                 <td>{{ row.prefixo }}</td>
                 <td>{{ row.atributo }}</td>
+                <td><a class="btn btn-ghost" href="{% url 'app_rotas_dados_registro' row.id %}">Payload</a></td>
               </tr>
             {% empty %}
               <tr>
-                <td colspan="8" class="muted">Sem registros para os filtros do app.</td>
+                <td colspan="9" class="muted">Sem registros para os filtros do app.</td>
               </tr>
             {% endfor %}
           </tbody>
