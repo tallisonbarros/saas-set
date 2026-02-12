@@ -5415,9 +5415,23 @@ def admin_db_table_data(request):
         payload_keys = _admin_db_ingest_payload_keys(table_name, max_keys=120)
         virtual_columns = ["client", *[f"payload.{key}" for key in payload_keys]]
     columns = [*base_columns, *virtual_columns]
+    qn = connections["default"].ops.quote_name
 
-    if sort_by not in columns:
-        sort_by = "id" if "id" in columns else columns[0]
+    recent_sort_sql = ""
+    if "updated_at" in base_columns and "created_at" in base_columns:
+        recent_sort_sql = f"COALESCE({qn('updated_at')}, {qn('created_at')})"
+    elif "updated_at" in base_columns:
+        recent_sort_sql = qn("updated_at")
+    elif "created_at" in base_columns:
+        recent_sort_sql = qn("created_at")
+    elif "id" in base_columns:
+        recent_sort_sql = qn("id")
+
+    allowed_sort_columns = set(columns)
+    if recent_sort_sql:
+        allowed_sort_columns.add("__recent__")
+    if sort_by not in allowed_sort_columns:
+        sort_by = "__recent__" if recent_sort_sql else ("id" if "id" in columns else columns[0])
 
     raw_filters = request.GET.get("filters", "").strip()
     parsed_filters = {}
@@ -5431,9 +5445,10 @@ def admin_db_table_data(request):
 
     where_parts = []
     where_params = []
-    qn = connections["default"].ops.quote_name
 
     def resolve_column_sql(col_name):
+        if col_name == "__recent__" and recent_sort_sql:
+            return recent_sort_sql, []
         if col_name in base_columns:
             return qn(col_name), []
         if is_ingest_record and col_name == "client":

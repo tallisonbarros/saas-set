@@ -1,0 +1,153 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ app.nome }} - Dados{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'app_rotas_dashboard' %}">{{ app.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>Dados</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card app-accent" {% if app.theme_color %}style="--app-accent: {{ app.theme_color }};"{% endif %}>
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">{{ app.nome }}</div>
+        <div class="hud-pill">Dados</div>
+        <div class="hud-menu" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'app_rotas_dashboard' %}">Dashboard</a>
+          <a class="hud-menu-pill" href="{% url 'app_rotas_conexao' %}">Conexao</a>
+          <a class="hud-menu-pill" href="{% url 'app_rotas_mapeamentos' %}">Mapeamentos</a>
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div>
+          <h1 class="page-title">Dados brutos do app</h1>
+          <p class="page-subtitle">Consulta filtrada somente por client_id e agent_id do cadastro do app.</p>
+        </div>
+      </div>
+      <div class="hud-meta">
+        Client {{ app.ingest_client_id|default:"-" }} - Agent {{ app.ingest_agent_id|default:"-" }}{% if app.ingest_source %} - Source configurado {{ app.ingest_source }}{% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% if config_missing %}
+    <section class="card">
+      <p class="notice notice-error">Configure ingest_client_id e ingest_agent_id no app para visualizar os dados.</p>
+    </section>
+  {% else %}
+    <section class="card">
+      <div class="table-wrap">
+        <table class="table">
+          <tbody>
+            <tr>
+              <th>Total por client+agent</th>
+              <td>{{ total_client_agent }}</td>
+            </tr>
+            <tr>
+              <th>Total com source do app aplicado</th>
+              <td>{{ total_with_source }}</td>
+            </tr>
+            <tr>
+              <th>Amostra parseada (cards)</th>
+              <td>{{ sample_parse_ok }} de {{ sample_size }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="io-card-head">
+        <h2 class="io-title">Registros (client+agent)</h2>
+      </div>
+      <form method="get" class="io-form">
+        <div class="io-form-grid">
+          <label class="field">
+            <span>Source</span>
+            <input type="text" name="source" value="{{ filters.source }}">
+          </label>
+          <label class="field">
+            <span>Source ID</span>
+            <input type="text" name="source_id" value="{{ filters.source_id }}">
+          </label>
+          <label class="field">
+            <span>Tag</span>
+            <input type="text" name="tag" value="{{ filters.tag }}">
+          </label>
+          <label class="field">
+            <span>Valor</span>
+            <input type="text" name="valor" value="{{ filters.valor }}">
+          </label>
+          <label class="field">
+            <span>Prefixo</span>
+            <input type="text" name="prefixo" value="{{ filters.prefixo }}">
+          </label>
+          <label class="field">
+            <span>Atributo</span>
+            <select name="atributo">
+              <option value="" {% if not filters.atributo %}selected{% endif %}>Todos</option>
+              <option value="LIGAR" {% if filters.atributo == "LIGAR" %}selected{% endif %}>LIGAR</option>
+              <option value="DESLIGAR" {% if filters.atributo == "DESLIGAR" %}selected{% endif %}>DESLIGAR</option>
+              <option value="LIGADA" {% if filters.atributo == "LIGADA" %}selected{% endif %}>LIGADA</option>
+              <option value="ORIGEM" {% if filters.atributo == "ORIGEM" %}selected{% endif %}>ORIGEM</option>
+              <option value="DESTINO" {% if filters.atributo == "DESTINO" %}selected{% endif %}>DESTINO</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Filtrar</button>
+          <a class="btn btn-ghost" href="{% url 'app_rotas_dados' %}">Limpar</a>
+        </div>
+      </form>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Source</th>
+              <th>Source ID</th>
+              <th>Tag</th>
+              <th>Valor</th>
+              <th>Prefixo</th>
+              <th>Atributo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>{{ row.timestamp_display }}</td>
+                <td>{{ row.source|default:"-" }}</td>
+                <td>{{ row.source_id|default:"-" }}</td>
+                <td>{{ row.tag|default:"-" }}</td>
+                <td>{{ row.value|default:"-" }}</td>
+                <td>{{ row.prefixo }}</td>
+                <td>{{ row.atributo }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="muted">Sem registros para os filtros do app.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <div class="page-actions" style="margin-top: 10px;">
+          {% if page_obj.has_previous %}
+            <a class="btn btn-ghost" href="?page={{ page_obj.previous_page_number }}&source={{ filters.source|urlencode }}&source_id={{ filters.source_id|urlencode }}&tag={{ filters.tag|urlencode }}&valor={{ filters.valor|urlencode }}&prefixo={{ filters.prefixo|urlencode }}&atributo={{ filters.atributo|urlencode }}">Anterior</a>
+          {% endif %}
+          <span class="panel-tag">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+            <a class="btn btn-ghost" href="?page={{ page_obj.next_page_number }}&source={{ filters.source|urlencode }}&source_id={{ filters.source_id|urlencode }}&tag={{ filters.tag|urlencode }}&valor={{ filters.valor|urlencode }}&prefixo={{ filters.prefixo|urlencode }}&atributo={{ filters.atributo|urlencode }}">Proxima</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

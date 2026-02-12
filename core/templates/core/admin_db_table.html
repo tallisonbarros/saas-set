@@ -56,6 +56,9 @@
           </select>
         </label>
         <button type="button" class="btn btn-ghost" id="columnsBtn">Colunas</button>
+        <button type="button" class="btn btn-ghost" id="recentDescBtn">Mais recente</button>
+        <button type="button" class="btn btn-ghost" id="recentAscBtn">Mais antigo</button>
+        <button type="button" class="btn btn-ghost" id="exportTxtBtn">Exportar TXT</button>
         <button type="button" class="btn btn-primary" id="reloadBtn">Atualizar</button>
       </div>
 
@@ -359,11 +362,14 @@
       const tableSelect = document.getElementById("tableSelect");
       const pageSizeSelect = document.getElementById("pageSizeSelect");
       const columnsBtn = document.getElementById("columnsBtn");
+      const recentDescBtn = document.getElementById("recentDescBtn");
+      const recentAscBtn = document.getElementById("recentAscBtn");
       const columnsPanel = document.getElementById("columnsPanel");
       const columnsList = document.getElementById("columnsList");
       const showAllColsBtn = document.getElementById("showAllColsBtn");
       const hideAllColsBtn = document.getElementById("hideAllColsBtn");
       const reloadBtn = document.getElementById("reloadBtn");
+      const exportTxtBtn = document.getElementById("exportTxtBtn");
       const prevPageBtn = document.getElementById("prevPageBtn");
       const nextPageBtn = document.getElementById("nextPageBtn");
       const gotoInput = document.getElementById("gotoInput");
@@ -378,8 +384,8 @@
         table: tableSelect.value,
         page: 1,
         pageSize: Number(pageSizeSelect.value || 50),
-        sortBy: "",
-        sortDir: "asc",
+        sortBy: "__recent__",
+        sortDir: "desc",
         totalRows: 0,
         totalPages: 1,
         columns: [],
@@ -489,7 +495,10 @@
 
       function renderStatus() {
         const filteredCount = Object.keys(sanitizeFilters()).length;
-        tableStatus.textContent = `${state.totalRows} linhas na tabela ${state.table}`;
+        const sortLabel = state.sortBy === "__recent__"
+          ? (state.sortDir === "desc" ? "mais recente" : "mais antigo")
+          : `${state.sortBy} ${state.sortDir}`.trim();
+        tableStatus.textContent = `${state.totalRows} linhas na tabela ${state.table} (ordenacao: ${sortLabel})`;
         filterStatus.textContent = filteredCount ? `${filteredCount} coluna(s) com filtro ativo` : "Sem filtros ativos";
         pageInfo.textContent = `Pagina ${state.page}/${state.totalPages}`;
         gotoInput.value = String(state.page);
@@ -604,6 +613,58 @@
           .replace(/>/g, "&gt;")
           .replace(/\"/g, "&quot;")
           .replace(/'/g, "&#039;");
+      }
+
+      function buildTxtExport() {
+        const visible = state.columns.filter((column) => isColumnVisible(column));
+        if (!visible.length) {
+          return "";
+        }
+        const rows = state.rows || [];
+        const stringRows = rows.map((row) => visible.map((col) => formatCellValue(row[col])));
+        const headers = visible.slice();
+        const colWidths = headers.map((header, colIndex) => {
+          let width = String(header).length;
+          stringRows.forEach((rowValues) => {
+            width = Math.max(width, String(rowValues[colIndex] || "").length);
+          });
+          return Math.min(width, 80);
+        });
+
+        const formatRow = (values) =>
+          values
+            .map((value, idx) => {
+              const raw = String(value == null ? "" : value).replace(/\r?\n/g, " ");
+              const trimmed = raw.length > colWidths[idx] ? raw.slice(0, colWidths[idx] - 1) + "…" : raw;
+              return trimmed.padEnd(colWidths[idx], " ");
+            })
+            .join(" | ");
+
+        const headerLine = formatRow(headers);
+        const separator = colWidths.map((w) => "-".repeat(w)).join("-+-");
+        const bodyLines = stringRows.map((values) => formatRow(values));
+        const metaLines = [
+          `Tabela: ${state.table}`,
+          `Pagina: ${state.page}/${state.totalPages}`,
+          `Linhas na pagina: ${rows.length}`,
+          `Linhas totais filtradas: ${state.totalRows}`,
+          `Ordenacao: ${state.sortBy === "__recent__" ? (state.sortDir === "desc" ? "mais recente" : "mais antigo") : `${state.sortBy || "-"} ${state.sortDir || ""}`.trim()}`,
+          `Exportado em: ${new Date().toLocaleString("pt-BR")}`,
+          "",
+        ];
+        return [...metaLines, headerLine, separator, ...bodyLines].join("\n");
+      }
+
+      function downloadTxt(content, filename) {
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
       }
 
       async function fetchColumnValues(columnName, searchTerm) {
@@ -832,8 +893,8 @@
       tableSelect.addEventListener("change", async () => {
         state.table = tableSelect.value;
         state.page = 1;
-        state.sortBy = "";
-        state.sortDir = "asc";
+        state.sortBy = "__recent__";
+        state.sortDir = "desc";
         state.filters = {};
         await safeLoadData({ resetPage: true });
       });
@@ -845,6 +906,29 @@
 
       reloadBtn.addEventListener("click", async () => {
         await safeLoadData({ resetPage: false });
+      });
+
+      exportTxtBtn.addEventListener("click", () => {
+        const content = buildTxtExport();
+        if (!content) {
+          tableStatus.textContent = "Nada para exportar: selecione ao menos uma coluna visivel.";
+          return;
+        }
+        const safeTable = (state.table || "tabela").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `${safeTable}_pagina-${state.page}.txt`;
+        downloadTxt(content, filename);
+      });
+
+      recentDescBtn.addEventListener("click", async () => {
+        state.sortBy = "__recent__";
+        state.sortDir = "desc";
+        await safeLoadData({ resetPage: true });
+      });
+
+      recentAscBtn.addEventListener("click", async () => {
+        state.sortBy = "__recent__";
+        state.sortDir = "asc";
+        await safeLoadData({ resetPage: true });
       });
 
       prevPageBtn.addEventListener("click", async () => {

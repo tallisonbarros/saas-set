@@ -1133,6 +1133,118 @@ def conexao(request):
 
 
 @login_required
+def dados(request):
+    app = _get_rotas_app()
+    if not _has_access(request.user, app):
+        return HttpResponseForbidden("Sem permissao.")
+
+    config_missing = not app.ingest_client_id or not app.ingest_agent_id
+    base_qs = IngestRecord.objects.none()
+    total_client_agent = 0
+    total_with_source = 0
+    sample_size = 0
+    sample_parse_ok = 0
+    page_obj = None
+    rows = []
+    source_q = (request.GET.get("source") or "").strip()
+    source_id_q = (request.GET.get("source_id") or "").strip()
+    tag_q = (request.GET.get("tag") or "").strip()
+    valor_q = (request.GET.get("valor") or "").strip()
+    prefixo_q = (request.GET.get("prefixo") or "").strip().upper()
+    atributo_q = (request.GET.get("atributo") or "").strip().upper()
+
+    if not config_missing:
+        base_qs = IngestRecord.objects.filter(
+            client_id=app.ingest_client_id,
+            agent_id=app.ingest_agent_id,
+        ).order_by("-updated_at", "-created_at")
+        filtered_qs = base_qs
+        if source_q:
+            filtered_qs = filtered_qs.filter(source__icontains=source_q)
+        if source_id_q:
+            filtered_qs = filtered_qs.filter(source_id__icontains=source_id_q)
+        if tag_q:
+            tag_lookup = Q()
+            for key in TAG_KEYS:
+                tag_lookup |= Q(**{f"payload__{key}__icontains": tag_q})
+            filtered_qs = filtered_qs.filter(tag_lookup)
+        if valor_q:
+            value_lookup = Q()
+            for key in VALUE_KEYS:
+                value_lookup |= Q(**{f"payload__{key}__icontains": valor_q})
+            filtered_qs = filtered_qs.filter(value_lookup)
+        if prefixo_q:
+            prefix_lookup = Q()
+            for key in TAG_KEYS:
+                prefix_lookup |= Q(**{f"payload__{key}__istartswith": f"{prefixo_q}_"})
+            filtered_qs = filtered_qs.filter(prefix_lookup)
+        if atributo_q in {"LIGAR", "DESLIGAR", "LIGADA", "ORIGEM", "DESTINO"}:
+            if atributo_q == "DESTINO":
+                suffixes = ["_DESTINO", "_DESTIN"]
+            else:
+                suffixes = [f"_{atributo_q}"]
+            attr_lookup = Q()
+            for key in TAG_KEYS:
+                for suffix in suffixes:
+                    attr_lookup |= Q(**{f"payload__{key}__iendswith": suffix})
+            filtered_qs = filtered_qs.filter(attr_lookup)
+
+        total_client_agent = base_qs.count()
+        if app.ingest_source:
+            total_with_source = base_qs.filter(source=app.ingest_source).count()
+        else:
+            total_with_source = total_client_agent
+
+        sample_records = list(filtered_qs.only("payload", "created_at", "updated_at", "source", "source_id")[:1200])
+        sample_size = len(sample_records)
+        for rec in sample_records:
+            if _build_event(rec):
+                sample_parse_ok += 1
+
+        paginator = Paginator(filtered_qs.only("payload", "created_at", "updated_at", "source", "source_id"), 50)
+        page_obj = paginator.get_page(request.GET.get("page", "1"))
+
+        for rec in page_obj.object_list:
+            payload = rec.payload if isinstance(rec.payload, dict) else {}
+            event = _build_event(rec)
+            timestamp = rec.updated_at or rec.created_at
+            rows.append(
+                {
+                    "timestamp_display": timezone.localtime(timestamp).strftime("%d/%m/%Y %H:%M:%S") if timestamp else "-",
+                    "source": rec.source,
+                    "source_id": rec.source_id,
+                    "tag": _extract_tag(payload),
+                    "value": payload.get("Value", payload.get("value", payload.get("valor", payload.get("status", "-")))),
+                    "prefixo": event["prefixo"] if event else "-",
+                    "atributo": event["atributo"] if event else "-",
+                }
+            )
+
+    return render(
+        request,
+        "core/apps/app_rotas/dados.html",
+        {
+            "app": app,
+            "config_missing": config_missing,
+            "total_client_agent": total_client_agent,
+            "total_with_source": total_with_source,
+            "sample_size": sample_size,
+            "sample_parse_ok": sample_parse_ok,
+            "page_obj": page_obj,
+            "rows": rows,
+            "filters": {
+                "source": source_q,
+                "source_id": source_id_q,
+                "tag": tag_q,
+                "valor": valor_q,
+                "prefixo": prefixo_q,
+                "atributo": atributo_q,
+            },
+        },
+    )
+
+
+@login_required
 def ordenar_rotas(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "method_not_allowed"}, status=405)
