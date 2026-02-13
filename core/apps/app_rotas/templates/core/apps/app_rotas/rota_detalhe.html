@@ -60,10 +60,6 @@
                 name="dia"
                 value="{{ selected_day|date:'Y-m-d' }}"
                 data-available-days="{% for day in available_days %}{{ day|date:'Y-m-d' }}{% if not forloop.last %},{% endif %}{% endfor %}"
-                {% if available_days %}
-                min="{{ available_days|last|date:'Y-m-d' }}"
-                max="{{ available_days.0|date:'Y-m-d' }}"
-                {% endif %}
               >
             </label>
             {% if next_day %}
@@ -169,6 +165,7 @@
     .day-nav-form { display: flex; justify-content: center; }
     .day-nav-form.in-section { margin-left: auto; align-self: flex-start; }
     .day-nav-capsule {
+      position: relative;
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -176,6 +173,25 @@
       background: linear-gradient(180deg, rgba(31, 41, 55, 0.42), rgba(17, 24, 39, 0.42));
       border-radius: 999px;
       padding: 8px;
+      transition: filter .15s ease, opacity .15s ease;
+    }
+    .day-nav-capsule.is-loading {
+      filter: blur(1px);
+      opacity: .82;
+    }
+    .day-nav-capsule.is-loading::after {
+      content: "";
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 2px solid rgba(148, 163, 184, 0.9);
+      border-top-color: #e2e8f0;
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.8);
+      animation: cardClockTick 1s linear infinite;
+      pointer-events: none;
     }
     .day-picker-field { min-width: 170px; margin: 0; cursor: pointer; }
     .day-picker-field input {
@@ -399,6 +415,8 @@
       var timeline = {{ timeline_json|safe }};
       var range = document.getElementById("timeline-range");
       var atField = document.getElementById("timeline-at");
+      var dayForm = document.getElementById("day-nav-form");
+      var dayNavCapsule = document.querySelector("#day-nav-form .day-nav-capsule");
       var readLabel = document.getElementById("timeline-read-label");
       var selectedAtLabels = document.querySelectorAll(".detail-selected-at");
       var backNow = document.getElementById("timeline-back-now");
@@ -474,6 +492,18 @@
         var resolvedDay = resolveClosestDay(nextDay);
         if (!resolvedDay || resolvedDay === timelineDay) {
           return;
+        }
+        if (dayNavCapsule) {
+          dayNavCapsule.classList.add("is-loading");
+        }
+        if (daySelect) {
+          daySelect.disabled = true;
+        }
+        if (dayPrevButton) {
+          dayPrevButton.disabled = true;
+        }
+        if (dayNextButton) {
+          dayNextButton.disabled = true;
         }
         daySelect.value = resolvedDay;
         var params = new URLSearchParams(window.location.search);
@@ -620,22 +650,60 @@
       }
 
       if (daySelect) {
+        function shouldOpenFromDayCapsule(eventTarget) {
+          if (!eventTarget) {
+            return false;
+          }
+          if (eventTarget === daySelect) {
+            return false;
+          }
+          if (eventTarget.closest && eventTarget.closest("#day-prev-button, #day-next-button")) {
+            return false;
+          }
+          return true;
+        }
+
+        if (dayNavCapsule) {
+          dayNavCapsule.addEventListener("pointerdown", function (event) {
+            if (!shouldOpenFromDayCapsule(event.target)) {
+              return;
+            }
+            openDayPicker();
+          });
+          dayNavCapsule.addEventListener("click", function (event) {
+            if (!shouldOpenFromDayCapsule(event.target)) {
+              return;
+            }
+            openDayPicker();
+          });
+        }
+
         var dayPickerField = daySelect.closest(".day-picker-field");
         if (dayPickerField) {
           dayPickerField.addEventListener("pointerdown", function (event) {
-            if (event.target === daySelect) {
+            if (!shouldOpenFromDayCapsule(event.target)) {
               return;
             }
             openDayPicker();
           });
           dayPickerField.addEventListener("click", function (event) {
-            if (event.target === daySelect) {
+            if (!shouldOpenFromDayCapsule(event.target)) {
               return;
             }
             openDayPicker();
           });
         }
         daySelect.addEventListener("change", function () {
+          goToDay(daySelect.value);
+        });
+      }
+
+      if (dayForm) {
+        dayForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          if (!daySelect || !daySelect.value) {
+            return;
+          }
           goToDay(daySelect.value);
         });
       }

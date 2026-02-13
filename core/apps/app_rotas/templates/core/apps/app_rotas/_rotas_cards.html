@@ -4,23 +4,25 @@
       <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %} {% if not lifebit_connected %}is-comm-down{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?dia={{ selected_day|date:'Y-m-d' }}&at={{ selected_at_iso }}" data-prefix="{{ rota.prefixo }}" draggable="true">
         <div class="panel-card-top">
           <div>
-            <div class="panel-title">{{ rota.titulo }}</div>
+            <div class="panel-title" data-role="title">{{ rota.titulo }}</div>
             {% if rota.nome_exibicao %}
-              <div class="muted rota-prefix">{{ rota.prefixo }}</div>
+              <div class="muted rota-prefix" data-role="prefix">{{ rota.prefixo }}</div>
+            {% else %}
+              <div class="muted rota-prefix" data-role="prefix" style="display: none;">{{ rota.prefixo }}</div>
             {% endif %}
           </div>
           <div class="rota-drag-hint" aria-hidden="true">::</div>
         </div>
-        <div class="rota-main">{{ rota.origem_display }} &gt; {{ rota.destino_display }}</div>
+        <div class="rota-main" data-role="main">{{ rota.origem_display }} &gt; {{ rota.destino_display }}</div>
         <div class="rota-status">
-          <span class="status-chip {% if rota.play_blink %}is-blink{% elif rota.play_on %}is-active{% endif %}">Play</span>
-          <span class="status-chip {% if rota.pause_on %}is-active pause{% endif %}">Pause</span>
+          <span class="status-chip {% if rota.play_blink %}is-blink{% elif rota.play_on %}is-active{% endif %}" data-role="play">Play</span>
+          <span class="status-chip {% if rota.pause_on %}is-active pause{% endif %}" data-role="pause">Pause</span>
         </div>
-        <div class="muted rota-context-status">{{ rota.context_status }}</div>
+        <div class="muted rota-context-status" data-role="context">{{ rota.context_status }}</div>
         {% if not lifebit_connected %}
           <div class="rota-comm-overlay" aria-hidden="true">
             <span class="rota-comm-icon">⛓</span>
-            <span class="rota-comm-last-seen">Ultima conexao lida: {{ lifebit_last_seen }}</span>
+            <span class="rota-comm-last-seen" data-role="overlay-last-seen">Ultima conexao lida: {{ lifebit_last_seen }}</span>
           </div>
         {% endif %}
       </a>

@@ -30,12 +30,16 @@
   var timelineLoadingRequests = 0;
   var pendingTimelineRequestIso = "";
   var isTimelineDragging = false;
+  var timelineCommitTimer = null;
+  var queuedTimelineIso = "";
   var autoplayTimer = null;
   var autoplayRunning = false;
   var lastTimelineRequestedIso = null;
+  var TIMELINE_COMMIT_STABILIZE_MS = 1000;
 
   var els = {
     dayForm: document.getElementById("day-nav-form"),
+    dayNavCapsule: document.querySelector("#day-nav-form .day-nav-capsule"),
     daySelect: document.getElementById("day-select"),
     dayPrevButton: document.getElementById("day-prev-button"),
     dayNextButton: document.getElementById("day-next-button"),
@@ -163,6 +167,14 @@
     }
   }
 
+  function clearTimelineCommitTimer() {
+    if (timelineCommitTimer) {
+      clearTimeout(timelineCommitTimer);
+      timelineCommitTimer = null;
+    }
+    queuedTimelineIso = "";
+  }
+
   function enterHistoricalMode() {
     state.follow_now = false;
     clearPollTimer();
@@ -175,6 +187,12 @@
       return;
     }
     timelineLoadingCards = next;
+    if (els.cardsContainer) {
+      els.cardsContainer.classList.toggle("is-timeline-loading", next);
+    }
+    if (els.dayNavCapsule) {
+      els.dayNavCapsule.classList.toggle("is-loading", next);
+    }
     renderCards();
   }
 
@@ -292,13 +310,8 @@
           els.daySelect.value = state.selected_day;
         }
         els.daySelect.setAttribute("data-available-days", availableDays.join(","));
-        if (availableDays.length) {
-          els.daySelect.min = availableDays[availableDays.length - 1];
-          els.daySelect.max = availableDays[0];
-        } else {
-          els.daySelect.removeAttribute("min");
-          els.daySelect.removeAttribute("max");
-        }
+        els.daySelect.removeAttribute("min");
+        els.daySelect.removeAttribute("max");
       } else {
         var fragment = document.createDocumentFragment();
         for (var i = 0; i < availableDays.length; i += 1) {
@@ -398,6 +411,13 @@
     if (els.timelineSliderThumb) {
       els.timelineSliderThumb.style.left = pct.toFixed(2) + "%";
     }
+  }
+
+  function setTimelineDraggingVisual(enabled) {
+    if (!els.timelineSliderShell) {
+      return;
+    }
+    els.timelineSliderShell.classList.toggle("is-dragging", !!enabled);
   }
 
   function indexToPct(index, total) {
@@ -504,6 +524,7 @@
     }
     enterHistoricalMode();
     timelinePendingIso = null;
+    clearTimelineCommitTimer();
     setTimelineCardsLoading(true);
     refreshState(
       { selected_at_iso: nextIso, events_page: 1, follow_now: false },
@@ -511,8 +532,52 @@
     );
   }
 
+  function scheduleTimelineCommit(nextIso) {
+    if (!nextIso) {
+      return;
+    }
+    var currentIso = state.selected_at_iso || state.selected_at || "";
+    if (nextIso === currentIso) {
+      if (!inFlight) {
+        setTimelineCardsLoading(false);
+      }
+      return;
+    }
+    queuedTimelineIso = nextIso;
+    setTimelineCardsLoading(true);
+    if (timelineCommitTimer) {
+      clearTimeout(timelineCommitTimer);
+    }
+    timelineCommitTimer = setTimeout(function () {
+      var isoToCommit = queuedTimelineIso;
+      timelineCommitTimer = null;
+      queuedTimelineIso = "";
+      if (!isoToCommit) {
+        if (!inFlight) {
+          setTimelineCardsLoading(false);
+        }
+        return;
+      }
+      if (isoToCommit === (state.selected_at_iso || state.selected_at || "")) {
+        if (!inFlight) {
+          setTimelineCardsLoading(false);
+        }
+        return;
+      }
+      if (isoToCommit === lastTimelineRequestedIso && inFlight) {
+        return;
+      }
+      lastTimelineRequestedIso = isoToCommit;
+      refreshState(
+        { selected_at_iso: isoToCommit, events_page: 1, follow_now: false },
+        { timeline_loading: true, timeline_iso: isoToCommit, abortPrevious: true }
+      );
+    }, TIMELINE_COMMIT_STABILIZE_MS);
+  }
+
   function goToLiveNow() {
     stopAutoplay();
+    clearTimelineCommitTimer();
     state.follow_now = true;
     refreshState(
       {
@@ -652,12 +717,12 @@
       card.classList.add("is-timeline-loading");
     }
 
-    var title = card.querySelector('[data-role="title"]');
-    var prefix = card.querySelector('[data-role="prefix"]');
-    var main = card.querySelector('[data-role="main"]');
-    var context = card.querySelector('[data-role="context"]');
-    var play = card.querySelector('[data-role="play"]');
-    var pause = card.querySelector('[data-role="pause"]');
+    var title = card.querySelector('[data-role="title"]') || card.querySelector(".panel-title");
+    var prefix = card.querySelector('[data-role="prefix"]') || card.querySelector(".rota-prefix");
+    var main = card.querySelector('[data-role="main"]') || card.querySelector(".rota-main");
+    var context = card.querySelector('[data-role="context"]') || card.querySelector(".rota-context-status");
+    var play = card.querySelector('[data-role="play"]') || card.querySelector(".rota-status .status-chip:first-child");
+    var pause = card.querySelector('[data-role="pause"]') || card.querySelector(".rota-status .status-chip:last-child");
 
     if (title) {
       title.textContent = rota.titulo || rota.prefixo || "-";
@@ -845,8 +910,8 @@
     renderDayNavigation();
     renderTimeline();
     updateTimelineNote();
-    renderCards();
     renderEvents();
+    renderCards();
     initDragDrop();
   }
 
@@ -1000,6 +1065,7 @@
     if (nextDay === state.selected_day) {
       return;
     }
+    clearTimelineCommitTimer();
     lastTimelineRequestedIso = null;
     enterHistoricalMode();
     refreshState(
@@ -1042,16 +1108,44 @@
   }
 
   if (els.daySelect) {
+    function shouldOpenFromDayCapsule(eventTarget) {
+      if (!eventTarget) {
+        return false;
+      }
+      if (eventTarget === els.daySelect) {
+        return false;
+      }
+      if (eventTarget.closest && eventTarget.closest("#day-prev-button, #day-next-button")) {
+        return false;
+      }
+      return true;
+    }
+
+    if (els.dayNavCapsule) {
+      els.dayNavCapsule.addEventListener("pointerdown", function (event) {
+        if (!shouldOpenFromDayCapsule(event.target)) {
+          return;
+        }
+        openDayPicker();
+      });
+      els.dayNavCapsule.addEventListener("click", function (event) {
+        if (!shouldOpenFromDayCapsule(event.target)) {
+          return;
+        }
+        openDayPicker();
+      });
+    }
+
     var dayPickerField = els.daySelect.closest(".day-picker-field");
     if (dayPickerField) {
       dayPickerField.addEventListener("pointerdown", function (event) {
-        if (event.target === els.daySelect) {
+        if (!shouldOpenFromDayCapsule(event.target)) {
           return;
         }
         openDayPicker();
       });
       dayPickerField.addEventListener("click", function (event) {
-        if (event.target === els.daySelect) {
+        if (!shouldOpenFromDayCapsule(event.target)) {
           return;
         }
         openDayPicker();
@@ -1111,18 +1205,12 @@
       }
       var nextIso = timelinePendingIso;
       timelinePendingIso = null;
-      if (nextIso === lastTimelineRequestedIso && inFlight) {
-        return;
-      }
-      lastTimelineRequestedIso = nextIso;
-      refreshState(
-        { selected_at_iso: nextIso, events_page: 1, follow_now: false },
-        { timeline_loading: true, timeline_iso: nextIso, abortPrevious: true }
-      );
+      scheduleTimelineCommit(nextIso);
     }
 
     els.timelineRange.addEventListener("pointerdown", function () {
       isTimelineDragging = true;
+      setTimelineDraggingVisual(true);
       enterHistoricalMode();
       stopAutoplay();
       setTimelineCardsLoading(true);
@@ -1132,6 +1220,7 @@
     });
     els.timelineRange.addEventListener("mousedown", function () {
       isTimelineDragging = true;
+      setTimelineDraggingVisual(true);
       stopAutoplay();
       var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
@@ -1139,6 +1228,7 @@
     });
     els.timelineRange.addEventListener("touchstart", function () {
       isTimelineDragging = true;
+      setTimelineDraggingVisual(true);
       stopAutoplay();
       var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
@@ -1157,6 +1247,7 @@
     els.timelineRange.addEventListener("pointerup", function () {
       commitTimelineSelection();
       isTimelineDragging = false;
+      setTimelineDraggingVisual(false);
     });
     els.timelineRange.addEventListener("mouseup", function () {
       if (!isTimelineDragging) {
@@ -1164,6 +1255,7 @@
       }
       commitTimelineSelection();
       isTimelineDragging = false;
+      setTimelineDraggingVisual(false);
     });
     els.timelineRange.addEventListener("touchend", function () {
       if (!isTimelineDragging) {
@@ -1171,15 +1263,23 @@
       }
       commitTimelineSelection();
       isTimelineDragging = false;
+      setTimelineDraggingVisual(false);
     }, { passive: true });
     els.timelineRange.addEventListener("pointercancel", function () {
       isTimelineDragging = false;
+      setTimelineDraggingVisual(false);
+      clearTimelineCommitTimer();
       setTimelineCardsLoading(false);
       setTimelineTooltipVisible(false);
     });
     els.timelineRange.addEventListener("blur", function () {
+      var wasDragging = isTimelineDragging;
       isTimelineDragging = false;
-      setTimelineCardsLoading(false);
+      setTimelineDraggingVisual(false);
+      if (wasDragging) {
+        clearTimelineCommitTimer();
+        setTimelineCardsLoading(false);
+      }
       setTimelineTooltipVisible(false);
     });
 
