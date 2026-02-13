@@ -619,6 +619,42 @@ def _build_global_ligada_intervals(day_events, day_start, day_end, initial_ligad
     return intervals
 
 
+def _build_global_ligada_intervals_for_timeline(day_events, timeline, available_until, initial_ligada_prefixes=None):
+    if not timeline:
+        return []
+    capped_points = [point for point in timeline if point["timestamp"] <= available_until]
+    if not capped_points:
+        return []
+
+    intervals = []
+    ligada_prefixes = set(initial_ligada_prefixes or set())
+    current_start = capped_points[0]["timestamp"] if ligada_prefixes else None
+    event_idx = 0
+    total_events = len(day_events)
+
+    for point in capped_points:
+        point_ts = point["timestamp"]
+        while event_idx < total_events and day_events[event_idx]["timestamp"] <= point_ts:
+            event = day_events[event_idx]
+            if event["atributo"] == "LIGADA":
+                if _is_active(event["valor"]):
+                    ligada_prefixes.add(event["prefixo"])
+                else:
+                    ligada_prefixes.discard(event["prefixo"])
+            event_idx += 1
+
+        is_any = bool(ligada_prefixes)
+        if is_any and current_start is None:
+            current_start = point_ts
+        elif not is_any and current_start is not None:
+            intervals.append((current_start, point_ts))
+            current_start = None
+
+    if current_start is not None:
+        intervals.append((current_start, capped_points[-1]["timestamp"]))
+    return intervals
+
+
 def _ligada_gradient(intervals, day_start, day_end):
     total_seconds = (day_end - day_start).total_seconds()
     if total_seconds <= 0:
@@ -766,9 +802,9 @@ def _build_dashboard_payload(app, query_params):
     initial_ligada_prefixes = {
         prefixo for prefixo, state in seed_states.items() if _is_active(state["attrs"].get("LIGADA"))
     }
-    global_ligada_intervals = _build_global_ligada_intervals(
+    global_ligada_intervals = _build_global_ligada_intervals_for_timeline(
         events_today,
-        day_start,
+        timeline,
         available_until,
         initial_ligada_prefixes=initial_ligada_prefixes,
     )
