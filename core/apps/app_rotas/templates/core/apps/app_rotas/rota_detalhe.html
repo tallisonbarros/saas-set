@@ -49,23 +49,27 @@
           <input type="hidden" name="at" value="{{ selected_at_iso }}">
           <div class="day-nav-capsule">
             {% if prev_day %}
-              <button class="day-arrow" type="submit" name="nav_dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
+              <button class="day-arrow" id="day-prev-button" type="submit" name="nav_dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
             {% else %}
-              <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
+              <button class="day-arrow" id="day-prev-button" type="button" disabled aria-label="Dia anterior">&lt;</button>
             {% endif %}
             <label class="field day-picker-field">
-              <select name="dia" onchange="this.form.submit()">
-                {% for day in available_days %}
-                  <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
-                {% empty %}
-                  <option value="{{ selected_day|date:'Y-m-d' }}">{{ selected_day|date:"d/m/Y" }}</option>
-                {% endfor %}
-              </select>
+              <input
+                id="day-select"
+                type="date"
+                name="dia"
+                value="{{ selected_day|date:'Y-m-d' }}"
+                data-available-days="{% for day in available_days %}{{ day|date:'Y-m-d' }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                {% if available_days %}
+                min="{{ available_days|last|date:'Y-m-d' }}"
+                max="{{ available_days.0|date:'Y-m-d' }}"
+                {% endif %}
+              >
             </label>
             {% if next_day %}
-              <button class="day-arrow" type="submit" name="nav_dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
+              <button class="day-arrow" id="day-next-button" type="submit" name="nav_dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
             {% else %}
-              <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
+              <button class="day-arrow" id="day-next-button" type="button" disabled aria-label="Dia seguinte">&gt;</button>
             {% endif %}
           </div>
         </form>
@@ -108,7 +112,7 @@
         <p class="muted">Status na hora <span class="detail-selected-at">{{ selected_at_label }}</span>.</p>
       </div>
     </div>
-    <div id="detail-attrs-container">
+    <div id="detail-attrs-container" class="detail-attrs-wrap">
       {% include "core/apps/app_rotas/_rota_detalhe_attrs.html" %}
     </div>
   </section>
@@ -173,14 +177,16 @@
       border-radius: 999px;
       padding: 8px;
     }
-    .day-picker-field { min-width: 170px; margin: 0; }
-    .day-picker-field select {
+    .day-picker-field { min-width: 170px; margin: 0; cursor: pointer; }
+    .day-picker-field input {
       border-radius: 999px;
       text-align: center;
       font-weight: 700;
       min-width: 170px;
       padding-left: 14px;
       padding-right: 14px;
+      cursor: pointer;
+      color-scheme: dark;
     }
     .day-arrow {
       width: 36px;
@@ -333,6 +339,51 @@
       transform: rotate(45deg);
       transform-origin: bottom center;
     }
+    .detail-attrs-wrap {
+      position: relative;
+      min-height: 120px;
+      transition: filter .15s ease, opacity .15s ease;
+    }
+    .detail-attrs-wrap.is-timeline-loading {
+      filter: blur(1px);
+      opacity: .78;
+    }
+    .detail-attrs-loading-clock {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 2px solid rgba(148, 163, 184, 0.9);
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.8);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .detail-attrs-loading-clock::before {
+      content: "";
+      position: absolute;
+      width: 2px;
+      height: 5px;
+      background: #e2e8f0;
+      left: 7px;
+      top: 2px;
+      border-radius: 2px;
+      transform-origin: bottom center;
+      animation: cardClockTick 1s steps(12, end) infinite;
+    }
+    .detail-attrs-loading-clock::after {
+      content: "";
+      position: absolute;
+      width: 2px;
+      height: 6px;
+      background: #94a3b8;
+      left: 8px;
+      top: 6px;
+      border-radius: 2px;
+      transform: rotate(45deg);
+      transform-origin: bottom center;
+    }
     @keyframes rotaBlink {
       0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.62); }
       50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
@@ -348,96 +399,313 @@
       var timeline = {{ timeline_json|safe }};
       var range = document.getElementById("timeline-range");
       var atField = document.getElementById("timeline-at");
-      var form = document.getElementById("timeline-form");
       var readLabel = document.getElementById("timeline-read-label");
       var selectedAtLabels = document.querySelectorAll(".detail-selected-at");
       var backNow = document.getElementById("timeline-back-now");
+      var daySelect = document.getElementById("day-select");
+      var dayPrevButton = document.getElementById("day-prev-button");
+      var dayNextButton = document.getElementById("day-next-button");
       var detailStatusContainer = document.getElementById("detail-status-container");
-      if (!range || !atField || !form || !readLabel || !timeline.length) {
-        return;
-      }
-      var timer = null;
+      var detailAttrsContainer = document.getElementById("detail-attrs-container");
+      var timelineDay = "{{ selected_day|date:'Y-m-d' }}";
+      var currentAppliedIso = atField ? (atField.value || "") : "";
+      var pendingTimelineIso = "";
+      var activeRequestId = 0;
       var controller = null;
-      var pendingRequestId = 0;
+      var timelineLoadingRequests = 0;
+      var isDragging = false;
+
+      function parseAvailableDays() {
+        if (!daySelect) {
+          return [];
+        }
+        return (daySelect.getAttribute("data-available-days") || "")
+          .split(",")
+          .map(function (item) { return item.trim(); })
+          .filter(Boolean);
+      }
+
+      function resolveClosestDay(nextDay) {
+        var availableDays = parseAvailableDays();
+        if (!nextDay || !availableDays.length) {
+          return nextDay;
+        }
+        if (availableDays.indexOf(nextDay) >= 0) {
+          return nextDay;
+        }
+        var nextTs = Date.parse(nextDay + "T00:00:00");
+        if (!Number.isFinite(nextTs)) {
+          return availableDays[0];
+        }
+        var best = availableDays[0];
+        var bestDiff = Math.abs(Date.parse(best + "T00:00:00") - nextTs);
+        for (var i = 1; i < availableDays.length; i += 1) {
+          var candidate = availableDays[i];
+          var candidateTs = Date.parse(candidate + "T00:00:00");
+          if (!Number.isFinite(candidateTs)) {
+            continue;
+          }
+          var diff = Math.abs(candidateTs - nextTs);
+          if (diff < bestDiff) {
+            best = candidate;
+            bestDiff = diff;
+          }
+        }
+        return best;
+      }
+
+      function openDayPicker() {
+        if (!daySelect) {
+          return;
+        }
+        daySelect.focus({ preventScroll: true });
+        if (typeof daySelect.showPicker === "function") {
+          try {
+            daySelect.showPicker();
+          } catch (_error) {
+          }
+        }
+      }
+
+      function goToDay(nextDay) {
+        if (!daySelect) {
+          return;
+        }
+        var resolvedDay = resolveClosestDay(nextDay);
+        if (!resolvedDay || resolvedDay === timelineDay) {
+          return;
+        }
+        daySelect.value = resolvedDay;
+        var params = new URLSearchParams(window.location.search);
+        params.set("dia", resolvedDay);
+        params.delete("nav_dia");
+        if (atField && atField.value) {
+          params.set("at", atField.value);
+        }
+        params.delete("partial");
+        window.location.assign(window.location.pathname + "?" + params.toString());
+      }
+
+      function beginTimelineLoading() {
+        timelineLoadingRequests += 1;
+        setDetailLoading(true);
+      }
+
+      function endTimelineLoading() {
+        timelineLoadingRequests = Math.max(0, timelineLoadingRequests - 1);
+        if (!timelineLoadingRequests) {
+          setDetailLoading(false);
+        }
+      }
 
       function setDetailLoading(enabled) {
-        if (!detailStatusContainer) {
-          return;
-        }
-        detailStatusContainer.classList.toggle("is-timeline-loading", !!enabled);
-        var clock = detailStatusContainer.querySelector(".detail-status-loading-clock");
-        if (enabled) {
-          if (!clock) {
-            clock = document.createElement("span");
-            clock.className = "detail-status-loading-clock";
-            clock.setAttribute("aria-hidden", "true");
-            detailStatusContainer.appendChild(clock);
+        if (detailStatusContainer) {
+          detailStatusContainer.classList.toggle("is-timeline-loading", !!enabled);
+          var clock = detailStatusContainer.querySelector(".detail-status-loading-clock");
+          if (enabled) {
+            if (!clock) {
+              clock = document.createElement("span");
+              clock.className = "detail-status-loading-clock";
+              clock.setAttribute("aria-hidden", "true");
+              detailStatusContainer.appendChild(clock);
+            }
+          } else if (clock) {
+            clock.remove();
           }
-          return;
         }
-        if (clock) {
-          clock.remove();
+        if (detailAttrsContainer) {
+          detailAttrsContainer.classList.toggle("is-timeline-loading", !!enabled);
+          var attrsClock = detailAttrsContainer.querySelector(".detail-attrs-loading-clock");
+          if (enabled) {
+            if (!attrsClock) {
+              attrsClock = document.createElement("span");
+              attrsClock.className = "detail-attrs-loading-clock";
+              attrsClock.setAttribute("aria-hidden", "true");
+              detailAttrsContainer.appendChild(attrsClock);
+            }
+          } else if (attrsClock) {
+            attrsClock.remove();
+          }
         }
       }
 
-      range.addEventListener("input", function () {
+      function applyTimelinePreview() {
+        if (!range || !timeline.length) {
+          return null;
+        }
         var index = Number(range.value);
         var point = timeline[index];
         if (!point) {
-          return;
+          return null;
         }
         atField.value = point.iso;
-        readLabel.textContent = point.label;
-        if (timer) { clearTimeout(timer); }
-        timer = setTimeout(function () {
-          if (controller) { controller.abort(); }
-          pendingRequestId += 1;
-          var requestId = pendingRequestId;
-          controller = new AbortController();
-          setDetailLoading(true);
-          var params = new URLSearchParams(window.location.search);
-          params.set("dia", "{{ selected_day|date:'Y-m-d' }}");
-          params.set("at", point.iso);
-          params.set("partial", "timeline");
-          fetch(window.location.pathname + "?" + params.toString(), {
-            headers: { "X-Requested-With": "XMLHttpRequest" },
-            signal: controller.signal
+        if (readLabel) {
+          readLabel.textContent = point.label;
+        }
+        selectedAtLabels.forEach(function (el) {
+          el.textContent = point.label;
+        });
+        return point;
+      }
+
+      function commitTimelineSelection() {
+        var point = applyTimelinePreview();
+        if (!point || !point.iso) {
+          return;
+        }
+        if (point.iso === currentAppliedIso || point.iso === pendingTimelineIso) {
+          return;
+        }
+        if (controller) {
+          controller.abort();
+        }
+        pendingTimelineIso = point.iso;
+        activeRequestId += 1;
+        var requestId = activeRequestId;
+        controller = new AbortController();
+        beginTimelineLoading();
+
+        var params = new URLSearchParams(window.location.search);
+        params.set("dia", timelineDay);
+        params.set("at", point.iso);
+        params.set("partial", "timeline");
+        fetch(window.location.pathname + "?" + params.toString(), {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          signal: controller.signal
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("HTTP " + response.status);
+            }
+            return response.json();
           })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-              if (!data || !data.ok) { return; }
-              var attrs = document.getElementById("detail-attrs-container");
-              var status = document.getElementById("detail-status-container");
-              var events = document.getElementById("detail-events-container");
-              if (attrs) { attrs.innerHTML = data.attrs_html; }
-              if (status) { status.innerHTML = data.status_html; }
-              if (events) { events.innerHTML = data.events_html; }
-              if (data.selected_at_label) {
+          .then(function (data) {
+            if (!data || !data.ok) {
+              return;
+            }
+            var attrs = document.getElementById("detail-attrs-container");
+            var status = document.getElementById("detail-status-container");
+            var events = document.getElementById("detail-events-container");
+            if (attrs) { attrs.innerHTML = data.attrs_html; }
+            if (status) { status.innerHTML = data.status_html; }
+            if (events) { events.innerHTML = data.events_html; }
+            if (data.selected_at_label) {
+              if (readLabel) {
                 readLabel.textContent = data.selected_at_label;
-                selectedAtLabels.forEach(function (el) { el.textContent = data.selected_at_label; });
               }
-              if (backNow) {
-                if (data.now_day && data.now_at_iso) {
-                  backNow.setAttribute("href", "?dia=" + data.now_day + "&at=" + encodeURIComponent(data.now_at_iso));
-                }
-                if (data.showing_now) {
-                  backNow.classList.add("is-hidden");
-                } else {
-                  backNow.classList.remove("is-hidden");
-                }
+              selectedAtLabels.forEach(function (el) { el.textContent = data.selected_at_label; });
+            }
+            if (backNow) {
+              if (data.now_day && data.now_at_iso) {
+                backNow.setAttribute("href", "?dia=" + data.now_day + "&at=" + encodeURIComponent(data.now_at_iso));
               }
-              params.delete("partial");
-              history.replaceState(null, "", window.location.pathname + "?" + params.toString());
-            })
-            .catch(function (err) {
-              if (err && err.name === "AbortError") { return; }
-            })
-            .finally(function () {
-              if (requestId === pendingRequestId) {
-                setDetailLoading(false);
-              }
-            });
-        }, 110);
+              backNow.classList.toggle("is-hidden", !!data.showing_now);
+            }
+            currentAppliedIso = point.iso;
+            atField.value = point.iso;
+            params.delete("partial");
+            history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+          })
+          .catch(function (err) {
+            if (err && err.name === "AbortError") {
+              return;
+            }
+          })
+          .finally(function () {
+            if (requestId === activeRequestId) {
+              pendingTimelineIso = "";
+            }
+            endTimelineLoading();
+          });
+      }
+
+      if (daySelect) {
+        var dayPickerField = daySelect.closest(".day-picker-field");
+        if (dayPickerField) {
+          dayPickerField.addEventListener("pointerdown", function (event) {
+            if (event.target === daySelect) {
+              return;
+            }
+            openDayPicker();
+          });
+          dayPickerField.addEventListener("click", function (event) {
+            if (event.target === daySelect) {
+              return;
+            }
+            openDayPicker();
+          });
+        }
+        daySelect.addEventListener("change", function () {
+          goToDay(daySelect.value);
+        });
+      }
+
+      if (dayPrevButton) {
+        dayPrevButton.addEventListener("click", function (event) {
+          if (dayPrevButton.disabled || !dayPrevButton.value) {
+            return;
+          }
+          event.preventDefault();
+          goToDay(dayPrevButton.value);
+        });
+      }
+
+      if (dayNextButton) {
+        dayNextButton.addEventListener("click", function (event) {
+          if (dayNextButton.disabled || !dayNextButton.value) {
+            return;
+          }
+          event.preventDefault();
+          goToDay(dayNextButton.value);
+        });
+      }
+
+      if (!range || !atField || !readLabel || !timeline.length) {
+        return;
+      }
+
+      range.addEventListener("pointerdown", function () {
+        isDragging = true;
+      });
+      range.addEventListener("mousedown", function () {
+        isDragging = true;
+      });
+      range.addEventListener("touchstart", function () {
+        isDragging = true;
+      }, { passive: true });
+      range.addEventListener("input", function () {
+        applyTimelinePreview();
+      });
+      range.addEventListener("change", function () {
+        commitTimelineSelection();
+        isDragging = false;
+      });
+      range.addEventListener("pointerup", function () {
+        if (!isDragging) {
+          return;
+        }
+        commitTimelineSelection();
+        isDragging = false;
+      });
+      range.addEventListener("mouseup", function () {
+        if (!isDragging) {
+          return;
+        }
+        commitTimelineSelection();
+        isDragging = false;
+      });
+      range.addEventListener("touchend", function () {
+        if (!isDragging) {
+          return;
+        }
+        commitTimelineSelection();
+        isDragging = false;
+      }, { passive: true });
+      range.addEventListener("pointercancel", function () {
+        isDragging = false;
+      });
+      range.addEventListener("blur", function () {
+        isDragging = false;
       });
     })();
 

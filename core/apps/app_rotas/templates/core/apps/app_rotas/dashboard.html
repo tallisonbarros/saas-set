@@ -100,8 +100,8 @@
                 value="{{ selected_day|date:'Y-m-d' }}"
                 data-available-days="{% for day in available_days %}{{ day|date:'Y-m-d' }}{% if not forloop.last %},{% endif %}{% endfor %}"
                 {% if available_days %}
-                min="{{ available_days.0|date:'Y-m-d' }}"
-                max="{{ available_days|last|date:'Y-m-d' }}"
+                min="{{ available_days|last|date:'Y-m-d' }}"
+                max="{{ available_days.0|date:'Y-m-d' }}"
                 {% endif %}
               >
             </label>

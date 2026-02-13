@@ -23,9 +23,12 @@
   var backoffIndex = 0;
   var pollTimer = null;
   var inFlight = false;
+  var inFlightCount = 0;
   var activeController = null;
   var timelinePendingIso = null;
   var timelineLoadingCards = false;
+  var timelineLoadingRequests = 0;
+  var pendingTimelineRequestIso = "";
   var isTimelineDragging = false;
   var autoplayTimer = null;
   var autoplayRunning = false;
@@ -175,6 +178,18 @@
     renderCards();
   }
 
+  function beginTimelineLoading() {
+    timelineLoadingRequests += 1;
+    setTimelineCardsLoading(true);
+  }
+
+  function endTimelineLoading() {
+    timelineLoadingRequests = Math.max(0, timelineLoadingRequests - 1);
+    if (!timelineLoadingRequests) {
+      setTimelineCardsLoading(false);
+    }
+  }
+
   function stopAutoplay() {
     autoplayRunning = false;
     if (autoplayTimer) {
@@ -278,8 +293,8 @@
         }
         els.daySelect.setAttribute("data-available-days", availableDays.join(","));
         if (availableDays.length) {
-          els.daySelect.min = availableDays[0];
-          els.daySelect.max = availableDays[availableDays.length - 1];
+          els.daySelect.min = availableDays[availableDays.length - 1];
+          els.daySelect.max = availableDays[0];
         } else {
           els.daySelect.removeAttribute("min");
           els.daySelect.removeAttribute("max");
@@ -492,7 +507,7 @@
     setTimelineCardsLoading(true);
     refreshState(
       { selected_at_iso: nextIso, events_page: 1, follow_now: false },
-      { timeline_loading: true, abortPrevious: true }
+      { timeline_loading: true, timeline_iso: nextIso, abortPrevious: true }
     );
   }
 
@@ -506,7 +521,7 @@
         events_page: 1,
         follow_now: true,
       },
-      { timeline_loading: true, abortPrevious: true }
+      { timeline_loading: true, timeline_iso: state.now_at_iso || state.selected_at_iso || "", abortPrevious: true }
     );
   }
 
@@ -906,8 +921,13 @@
     var requestOverrides = overrides || {};
     var requestOptions = options || {};
     var timelineLoadingRequest = !!requestOptions.timeline_loading;
+    var timelineIso = requestOptions.timeline_iso || "";
 
     if (inFlight && requestOptions.poll) {
+      return Promise.resolve();
+    }
+
+    if (timelineLoadingRequest && timelineIso && timelineIso === pendingTimelineRequestIso) {
       return Promise.resolve();
     }
 
@@ -917,9 +937,13 @@
 
     var controller = new AbortController();
     activeController = controller;
+    inFlightCount += 1;
     inFlight = true;
     if (timelineLoadingRequest) {
-      setTimelineCardsLoading(true);
+      if (timelineIso) {
+        pendingTimelineRequestIso = timelineIso;
+      }
+      beginTimelineLoading();
     }
     setSyncStatus("updating");
 
@@ -957,9 +981,13 @@
         if (activeController === controller) {
           activeController = null;
         }
-        inFlight = false;
+        inFlightCount = Math.max(0, inFlightCount - 1);
+        inFlight = inFlightCount > 0;
         if (timelineLoadingRequest) {
-          setTimelineCardsLoading(false);
+          endTimelineLoading();
+          if (timelineIso && pendingTimelineRequestIso === timelineIso) {
+            pendingTimelineRequestIso = "";
+          }
         }
         scheduleNextPoll(currentDelay());
       });
@@ -1089,7 +1117,7 @@
       lastTimelineRequestedIso = nextIso;
       refreshState(
         { selected_at_iso: nextIso, events_page: 1, follow_now: false },
-        { timeline_loading: true, abortPrevious: true }
+        { timeline_loading: true, timeline_iso: nextIso, abortPrevious: true }
       );
     }
 

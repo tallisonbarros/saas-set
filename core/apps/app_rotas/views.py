@@ -28,7 +28,9 @@ ROTA_SUFFIXES = (
     ("_DESTINO", "DESTINO"),
     ("_DESTIN", "DESTINO"),
 )
-MAX_DASHBOARD_RECORDS = 8000
+# Keep dashboard and detail on the same event-window cap to avoid route-state
+# divergence for identical `selected_at` cutoffs.
+MAX_DASHBOARD_RECORDS = 16000
 MAX_ROUTE_RECORDS = 16000
 BASELINE_RECORDS_LIMIT = 12000
 RECENT_EVENTS_PAGE_SIZE = 10
@@ -408,6 +410,18 @@ def _clone_state(state):
         "attrs": dict(state["attrs"]),
         "last_update": state.get("last_update"),
     }
+
+
+def _attrs_at_selected(events, selected_at, baseline_attrs=None):
+    attrs = {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None}
+    if baseline_attrs:
+        for key in attrs:
+            attrs[key] = baseline_attrs.get(key)
+    for event in events:
+        if event["timestamp"] > selected_at:
+            break
+        attrs[event["atributo"]] = event["valor"]
+    return attrs
 
 
 def _build_route_cards(
@@ -909,14 +923,15 @@ def rota_detalhe(request, prefixo):
             suffix = f"?{'&'.join(query)}" if query else ""
             return redirect(f"{request.path}{suffix}")
 
-    available_days = [] if config_missing else _available_days(app)
+    available_days = [] if config_missing else _available_days_cached(app)
     selected_day = _parse_query_date(request.GET.get("nav_dia")) or _parse_query_date(request.GET.get("dia"))
     if not selected_day:
         today = timezone.localdate()
         selected_day = today if today in available_days else (available_days[0] if available_days else today)
 
     day_start, day_end_exclusive = _day_bounds(selected_day)
-    timeline_end_point = _timeline_end_for_day(selected_day, day_start, day_end_exclusive)
+    day_end_point = day_end_exclusive - timedelta(seconds=1)
+    available_until = _timeline_end_for_day(selected_day, day_start, day_end_exclusive)
 
     day_events = []
     baseline_seed = {}
@@ -928,17 +943,21 @@ def rota_detalhe(request, prefixo):
         baseline_events = _events_from_records(records_before, end_exclusive=day_start, prefix=prefix_norm)
         baseline_seed = _seed_states_from_events(baseline_events)
 
-    timeline = _build_timeline_with_events(day_start, timeline_end_point, day_events)
+    timeline = _build_timeline_with_events(day_start, day_end_point, day_events)
     selected_at = _parse_query_datetime(request.GET.get("at"))
     if not selected_at:
         now = timezone.localtime(timezone.now())
-        selected_at = now if selected_day == timezone.localdate() else timeline_end_point
+        selected_at = now if selected_day == timezone.localdate() else day_end_point
     selected_at = _clamp_datetime(selected_at, day_start, day_end_exclusive)
-    if selected_at and selected_at > timeline_end_point:
-        selected_at = timeline_end_point
+    if selected_at and selected_at > day_end_point:
+        selected_at = day_end_point
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
         selected_at = selected_point["timestamp"]
+
+    available_point, _available_index = _selected_timeline_point(timeline, available_until)
+    if available_point:
+        available_until = available_point["timestamp"]
 
     seed_attrs = baseline_seed.get(
         prefix_norm,
@@ -947,17 +966,7 @@ def rota_detalhe(request, prefixo):
             "last_update": None,
         },
     )["attrs"]
-    attrs = {
-        "LIGAR": seed_attrs.get("LIGAR"),
-        "DESLIGAR": seed_attrs.get("DESLIGAR"),
-        "LIGADA": seed_attrs.get("LIGADA"),
-        "ORIGEM": seed_attrs.get("ORIGEM"),
-        "DESTINO": seed_attrs.get("DESTINO"),
-    }
-    for event in day_events:
-        if event["timestamp"] > selected_at:
-            break
-        attrs[event["atributo"]] = event["valor"]
+    attrs = _attrs_at_selected(day_events, selected_at, baseline_attrs=seed_attrs)
 
     ligar_on = _is_active(attrs.get("LIGAR"))
     desligar_on = _is_active(attrs.get("DESLIGAR"))
@@ -968,6 +977,14 @@ def rota_detalhe(request, prefixo):
         "pause_on": desligar_on,
         "context_label": _context_status_label(attrs.get("LIGAR"), attrs.get("DESLIGAR"), attrs.get("LIGADA")),
     }
+    is_future_selected = bool(selected_day == timezone.localdate() and selected_at and selected_at > available_until)
+    if is_future_selected:
+        status = {
+            "play_blink": False,
+            "play_on": False,
+            "pause_on": False,
+            "context_label": "Sem leitura futura",
+        }
 
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
     origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
@@ -1014,8 +1031,8 @@ def rota_detalhe(request, prefixo):
     detail_events_page = detail_events_paginator.get_page(detail_events_page_num)
 
     initial_ligada_on = _is_active(seed_attrs.get("LIGADA"))
-    ligada_intervals = _build_ligada_intervals(day_events, day_start, timeline_end_point, initial_ligada_on)
-    ligada_gradient = _ligada_gradient(ligada_intervals, day_start, timeline_end_point)
+    ligada_intervals = _build_ligada_intervals(day_events, day_start, available_until, initial_ligada_on)
+    ligada_gradient = _ligada_gradient(ligada_intervals, day_start, day_end_point)
 
     prev_day, next_day = _day_navigation(available_days, selected_day)
     route_config = AppRotaConfig.objects.filter(app=app, prefixo=prefix_norm).first()
