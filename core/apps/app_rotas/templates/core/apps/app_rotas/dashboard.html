@@ -581,8 +581,8 @@
     }
     .timeline-slider-progress {
       width: 0;
-      background: rgba(226, 232, 240, 0.22);
-      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.2) inset;
+      background: transparent;
+      box-shadow: none;
     }
     .timeline-slider-thumb {
       position: absolute;
@@ -680,6 +680,9 @@
       pointer-events: none;
       white-space: nowrap;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .timeline-thumb-tooltip.is-below {
+      top: 24px;
     }
     .timeline-thumb-tooltip.is-hidden { display: none; }
     .timeline-quick-jumps {

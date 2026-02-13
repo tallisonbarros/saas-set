@@ -418,6 +418,9 @@
       return;
     }
     els.timelineSliderShell.classList.toggle("is-dragging", !!enabled);
+    if (els.timelineTooltip) {
+      els.timelineTooltip.classList.toggle("is-below", !!enabled);
+    }
   }
 
   function indexToPct(index, total) {
