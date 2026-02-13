@@ -373,43 +373,10 @@
     var pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
     var progress = "var(--timeline-progress-color, rgba(56, 189, 248, 0.68))";
     var baseGradient = state.global_ligada_gradient || "linear-gradient(90deg, var(--timeline-track-1), var(--timeline-track-2))";
-
-    var futureStartPct = 100;
-    var availableIndex = Number(state.available_index);
-    var isTodayTimeline = state.selected_day && state.now_day && state.selected_day === state.now_day;
-    if (isTodayTimeline && Number.isFinite(availableIndex) && max > 0) {
-      futureStartPct = Math.max(0, Math.min(100, (availableIndex / max) * 100));
-    }
-    var futureWidth = Math.max(0, 100 - futureStartPct);
-
-    var layers = [];
-    var sizes = [];
-    var positions = [];
-    var repeats = [];
-
-    layers.push("linear-gradient(90deg, " + progress + " 0% " + pct.toFixed(2) + "%, transparent " + pct.toFixed(2) + "% 100%)");
-    sizes.push("100% 100%");
-    positions.push("0 0");
-    repeats.push("no-repeat");
-
-    layers.push(baseGradient);
-    sizes.push("100% 100%");
-    positions.push("0 0");
-    repeats.push("no-repeat");
-
-    if (futureWidth > 0.15) {
-      layers.push(
-        "repeating-linear-gradient(-45deg, rgba(15, 23, 42, 0.58) 0 6px, rgba(100, 116, 139, 0.32) 6px 12px)"
-      );
-      sizes.push(futureWidth.toFixed(3) + "% 100%");
-      positions.push(futureStartPct.toFixed(3) + "% 0");
-      repeats.push("no-repeat");
-    }
-
-    els.timelineRange.style.backgroundImage = layers.join(", ");
-    els.timelineRange.style.backgroundSize = sizes.join(", ");
-    els.timelineRange.style.backgroundPosition = positions.join(", ");
-    els.timelineRange.style.backgroundRepeat = repeats.join(", ");
+    els.timelineRange.style.backgroundImage = "linear-gradient(90deg, " + progress + " 0% " + pct.toFixed(2) + "%, transparent " + pct.toFixed(2) + "% 100%), " + baseGradient;
+    els.timelineRange.style.backgroundSize = "100% 100%, 100% 100%";
+    els.timelineRange.style.backgroundPosition = "0 0, 0 0";
+    els.timelineRange.style.backgroundRepeat = "no-repeat, no-repeat";
   }
 
   function indexToPct(index, total) {
