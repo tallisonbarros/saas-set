@@ -27,9 +27,17 @@
         <div>
           <h1 class="page-title">{{ proposta.nome }}</h1>
           {% if proposta.trabalho_id %}
-            <div class="proposal-link-badge">
-              Vinculada ao Trabalho #{{ proposta.trabalho_id }}
-            </div>
+            {% if trabalho_vinculado %}
+              <a
+                class="proposal-link-badge"
+                href="{% url 'radar_trabalho_detail' trabalho_vinculado.radar.id trabalho_vinculado.id %}"
+                title="Abrir trabalho vinculado"
+              >
+                Vinculada ao Trabalho: {{ trabalho_vinculado.nome }}
+              </a>
+            {% else %}
+              <span class="proposal-link-badge">Vinculada ao Trabalho indisponivel</span>
+            {% endif %}
           {% endif %}
         </div>
       </div>

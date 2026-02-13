@@ -1300,6 +1300,11 @@ body {
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
+  text-decoration: none;
+}
+
+a.proposal-link-badge:hover {
+  background: rgba(255, 122, 26, 0.16);
 }
 
 .proposal-block-trabalho {
