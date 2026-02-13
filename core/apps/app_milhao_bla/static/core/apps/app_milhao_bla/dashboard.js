@@ -143,11 +143,44 @@
       return;
     }
     host.classList.remove("rt-shimmer");
+    var layer = null;
+    Array.prototype.some.call(host.children || [], function (child) {
+      if (child && child.classList && child.classList.contains("rt-shimmer-layer")) {
+        layer = child;
+        return true;
+      }
+      return false;
+    });
+    if (layer) {
+      layer.classList.remove("is-running");
+    }
     var timerId = shimmerCleanupTimers.get(host);
     if (timerId) {
       clearTimeout(timerId);
       shimmerCleanupTimers.delete(host);
     }
+  }
+
+  function ensureShimmerLayer(host) {
+    if (!host) {
+      return null;
+    }
+    var layer = null;
+    Array.prototype.some.call(host.children || [], function (child) {
+      if (child && child.classList && child.classList.contains("rt-shimmer-layer")) {
+        layer = child;
+        return true;
+      }
+      return false;
+    });
+    if (layer) {
+      return layer;
+    }
+    layer = document.createElement("span");
+    layer.className = "rt-shimmer-layer";
+    layer.setAttribute("aria-hidden", "true");
+    host.appendChild(layer);
+    return layer;
   }
 
   function resolveShimmerHost(el) {
@@ -175,13 +208,18 @@
     shimmerLastRunAt.set(host, now);
 
     host.classList.add("rt-shimmer-host");
+    var layer = ensureShimmerLayer(host);
     clearShimmerState(host);
+    if (layer) {
+      void layer.offsetWidth;
+      layer.classList.add("is-running");
+    }
     void host.offsetWidth;
     host.classList.add("rt-shimmer");
 
     var fallbackTimer = setTimeout(function () {
       clearShimmerState(host);
-    }, 650);
+    }, 800);
     shimmerCleanupTimers.set(host, fallbackTimer);
   }
 
@@ -364,14 +402,24 @@
     dynamicRoot.setAttribute("data-js-bound", "1");
 
     dynamicRoot.addEventListener("animationend", function (event) {
-      if (!event || event.animationName !== "rtShimmerSweep") {
+      if (!event) {
+        return;
+      }
+      if (event.animationName !== "rtShimmerSweepLayer" && event.animationName !== "rtCardGlow") {
         return;
       }
       var target = event.target;
-      if (!target || !target.classList || !target.classList.contains("rt-shimmer-host")) {
-        return;
+      var host = null;
+      if (target && target.classList) {
+        if (target.classList.contains("rt-shimmer-layer")) {
+          host = target.parentElement;
+        } else if (target.classList.contains("rt-shimmer-host")) {
+          host = target;
+        }
       }
-      clearShimmerState(target);
+      if (host && host.classList && host.classList.contains("rt-shimmer-host")) {
+        clearShimmerState(host);
+      }
     });
 
     dynamicRoot.addEventListener("click", function (event) {

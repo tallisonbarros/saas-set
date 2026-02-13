@@ -356,16 +356,28 @@
       overflow: hidden;
       isolation: isolate;
     }
-    .rt-shimmer-host.rt-shimmer::after {
-      content: "";
+    .rt-shimmer-host.rt-shimmer {
+      animation: rtCardGlow 520ms ease-out;
+    }
+    .rt-shimmer-layer {
       position: absolute;
-      inset: -22% -45%;
-      background: linear-gradient(108deg, rgba(255,255,255,0) 36%, rgba(255, 188, 116, 0.38) 50%, rgba(255,255,255,0) 64%);
-      transform: translateX(-56%) skewX(-14deg);
-      animation: rtShimmerSweep 420ms ease-out;
+      inset: -28% -62%;
+      background: linear-gradient(
+        108deg,
+        rgba(255, 255, 255, 0) 34%,
+        rgba(255, 196, 128, 0.56) 48%,
+        rgba(255, 232, 196, 0.72) 52%,
+        rgba(255, 255, 255, 0) 66%
+      );
+      transform: translate3d(-126%, 0, 0) skewX(-16deg);
+      opacity: 0;
       pointer-events: none;
       mix-blend-mode: screen;
-      z-index: 3;
+      z-index: 4;
+      will-change: transform, opacity;
+    }
+    .rt-shimmer-layer.is-running {
+      animation: rtShimmerSweepLayer 620ms cubic-bezier(.22,.72,.22,1);
     }
     @media (max-width: 700px) {
       .milhao-section { margin: 0 auto 10px; }
@@ -385,15 +397,21 @@
       38% { transform: scale(1.032); filter: brightness(1.18) drop-shadow(0 0 8px rgba(255, 140, 46, 0.28)); }
       100% { transform: scale(1); filter: brightness(1); }
     }
-    @keyframes rtShimmerSweep {
-      0% { transform: translateX(-56%) skewX(-14deg); opacity: .08; }
-      38% { opacity: .95; }
-      100% { transform: translateX(58%) skewX(-14deg); opacity: 0; }
+    @keyframes rtShimmerSweepLayer {
+      0% { transform: translate3d(-126%, 0, 0) skewX(-16deg); opacity: 0; }
+      20% { opacity: .35; }
+      48% { opacity: 1; }
+      100% { transform: translate3d(126%, 0, 0) skewX(-16deg); opacity: 0; }
+    }
+    @keyframes rtCardGlow {
+      0% { box-shadow: 0 0 0 rgba(255, 156, 83, 0), inset 0 0 0 rgba(255, 196, 138, 0); }
+      45% { box-shadow: 0 0 0 1px rgba(255, 156, 83, 0.32), 0 10px 30px rgba(255, 156, 83, 0.16), inset 0 0 0 1px rgba(255, 210, 160, 0.24); }
+      100% { box-shadow: 0 0 0 rgba(255, 156, 83, 0), inset 0 0 0 rgba(255, 196, 138, 0); }
     }
   </style>
 {% endblock %}
 
 {% block scripts %}
   {{ block.super }}
-  <script src="{% static 'core/apps/app_milhao_bla/dashboard.js' %}"></script>
+  <script src="{% static 'core/apps/app_milhao_bla/dashboard.js' %}?v=20260213-rt2"></script>
 {% endblock %}
