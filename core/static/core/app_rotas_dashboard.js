@@ -19,7 +19,7 @@
     return;
   }
 
-  var pollDelays = [2500, 5000, 10000];
+  var pollDelays = [5000, 9000, 14000];
   var backoffIndex = 0;
   var pollTimer = null;
   var inFlight = false;
@@ -29,6 +29,7 @@
   var isTimelineDragging = false;
   var autoplayTimer = null;
   var autoplayRunning = false;
+  var lastTimelineRequestedIso = null;
 
   var els = {
     dayForm: document.getElementById("day-nav-form"),
@@ -36,7 +37,6 @@
     dayPrevButton: document.getElementById("day-prev-button"),
     dayNextButton: document.getElementById("day-next-button"),
     timelineRange: document.getElementById("timeline-range"),
-    timelineFutureMask: document.getElementById("timeline-future-mask"),
     timelineNowMarker: document.getElementById("timeline-now-marker"),
     timelineTooltip: document.getElementById("timeline-thumb-tooltip"),
     timelinePlayToggle: document.getElementById("timeline-play-toggle"),
@@ -82,6 +82,67 @@
       return dayIso;
     }
     return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function parseAvailableDays() {
+    if (!els.daySelect) {
+      return [];
+    }
+    if ((els.daySelect.tagName || "").toUpperCase() === "INPUT") {
+      return (els.daySelect.getAttribute("data-available-days") || "")
+        .split(",")
+        .map(function (item) { return item.trim(); })
+        .filter(Boolean);
+    }
+    var days = [];
+    for (var i = 0; i < els.daySelect.options.length; i += 1) {
+      if (els.daySelect.options[i].value) {
+        days.push(els.daySelect.options[i].value);
+      }
+    }
+    return days;
+  }
+
+  function resolveClosestDay(nextDay) {
+    var availableDays = parseAvailableDays();
+    if (!nextDay || !availableDays.length) {
+      return nextDay;
+    }
+    if (availableDays.indexOf(nextDay) >= 0) {
+      return nextDay;
+    }
+    var nextTs = Date.parse(nextDay + "T00:00:00");
+    if (!Number.isFinite(nextTs)) {
+      return availableDays[0];
+    }
+    var best = availableDays[0];
+    var bestDiff = Math.abs(Date.parse(best + "T00:00:00") - nextTs);
+    for (var i = 1; i < availableDays.length; i += 1) {
+      var candidate = availableDays[i];
+      var candidateTs = Date.parse(candidate + "T00:00:00");
+      if (!Number.isFinite(candidateTs)) {
+        continue;
+      }
+      var diff = Math.abs(candidateTs - nextTs);
+      if (diff < bestDiff) {
+        best = candidate;
+        bestDiff = diff;
+      }
+    }
+    return best;
+  }
+
+  function openDayPicker() {
+    if (!els.daySelect || (els.daySelect.tagName || "").toUpperCase() !== "INPUT") {
+      return;
+    }
+    els.daySelect.focus({ preventScroll: true });
+    if (typeof els.daySelect.showPicker === "function") {
+      try {
+        els.daySelect.showPicker();
+      } catch (_error) {
+      }
+    }
   }
 
   function isLiveMode() {
@@ -203,20 +264,34 @@
 
   function renderDayNavigation() {
     if (els.daySelect) {
-      var fragment = document.createDocumentFragment();
       var availableDays = Array.isArray(state.available_days) ? state.available_days.slice() : [];
       if (!availableDays.length && state.selected_day) {
         availableDays = [state.selected_day];
       }
-      for (var i = 0; i < availableDays.length; i += 1) {
-        var dayIso = availableDays[i];
-        var option = createElement("option");
-        option.value = dayIso;
-        option.textContent = formatDayLabel(dayIso);
-        option.selected = dayIso === state.selected_day;
-        fragment.appendChild(option);
+      if ((els.daySelect.tagName || "").toUpperCase() === "INPUT") {
+        if (state.selected_day) {
+          els.daySelect.value = state.selected_day;
+        }
+        els.daySelect.setAttribute("data-available-days", availableDays.join(","));
+        if (availableDays.length) {
+          els.daySelect.min = availableDays[0];
+          els.daySelect.max = availableDays[availableDays.length - 1];
+        } else {
+          els.daySelect.removeAttribute("min");
+          els.daySelect.removeAttribute("max");
+        }
+      } else {
+        var fragment = document.createDocumentFragment();
+        for (var i = 0; i < availableDays.length; i += 1) {
+          var dayIso = availableDays[i];
+          var option = createElement("option");
+          option.value = dayIso;
+          option.textContent = formatDayLabel(dayIso);
+          option.selected = dayIso === state.selected_day;
+          fragment.appendChild(option);
+        }
+        els.daySelect.replaceChildren(fragment);
       }
-      els.daySelect.replaceChildren(fragment);
     }
 
     if (els.dayPrevButton) {
@@ -267,10 +342,6 @@
       els.timelineReadLabel.textContent = state.selected_at_label || "-";
     }
 
-    if (els.globalLigadaTrack && state.global_ligada_gradient) {
-      els.globalLigadaTrack.style.background = state.global_ligada_gradient;
-    }
-
     if (els.timelineBackNow) {
       if (state.now_day && state.now_at_iso) {
         els.timelineBackNow.setAttribute("href", "?dia=" + state.now_day + "&at=" + encodeURIComponent(state.now_at_iso));
@@ -300,8 +371,44 @@
     var value = Number(els.timelineRange.value || "0");
     var pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
     var progress = "var(--timeline-progress-color, rgba(56, 189, 248, 0.68))";
-    var base = "var(--timeline-track-2)";
-    els.timelineRange.style.background = "linear-gradient(90deg, " + progress + " 0% " + pct.toFixed(2) + "%, " + base + " " + pct.toFixed(2) + "% 100%)";
+    var baseGradient = state.global_ligada_gradient || "linear-gradient(90deg, var(--timeline-track-1), var(--timeline-track-2))";
+
+    var futureStartPct = 100;
+    var availableIndex = Number(state.available_index);
+    var isTodayTimeline = state.selected_day && state.now_day && state.selected_day === state.now_day;
+    if (isTodayTimeline && Number.isFinite(availableIndex) && max > 0) {
+      futureStartPct = Math.max(0, Math.min(100, (availableIndex / max) * 100));
+    }
+    var futureWidth = Math.max(0, 100 - futureStartPct);
+
+    var layers = [];
+    var sizes = [];
+    var positions = [];
+    var repeats = [];
+
+    layers.push("linear-gradient(90deg, " + progress + " 0% " + pct.toFixed(2) + "%, transparent " + pct.toFixed(2) + "% 100%)");
+    sizes.push("100% 100%");
+    positions.push("0 0");
+    repeats.push("no-repeat");
+
+    layers.push(baseGradient);
+    sizes.push("100% 100%");
+    positions.push("0 0");
+    repeats.push("no-repeat");
+
+    if (futureWidth > 0.15) {
+      layers.push(
+        "repeating-linear-gradient(-45deg, rgba(15, 23, 42, 0.58) 0 6px, rgba(100, 116, 139, 0.32) 6px 12px)"
+      );
+      sizes.push(futureWidth.toFixed(3) + "% 100%");
+      positions.push(futureStartPct.toFixed(3) + "% 0");
+      repeats.push("no-repeat");
+    }
+
+    els.timelineRange.style.backgroundImage = layers.join(", ");
+    els.timelineRange.style.backgroundSize = sizes.join(", ");
+    els.timelineRange.style.backgroundPosition = positions.join(", ");
+    els.timelineRange.style.backgroundRepeat = repeats.join(", ");
   }
 
   function indexToPct(index, total) {
@@ -323,13 +430,6 @@
       availableIndex = total - 1;
     }
     var nowPct = indexToPct(availableIndex, total);
-
-    if (els.timelineFutureMask) {
-      var futureWidth = Math.max(0, 100 - nowPct);
-      els.timelineFutureMask.style.width = futureWidth.toFixed(3) + "%";
-      els.timelineFutureMask.style.left = nowPct.toFixed(3) + "%";
-      els.timelineFutureMask.style.display = futureWidth > 0.1 ? "" : "none";
-    }
 
     if (els.timelineNowMarker) {
       els.timelineNowMarker.style.left = nowPct.toFixed(3) + "%";
@@ -895,6 +995,10 @@
     if (!nextDay) {
       return;
     }
+    if (nextDay === state.selected_day) {
+      return;
+    }
+    lastTimelineRequestedIso = null;
     enterHistoricalMode();
     refreshState(
       { selected_day: nextDay, selected_at_iso: "", events_page: 1, follow_now: false },
@@ -917,8 +1021,22 @@
   }
 
   if (els.daySelect) {
+    var dayPickerField = els.daySelect.closest(".day-picker-field");
+    if (dayPickerField) {
+      dayPickerField.addEventListener("pointerdown", function () {
+        openDayPicker();
+      });
+      dayPickerField.addEventListener("click", function (event) {
+        event.preventDefault();
+        openDayPicker();
+      });
+    }
     els.daySelect.addEventListener("change", function () {
-      handleDayChange(els.daySelect.value);
+      var nextDay = resolveClosestDay(els.daySelect.value);
+      if (nextDay && els.daySelect.value !== nextDay) {
+        els.daySelect.value = nextDay;
+      }
+      handleDayChange(nextDay);
     });
   }
 
@@ -967,6 +1085,10 @@
       }
       var nextIso = timelinePendingIso;
       timelinePendingIso = null;
+      if (nextIso === lastTimelineRequestedIso && inFlight) {
+        return;
+      }
+      lastTimelineRequestedIso = nextIso;
       refreshState(
         { selected_at_iso: nextIso, events_page: 1, follow_now: false },
         { timeline_loading: true, abortPrevious: true }
@@ -1001,8 +1123,10 @@
       setTimelineTooltipVisible(true);
     });
     els.timelineRange.addEventListener("change", function () {
+      if (isTimelineDragging) {
+        return;
+      }
       commitTimelineSelection();
-      isTimelineDragging = false;
     });
     els.timelineRange.addEventListener("pointerup", function () {
       commitTimelineSelection();

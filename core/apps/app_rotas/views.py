@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta, timezone as dt_timezone
 from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Q
@@ -38,6 +39,7 @@ LIFEBIT_TAG_NAME = "LIFEBIT"
 LIFEBIT_TIMEOUT_SECONDS = 45
 PAYLOAD_WINDOW_MARGIN_DAYS = 1
 AVAILABLE_DAYS_SCAN_LIMIT = 40000
+AVAILABLE_DAYS_CACHE_TTL_SECONDS = 45
 
 
 def _get_rotas_app():
@@ -505,6 +507,16 @@ def _available_days(app):
     return days[:AVAILABLE_DAYS_LIMIT]
 
 
+def _available_days_cached(app):
+    key = f"app_rotas_available_days:{app.pk}:{app.ingest_client_id}:{app.ingest_agent_id}:{app.ingest_source or '-'}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    days = _available_days(app)
+    cache.set(key, days, AVAILABLE_DAYS_CACHE_TTL_SECONDS)
+    return days
+
+
 def _day_navigation(available_days, selected_day):
     prev_day = None
     next_day = None
@@ -669,7 +681,7 @@ def _build_dashboard_payload(app, query_params):
     if not config_missing:
         lifebit_connected, lifebit_last_seen = _lifebit_status(app)
 
-    available_days = [] if config_missing else _available_days(app)
+    available_days = [] if config_missing else _available_days_cached(app)
     selected_day = _parse_query_date(query_params.get("nav_dia")) or _parse_query_date(query_params.get("dia"))
     if not selected_day:
         today = timezone.localdate()
