@@ -30,6 +30,7 @@
   var autoplayTimer = null;
   var autoplayRunning = false;
   var lastTimelineRequestedIso = null;
+  var pendingDayNavValue = null;
 
   var els = {
     dayForm: document.getElementById("day-nav-form"),
@@ -1007,15 +1008,22 @@
   }
 
   if (els.dayForm) {
+    els.dayForm.addEventListener("click", function (event) {
+      var navButton = event.target.closest("button[name='nav_dia']");
+      pendingDayNavValue = navButton && navButton.value ? navButton.value : null;
+    });
     els.dayForm.addEventListener("submit", function (event) {
       event.preventDefault();
       var submitter = event.submitter;
       var nextDay = null;
       if (submitter && submitter.name === "nav_dia" && submitter.value) {
         nextDay = submitter.value;
+      } else if (pendingDayNavValue) {
+        nextDay = pendingDayNavValue;
       } else if (els.daySelect && els.daySelect.value) {
         nextDay = els.daySelect.value;
       }
+      pendingDayNavValue = null;
       handleDayChange(nextDay);
     });
   }
@@ -1023,11 +1031,10 @@
   if (els.daySelect) {
     var dayPickerField = els.daySelect.closest(".day-picker-field");
     if (dayPickerField) {
-      dayPickerField.addEventListener("pointerdown", function () {
-        openDayPicker();
-      });
       dayPickerField.addEventListener("click", function (event) {
-        event.preventDefault();
+        if (event.target === els.daySelect) {
+          return;
+        }
         openDayPicker();
       });
     }
