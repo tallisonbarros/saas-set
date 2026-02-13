@@ -33,6 +33,10 @@
     dayPrevButton: document.getElementById("day-prev-button"),
     dayNextButton: document.getElementById("day-next-button"),
     timelineRange: document.getElementById("timeline-range"),
+    timelineTooltip: document.getElementById("timeline-thumb-tooltip"),
+    timelineMinus15: document.getElementById("timeline-minus-15"),
+    timelinePlus15: document.getElementById("timeline-plus-15"),
+    timelineNowMini: document.getElementById("timeline-now-mini"),
     timelineAtField: document.getElementById("timeline-at"),
     timelineReadLabel: document.getElementById("timeline-read-label"),
     timelineBackNow: document.getElementById("timeline-back-now"),
@@ -48,8 +52,7 @@
     liveShort: document.getElementById("dashboard-live-short"),
     liveAction: document.getElementById("timeline-back-action"),
     liveHint: document.getElementById("timeline-back-hint"),
-    rotasSection: document.getElementById("rotas-section"),
-    rotasModeContext: document.getElementById("rotas-mode-context"),
+    rotasStateShells: document.querySelectorAll(".rotas-state-shell"),
   };
 
   function createElement(tagName, className, text) {
@@ -140,16 +143,11 @@
     if (els.liveHint) {
       els.liveHint.classList.toggle("is-hidden", live);
     }
-    if (els.rotasSection) {
-      els.rotasSection.classList.toggle("is-live", live);
-      els.rotasSection.classList.toggle("is-history", !live);
-    }
-    if (els.rotasModeContext) {
-      els.rotasModeContext.classList.toggle("is-live", live);
-      els.rotasModeContext.classList.toggle("is-history", !live);
-      els.rotasModeContext.textContent = live
-        ? "Atualizando em tempo real"
-        : "Visualizando snapshot do historico";
+    if (els.rotasStateShells && els.rotasStateShells.length) {
+      for (var i = 0; i < els.rotasStateShells.length; i += 1) {
+        els.rotasStateShells[i].classList.toggle("is-live", live);
+        els.rotasStateShells[i].classList.toggle("is-history", !live);
+      }
     }
   }
 
@@ -221,14 +219,16 @@
   }
 
   function renderTimeline() {
+    var timeline = Array.isArray(state.timeline) ? state.timeline : [];
     if (els.timelineRange) {
-      var timelineLength = Array.isArray(state.timeline) ? state.timeline.length : 0;
+      var timelineLength = timeline.length;
       var max = Math.max(0, timelineLength - 1);
       els.timelineRange.max = String(max);
       els.timelineRange.disabled = max < 1;
       if (typeof state.selected_index === "number" && state.selected_index >= 0) {
         els.timelineRange.value = String(state.selected_index);
       }
+      updateRangeProgress();
     }
 
     if (els.timelineAtField) {
@@ -248,6 +248,95 @@
         els.timelineBackNow.setAttribute("href", "?dia=" + state.now_day + "&at=" + encodeURIComponent(state.now_at_iso));
       }
     }
+
+    var jumpsDisabled = timeline.length < 2 || !els.timelineRange || els.timelineRange.disabled;
+    if (els.timelineMinus15) {
+      els.timelineMinus15.disabled = jumpsDisabled;
+    }
+    if (els.timelinePlus15) {
+      els.timelinePlus15.disabled = jumpsDisabled;
+    }
+    if (els.timelineNowMini) {
+      els.timelineNowMini.disabled = false;
+    }
+  }
+
+  function updateRangeProgress() {
+    if (!els.timelineRange) {
+      return;
+    }
+    var min = Number(els.timelineRange.min || "0");
+    var max = Number(els.timelineRange.max || "0");
+    var value = Number(els.timelineRange.value || "0");
+    var pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+    var progress = "var(--timeline-progress-color, rgba(56, 189, 248, 0.68))";
+    var base = "var(--timeline-track-2)";
+    els.timelineRange.style.background = "linear-gradient(90deg, " + progress + " 0% " + pct.toFixed(2) + "%, " + base + " " + pct.toFixed(2) + "% 100%)";
+  }
+
+  function setTimelineTooltipVisible(visible) {
+    if (!els.timelineTooltip) {
+      return;
+    }
+    els.timelineTooltip.classList.toggle("is-hidden", !visible);
+  }
+
+  function updateTimelineTooltip(pointLabel) {
+    if (!els.timelineTooltip || !els.timelineRange) {
+      return;
+    }
+    var label = String(pointLabel || "").trim();
+    if (label.indexOf(" ") > 0) {
+      label = label.split(" ").pop();
+    }
+    els.timelineTooltip.textContent = label || "--:--:--";
+
+    var wrap = els.timelineRange.closest(".timeline-track-wrap");
+    if (!wrap) {
+      return;
+    }
+    var wrapRect = wrap.getBoundingClientRect();
+    var rangeRect = els.timelineRange.getBoundingClientRect();
+    var min = Number(els.timelineRange.min || "0");
+    var max = Number(els.timelineRange.max || "0");
+    var value = Number(els.timelineRange.value || "0");
+    var pct = max > min ? (value - min) / (max - min) : 0;
+    var thumbWidth = 34;
+    var x = rangeRect.left - wrapRect.left + pct * (rangeRect.width - thumbWidth) + thumbWidth / 2;
+    els.timelineTooltip.style.left = x.toFixed(1) + "px";
+  }
+
+  function findClosestTimelineIndexByMs(targetMs) {
+    var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+    if (!timeline.length) {
+      return -1;
+    }
+    var best = 0;
+    for (var i = 0; i < timeline.length; i += 1) {
+      var ts = Date.parse(timeline[i].iso);
+      if (!Number.isFinite(ts)) {
+        continue;
+      }
+      if (ts <= targetMs) {
+        best = i;
+      } else {
+        break;
+      }
+    }
+    return best;
+  }
+
+  function goToLiveNow() {
+    state.follow_now = true;
+    refreshState(
+      {
+        selected_day: state.now_day || state.selected_day,
+        selected_at_iso: state.now_at_iso || state.selected_at_iso,
+        events_page: 1,
+        follow_now: true,
+      },
+      { timeline_loading: true, abortPrevious: true }
+    );
   }
 
   function buildCardNode() {
@@ -695,10 +784,13 @@
       if (els.selectedAtNote) {
         els.selectedAtNote.textContent = point.label;
       }
+      updateRangeProgress();
+      updateTimelineTooltip(point.label);
       return point;
     }
 
     function commitTimelineSelection() {
+      setTimelineTooltipVisible(false);
       if (!timelinePendingIso) {
         if (!inFlight) {
           setTimelineCardsLoading(false);
@@ -723,33 +815,84 @@
     els.timelineRange.addEventListener("pointerdown", function () {
       enterHistoricalMode();
       setTimelineCardsLoading(true);
+      var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+      var index = Number(els.timelineRange.value);
+      var point = timeline[index];
+      updateTimelineTooltip(point ? point.label : "");
+      setTimelineTooltipVisible(true);
     });
     els.timelineRange.addEventListener("input", function () {
       applyTimelinePreview();
+      setTimelineTooltipVisible(true);
     });
     els.timelineRange.addEventListener("change", commitTimelineSelection);
     els.timelineRange.addEventListener("pointerup", commitTimelineSelection);
     els.timelineRange.addEventListener("pointercancel", function () {
       setTimelineCardsLoading(false);
+      setTimelineTooltipVisible(false);
     });
     els.timelineRange.addEventListener("blur", function () {
       setTimelineCardsLoading(false);
+      setTimelineTooltipVisible(false);
+    });
+
+    if (els.timelineMinus15) {
+      els.timelineMinus15.addEventListener("click", function () {
+        var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+        if (!timeline.length) {
+          return;
+        }
+        enterHistoricalMode();
+        var baseIndex = Number(els.timelineRange.value || state.selected_index || 0);
+        var basePoint = timeline[Math.max(0, Math.min(baseIndex, timeline.length - 1))];
+        var baseMs = Date.parse(basePoint.iso);
+        if (!Number.isFinite(baseMs)) {
+          return;
+        }
+        var targetIndex = findClosestTimelineIndexByMs(baseMs - 15 * 60 * 1000);
+        if (targetIndex < 0) {
+          return;
+        }
+        els.timelineRange.value = String(targetIndex);
+        applyTimelinePreview();
+        commitTimelineSelection();
+      });
+    }
+
+    if (els.timelinePlus15) {
+      els.timelinePlus15.addEventListener("click", function () {
+        var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+        if (!timeline.length) {
+          return;
+        }
+        enterHistoricalMode();
+        var baseIndex = Number(els.timelineRange.value || state.selected_index || 0);
+        var basePoint = timeline[Math.max(0, Math.min(baseIndex, timeline.length - 1))];
+        var baseMs = Date.parse(basePoint.iso);
+        if (!Number.isFinite(baseMs)) {
+          return;
+        }
+        var targetIndex = findClosestTimelineIndexByMs(baseMs + 15 * 60 * 1000);
+        if (targetIndex < 0) {
+          return;
+        }
+        els.timelineRange.value = String(targetIndex);
+        applyTimelinePreview();
+        commitTimelineSelection();
+      });
     });
   }
 
   if (els.timelineBackNow) {
     els.timelineBackNow.addEventListener("click", function (event) {
       event.preventDefault();
-      state.follow_now = true;
-      refreshState(
-        {
-          selected_day: state.now_day || state.selected_day,
-          selected_at_iso: state.now_at_iso || state.selected_at_iso,
-          events_page: 1,
-          follow_now: true,
-        },
-        { timeline_loading: true, abortPrevious: true }
-      );
+      goToLiveNow();
+    });
+  }
+
+  if (els.timelineNowMini) {
+    els.timelineNowMini.addEventListener("click", function () {
+      goToLiveNow();
     });
   }
 
