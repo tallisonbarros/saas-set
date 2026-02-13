@@ -1889,6 +1889,187 @@ def _render_rack_io_pdf(rack, canais):
     return buffer
 
 
+def _proposta_status_label(proposta):
+    if proposta.finalizada:
+        return "Finalizada"
+    if proposta.andamento == "EXECUTANDO":
+        return "Executando"
+    if proposta.aprovada is True:
+        return "Aprovada"
+    if proposta.aprovada is False:
+        return "Reprovada"
+    if proposta.valor is None or proposta.valor == 0:
+        return "Levantamento"
+    return "Pendente"
+
+
+def _render_proposta_pdf(proposta, status_label):
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.utils import ImageReader
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        from reportlab.pdfgen import canvas
+    except ImportError:
+        return None
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    left = 42
+    right = width - 42
+    usable_width = right - left
+    y = height - 42
+
+    logo_primary = os.path.join(os.path.dirname(__file__), "static", "core", "logoset.png")
+    logo_fallback = os.path.join(os.path.dirname(__file__), "static", "core", "FAVICON_PRETO.png")
+    logo_path = logo_primary if os.path.exists(logo_primary) else logo_fallback
+
+    def split_lines(text, font_name="Helvetica", font_size=10, max_width=usable_width):
+        raw = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+        lines = []
+        for paragraph in raw.split("\n"):
+            chunk = paragraph.strip()
+            if not chunk:
+                lines.append("")
+                continue
+            words = chunk.split()
+            current = words[0]
+            for word in words[1:]:
+                candidate = f"{current} {word}"
+                if stringWidth(candidate, font_name, font_size) <= max_width:
+                    current = candidate
+                else:
+                    lines.append(current)
+                    current = word
+            lines.append(current)
+        return lines
+
+    def ensure_space(required=60):
+        nonlocal y
+        if y < required:
+            pdf.showPage()
+            draw_header()
+
+    def draw_meta_line(label, value, row_height=14):
+        nonlocal y
+        ensure_space(80)
+        pdf.setFont("Helvetica-Bold", 9)
+        pdf.setFillColor(colors.HexColor("#3b3b3b"))
+        pdf.drawString(left, y, f"{label}:")
+        pdf.setFont("Helvetica", 9)
+        pdf.setFillColor(colors.black)
+        lines = split_lines(str(value or "-"), font_size=9, max_width=usable_width - 84)
+        if not lines:
+            lines = ["-"]
+        pdf.drawString(left + 84, y, lines[0])
+        for extra in lines[1:]:
+            y -= row_height
+            ensure_space(80)
+            pdf.drawString(left + 84, y, extra)
+        y -= row_height
+
+    def draw_section(title, text):
+        nonlocal y
+        lines = split_lines(text or "-", font_size=10, max_width=usable_width - 18)
+        section_height = 28 + (len(lines) * 14)
+        ensure_space(section_height + 24)
+        pdf.setFillColor(colors.HexColor("#fff4ea"))
+        pdf.roundRect(left, y - section_height + 8, usable_width, section_height, 8, fill=1, stroke=0)
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.setFillColor(colors.HexColor("#b45309"))
+        pdf.drawString(left + 10, y - 2, title)
+        ty = y - 18
+        pdf.setFillColor(colors.black)
+        pdf.setFont("Helvetica", 10)
+        for line in lines:
+            pdf.drawString(left + 10, ty, line or " ")
+            ty -= 14
+        y = y - section_height - 10
+
+    def draw_header():
+        nonlocal y
+        y = height - 42
+        pdf.setFillColor(colors.HexColor("#ffefe1"))
+        pdf.roundRect(left, y - 40, usable_width, 46, 10, fill=1, stroke=0)
+        pdf.setFillColor(colors.HexColor("#c2410c"))
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(left + 12, y - 10, "SET - Proposta Comercial")
+        pdf.setFont("Helvetica", 9)
+        pdf.setFillColor(colors.black)
+        codigo = proposta.codigo or f"ID {proposta.id}"
+        pdf.drawString(left + 12, y - 25, f"Codigo: {codigo} | Status: {status_label}")
+        if logo_path and os.path.exists(logo_path):
+            try:
+                logo = ImageReader(logo_path)
+                pdf.drawImage(
+                    logo,
+                    right - 86,
+                    y - 34,
+                    width=72,
+                    height=28,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:
+                pass
+        y -= 56
+
+    pdf.setTitle(f"Proposta - {proposta.codigo or proposta.id}")
+    draw_header()
+
+    destinatario = proposta.cliente.nome if proposta.cliente and proposta.cliente.nome else "-"
+    destinatario_email = proposta.cliente.email if proposta.cliente and proposta.cliente.email else "-"
+    emissor = proposta.criada_por.username if proposta.criada_por else "Sistema"
+    valor = f"R$ {proposta.valor}" if proposta.valor is not None else "A definir"
+    origem = "-"
+    if proposta.origem_trabalho_id and proposta.origem_trabalho:
+        origem = f"{proposta.origem_trabalho.radar.nome} / {proposta.origem_trabalho.nome}"
+
+    draw_meta_line("Proposta", proposta.nome)
+    draw_meta_line("Para", f"{destinatario} ({destinatario_email})")
+    draw_meta_line("De", emissor)
+    draw_meta_line("Valor", valor)
+    draw_meta_line("Prioridade", proposta.prioridade)
+    draw_meta_line("Criada em", timezone.localtime(proposta.criado_em).strftime("%d/%m/%Y %H:%M"))
+    if proposta.decidido_em:
+        draw_meta_line("Decidida em", timezone.localtime(proposta.decidido_em).strftime("%d/%m/%Y %H:%M"))
+    if proposta.finalizada_em:
+        draw_meta_line("Finalizada em", timezone.localtime(proposta.finalizada_em).strftime("%d/%m/%Y %H:%M"))
+    if origem != "-":
+        draw_meta_line("Origem tecnica", origem)
+
+    draw_section("Descricao", proposta.descricao or "-")
+    if proposta.observacao_cliente:
+        draw_section("Observacao", proposta.observacao_cliente)
+
+    anexos = list(proposta.anexos.all())
+    if anexos:
+        ensure_space(70)
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.setFillColor(colors.HexColor("#b45309"))
+        pdf.drawString(left, y, "Anexos")
+        y -= 14
+        pdf.setFillColor(colors.black)
+        pdf.setFont("Helvetica", 9)
+        for anexo in anexos:
+            ensure_space(60)
+            nome_arquivo = os.path.basename(anexo.arquivo.name) if anexo.arquivo else "-"
+            linha = f"- {anexo.get_tipo_display()}: {nome_arquivo}"
+            for idx, ln in enumerate(split_lines(linha, font_size=9, max_width=usable_width)):
+                pdf.drawString(left + (0 if idx == 0 else 10), y, ln)
+                y -= 12
+
+    pdf.setFont("Helvetica", 8)
+    pdf.setFillColor(colors.HexColor("#6b7280"))
+    pdf.drawRightString(right, 20, f"Gerado em {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}")
+
+    pdf.save()
+    buffer.seek(0)
+    return buffer
+
+
 @login_required
 def ios_rack_io_list(request, pk):
     cliente = _get_cliente(request.user)
@@ -3661,8 +3842,7 @@ def _build_proposta_sections(user, cliente, tipo, status_filter, search_term=Non
         valor__gt=0,
         finalizada=False,
     ).order_by("-criado_em")
-    if tipo == "recebidas":
-        executando = tipo_qs.filter(andamento="EXECUTANDO", finalizada=False).order_by("-criado_em")
+    executando = tipo_qs.filter(andamento="EXECUTANDO", finalizada=False).order_by("-criado_em")
     levantamento = tipo_qs.filter(aprovada__isnull=True, finalizada=False).filter(
         Q(valor=0) | Q(valor__isnull=True)
     ).order_by("-criado_em")
@@ -3928,18 +4108,7 @@ def proposta_detail(request, pk):
             else:
                 proposta.delete()
                 return redirect("propostas")
-    if proposta.finalizada:
-        status_label = "Finalizada"
-    elif proposta.andamento == "EXECUTANDO":
-        status_label = "Executando"
-    elif proposta.aprovada is True:
-        status_label = "Aprovada"
-    elif proposta.aprovada is False:
-        status_label = "Reprovada"
-    elif proposta.valor is None or proposta.valor == 0:
-        status_label = "Levantamento"
-    else:
-        status_label = "Pendente"
+    status_label = _proposta_status_label(proposta)
     return render(
         request,
         "core/proposta_detail.html",
@@ -3950,6 +4119,39 @@ def proposta_detail(request, pk):
             "status_label": status_label,
         },
     )
+
+
+@login_required
+def proposta_export_pdf(request, pk):
+    cliente = _get_cliente(request.user)
+    if cliente:
+        proposta_qs = Proposta.objects.select_related(
+            "cliente",
+            "criada_por",
+            "origem_trabalho",
+            "origem_trabalho__radar",
+        ).prefetch_related("anexos").filter(Q(criada_por=request.user) | Q(cliente=cliente))
+        proposta = get_object_or_404(proposta_qs, pk=pk)
+    else:
+        proposta = get_object_or_404(
+            Proposta.objects.select_related(
+                "cliente",
+                "criada_por",
+                "origem_trabalho",
+                "origem_trabalho__radar",
+            ).prefetch_related("anexos"),
+            pk=pk,
+            criada_por=request.user,
+        )
+    status_label = _proposta_status_label(proposta)
+    pdf_buffer = _render_proposta_pdf(proposta, status_label)
+    if not pdf_buffer:
+        return HttpResponse("Biblioteca de PDF indisponivel (reportlab).", status=500)
+    base_name = proposta.codigo or f"proposta_{proposta.id}"
+    filename = re.sub(r"[^A-Za-z0-9_-]+", "_", str(base_name)).strip("_") or f"proposta_{proposta.id}"
+    response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}.pdf"'
+    return response
 
 
 @login_required

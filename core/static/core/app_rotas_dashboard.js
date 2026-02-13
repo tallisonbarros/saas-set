@@ -15,7 +15,7 @@
   var state = {};
   try {
     state = JSON.parse(stateNode.textContent || "{}");
-  } catch (error) {
+  } catch (_error) {
     return;
   }
 
@@ -43,6 +43,7 @@
     cardsContainer: document.getElementById("rotas-cards-container"),
     eventsContainer: document.getElementById("recent-events-container"),
     syncStatus: document.getElementById("dashboard-sync-status"),
+    liveBadge: document.getElementById("dashboard-live-badge"),
   };
 
   function createElement(tagName, className, text) {
@@ -67,6 +68,23 @@
     return parts[2] + "/" + parts[1] + "/" + parts[0];
   }
 
+  function isLiveMode() {
+    return !!(state.follow_now && state.showing_now && state.selected_day === state.now_day);
+  }
+
+  function clearPollTimer() {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function enterHistoricalMode() {
+    state.follow_now = false;
+    clearPollTimer();
+    renderLiveBadge();
+  }
+
   function setSyncStatus(mode) {
     if (!els.syncStatus) {
       return;
@@ -80,6 +98,16 @@
       return;
     }
     els.syncStatus.textContent = "";
+  }
+
+  function renderLiveBadge() {
+    if (!els.liveBadge) {
+      return;
+    }
+    var live = isLiveMode();
+    els.liveBadge.textContent = live ? "AO VIVO" : "PAUSADO";
+    els.liveBadge.classList.toggle("is-live", live);
+    els.liveBadge.classList.toggle("is-paused", !live);
   }
 
   function updateTimelineNote() {
@@ -116,9 +144,7 @@
         var option = createElement("option");
         option.value = dayIso;
         option.textContent = formatDayLabel(dayIso);
-        if (dayIso === state.selected_day) {
-          option.selected = true;
-        }
+        option.selected = dayIso === state.selected_day;
         fragment.appendChild(option);
       }
       els.daySelect.replaceChildren(fragment);
@@ -182,6 +208,123 @@
     }
   }
 
+  function buildCardNode() {
+    var card = createElement("a", "panel-card rota-card");
+    card.draggable = true;
+
+    var top = createElement("div", "panel-card-top");
+    var left = createElement("div");
+    var title = createElement("div", "panel-title");
+    title.dataset.role = "title";
+    var prefix = createElement("div", "muted rota-prefix");
+    prefix.dataset.role = "prefix";
+    left.appendChild(title);
+    left.appendChild(prefix);
+    top.appendChild(left);
+    top.appendChild(createElement("div", "rota-drag-hint", "::"));
+    card.appendChild(top);
+
+    var main = createElement("div", "rota-main");
+    main.dataset.role = "main";
+    card.appendChild(main);
+
+    var status = createElement("div", "rota-status");
+    var play = createElement("span", "status-chip", "Play");
+    play.dataset.role = "play";
+    var pause = createElement("span", "status-chip", "Pause");
+    pause.dataset.role = "pause";
+    status.appendChild(play);
+    status.appendChild(pause);
+    card.appendChild(status);
+
+    var context = createElement("div", "muted rota-context-status");
+    context.dataset.role = "context";
+    card.appendChild(context);
+
+    return card;
+  }
+
+  function ensureCommOverlay(card) {
+    var overlay = card.querySelector(".rota-comm-overlay");
+    if (!overlay) {
+      overlay = createElement("div", "rota-comm-overlay");
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.appendChild(createElement("span", "rota-comm-icon", "X"));
+      var lastSeen = createElement("span", "rota-comm-last-seen");
+      lastSeen.dataset.role = "overlay-last-seen";
+      overlay.appendChild(lastSeen);
+      card.appendChild(overlay);
+    }
+    return overlay;
+  }
+
+  function applyCardState(card, rota) {
+    card.href = rota.detail_url || "#";
+    card.dataset.prefix = rota.prefixo || "";
+
+    card.className = "panel-card rota-card";
+    if (rota.play_blink) {
+      card.classList.add("is-play-blink");
+    } else if (rota.play_on) {
+      card.classList.add("is-play-on");
+    }
+    if (rota.pause_on) {
+      card.classList.add("is-pause-on");
+    }
+    if (!state.lifebit_connected) {
+      card.classList.add("is-comm-down");
+    }
+
+    var title = card.querySelector('[data-role="title"]');
+    var prefix = card.querySelector('[data-role="prefix"]');
+    var main = card.querySelector('[data-role="main"]');
+    var context = card.querySelector('[data-role="context"]');
+    var play = card.querySelector('[data-role="play"]');
+    var pause = card.querySelector('[data-role="pause"]');
+
+    if (title) {
+      title.textContent = rota.titulo || rota.prefixo || "-";
+    }
+    if (prefix) {
+      prefix.textContent = rota.prefixo || "";
+      prefix.style.display = rota.nome_exibicao ? "" : "none";
+    }
+    if (main) {
+      main.textContent = (rota.origem_display || "--") + " > " + (rota.destino_display || "--");
+    }
+    if (context) {
+      context.textContent = rota.context_status || "Estado indefinido";
+    }
+    if (play) {
+      play.className = "status-chip";
+      if (rota.play_blink) {
+        play.classList.add("is-blink");
+      } else if (rota.play_on) {
+        play.classList.add("is-active");
+      }
+    }
+    if (pause) {
+      pause.className = "status-chip";
+      if (rota.pause_on) {
+        pause.classList.add("is-active");
+        pause.classList.add("pause");
+      }
+    }
+
+    if (!state.lifebit_connected) {
+      var overlay = ensureCommOverlay(card);
+      var lastSeen = overlay.querySelector('[data-role="overlay-last-seen"]');
+      if (lastSeen) {
+        lastSeen.textContent = "Ultima conexao lida: " + (state.lifebit_last_seen || "-");
+      }
+    } else {
+      var currentOverlay = card.querySelector(".rota-comm-overlay");
+      if (currentOverlay) {
+        currentOverlay.remove();
+      }
+    }
+  }
+
   function renderCards() {
     if (!els.cardsContainer) {
       return;
@@ -193,72 +336,44 @@
       return;
     }
 
-    var grid = createElement("div", "rotas-grid");
-    grid.id = "rotas-grid";
-
-    for (var i = 0; i < cards.length; i += 1) {
-      var rota = cards[i];
-      var cardClass = "panel-card rota-card";
-      if (rota.play_blink) {
-        cardClass += " is-play-blink";
-      } else if (rota.play_on) {
-        cardClass += " is-play-on";
-      }
-      if (rota.pause_on) {
-        cardClass += " is-pause-on";
-      }
-      if (!state.lifebit_connected) {
-        cardClass += " is-comm-down";
-      }
-
-      var card = createElement("a", cardClass);
-      card.href = rota.detail_url || "#";
-      card.dataset.prefix = rota.prefixo || "";
-      card.draggable = true;
-
-      var top = createElement("div", "panel-card-top");
-      var left = createElement("div");
-      left.appendChild(createElement("div", "panel-title", rota.titulo || rota.prefixo || "-"));
-      if (rota.nome_exibicao) {
-        left.appendChild(createElement("div", "muted rota-prefix", rota.prefixo || ""));
-      }
-      top.appendChild(left);
-      top.appendChild(createElement("div", "rota-drag-hint", "::"));
-      card.appendChild(top);
-
-      card.appendChild(createElement("div", "rota-main", (rota.origem_display || "--") + " > " + (rota.destino_display || "--")));
-
-      var status = createElement("div", "rota-status");
-      var play = createElement("span", "status-chip", "Play");
-      if (rota.play_blink) {
-        play.classList.add("is-blink");
-      } else if (rota.play_on) {
-        play.classList.add("is-active");
-      }
-      status.appendChild(play);
-
-      var pause = createElement("span", "status-chip", "Pause");
-      if (rota.pause_on) {
-        pause.classList.add("is-active");
-        pause.classList.add("pause");
-      }
-      status.appendChild(pause);
-      card.appendChild(status);
-
-      card.appendChild(createElement("div", "muted rota-context-status", rota.context_status || "Estado indefinido"));
-
-      if (!state.lifebit_connected) {
-        var overlay = createElement("div", "rota-comm-overlay");
-        overlay.setAttribute("aria-hidden", "true");
-        overlay.appendChild(createElement("span", "rota-comm-icon", "X"));
-        overlay.appendChild(createElement("span", "rota-comm-last-seen", "Ultima conexao lida: " + (state.lifebit_last_seen || "-")));
-        card.appendChild(overlay);
-      }
-
-      grid.appendChild(card);
+    var grid = document.getElementById("rotas-grid");
+    if (!grid) {
+      grid = createElement("div", "rotas-grid");
+      grid.id = "rotas-grid";
+      els.cardsContainer.replaceChildren(grid);
     }
 
-    els.cardsContainer.replaceChildren(grid);
+    if (grid.querySelector(".rota-card.is-dragging")) {
+      return;
+    }
+
+    var existing = {};
+    var existingCards = grid.querySelectorAll(".rota-card[data-prefix]");
+    for (var i = 0; i < existingCards.length; i += 1) {
+      existing[existingCards[i].dataset.prefix] = existingCards[i];
+    }
+
+    var seen = {};
+    for (var idx = 0; idx < cards.length; idx += 1) {
+      var rota = cards[idx];
+      var key = rota.prefixo || "";
+      var node = existing[key] || buildCardNode();
+      applyCardState(node, rota);
+      seen[key] = true;
+
+      var atIndexNode = grid.children[idx] || null;
+      if (node !== atIndexNode) {
+        grid.insertBefore(node, atIndexNode);
+      }
+    }
+
+    for (var j = grid.children.length - 1; j >= 0; j -= 1) {
+      var child = grid.children[j];
+      var childKey = child.dataset ? child.dataset.prefix : "";
+      if (childKey && !seen[childKey]) {
+        child.remove();
+      }
+    }
   }
 
   function renderEvents() {
@@ -337,6 +452,7 @@
   }
 
   function renderDashboard() {
+    renderLiveBadge();
     renderLifebit();
     renderDayNavigation();
     renderTimeline();
@@ -392,7 +508,6 @@
     if (followNow) {
       params.set("follow_now", "1");
     }
-
     return params;
   }
 
@@ -401,10 +516,8 @@
   }
 
   function scheduleNextPoll(delayMs) {
-    if (pollTimer) {
-      clearTimeout(pollTimer);
-    }
-    if (state.config_missing) {
+    clearPollTimer();
+    if (state.config_missing || !isLiveMode()) {
       return;
     }
     pollTimer = setTimeout(function () {
@@ -476,7 +589,7 @@
     if (!nextDay) {
       return;
     }
-    state.follow_now = false;
+    enterHistoricalMode();
     refreshState({ selected_day: nextDay, selected_at_iso: "", events_page: 1, follow_now: false });
   }
 
@@ -501,6 +614,7 @@
   }
 
   if (els.timelineRange) {
+    els.timelineRange.addEventListener("pointerdown", enterHistoricalMode);
     els.timelineRange.addEventListener("input", function () {
       var index = Number(els.timelineRange.value);
       var timeline = Array.isArray(state.timeline) ? state.timeline : [];
@@ -508,6 +622,7 @@
       if (!point) {
         return;
       }
+      enterHistoricalMode();
       if (els.timelineReadLabel) {
         els.timelineReadLabel.textContent = point.label;
       }
@@ -515,9 +630,8 @@
         clearTimeout(timelineDebounce);
       }
       timelineDebounce = setTimeout(function () {
-        state.follow_now = false;
         refreshState({ selected_at_iso: point.iso, events_page: 1, follow_now: false });
-      }, 110);
+      }, 120);
     });
   }
 
@@ -552,7 +666,8 @@
       if (page < 1) {
         return;
       }
-      refreshState({ events_page: page, follow_now: state.follow_now });
+      enterHistoricalMode();
+      refreshState({ events_page: page, follow_now: false });
     });
   }
 

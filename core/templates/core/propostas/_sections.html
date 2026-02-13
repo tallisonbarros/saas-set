@@ -1,4 +1,41 @@
 {% if propostas_para_aprovar or propostas_todas or propostas_finalizadas %}
+  {% if tipo_ativo == "enviadas" %}
+    <div class="proposal-section proposal-section-compact">
+      <div class="proposal-section-head">
+        <div>
+          <div class="proposal-section-title">Em execucao</div>
+          <div class="proposal-section-subtitle">Propostas enviadas em andamento.</div>
+        </div>
+      </div>
+      <div class="proposal-grid proposal-grid-compact">
+        {% if propostas_executando %}
+          {% for proposta in propostas_executando %}
+            <article class="proposal-card proposal-card-compact proposal-card-executando proposal-card-sent">
+              <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
+              <div class="proposal-card-head">
+                <div class="proposal-title-line">
+                  <span class="proposal-title">{{ proposta.nome }}</span>
+                </div>
+                <div class="proposal-card-badges">
+                  <span class="badge badge-executando">Executando</span>
+                  <span class="proposal-tag">Enviada</span>
+                </div>
+              </div>
+              <div class="proposal-card-footer">
+                <span class="proposal-code">{{ proposta.codigo }}</span>
+              </div>
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="proposal-card proposal-card-empty">
+            <div class="proposal-title">Sem propostas em execucao</div>
+            <div class="proposal-meta">Nenhuma proposta enviada em andamento.</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
   <div class="proposal-section">
     <div class="proposal-section-head">
       <div>
@@ -31,20 +68,17 @@
               </div>
               <div class="proposal-card-meta">
                 <div class="proposal-meta-item">
-                  <span class="meta-label">Valor</span>
                   <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
                 </div>
                 <div class="proposal-meta-item">
-                  <span class="meta-label">Para</span>
                   <span class="meta-value">{{ proposta.cliente.nome|default:"Sistema" }}</span>
                 </div>
                 <div class="proposal-meta-item">
-                  <span class="meta-label">De</span>
                   <span class="meta-value">Voce</span>
                 </div>
                 <div class="proposal-meta-item">
                   <span class="meta-label">Criada em</span>
-                  <span class="meta-value">{{ proposta.criado_em|date:"d/m/Y" }}</span>
+                  <span class="meta-value proposal-meta-date">{{ proposta.criado_em|date:"d/m/Y" }}</span>
                 </div>
               </div>
               <div class="proposal-card-footer">
@@ -217,11 +251,11 @@
             </div>
             <div class="proposal-card-meta">
               <div class="proposal-meta-item">
-                <span class="meta-label">Valor</span>
+                {% if tipo_ativo != "enviadas" %}<span class="meta-label">Valor</span>{% endif %}
                 <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
               </div>
               <div class="proposal-meta-item">
-                <span class="meta-label">{% if tipo_ativo == "enviadas" %}Para{% else %}De{% endif %}</span>
+                {% if tipo_ativo != "enviadas" %}<span class="meta-label">De</span>{% endif %}
                 <span class="meta-value">
                   {% if tipo_ativo == "enviadas" %}
                     {{ proposta.cliente.nome|default:"Sistema" }}
@@ -231,7 +265,7 @@
                 </span>
               </div>
               <div class="proposal-meta-item">
-                <span class="meta-label">{% if tipo_ativo == "enviadas" %}De{% else %}Para{% endif %}</span>
+                {% if tipo_ativo != "enviadas" %}<span class="meta-label">Para</span>{% endif %}
                 <span class="meta-value">Voce</span>
               </div>
               <div class="proposal-meta-item">
@@ -297,11 +331,11 @@
                     </div>
                     <div class="proposal-card-meta">
                       <div class="proposal-meta-item">
-                        <span class="meta-label">Valor</span>
+                        {% if tipo_ativo != "enviadas" %}<span class="meta-label">Valor</span>{% endif %}
                         <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
                       </div>
                       <div class="proposal-meta-item">
-                        <span class="meta-label">{% if tipo_ativo == "enviadas" %}Para{% else %}De{% endif %}</span>
+                        {% if tipo_ativo != "enviadas" %}<span class="meta-label">De</span>{% endif %}
                         <span class="meta-value">
                           {% if tipo_ativo == "enviadas" %}
                             {{ proposta.cliente.nome|default:"Sistema" }}
@@ -311,12 +345,12 @@
                         </span>
                       </div>
                       <div class="proposal-meta-item">
-                        <span class="meta-label">{% if tipo_ativo == "enviadas" %}De{% else %}Para{% endif %}</span>
+                        {% if tipo_ativo != "enviadas" %}<span class="meta-label">Para</span>{% endif %}
                         <span class="meta-value">Voce</span>
                       </div>
                       <div class="proposal-meta-item">
                         <span class="meta-label">Criada em</span>
-                        <span class="meta-value">{{ proposta.criado_em|date:"d/m/Y" }}</span>
+                        <span class="meta-value{% if tipo_ativo == 'enviadas' %} proposal-meta-date{% endif %}">{{ proposta.criado_em|date:"d/m/Y" }}</span>
                       </div>
                     </div>
                     {% if proposta.aprovada == None and proposta.valor and proposta.cliente.usuario_id == request.user.id %}

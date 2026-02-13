@@ -53,6 +53,7 @@ urlpatterns = [
         name="proposta_nova_de_trabalho",
     ),
     path('propostas/nova/', views.proposta_nova_vendedor, name="proposta_nova_vendedor"),
+    path('propostas/<int:pk>/pdf/', views.proposta_export_pdf, name="proposta_export_pdf"),
     path('propostas/<int:pk>/', views.proposta_detail, name="proposta_detail"),
     path('propostas/<int:pk>/aprovar/', views.aprovar_proposta, name="aprovar_proposta"),
     path('propostas/<int:pk>/reprovar/', views.reprovar_proposta, name="reprovar_proposta"),

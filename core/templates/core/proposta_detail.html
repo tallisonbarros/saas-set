@@ -21,6 +21,7 @@
         <div class="hud-pill">Resumo</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'propostas' %}">Inicio do modulo</a>
+          <a class="hud-menu-pill" href="{% url 'proposta_export_pdf' proposta.pk %}" target="_blank" rel="noopener noreferrer">Exportar PDF</a>
         </div>
       </div>
       <div class="page-hud-head">
@@ -31,6 +32,23 @@
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
+    {% endif %}
+    {% if proposta.aprovada == None and proposta.valor and proposta.cliente.usuario_id == request.user.id %}
+      <div class="proposal-block">
+        <div class="proposal-block-head">
+          <h2 class="proposal-block-title">Aprovacao</h2>
+        </div>
+        <div class="proposal-card-actions">
+          <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-primary btn-aprovar-pulse" type="submit">Aprovar</button>
+          </form>
+          <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-outline" type="submit">Reprovar</button>
+          </form>
+        </div>
+      </div>
     {% endif %}
     <div class="proposal-detail-flow">
         <div class="proposal-block proposal-block-description">
@@ -195,23 +213,6 @@
               <input type="hidden" name="action" value="delete_proposta">
               <button class="btn btn-outline" type="submit">Excluir proposta</button>
             </form>
-          </div>
-        {% endif %}
-        {% if proposta.aprovada == None and proposta.valor and proposta.cliente.usuario_id == request.user.id %}
-          <div class="proposal-block">
-            <div class="proposal-block-head">
-              <h2 class="proposal-block-title">Aprovacao</h2>
-            </div>
-            <div class="form-actions">
-              <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
-                {% csrf_token %}
-                <button class="btn btn-primary" type="submit">Aprovar</button>
-              </form>
-              <form method="post" action="{% url 'reprovar_proposta' proposta.pk %}">
-                {% csrf_token %}
-                <button class="btn btn-outline" type="submit">Reprovar</button>
-              </form>
-            </div>
           </div>
         {% endif %}
     </div>
