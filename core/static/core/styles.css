@@ -804,6 +804,48 @@ body {
   border-top: 1px dashed rgba(122, 107, 96, 0.3);
 }
 
+.proposal-pdf-corner {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(122, 107, 96, 0.35);
+  background: rgba(255, 255, 255, 0.74);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.proposal-pdf-corner img {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.proposal-hud-pdf-corner {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(122, 107, 96, 0.35);
+  background: rgba(255, 255, 255, 0.75);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.proposal-hud-pdf-corner img {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
 .proposal-card-badges {
   display: flex;
   flex-direction: column;

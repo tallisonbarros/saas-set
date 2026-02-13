@@ -21,7 +21,6 @@
         <div class="hud-pill">Resumo</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'propostas' %}">Inicio do modulo</a>
-          <a class="hud-menu-pill" href="{% url 'proposta_export_pdf' proposta.pk %}" target="_blank" rel="noopener noreferrer">Exportar PDF</a>
         </div>
       </div>
       <div class="page-hud-head">
@@ -29,6 +28,9 @@
           <h1 class="page-title">{{ proposta.nome }}</h1>
         </div>
       </div>
+      <a class="proposal-hud-pdf-corner" href="{% url 'proposta_export_pdf' proposta.pk %}" target="_blank" rel="noopener noreferrer" title="Exportar PDF" aria-label="Exportar proposta em PDF">
+        <img src="{% static 'core/IconePdfDownload.png' %}" alt="PDF">
+      </a>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
