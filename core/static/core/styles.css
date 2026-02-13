@@ -484,7 +484,7 @@ body {
 .proposal-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 600px));
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
   justify-content: flex-start;
 }
 
@@ -559,8 +559,14 @@ body {
 }
 
 .proposal-grid-compact {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 600px));
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
   justify-content: flex-start;
+}
+
+.proposal-grid > .proposal-card,
+.proposal-grid-compact > .proposal-card {
+  width: 100%;
+  max-width: 400px;
 }
 
 .proposal-section-head {
