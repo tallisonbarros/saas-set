@@ -1,7 +1,7 @@
 {% if cards %}
   <div class="rotas-grid" id="rotas-grid">
     {% for rota in cards %}
-      <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %} {% if not lifebit_connected and showing_now %}is-comm-down{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?dia={{ selected_day|date:'Y-m-d' }}&at={{ selected_at_iso }}" data-prefix="{{ rota.prefixo }}" draggable="true">
+      <a class="panel-card rota-card {% if rota.play_blink %}is-play-blink{% elif rota.play_on %}is-play-on{% endif %} {% if rota.pause_on %}is-pause-on{% endif %}" href="{% url 'app_rotas_detalhe' rota.prefixo %}?dia={{ selected_day|date:'Y-m-d' }}&at={{ selected_at_iso }}" data-prefix="{{ rota.prefixo }}" draggable="true">
         <div class="panel-card-top">
           <div>
             <div class="panel-title" data-role="title">{{ rota.titulo }}</div>
@@ -19,11 +19,9 @@
           <span class="status-chip {% if rota.pause_on %}is-active pause{% endif %}" data-role="pause">Pause</span>
         </div>
         <div class="muted rota-context-status" data-role="context">{{ rota.context_status }}</div>
-        {% if not lifebit_connected and showing_now %}
-          <div class="rota-comm-overlay" aria-hidden="true">
-            <span class="rota-comm-icon">⛓</span>
-            <span class="rota-comm-last-seen" data-role="overlay-last-seen">Ultima conexao lida: {{ lifebit_last_seen }}</span>
-          </div>
+        {% if not lifebit_connected %}
+          <span class="rota-comm-badge" aria-hidden="true"></span>
+          <div class="muted rota-comm-footnote" data-role="comm-last-seen">Ultima leitura: {{ lifebit_last_seen }}</div>
         {% endif %}
       </a>
     {% endfor %}

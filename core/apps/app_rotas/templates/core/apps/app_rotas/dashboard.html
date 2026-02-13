@@ -43,24 +43,6 @@
       </section>
     {% endif %}
 
-    <section id="rotas-section" class="card rotas-state-shell {% if showing_now %}is-live{% else %}is-history{% endif %}">
-      <div class="io-card-head timeline-global-head">
-        <h2 class="io-title">Linha do tempo global</h2>
-        <div class="lifebit-state-head">
-          <span id="dashboard-sync-status" class="muted sync-status" aria-live="polite"></span>
-          <span
-            id="lifebit-badge"
-            class="panel-tag comm-pill {% if lifebit_connected %}comm-on{% else %}comm-off{% endif %}"
-            title="Ultimo LIFEBIT: {{ lifebit_last_seen }}"
-          >{{ lifebit_label }}</span>
-          <span id="lifebit-last-seen" class="muted comm-last-seen {% if lifebit_connected %}is-hidden{% endif %}">
-            Ultima conexao lida: {{ lifebit_last_seen }}
-          </span>
-        </div>
-      </div>
-      <p class="muted timeline-note" id="timeline-global-note">Nota: estado aplicado em <span id="selected-at-note">{{ selected_at_label }}</span> (<span id="total-events-note">{{ total_events }}</span> eventos processados, limite {{ max_records }} registros).</p>
-    </section>
-
     <section class="card rotas-state-shell {% if showing_now %}is-live{% else %}is-history{% endif %}">
       <div class="io-card-head">
         <div class="rotas-header-state">
@@ -80,34 +62,47 @@
             <span class="mode-chip-dot" aria-hidden="true"></span>
             <span class="mode-chip-prefix">Modo:</span>
             <strong id="dashboard-live-badge" class="mode-chip-state">{% if showing_now %}Ao vivo{% else %}Historico{% endif %}</strong>
-            <span id="timeline-back-action" class="mode-chip-action">{% if showing_now %}Sincronizando agora{% else %}Ir para ao vivo{% endif %}</span>
+            <span id="timeline-back-action" class="mode-chip-action {% if showing_now %}is-hidden{% endif %}">Ir para ao vivo</span>
           </a>
           <p id="timeline-back-hint" class="mode-chip-hint {% if showing_now %}is-hidden{% endif %}">clique para voltar ao vivo</p>
         </div>
-        <form method="get" class="io-form day-nav-form in-section" id="day-nav-form">
-          <input type="hidden" name="at" value="{{ selected_at_iso }}">
-          <div class="day-nav-capsule">
-            {% if prev_day %}
-              <button class="day-arrow" id="day-prev-button" type="submit" name="nav_dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
-            {% else %}
-              <button class="day-arrow" id="day-prev-button" type="button" disabled aria-label="Dia anterior">&lt;</button>
-            {% endif %}
-            <label class="field day-picker-field">
-              <input
-                id="day-select"
-                type="date"
-                name="dia"
-                value="{{ selected_day|date:'Y-m-d' }}"
-                data-available-days="{% for day in available_days %}{{ day|date:'Y-m-d' }}{% if not forloop.last %},{% endif %}{% endfor %}"
-              >
-            </label>
-            {% if next_day %}
-              <button class="day-arrow" id="day-next-button" type="submit" name="nav_dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
-            {% else %}
-              <button class="day-arrow" id="day-next-button" type="button" disabled aria-label="Dia seguinte">&gt;</button>
-            {% endif %}
+        <div class="rotas-header-tools">
+          <div class="lifebit-state-head">
+            <span id="dashboard-sync-status" class="muted sync-status" aria-live="polite"></span>
+            <span
+              id="lifebit-badge"
+              class="panel-tag comm-pill {% if lifebit_connected %}comm-on{% else %}comm-off{% endif %}"
+              title="Ultimo LIFEBIT: {{ lifebit_last_seen }}"
+            >{{ lifebit_label }}</span>
+            <span id="lifebit-last-seen" class="muted comm-last-seen {% if lifebit_connected %}is-hidden{% endif %}">
+              Ultima conexao lida: {{ lifebit_last_seen }}
+            </span>
           </div>
-        </form>
+          <form method="get" class="io-form day-nav-form in-section" id="day-nav-form">
+            <input type="hidden" name="at" value="{{ selected_at_iso }}">
+            <div class="day-nav-capsule">
+              {% if prev_day %}
+                <button class="day-arrow" id="day-prev-button" type="submit" name="nav_dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
+              {% else %}
+                <button class="day-arrow" id="day-prev-button" type="button" disabled aria-label="Dia anterior">&lt;</button>
+              {% endif %}
+              <label class="field day-picker-field">
+                <input
+                  id="day-select"
+                  type="date"
+                  name="dia"
+                  value="{{ selected_day|date:'Y-m-d' }}"
+                  data-available-days="{% for day in available_days %}{{ day|date:'Y-m-d' }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                >
+              </label>
+              {% if next_day %}
+                <button class="day-arrow" id="day-next-button" type="submit" name="nav_dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
+              {% else %}
+                <button class="day-arrow" id="day-next-button" type="button" disabled aria-label="Dia seguinte">&gt;</button>
+              {% endif %}
+            </div>
+          </form>
+        </div>
       </div>
       <p class="muted">Navegue na linha do tempo e veja os status da hora desejada.</p>
       {% if timeline %}
@@ -146,6 +141,7 @@
         {% include "core/apps/app_rotas/_rotas_cards.html" %}
       </div>
       <p class="muted" id="rotas-order-status" style="min-height: 16px;"></p>
+      <p class="muted timeline-note timeline-note-footer" id="timeline-global-note">Nota: estado aplicado em <span id="selected-at-note">{{ selected_at_label }}</span> (<span id="total-events-note">{{ total_events }}</span> eventos processados, limite {{ max_records }} registros).</p>
     </section>
 
     <section class="card">
@@ -173,7 +169,7 @@
       text-transform: uppercase;
     }
     .day-nav-form { display: flex; justify-content: center; }
-    .day-nav-form.in-section { margin-left: auto; align-self: flex-start; }
+    .day-nav-form.in-section { margin-left: 0; align-self: flex-start; }
     .day-nav-capsule {
       position: relative;
       display: inline-flex;
@@ -238,6 +234,7 @@
       border-width: 1px;
       border-style: solid;
       transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+      position: relative;
     }
     .rotas-state-shell.is-history {
       --timeline-track-1: rgba(245, 158, 11, 0.34);
@@ -261,7 +258,13 @@
       border-color: rgba(74, 222, 128, .62);
       box-shadow: 0 0 0 1px rgba(74, 222, 128, .22) inset, 0 0 0 6px rgba(74, 222, 128, .10);
     }
-    .timeline-global-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .rotas-header-tools {
+      margin-left: auto;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
     .lifebit-state-head { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .sync-status { min-height: 14px; font-size: .74rem; opacity: .84; }
     .rotas-header-state {
@@ -287,6 +290,10 @@
       letter-spacing: .08em;
       border: 1px solid transparent;
       line-height: 1;
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 2;
     }
     .hud-live-short.is-live {
       color: #dcfce7;
@@ -366,6 +373,7 @@
       margin-left: 2px;
       opacity: .95;
     }
+    .mode-chip-action.is-hidden { display: none; }
     .mode-chip.is-history .mode-chip-action {
       color: #67e8f9;
       border-color: rgba(103, 232, 249, .35);
@@ -399,8 +407,8 @@
     }
     @media (max-width: 760px) {
       .io-card-head { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
-      .day-nav-form.in-section { margin-left: 0; align-self: center; width: 100%; justify-content: center; }
-      .timeline-global-head { align-items: stretch; }
+      .day-nav-form.in-section { align-self: center; width: 100%; justify-content: center; }
+      .rotas-header-tools { margin-left: 0; align-items: stretch; }
       .lifebit-state-head { align-items: flex-start; }
     }
     .rotas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
@@ -457,57 +465,42 @@
       border-color: rgba(34, 197, 94, 0.55) !important;
       box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.22);
     }
-    .rota-card.is-comm-down {
-      position: relative;
-      filter: saturate(.55) brightness(.58);
-      pointer-events: none;
-      user-select: none;
-    }
-    .rota-card.is-comm-down .rota-status .status-chip {
-      opacity: .6;
-    }
-    .rota-comm-overlay {
+    .rota-comm-badge {
       position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: rgba(10, 14, 24, 0.42);
-      border-radius: inherit;
-      z-index: 2;
+      right: 10px;
+      bottom: 10px;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(248, 113, 113, 0.85);
+      background: rgba(127, 29, 29, 0.42);
+      box-shadow: 0 0 0 1px rgba(127, 29, 29, 0.25) inset;
+      pointer-events: none;
     }
-    .rota-comm-icon {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 72px;
-      height: 72px;
-      color: #fca5a5;
-      font-size: 2.4rem;
-      line-height: 1;
-      opacity: .92;
-      text-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
-    }
-    .rota-comm-icon::after {
+    .rota-comm-badge::before,
+    .rota-comm-badge::after {
       content: "";
       position: absolute;
-      width: 82%;
-      height: 4px;
-      background: #ef4444;
-      transform: rotate(-35deg);
-      border-radius: 99px;
-      box-shadow: 0 0 8px rgba(239, 68, 68, 0.48);
+      left: 3px;
+      right: 3px;
+      top: 7px;
+      height: 2px;
+      border-radius: 999px;
+      background: rgba(254, 202, 202, 0.9);
+      transform-origin: center;
     }
-    .rota-comm-last-seen {
-      font-size: .75rem;
-      font-weight: 700;
+    .rota-comm-badge::before { transform: rotate(34deg); }
+    .rota-comm-badge::after { transform: rotate(-34deg); opacity: .58; }
+    .rota-comm-footnote {
+      margin-top: 6px;
+      font-size: .71rem;
       letter-spacing: .01em;
-      color: #fecaca;
-      text-align: center;
-      max-width: 86%;
+      color: #fda4af;
+      opacity: .88;
+      max-width: calc(100% - 30px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .rota-main { font-weight: 700; font-size: 1rem; }
     .rota-prefix { font-size: .76rem; margin-top: 2px; }
@@ -763,6 +756,10 @@
       opacity: .82;
     }
     .timeline-note { margin-top: 10px; font-size: .82rem; opacity: .88; }
+    .timeline-note-footer {
+      margin-top: 12px;
+      margin-bottom: 0;
+    }
     @keyframes rotaBlink {
       0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.62); }
       50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }

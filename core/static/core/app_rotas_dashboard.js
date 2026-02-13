@@ -264,7 +264,8 @@
       els.timelineBackNow.setAttribute("title", live ? "Modo ao vivo" : "Ir para ao vivo");
     }
     if (els.liveAction) {
-      els.liveAction.textContent = live ? "Sincronizando agora" : "Ir para ao vivo";
+      els.liveAction.textContent = "Ir para ao vivo";
+      els.liveAction.classList.toggle("is-hidden", live);
     }
     if (els.liveHint) {
       els.liveHint.classList.toggle("is-hidden", live);
@@ -686,18 +687,20 @@
     return card;
   }
 
-  function ensureCommOverlay(card) {
-    var overlay = card.querySelector(".rota-comm-overlay");
-    if (!overlay) {
-      overlay = createElement("div", "rota-comm-overlay");
-      overlay.setAttribute("aria-hidden", "true");
-      overlay.appendChild(createElement("span", "rota-comm-icon", "X"));
-      var lastSeen = createElement("span", "rota-comm-last-seen");
-      lastSeen.dataset.role = "overlay-last-seen";
-      overlay.appendChild(lastSeen);
-      card.appendChild(overlay);
+  function ensureCommDisconnectedUi(card) {
+    var badge = card.querySelector(".rota-comm-badge");
+    if (!badge) {
+      badge = createElement("span", "rota-comm-badge");
+      badge.setAttribute("aria-hidden", "true");
+      card.appendChild(badge);
     }
-    return overlay;
+    var footnote = card.querySelector('[data-role="comm-last-seen"]');
+    if (!footnote) {
+      footnote = createElement("div", "muted rota-comm-footnote");
+      footnote.dataset.role = "comm-last-seen";
+      card.appendChild(footnote);
+    }
+    return { badge: badge, footnote: footnote };
   }
 
   function applyCardState(card, rota) {
@@ -712,10 +715,6 @@
     }
     if (rota.pause_on) {
       card.classList.add("is-pause-on");
-    }
-    var commBlocked = !state.lifebit_connected && isLiveMode();
-    if (commBlocked) {
-      card.classList.add("is-comm-down");
     }
     if (timelineLoadingCards) {
       card.classList.add("is-timeline-loading");
@@ -757,17 +756,18 @@
       }
     }
 
-    if (commBlocked) {
-      var overlay = ensureCommOverlay(card);
-      var lastSeen = overlay.querySelector('[data-role="overlay-last-seen"]');
-      if (lastSeen) {
-        lastSeen.textContent = "Ultima conexao lida: " + (state.lifebit_last_seen || "-");
+    if (!state.lifebit_connected) {
+      var commUi = ensureCommDisconnectedUi(card);
+      if (commUi.footnote) {
+        commUi.footnote.textContent = "Ultima leitura: " + (state.lifebit_last_seen || "-");
       }
     } else {
-      var currentOverlay = card.querySelector(".rota-comm-overlay");
-      if (currentOverlay) {
-        currentOverlay.remove();
-      }
+      var currentBadge = card.querySelector(".rota-comm-badge");
+      if (currentBadge) { currentBadge.remove(); }
+      var currentFootnote = card.querySelector('[data-role="comm-last-seen"]');
+      if (currentFootnote) { currentFootnote.remove(); }
+      var oldOverlay = card.querySelector(".rota-comm-overlay");
+      if (oldOverlay) { oldOverlay.remove(); }
     }
 
     var loadingClock = card.querySelector(".rota-card-loading-clock");
