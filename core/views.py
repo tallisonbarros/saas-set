@@ -588,34 +588,7 @@ def _radar_trabalho_schema_ready():
 
 
 def _descricao_proposta_de_trabalho(trabalho):
-    linhas = [
-        "Origem tecnica",
-        f"Radar: {trabalho.radar.nome}",
-        f"Trabalho: {trabalho.nome}",
-    ]
-    if trabalho.descricao:
-        linhas.append(f"Descricao do trabalho: {trabalho.descricao}")
-    if trabalho.setor:
-        linhas.append(f"Setor: {trabalho.setor}")
-    if trabalho.solicitante:
-        linhas.append(f"Solicitante: {trabalho.solicitante}")
-    if trabalho.responsavel:
-        linhas.append(f"Responsavel: {trabalho.responsavel}")
-    if trabalho.contrato:
-        linhas.append(f"Contrato: {trabalho.contrato.nome}")
-    if trabalho.classificacao:
-        linhas.append(f"Classificacao: {trabalho.classificacao.nome}")
-    linhas.append(f"Data de registro: {trabalho.data_registro.strftime('%d/%m/%Y')}")
-    linhas.append("")
-    linhas.append("Resumo das atividades")
-    atividades = list(trabalho.atividades.all())
-    if atividades:
-        for atividade in atividades:
-            descricao = atividade.descricao or "Sem descricao"
-            linhas.append(f"- {atividade.nome}: {descricao}")
-    else:
-        linhas.append("- Nenhuma atividade cadastrada.")
-    return "\n".join(linhas)
+    return (trabalho.descricao or "").strip()
 
 
 def home(request):
