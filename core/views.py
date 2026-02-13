@@ -544,6 +544,8 @@ def _sync_trabalho_status(trabalho):
 
 
 def _get_radar_trabalho_acessivel(user, trabalho_pk):
+    if not _radar_trabalho_schema_ready():
+        return None
     cliente = _get_cliente(user)
     trabalhos = RadarTrabalho.objects.select_related(
         "radar",
@@ -560,6 +562,29 @@ def _get_radar_trabalho_acessivel(user, trabalho_pk):
         Q(pk=trabalho_pk),
         Q(radar__cliente=cliente) | Q(radar__id_radar__in=cliente.radares.all()),
     ).first()
+
+
+def _db_column_exists(table_name, column_name):
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = %s
+                  AND column_name = %s
+                LIMIT 1
+                """,
+                [table_name, column_name],
+            )
+            return cursor.fetchone() is not None
+    except DatabaseError:
+        return False
+
+
+def _radar_trabalho_schema_ready():
+    return _db_column_exists("core_radartrabalho", "criado_por_id")
 
 
 def _descricao_proposta_de_trabalho(trabalho):
@@ -1962,8 +1987,8 @@ def _status_badge_class(status_label):
     }.get(normalized, "status-pendente")
 
 
-def _build_proposta_pdf_context(proposta, status_label):
-    origem = proposta.origem_trabalho
+def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
+    origem = proposta.origem_trabalho if include_origem else None
     origem_rows = []
     atividades = []
     if origem:
@@ -2023,13 +2048,13 @@ def _build_proposta_pdf_context(proposta, status_label):
     }
 
 
-def _render_proposta_pdf(proposta, status_label):
+def _render_proposta_pdf(proposta, status_label, include_origem=True):
     try:
         from weasyprint import CSS, HTML
     except ImportError:
         return None
 
-    context = _build_proposta_pdf_context(proposta, status_label)
+    context = _build_proposta_pdf_context(proposta, status_label, include_origem=include_origem)
     html = render_to_string("propostas/proposta_pdf.html", context)
     css_path = finders.find("css/proposta_pdf.css")
     stylesheets = [CSS(filename=css_path)] if css_path else None
@@ -4007,17 +4032,15 @@ def proposta_busca(request):
 @login_required
 def proposta_detail(request, pk):
     cliente = _get_cliente(request.user)
+    radar_schema_ready = _radar_trabalho_schema_ready()
+    proposta_qs_base = Proposta.objects.all()
+    if radar_schema_ready:
+        proposta_qs_base = proposta_qs_base.select_related("origem_trabalho", "origem_trabalho__radar")
     if cliente:
-        proposta_qs = Proposta.objects.select_related("origem_trabalho", "origem_trabalho__radar").filter(
-            Q(criada_por=request.user) | Q(cliente=cliente)
-        )
+        proposta_qs = proposta_qs_base.filter(Q(criada_por=request.user) | Q(cliente=cliente))
         proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
-        proposta = get_object_or_404(
-            Proposta.objects.select_related("origem_trabalho", "origem_trabalho__radar"),
-            pk=pk,
-            criada_por=request.user,
-        )
+        proposta = get_object_or_404(proposta_qs_base, pk=pk, criada_por=request.user)
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
@@ -4118,6 +4141,7 @@ def proposta_detail(request, pk):
             "proposta": proposta,
             "message": message,
             "status_label": status_label,
+            "show_origem_tecnica": radar_schema_ready,
         },
     )
 
@@ -4125,27 +4149,23 @@ def proposta_detail(request, pk):
 @login_required
 def proposta_export_pdf(request, pk):
     cliente = _get_cliente(request.user)
+    radar_schema_ready = _radar_trabalho_schema_ready()
+    select_related_fields = ["cliente", "criada_por"]
+    if radar_schema_ready:
+        select_related_fields.extend(["origem_trabalho", "origem_trabalho__radar"])
     if cliente:
-        proposta_qs = Proposta.objects.select_related(
-            "cliente",
-            "criada_por",
-            "origem_trabalho",
-            "origem_trabalho__radar",
-        ).prefetch_related("anexos").filter(Q(criada_por=request.user) | Q(cliente=cliente))
+        proposta_qs = Proposta.objects.select_related(*select_related_fields).prefetch_related("anexos").filter(
+            Q(criada_por=request.user) | Q(cliente=cliente)
+        )
         proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
         proposta = get_object_or_404(
-            Proposta.objects.select_related(
-                "cliente",
-                "criada_por",
-                "origem_trabalho",
-                "origem_trabalho__radar",
-            ).prefetch_related("anexos"),
+            Proposta.objects.select_related(*select_related_fields).prefetch_related("anexos"),
             pk=pk,
             criada_por=request.user,
         )
     status_label = _proposta_status_label(proposta)
-    pdf_buffer = _render_proposta_pdf(proposta, status_label)
+    pdf_buffer = _render_proposta_pdf(proposta, status_label, include_origem=radar_schema_ready)
     if not pdf_buffer:
         return HttpResponse("Biblioteca de PDF indisponivel (reportlab).", status=500)
     base_name = proposta.codigo or f"proposta_{proposta.id}"

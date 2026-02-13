@@ -2537,6 +2537,16 @@ select {
   .composition-mini {
     max-width: none;
   }
+
+  .milhao-date-nav-grid {
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    gap: 8px;
+  }
+
+  .milhao-date-arrow {
+    width: 30px;
+    height: 30px;
+  }
 }
 
 @media (max-width: 560px) {
@@ -2547,6 +2557,87 @@ select {
 
 .balance-filter-card {
   padding: 16px;
+}
+
+.date-nav-card {
+  padding: 14px 16px;
+  max-width: 420px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 122, 24, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(255, 166, 102, 0.18), transparent 54%),
+    linear-gradient(180deg, #fffdfa 0%, #fff7f1 100%);
+}
+
+.milhao-date-nav-form {
+  margin: 0;
+}
+
+.milhao-date-nav-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: end;
+  gap: 10px;
+}
+
+.milhao-date-field {
+  margin: 0;
+  text-align: center;
+}
+
+.milhao-date-field > span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #8c4d21;
+}
+
+.milhao-date-input {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 5px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 122, 24, 0.36);
+  background: rgba(255, 255, 255, 0.92);
+  color: #4a2a13;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(255, 122, 24, 0.12);
+}
+
+.milhao-date-input:focus {
+  outline: none;
+  border-color: rgba(255, 122, 24, 0.62);
+  box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.18), 0 8px 20px rgba(255, 122, 24, 0.16);
+}
+
+.milhao-date-arrow {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  color: #7c4b2a;
+  text-decoration: none;
+  font-weight: 700;
+  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.milhao-date-arrow:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 122, 24, 0.55);
+  background: #fff;
+}
+
+.milhao-date-arrow.is-disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .date-filter-card {

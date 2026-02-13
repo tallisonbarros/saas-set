@@ -80,7 +80,7 @@
             {% if proposta.criada_por %}
               <div><strong>De:</strong> {{ proposta.criada_por.username }}</div>
             {% endif %}
-            {% if proposta.origem_trabalho %}
+            {% if show_origem_tecnica and proposta.origem_trabalho %}
               <div>
                 <strong>Origem:</strong>
                 <a href="{% url 'radar_trabalho_detail' proposta.origem_trabalho.radar.id proposta.origem_trabalho.id %}">

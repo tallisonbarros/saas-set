@@ -40,66 +40,49 @@
     </div>
   </section>
 
-  {% if not composition %}
-  <section class="card app-accent balance-filter-card date-filter-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
-    <form method="get" class="io-form">
+  <div id="milhao-dashboard-dynamic">
+  <section class="card app-accent composition-card date-nav-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <form method="get" class="io-form milhao-date-nav-form">
       {% for bal in selected_balances %}
         <input type="hidden" name="balance" value="{{ bal }}" />
       {% endfor %}
-      <div class="balance-filter-grid">
-        <label class="field balance-filter-date">
-          <span>Dia</span>
-          <select name="date" class="milhao-date-select">
-            {% for day in dates %}
-              <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
-                {{ day|date:"d/m/Y" }}
-              </option>
-            {% endfor %}
-          </select>
-        </label>
-      </div>
-    </form>
-  </section>
-  {% endif %}
-
-  {% if composition %}
-  <section class="card composition-card" style="padding: 14px;">
-    <form method="get" class="io-form composition-date-form" style="width: 100%; display: flex; justify-content: center; margin: 0;">
-      {% for bal in selected_balances %}
-        <input type="hidden" name="balance" value="{{ bal }}" />
-      {% endfor %}
-      <div style="width: 100%; display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 10px;">
+      <div class="milhao-date-nav-grid">
         {% if prev_date %}
           <a
             href="?date={{ prev_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
+            class="milhao-date-arrow"
             aria-label="Dia anterior"
-            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); text-decoration: none; color: inherit;"
           >&lt;</a>
         {% else %}
-          <span aria-hidden="true" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); opacity: 0.35;">&lt;</span>
+          <span class="milhao-date-arrow is-disabled" aria-hidden="true">&lt;</span>
         {% endif %}
-        <label class="field composition-date-field" style="width: 100%; max-width: 320px; margin: 0 auto;">
-          <select name="date" class="milhao-date-select composition-date-select" style="width: 100%;">
-            {% for day in dates %}
-              <option value="{{ day|date:'Y-m-d' }}" {% if selected_date == day %}selected{% endif %}>
-                {{ day|date:"d/m/Y" }}
-              </option>
-            {% endfor %}
-          </select>
+        <label class="field milhao-date-field">
+          <span>Dia de leitura</span>
+          <input
+            id="milhao-date-input"
+            type="date"
+            name="date"
+            class="milhao-date-input"
+            value="{{ selected_date|date:'Y-m-d' }}"
+            data-available-dates="{% for day in dates %}{{ day|date:'Y-m-d' }}{% if not forloop.last %},{% endif %}{% endfor %}"
+            {% if dates %}
+            min="{{ dates.0|date:'Y-m-d' }}"
+            max="{{ dates|last|date:'Y-m-d' }}"
+            {% endif %}
+          />
         </label>
         {% if next_date %}
           <a
             href="?date={{ next_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
+            class="milhao-date-arrow"
             aria-label="Dia seguinte"
-            style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); text-decoration: none; color: inherit;"
           >&gt;</a>
         {% else %}
-          <span aria-hidden="true" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border); opacity: 0.35;">&gt;</span>
+          <span class="milhao-date-arrow is-disabled" aria-hidden="true">&gt;</span>
         {% endif %}
       </div>
     </form>
   </section>
-  {% endif %}
 
   {% if composition %}
   <section class="card composition-card">
@@ -282,10 +265,12 @@
       <p class="muted">Nenhum dado para o filtro selecionado.</p>
     {% endif %}
   </section>
+  </div>
 
   </div>
   <style>
     .is-hidden { display: none !important; }
+    #milhao-dashboard-dynamic.is-loading { opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease; }
     .rt-pulse { animation: rtPulse 0.45s ease; }
     @keyframes rtPulse {
       0% { opacity: 0.72; transform: translateY(1px); }
@@ -294,19 +279,36 @@
   </style>
   <script>
     (function () {
-      var grid = document.getElementById("balance-chip-grid");
-      var dateSelects = Array.from(document.querySelectorAll(".milhao-date-select"));
-      if (!grid) {
+      var dynamicRoot = document.getElementById("milhao-dashboard-dynamic");
+      if (!dynamicRoot) {
         return;
       }
-      var form = grid.closest("form");
-      var hiddenContainer = document.getElementById("balance-hidden-inputs");
-      var selectedRaw = (grid.getAttribute("data-selected") || "").split(",");
-      var selected = selectedRaw.map(function (item) { return item.trim(); }).filter(Boolean);
       var cardsDataUrl = "{% url 'app_milhao_bla_cards_data' %}";
       var rtStatus = document.getElementById("milhao-rt-status");
       var rtIntervalMs = 15000;
       var rtTimer = null;
+      var isNavigating = false;
+      var grid = null;
+      var form = null;
+      var hiddenContainer = null;
+      var dateInput = null;
+      var availableDates = [];
+      var selected = [];
+
+      function hydrateElements() {
+        dynamicRoot = document.getElementById("milhao-dashboard-dynamic");
+        grid = dynamicRoot ? dynamicRoot.querySelector("#balance-chip-grid") : null;
+        form = grid ? grid.closest("form") : null;
+        hiddenContainer = dynamicRoot ? dynamicRoot.querySelector("#balance-hidden-inputs") : null;
+        dateInput = dynamicRoot ? dynamicRoot.querySelector("#milhao-date-input") : null;
+        rtStatus = document.getElementById("milhao-rt-status");
+        availableDates = dateInput
+          ? (dateInput.getAttribute("data-available-dates") || "").split(",").map(function (item) { return item.trim(); }).filter(Boolean)
+          : [];
+        selected = grid
+          ? (grid.getAttribute("data-selected") || "").split(",").map(function (item) { return item.trim(); }).filter(Boolean)
+          : [];
+      }
 
       function setHiddenInputs(values) {
         if (!hiddenContainer) {
@@ -323,6 +325,9 @@
       }
 
       function updateUI() {
+        if (!grid) {
+          return;
+        }
         var chips = Array.from(grid.querySelectorAll(".balance-chip"));
         var selectableChips = chips.filter(function (chip) {
           return chip.getAttribute("data-balance") !== "__all__";
@@ -352,10 +357,51 @@
         setHiddenInputs(selected);
       }
 
-      function submit() {
-        if (form) {
-          form.submit();
+      function buildFormUrl(targetForm) {
+        var nextUrl = new URL(window.location.href);
+        nextUrl.search = "";
+        var params = new URLSearchParams(new FormData(targetForm));
+        nextUrl.search = params.toString();
+        return nextUrl.toString();
+      }
+
+      function navigatePartial(nextUrl, pushState) {
+        if (isNavigating) {
+          return;
         }
+        isNavigating = true;
+        dynamicRoot.classList.add("is-loading");
+        fetch(nextUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("bad_response");
+            }
+            return response.text();
+          })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, "text/html");
+            var nextDynamic = doc.getElementById("milhao-dashboard-dynamic");
+            if (!nextDynamic) {
+              throw new Error("missing_dynamic");
+            }
+            dynamicRoot.replaceWith(nextDynamic);
+            if (pushState) {
+              window.history.pushState({}, "", nextUrl);
+            }
+            hydrateElements();
+            bindDynamicHandlers();
+            updateUI();
+            refreshCardsRealtime();
+          })
+          .catch(function () {
+            window.location.href = nextUrl;
+          })
+          .finally(function () {
+            isNavigating = false;
+            if (dynamicRoot) {
+              dynamicRoot.classList.remove("is-loading");
+            }
+          });
       }
 
       function pulseElement(el) {
@@ -397,14 +443,31 @@
       }
 
       function getFilters() {
-        var dateValue = "";
-        if (dateSelects.length) {
-          dateValue = dateSelects[0].value || "";
-        }
+        var dateValue = dateInput ? (dateInput.value || "") : "";
         return {
           date: dateValue,
           balances: selected.slice(),
         };
+      }
+
+      function resolveClosestDate(value) {
+        if (!availableDates.length || !value) {
+          return value;
+        }
+        if (availableDates.indexOf(value) >= 0) {
+          return value;
+        }
+        var selectedTs = new Date(value + "T00:00:00").getTime();
+        var best = availableDates[0];
+        var bestDiff = Math.abs(new Date(best + "T00:00:00").getTime() - selectedTs);
+        availableDates.forEach(function (candidate) {
+          var diff = Math.abs(new Date(candidate + "T00:00:00").getTime() - selectedTs);
+          if (diff < bestDiff) {
+            best = candidate;
+            bestDiff = diff;
+          }
+        });
+        return best;
       }
 
       function applyRealtimeData(payload) {
@@ -498,58 +561,89 @@
         rtTimer = setInterval(refreshCardsRealtime, rtIntervalMs);
       }
 
-      grid.addEventListener("click", function (event) {
-        var mainButton = event.target.closest(".balance-chip-main");
-        var addButton = event.target.closest(".balance-chip-add");
-        if (!mainButton && !addButton) {
+      function bindDynamicHandlers() {
+        if (!dynamicRoot || dynamicRoot.getAttribute("data-js-bound") === "1") {
           return;
         }
-        var chip = event.target.closest(".balance-chip");
-        if (!chip) {
-          return;
-        }
-        var balance = chip.getAttribute("data-balance");
-        if (balance === "__all__") {
-          selected = Array.from(grid.querySelectorAll(".balance-chip"))
-            .map(function (item) { return item.getAttribute("data-balance"); })
-            .filter(function (item) { return item && item !== "__all__"; });
-          updateUI();
-          submit();
-          return;
-        }
-        if (mainButton) {
-          selected = [balance];
-          updateUI();
-          submit();
-          return;
-        }
-        if (addButton) {
-          if (selected.indexOf(balance) >= 0) {
-            selected = selected.filter(function (item) { return item !== balance; });
-          } else {
-            selected = selected.concat(balance);
-          }
-          updateUI();
-          submit();
-        }
-      });
+        dynamicRoot.setAttribute("data-js-bound", "1");
 
-      if (dateSelects.length) {
-        dateSelects.forEach(function (select) {
-          select.addEventListener("change", function () {
-            var value = select.value;
-            dateSelects.forEach(function (other) {
-              if (other !== select) {
-                other.value = value;
-              }
-            });
-            if (select.form) {
-              select.form.submit();
+        dynamicRoot.addEventListener("click", function (event) {
+          var prevNextLink = event.target.closest(".milhao-date-arrow[href]");
+          if (prevNextLink) {
+            event.preventDefault();
+            navigatePartial(prevNextLink.href, true);
+            return;
+          }
+
+          if (!grid || !form) {
+            return;
+          }
+
+          var mainButton = event.target.closest(".balance-chip-main");
+          var addButton = event.target.closest(".balance-chip-add");
+          if (!mainButton && !addButton) {
+            return;
+          }
+          var chip = event.target.closest(".balance-chip");
+          if (!chip) {
+            return;
+          }
+          var balance = chip.getAttribute("data-balance");
+          if (balance === "__all__") {
+            selected = Array.from(grid.querySelectorAll(".balance-chip"))
+              .map(function (item) { return item.getAttribute("data-balance"); })
+              .filter(function (item) { return item && item !== "__all__"; });
+            updateUI();
+            navigatePartial(buildFormUrl(form), true);
+            return;
+          }
+          if (mainButton) {
+            selected = [balance];
+            updateUI();
+            navigatePartial(buildFormUrl(form), true);
+            return;
+          }
+          if (addButton) {
+            if (selected.indexOf(balance) >= 0) {
+              selected = selected.filter(function (item) { return item !== balance; });
+            } else {
+              selected = selected.concat(balance);
             }
-          });
+            updateUI();
+            navigatePartial(buildFormUrl(form), true);
+          }
+        });
+
+        dynamicRoot.addEventListener("change", function (event) {
+          var target = event.target;
+          if (!target || target.id !== "milhao-date-input") {
+            return;
+          }
+          var resolved = resolveClosestDate(target.value || "");
+          if (resolved !== (target.value || "")) {
+            target.value = resolved;
+          }
+          if (target.form) {
+            navigatePartial(buildFormUrl(target.form), true);
+          }
+        });
+
+        dynamicRoot.addEventListener("submit", function (event) {
+          var targetForm = event.target;
+          if (!targetForm || !targetForm.matches(".milhao-date-nav-form, .metrics-filter-form")) {
+            return;
+          }
+          event.preventDefault();
+          navigatePartial(buildFormUrl(targetForm), true);
         });
       }
 
+      window.addEventListener("popstate", function () {
+        navigatePartial(window.location.href, false);
+      });
+
+      hydrateElements();
+      bindDynamicHandlers();
       updateUI();
       refreshCardsRealtime();
       startRealtime();

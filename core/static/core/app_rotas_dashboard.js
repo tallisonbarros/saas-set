@@ -45,6 +45,11 @@
     eventsContainer: document.getElementById("recent-events-container"),
     syncStatus: document.getElementById("dashboard-sync-status"),
     liveBadge: document.getElementById("dashboard-live-badge"),
+    liveShort: document.getElementById("dashboard-live-short"),
+    liveAction: document.getElementById("timeline-back-action"),
+    liveHint: document.getElementById("timeline-back-hint"),
+    rotasSection: document.getElementById("rotas-section"),
+    rotasModeContext: document.getElementById("rotas-mode-context"),
   };
 
   function createElement(tagName, className, text) {
@@ -111,13 +116,41 @@
   }
 
   function renderLiveBadge() {
-    if (!els.liveBadge) {
+    if (!els.liveBadge && !els.timelineBackNow) {
       return;
     }
     var live = isLiveMode();
-    els.liveBadge.textContent = live ? "AO VIVO" : "PAUSADO";
-    els.liveBadge.classList.toggle("is-live", live);
-    els.liveBadge.classList.toggle("is-paused", !live);
+    if (els.liveBadge) {
+      els.liveBadge.textContent = live ? "Ao vivo" : "Historico";
+    }
+    if (els.liveShort) {
+      els.liveShort.textContent = live ? "LIVE" : "HIST";
+      els.liveShort.classList.toggle("is-live", live);
+      els.liveShort.classList.toggle("is-history", !live);
+    }
+    if (els.timelineBackNow) {
+      els.timelineBackNow.classList.toggle("is-live", live);
+      els.timelineBackNow.classList.toggle("is-history", !live);
+      els.timelineBackNow.setAttribute("aria-label", live ? "Modo ao vivo" : "Ir para ao vivo");
+      els.timelineBackNow.setAttribute("title", live ? "Modo ao vivo" : "Ir para ao vivo");
+    }
+    if (els.liveAction) {
+      els.liveAction.textContent = live ? "Sincronizando agora" : "Ir para ao vivo";
+    }
+    if (els.liveHint) {
+      els.liveHint.classList.toggle("is-hidden", live);
+    }
+    if (els.rotasSection) {
+      els.rotasSection.classList.toggle("is-live", live);
+      els.rotasSection.classList.toggle("is-history", !live);
+    }
+    if (els.rotasModeContext) {
+      els.rotasModeContext.classList.toggle("is-live", live);
+      els.rotasModeContext.classList.toggle("is-history", !live);
+      els.rotasModeContext.textContent = live
+        ? "Atualizando em tempo real"
+        : "Visualizando snapshot do historico";
+    }
   }
 
   function updateTimelineNote() {
@@ -214,7 +247,6 @@
       if (state.now_day && state.now_at_iso) {
         els.timelineBackNow.setAttribute("href", "?dia=" + state.now_day + "&at=" + encodeURIComponent(state.now_at_iso));
       }
-      els.timelineBackNow.classList.toggle("is-hidden", !!state.showing_now);
     }
   }
 
