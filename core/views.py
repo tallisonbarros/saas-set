@@ -87,6 +87,27 @@ def _build_module_signal_badges(user, cliente):
     - tone: warning|info|success
     """
     propostas_aprovar_count = _pendencias_total(user, cliente)
+
+    if user.is_staff and not cliente:
+        ios_count = RackIO.objects.count()
+        listas_ip_count = ListaIP.objects.count()
+        radar_count = Radar.objects.count()
+    elif cliente:
+        ios_count = RackIO.objects.filter(cliente=cliente).count()
+        listas_ip_count = (
+            ListaIP.objects.filter(Q(cliente=cliente) | Q(id_listaip__in=cliente.listas_ip.all()))
+            .distinct()
+            .count()
+        )
+        radar_count = (
+            Radar.objects.filter(Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()))
+            .distinct()
+            .count()
+        )
+    else:
+        ios_count = 0
+        listas_ip_count = 0
+        radar_count = 0
     badges = {
         "propostas": {
             "count": propostas_aprovar_count,
@@ -95,10 +116,25 @@ def _build_module_signal_badges(user, cliente):
             "tone": "warning",
         },
         "financeiro": {"count": 0, "visible": False, "label": "", "tone": "info"},
-        "ios": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "ios": {
+            "count": ios_count,
+            "visible": ios_count > 0,
+            "label": f"{ios_count} rack{'s' if ios_count != 1 else ''}",
+            "tone": "info",
+        },
         "inventarios": {"count": 0, "visible": False, "label": "", "tone": "info"},
-        "listas_ip": {"count": 0, "visible": False, "label": "", "tone": "info"},
-        "radar": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "listas_ip": {
+            "count": listas_ip_count,
+            "visible": listas_ip_count > 0,
+            "label": f"{listas_ip_count} lista{'s' if listas_ip_count != 1 else ''}",
+            "tone": "info",
+        },
+        "radar": {
+            "count": radar_count,
+            "visible": radar_count > 0,
+            "label": f"{radar_count} radar{'es' if radar_count != 1 else ''}",
+            "tone": "info",
+        },
         "nuvem_projetos": {"count": 0, "visible": False, "label": "", "tone": "info"},
         "planta_conectada": {"count": 0, "visible": False, "label": "", "tone": "info"},
     }

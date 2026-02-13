@@ -2443,6 +2443,16 @@ select {
   box-shadow: var(--shadow-strong);
 }
 
+.panel-card:focus {
+  outline: none;
+}
+
+.panel-card:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-strong), 0 0 0 3px rgba(255, 122, 26, 0.4);
+  border-color: rgba(255, 157, 86, 0.8);
+}
+
 .panel-card.app-card {
   border: 1px solid rgba(214, 171, 142, 0.35);
   background: radial-gradient(circle at top right, rgba(255, 231, 214, 0.5), #ffffff);
@@ -2877,6 +2887,74 @@ select {
 .panel-shell {
   display: grid;
   gap: 24px;
+}
+
+.page-painel .panel-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.page-painel .panel-shell {
+  gap: 16px;
+}
+
+.page-painel .panel-grid-spaced {
+  margin-top: 14px;
+}
+
+.page-painel .apps-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: stretch;
+}
+
+.page-painel .apps-grid .panel-card {
+  max-width: none;
+}
+
+.page-painel .panel-card {
+  min-height: 132px;
+  align-content: start;
+}
+
+.page-painel .panel-card .muted {
+  color: #97a1ae;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: calc(1.45em * 2);
+}
+
+.page-painel .panel-section {
+  gap: 8px;
+}
+
+.page-painel .panel-section-title {
+  color: #edf2f7;
+}
+
+.page-painel .panel-section-surface {
+  border: 1px solid rgba(96, 119, 146, 0.26);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(34, 41, 50, 0.48) 0%, rgba(25, 30, 37, 0.32) 100%);
+}
+
+.page-painel .panel-section-operacao {
+  border-color: rgba(96, 119, 146, 0.28);
+}
+
+.page-painel .panel-section-apps {
+  border-color: rgba(110, 130, 155, 0.3);
+  background: linear-gradient(180deg, rgba(29, 37, 47, 0.52) 0%, rgba(23, 28, 35, 0.34) 100%);
+}
+
+.page-painel .panel-section-admin {
+  border-color: rgba(124, 136, 153, 0.3);
+  background: linear-gradient(180deg, rgba(35, 39, 46, 0.5) 0%, rgba(26, 30, 35, 0.33) 100%);
 }
 
 .panel-hud {
@@ -4358,6 +4436,14 @@ select {
 
   .panel-grid {
     grid-template-columns: 1fr;
+  }
+
+  .page-painel .apps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-painel .panel-section-surface {
+    padding: 12px;
   }
 
   .finance-grid {
