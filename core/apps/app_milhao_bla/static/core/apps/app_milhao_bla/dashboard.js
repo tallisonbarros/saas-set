@@ -214,7 +214,6 @@
       } catch (error) {
       }
     }
-    input.click();
   }
 
   function applyRealtimeData(payload) {
@@ -315,6 +314,12 @@
     dynamicRoot.setAttribute("data-js-bound", "1");
 
     dynamicRoot.addEventListener("click", function (event) {
+      var directDateInput = event.target.closest("#milhao-date-input");
+      if (directDateInput) {
+        openDatePicker(directDateInput);
+        return;
+      }
+
       var prevNextLink = event.target.closest(".milhao-date-arrow[href]");
       if (prevNextLink) {
         event.preventDefault();
@@ -338,6 +343,7 @@
       if (!mainButton && !addButton) {
         return;
       }
+      event.preventDefault();
       var chip = event.target.closest(".balance-chip");
       if (!chip) {
         return;
@@ -389,6 +395,14 @@
       }
       event.preventDefault();
       navigatePartial(buildFormUrl(targetForm), true);
+    });
+
+    dynamicRoot.addEventListener("pointerdown", function (event) {
+      var field = event.target.closest(".milhao-date-field");
+      if (!field || !dateInput) {
+        return;
+      }
+      openDatePicker(dateInput);
     });
   }
 

@@ -26,6 +26,7 @@
   var activeController = null;
   var timelinePendingIso = null;
   var timelineLoadingCards = false;
+  var isTimelineDragging = false;
 
   var els = {
     dayForm: document.getElementById("day-nav-form"),
@@ -304,6 +305,22 @@
     var thumbWidth = 34;
     var x = rangeRect.left - wrapRect.left + pct * (rangeRect.width - thumbWidth) + thumbWidth / 2;
     els.timelineTooltip.style.left = x.toFixed(1) + "px";
+  }
+
+  function pointFromCurrentRange() {
+    if (!els.timelineRange) {
+      return null;
+    }
+    var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+    if (!timeline.length) {
+      return null;
+    }
+    var index = Number(els.timelineRange.value || "0");
+    if (!Number.isFinite(index)) {
+      return null;
+    }
+    index = Math.max(0, Math.min(index, timeline.length - 1));
+    return timeline[index] || null;
   }
 
   function findClosestTimelineIndexByMs(targetMs) {
@@ -809,6 +826,12 @@
     function commitTimelineSelection() {
       setTimelineTooltipVisible(false);
       if (!timelinePendingIso) {
+        var currentPoint = pointFromCurrentRange();
+        if (currentPoint && currentPoint.iso) {
+          timelinePendingIso = currentPoint.iso;
+        }
+      }
+      if (!timelinePendingIso) {
         if (!inFlight) {
           setTimelineCardsLoading(false);
         }
@@ -830,25 +853,22 @@
     }
 
     els.timelineRange.addEventListener("pointerdown", function () {
+      isTimelineDragging = true;
       enterHistoricalMode();
       setTimelineCardsLoading(true);
-      var timeline = Array.isArray(state.timeline) ? state.timeline : [];
-      var index = Number(els.timelineRange.value);
-      var point = timeline[index];
+      var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
       setTimelineTooltipVisible(true);
     });
     els.timelineRange.addEventListener("mousedown", function () {
-      var timeline = Array.isArray(state.timeline) ? state.timeline : [];
-      var index = Number(els.timelineRange.value);
-      var point = timeline[index];
+      isTimelineDragging = true;
+      var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
       setTimelineTooltipVisible(true);
     });
     els.timelineRange.addEventListener("touchstart", function () {
-      var timeline = Array.isArray(state.timeline) ? state.timeline : [];
-      var index = Number(els.timelineRange.value);
-      var point = timeline[index];
+      isTimelineDragging = true;
+      var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
       setTimelineTooltipVisible(true);
     }, { passive: true });
@@ -856,13 +876,35 @@
       applyTimelinePreview();
       setTimelineTooltipVisible(true);
     });
-    els.timelineRange.addEventListener("change", commitTimelineSelection);
-    els.timelineRange.addEventListener("pointerup", commitTimelineSelection);
+    els.timelineRange.addEventListener("change", function () {
+      commitTimelineSelection();
+      isTimelineDragging = false;
+    });
+    els.timelineRange.addEventListener("pointerup", function () {
+      commitTimelineSelection();
+      isTimelineDragging = false;
+    });
+    els.timelineRange.addEventListener("mouseup", function () {
+      if (!isTimelineDragging) {
+        return;
+      }
+      commitTimelineSelection();
+      isTimelineDragging = false;
+    });
+    els.timelineRange.addEventListener("touchend", function () {
+      if (!isTimelineDragging) {
+        return;
+      }
+      commitTimelineSelection();
+      isTimelineDragging = false;
+    }, { passive: true });
     els.timelineRange.addEventListener("pointercancel", function () {
+      isTimelineDragging = false;
       setTimelineCardsLoading(false);
       setTimelineTooltipVisible(false);
     });
     els.timelineRange.addEventListener("blur", function () {
+      isTimelineDragging = false;
       setTimelineCardsLoading(false);
       setTimelineTooltipVisible(false);
     });

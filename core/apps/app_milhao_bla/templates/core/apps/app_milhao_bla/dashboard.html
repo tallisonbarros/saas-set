@@ -15,7 +15,7 @@
 
 {% block content %}
   <div class="card-stack" style="display: flex; flex-direction: column; gap: 16px;">
-  <section class="card app-accent milhao-readings" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="card app-accent milhao-readings milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     {% if app.logo %}
       <div class="hud-logo-wrap" style="display: flex; justify-content: center; margin: 6px 0 18px;">
         <img class="hud-logo" src="{{ app.logo.url }}" alt="Logo {{ app.nome }}" style="max-width: 220px; height: auto; display: block;" />
@@ -85,7 +85,7 @@
   </section>
 
   {% if composition %}
-  <section class="card composition-card">
+  <section class="card composition-card milhao-section">
     <div class="io-card-head composition-head">
       <div>
         <h2 class="io-title">Proporcao de composicao do dia</h2>
@@ -131,12 +131,12 @@
   </section>
   {% endif %}
 
-  <section class="card" style="padding: 12px;">
+  <section class="card milhao-section" style="padding: 12px;">
     <form method="get" class="io-form metrics-filter-form" style="margin-top: 0; gap: 10px;">
     {% if selected_date %}
       <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
     {% endif %}
-    <label class="field metrics-balance-filter">
+    <div class="field metrics-balance-filter">
       <span>Balancas</span>
       <div
         id="balance-chip-grid"
@@ -173,11 +173,11 @@
         {% endfor %}
       </div>
       <div id="balance-hidden-inputs"></div>
-    </label>
+    </div>
     </form>
   </section>
 
-  <section class="card app-accent metrics-card" {% if theme_color %}style="--app-accent: {{ theme_color }}; padding: 16px;"{% endif %}>
+  <section class="card app-accent metrics-card milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }}; padding: 16px;"{% endif %}>
     <div class="io-card-head metrics-head">
       <div>
         <h2 class="io-title">Indicadores do dia</h2>
@@ -218,7 +218,7 @@
     {% endif %}
   </section>
 
-  <section class="card app-accent milhao-readings" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="card app-accent milhao-readings milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Leituras por hora</h2>
@@ -270,14 +270,15 @@
   </div>
   <style>
     .is-hidden { display: none !important; }
+    .milhao-section { margin: 0 auto 14px; }
+    .card-stack > .milhao-section:last-child { margin-bottom: 0; }
     .date-nav-card {
       padding: 12px 14px;
       max-width: 420px;
-      margin: 0 auto;
-      border: 1px solid var(--border);
-      background:
-        radial-gradient(circle at top right, rgba(255, 122, 26, 0.14), transparent 52%),
-        linear-gradient(180deg, var(--surface-strong) 0%, var(--surface-soft) 100%);
+      margin: 0 auto 14px;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
     }
     .milhao-date-nav-form { margin: 0; }
     .milhao-date-nav-grid {
@@ -326,15 +327,40 @@
       font-weight: 700;
       transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
     }
+    .milhao-date-arrow[href] {
+      border-color: transparent;
+      background:
+        linear-gradient(var(--surface), var(--surface)) padding-box,
+        linear-gradient(135deg, rgba(255, 122, 26, 0.95), rgba(255, 164, 69, 0.9)) border-box;
+      box-shadow: 0 0 0 1px rgba(255, 122, 26, 0.22), 0 8px 16px rgba(0, 0, 0, 0.22);
+    }
     .milhao-date-arrow:hover {
       transform: translateY(-1px);
       border-color: rgba(255, 122, 26, 0.6);
       background: var(--surface-strong);
     }
+    .milhao-date-arrow[href]:hover {
+      background:
+        linear-gradient(var(--surface-strong), var(--surface-strong)) padding-box,
+        linear-gradient(135deg, #ff7a1a, #ffbe73) border-box;
+    }
     .milhao-date-arrow.is-disabled { opacity: 0.4; pointer-events: none; }
+    .metrics-balance-filter { margin: 0; }
+    .metrics-balance-filter > span { display: block; margin-bottom: 8px; }
+    .balance-chip.is-selected {
+      border-color: rgba(255, 122, 26, 0.65);
+      background: linear-gradient(180deg, rgba(255, 122, 26, 0.22), rgba(255, 122, 26, 0.1));
+      box-shadow: 0 0 0 1px rgba(255, 122, 26, 0.28);
+    }
+    .balance-chip-main.is-selected .balance-title,
+    .balance-chip-main.is-selected .balance-subtitle {
+      color: #ffd7b6;
+    }
     #milhao-dashboard-dynamic.is-loading { opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease; }
     .rt-pulse { animation: rtPulse 0.45s ease; }
     @media (max-width: 700px) {
+      .milhao-section { margin: 0 auto 10px; }
+      .card-stack > .milhao-section:last-child { margin-bottom: 0; }
       .milhao-date-nav-grid {
         grid-template-columns: 36px minmax(0, 1fr) 36px;
         gap: 8px;
