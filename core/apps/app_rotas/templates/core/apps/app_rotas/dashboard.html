@@ -131,7 +131,7 @@
           <div class="timeline-quick-jumps" aria-label="Ajustes rapidos da hora">
             <button id="timeline-minus-15" class="timeline-mini-btn" type="button">-15m</button>
             <button id="timeline-plus-15" class="timeline-mini-btn" type="button">+15m</button>
-            <button id="timeline-now-mini" class="timeline-mini-btn" type="button">Agora</button>
+            <button id="timeline-now-mini" class="timeline-mini-btn {% if showing_now %}is-hidden{% else %}is-attention{% endif %}" type="button">Agora</button>
           </div>
         </div>
       {% else %}
@@ -701,6 +701,20 @@
       opacity: .45;
       cursor: not-allowed;
     }
+    .timeline-mini-btn.is-hidden {
+      display: none;
+    }
+    .timeline-mini-btn.is-attention {
+      border-color: rgba(245, 158, 11, 0.65);
+      color: #fde68a;
+      background: rgba(68, 42, 10, 0.42);
+      animation: agoraCallout 1.2s ease-in-out infinite;
+    }
+    .timeline-mini-btn.is-attention:hover {
+      animation-play-state: paused;
+      border-color: rgba(251, 191, 36, 0.85);
+      background: rgba(68, 42, 10, 0.58);
+    }
     .timeline-player {
       display: flex;
       align-items: center;
@@ -773,6 +787,11 @@
     @keyframes cardClockTick {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
+    }
+    @keyframes agoraCallout {
+      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, .44); transform: translateY(0); }
+      55% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); transform: translateY(-1px); }
+      100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); transform: translateY(0); }
     }
   </style>
   {{ dashboard_state|json_script:"app-rotas-dashboard-state" }}

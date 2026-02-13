@@ -391,6 +391,9 @@
       els.timelinePlus15.disabled = jumpsDisabled;
     }
     if (els.timelineNowMini) {
+      var showingNow = !!state.showing_now && state.selected_day === state.now_day;
+      els.timelineNowMini.classList.toggle("is-hidden", showingNow);
+      els.timelineNowMini.classList.toggle("is-attention", !showingNow);
       els.timelineNowMini.disabled = false;
     }
   }
