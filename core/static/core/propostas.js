@@ -15,22 +15,54 @@
       title: "Propostas recebidas",
       subtitle: "Propostas que chegaram para voce aprovar, responder ou acompanhar.",
       summaryLabels: {
-        pendentes: "Pendentes para voce",
-        execucao: "Em analise",
-        total: "Total recebidas",
-        finalizadas_90: "Finalizadas (90 dias)",
+        pendentes: "Para decidir agora",
+        execucao: "Em levantamento",
+        total: "Aprovadas para executar",
+        finalizadas_90: "Concluidas (30 dias)",
       },
     },
     enviadas: {
       title: "Propostas enviadas",
       subtitle: "Propostas que voce enviou para clientes e esta acompanhando o retorno.",
       summaryLabels: {
-        pendentes: "Aguardando resposta",
-        execucao: "Em negociacao",
-        total: "Total enviadas",
-        finalizadas_90: "Finalizadas (90 dias)",
+        pendentes: "Aguardando cliente",
+        execucao: "Em levantamento",
+        total: "Em execucao",
+        finalizadas_90: "Taxa de aprovacao (30 dias)",
       },
     },
+  };
+
+  const summaryHintText = (mode, key, value) => {
+    const n = value ?? 0;
+    if (mode === "enviadas") {
+      if (key === "pendentes") {
+        return `${n} aguardando retorno`;
+      }
+      if (key === "execucao") {
+        return `${n} ainda sem valor definido`;
+      }
+      if (key === "total") {
+        return `${n} em execucao agora`;
+      }
+      if (key === "finalizadas_90") {
+        return `${n} de aprovacao no periodo`;
+      }
+      return String(n);
+    }
+    if (key === "pendentes") {
+      return `${n} com valor e sem decisao`;
+    }
+    if (key === "execucao") {
+      return `${n} ainda sem valor definido`;
+    }
+    if (key === "total") {
+      return `${n} prontas para iniciar execucao`;
+    }
+    if (key === "finalizadas_90") {
+      return `${n} concluidas nos ultimos 30 dias`;
+    }
+    return String(n);
   };
 
   const getQueryParams = () => {
@@ -89,9 +121,14 @@
       return;
     }
     Object.entries(summary).forEach(([key, value]) => {
+      const safeValue = value ?? "0";
       const valueEl = summaryWrap.querySelector(`[data-summary-value="${key}"]`);
       if (valueEl) {
-        valueEl.textContent = value ?? "0";
+        valueEl.textContent = safeValue;
+      }
+      const hintEl = summaryWrap.querySelector(`[data-summary-hint="${key}"]`);
+      if (hintEl) {
+        hintEl.textContent = summaryHintText(state.mode, key, safeValue);
       }
     });
   };

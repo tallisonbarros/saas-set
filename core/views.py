@@ -3863,17 +3863,34 @@ def _build_proposta_sections(user, cliente, tipo, status_filter, search_term=Non
 
 
 def _proposta_quick_stats(user, cliente, tipo):
-    cutoff = timezone.now() - timedelta(days=90)
+    cutoff_30 = timezone.now() - timedelta(days=30)
     base = _proposta_tipo_qs(user, cliente, tipo)
+    pendentes = base.filter(
+        aprovada__isnull=True,
+        valor__gt=0,
+        finalizada=False,
+    ).count()
+    levantamento = base.filter(aprovada__isnull=True).filter(Q(valor=0) | Q(valor__isnull=True)).filter(
+        finalizada=False
+    ).count()
+    if tipo == "enviadas":
+        executando = base.filter(aprovada=True, andamento="EXECUTANDO", finalizada=False).count()
+        decididas_30 = base.filter(aprovada__isnull=False, decidido_em__gte=cutoff_30).count()
+        aprovadas_30 = base.filter(aprovada=True, decidido_em__gte=cutoff_30).count()
+        taxa_aprovacao = int(round((aprovadas_30 / decididas_30) * 100)) if decididas_30 else 0
+        return {
+            "pendentes": pendentes,
+            "em_execucao": levantamento,
+            "total": executando,
+            "finalizadas_90": f"{taxa_aprovacao}%",
+        }
+    aprovadas_para_execucao = base.filter(aprovada=True, finalizada=False).exclude(andamento="EXECUTANDO").count()
+    concluidas_30 = base.filter(finalizada=True, finalizada_em__gte=cutoff_30).count()
     return {
-        "pendentes": base.filter(
-            aprovada__isnull=True,
-            valor__gt=0,
-            finalizada=False,
-        ).count(),
-        "em_execucao": base.filter(andamento="EXECUTANDO", finalizada=False).count(),
-        "finalizadas_90": base.filter(finalizada=True, finalizada_em__gte=cutoff).count(),
-        "total": base.count(),
+        "pendentes": pendentes,
+        "em_execucao": levantamento,
+        "total": aprovadas_para_execucao,
+        "finalizadas_90": concluidas_30,
     }
 
 

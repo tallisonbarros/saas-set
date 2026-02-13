@@ -34,10 +34,7 @@
       <p class="muted">{{ message }}</p>
     {% endif %}
     {% if proposta.aprovada == None and proposta.valor and proposta.cliente.usuario_id == request.user.id %}
-      <div class="proposal-block">
-        <div class="proposal-block-head">
-          <h2 class="proposal-block-title">Aprovacao</h2>
-        </div>
+      <div class="proposal-approval-strip">
         <div class="proposal-card-actions">
           <form method="post" action="{% url 'aprovar_proposta' proposta.pk %}">
             {% csrf_token %}

@@ -43,25 +43,49 @@
     <div class="proposal-summary-grid" data-proposta-summary>
       <div class="summary-card">
         <div class="summary-label" data-summary-label="pendentes">
-          {% if tipo_ativo == "enviadas" %}Aguardando resposta{% else %}Pendentes para voce{% endif %}
+          {% if tipo_ativo == "enviadas" %}Aguardando cliente{% else %}Para decidir agora{% endif %}
         </div>
         <div class="summary-value" data-summary-value="pendentes">{{ quick_stats.pendentes|default:"0" }}</div>
+        <div class="summary-hint" data-summary-hint="pendentes">
+          {% if tipo_ativo == "enviadas" %}
+            {{ quick_stats.pendentes|default:"0" }} aguardando retorno
+          {% else %}
+            {{ quick_stats.pendentes|default:"0" }} com valor e sem decisao
+          {% endif %}
+        </div>
       </div>
       <div class="summary-card">
         <div class="summary-label" data-summary-label="execucao">
-          {% if tipo_ativo == "enviadas" %}Em negociacao{% else %}Em analise{% endif %}
+          Em levantamento
         </div>
         <div class="summary-value" data-summary-value="execucao">{{ quick_stats.em_execucao|default:"0" }}</div>
+        <div class="summary-hint" data-summary-hint="execucao">{{ quick_stats.em_execucao|default:"0" }} ainda sem valor definido</div>
       </div>
       <div class="summary-card">
         <div class="summary-label" data-summary-label="total">
-          {% if tipo_ativo == "enviadas" %}Total enviadas{% else %}Total recebidas{% endif %}
+          {% if tipo_ativo == "enviadas" %}Em execucao{% else %}Aprovadas para executar{% endif %}
         </div>
         <div class="summary-value" data-summary-value="total">{{ quick_stats.total|default:"0" }}</div>
+        <div class="summary-hint" data-summary-hint="total">
+          {% if tipo_ativo == "enviadas" %}
+            {{ quick_stats.total|default:"0" }} em execucao agora
+          {% else %}
+            {{ quick_stats.total|default:"0" }} prontas para iniciar execucao
+          {% endif %}
+        </div>
       </div>
       <div class="summary-card">
-        <div class="summary-label" data-summary-label="finalizadas_90">Finalizadas (90 dias)</div>
+        <div class="summary-label" data-summary-label="finalizadas_90">
+          {% if tipo_ativo == "enviadas" %}Taxa de aprovacao (30 dias){% else %}Concluidas (30 dias){% endif %}
+        </div>
         <div class="summary-value" data-summary-value="finalizadas_90">{{ quick_stats.finalizadas_90|default:"0" }}</div>
+        <div class="summary-hint" data-summary-hint="finalizadas_90">
+          {% if tipo_ativo == "enviadas" %}
+            {{ quick_stats.finalizadas_90|default:"0" }} de aprovacao no periodo
+          {% else %}
+            {{ quick_stats.finalizadas_90|default:"0" }} concluidas nos ultimos 30 dias
+          {% endif %}
+        </div>
       </div>
     </div>
     {% if not cliente %}
