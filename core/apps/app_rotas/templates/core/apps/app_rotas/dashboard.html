@@ -1,4 +1,5 @@
-﻿{% extends "core/base.html" %}
+{% extends "core/base.html" %}
+{% load static %}
 
 {% block title %}{{ app.nome }}{% endblock %}
 
@@ -46,6 +47,7 @@
       <div class="io-card-head timeline-global-head">
         <h2 class="io-title">Linha do tempo global</h2>
         <div class="lifebit-state-head">
+          <span id="dashboard-sync-status" class="muted sync-status" aria-live="polite"></span>
           <span
             id="lifebit-badge"
             class="panel-tag comm-pill {% if lifebit_connected %}comm-on{% else %}comm-off{% endif %}"
@@ -68,12 +70,12 @@
           <input type="hidden" name="at" value="{{ selected_at_iso }}">
           <div class="day-nav-capsule">
             {% if prev_day %}
-              <button class="day-arrow" type="submit" name="nav_dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
+              <button class="day-arrow" id="day-prev-button" type="submit" name="nav_dia" value="{{ prev_day|date:'Y-m-d' }}" aria-label="Dia anterior">&lt;</button>
             {% else %}
-              <button class="day-arrow" type="button" disabled aria-label="Dia anterior">&lt;</button>
+              <button class="day-arrow" id="day-prev-button" type="button" disabled aria-label="Dia anterior">&lt;</button>
             {% endif %}
             <label class="field day-picker-field">
-              <select name="dia" onchange="this.form.submit()">
+              <select id="day-select" name="dia">
                 {% for day in available_days %}
                   <option value="{{ day|date:'Y-m-d' }}" {% if day == selected_day %}selected{% endif %}>{{ day|date:"d/m/Y" }}</option>
                 {% empty %}
@@ -82,9 +84,9 @@
               </select>
             </label>
             {% if next_day %}
-              <button class="day-arrow" type="submit" name="nav_dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
+              <button class="day-arrow" id="day-next-button" type="submit" name="nav_dia" value="{{ next_day|date:'Y-m-d' }}" aria-label="Dia seguinte">&gt;</button>
             {% else %}
-              <button class="day-arrow" type="button" disabled aria-label="Dia seguinte">&gt;</button>
+              <button class="day-arrow" id="day-next-button" type="button" disabled aria-label="Dia seguinte">&gt;</button>
             {% endif %}
           </div>
         </form>
@@ -109,7 +111,7 @@
             href="?dia={{ now_day|date:'Y-m-d' }}&at={{ now_at_iso }}"
             aria-label="Voltar para agora"
             title="Voltar para agora"
-          >↩</a>
+          >&larr;</a>
         </div>
       {% else %}
         <p class="muted">Sem eventos no dia selecionado.</p>
@@ -179,6 +181,7 @@
     .day-arrow[disabled] { opacity: .42; cursor: not-allowed; }
     .timeline-global-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .lifebit-state-head { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .sync-status { min-height: 14px; font-size: .74rem; opacity: .84; }
     .comm-last-seen { font-size: .76rem; }
     .comm-last-seen.is-hidden { display: none; }
     .comm-pill { font-weight: 700; letter-spacing: .02em; }
@@ -348,266 +351,18 @@
       100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
   </style>
-  <script>
-    (function () {
-      var timeline = {{ timeline_json|safe }};
-      var range = document.getElementById("timeline-range");
-      var atField = document.getElementById("timeline-at");
-      var form = document.getElementById("timeline-form");
-      var readLabel = document.getElementById("timeline-read-label");
-      var backNow = document.getElementById("timeline-back-now");
-      var totalEventsNote = document.getElementById("total-events-note");
-      var selectedAtNote = document.getElementById("selected-at-note");
-      var ligadaTrack = document.getElementById("global-ligada-track");
-      var refreshTimer = null;
-      var RANGE_DEBOUNCE_MS = 110;
-      var LIVE_REFRESH_MS = 2500;
-      if (!range || !atField || !form || !readLabel || !timeline.length) {
-        return;
-      }
-      var controller = null;
-
-      function applyPartialResponse(data, params) {
-        if (!data || !data.ok) { return; }
-        var cardsContainer = document.getElementById("rotas-cards-container");
-        var eventsContainer = document.getElementById("recent-events-container");
-        if (cardsContainer) { cardsContainer.innerHTML = data.cards_html; }
-        if (eventsContainer) { eventsContainer.innerHTML = data.events_html; }
-        var lifebitBadge = document.getElementById("lifebit-badge");
-        var lifebitLastSeen = document.getElementById("lifebit-last-seen");
-        if (lifebitBadge && typeof data.lifebit_connected !== "undefined") {
-          lifebitBadge.textContent = data.lifebit_label || (data.lifebit_connected ? "Conectado" : "Desconectado");
-          lifebitBadge.classList.toggle("comm-on", !!data.lifebit_connected);
-          lifebitBadge.classList.toggle("comm-off", !data.lifebit_connected);
-        }
-        if (lifebitLastSeen && typeof data.lifebit_connected !== "undefined") {
-          var lastSeenText = "Ultima conexao lida: " + (data.lifebit_last_seen || "-");
-          lifebitLastSeen.textContent = lastSeenText;
-          lifebitLastSeen.classList.toggle("is-hidden", !!data.lifebit_connected);
-        }
-        if (data.selected_at_label) {
-          readLabel.textContent = data.selected_at_label;
-          if (selectedAtNote) { selectedAtNote.textContent = data.selected_at_label; }
-        }
-        if (typeof data.total_events !== "undefined" && totalEventsNote) {
-          totalEventsNote.textContent = String(data.total_events);
-        }
-        if (data.global_ligada_gradient && ligadaTrack) {
-          ligadaTrack.style.background = data.global_ligada_gradient;
-        }
-        if (typeof data.timeline_total !== "undefined" && typeof data.selected_index !== "undefined" && range) {
-          var nextMax = Math.max(0, Number(data.timeline_total) - 1);
-          range.max = String(nextMax);
-          range.disabled = nextMax < 1;
-          if (Number(data.selected_index) >= 0) {
-            range.value = String(data.selected_index);
-          }
-        }
-        if (data.selected_at_iso) {
-          atField.value = data.selected_at_iso;
-          params.set("at", data.selected_at_iso);
-        }
-        if (backNow) {
-          if (data.now_day && data.now_at_iso) {
-            backNow.setAttribute("href", "?dia=" + data.now_day + "&at=" + encodeURIComponent(data.now_at_iso));
-          }
-          if (data.showing_now) {
-            backNow.classList.add("is-hidden");
-          } else {
-            backNow.classList.remove("is-hidden");
-          }
-        }
-        params.delete("partial");
-        params.delete("follow_now");
-        history.replaceState(null, "", window.location.pathname + "?" + params.toString());
-        initDragDrop();
-      }
-
-      function fetchDashboardPartial(mode) {
-        var params = new URLSearchParams(window.location.search);
-        params.set("dia", "{{ selected_day|date:'Y-m-d' }}");
-        params.set("at", atField.value || "{{ selected_at_iso }}");
-        params.set("partial", mode || "timeline");
-        if (backNow && backNow.classList.contains("is-hidden")) {
-          params.set("follow_now", "1");
-        }
-        if (controller && mode === "timeline") { controller.abort(); }
-        var localController = new AbortController();
-        if (mode === "timeline") { controller = localController; }
-        return fetch(window.location.pathname + "?" + params.toString(), {
-          headers: { "X-Requested-With": "XMLHttpRequest" },
-          signal: localController.signal
-        })
-          .then(function (response) { return response.json(); })
-          .then(function (data) {
-            applyPartialResponse(data, params);
-          })
-          .catch(function (err) {
-            if (err && err.name === "AbortError") { return; }
-          });
-      }
-
-      range.addEventListener("input", function () {
-        var index = Number(range.value);
-        var point = timeline[index];
-        if (!point) {
-          return;
-        }
-        atField.value = point.iso;
-        readLabel.textContent = point.label;
-        if (refreshTimer) { clearTimeout(refreshTimer); }
-        refreshTimer = setTimeout(function () {
-          fetchDashboardPartial("timeline");
-        }, RANGE_DEBOUNCE_MS);
-      });
-
-      setInterval(function () {
-        fetchDashboardPartial("live");
-      }, LIVE_REFRESH_MS);
-    })();
-
-    (function () {
-      var container = document.getElementById("recent-events-container");
-      if (!container) {
-        return;
-      }
-      container.addEventListener("click", function (event) {
-        var target = event.target;
-        if (!(target instanceof HTMLElement)) {
-          return;
-        }
-        var button = target.closest("[data-events-page]");
-        if (!button) {
-          return;
-        }
-        event.preventDefault();
-        var page = button.getAttribute("data-events-page");
-        if (!page || button.hasAttribute("disabled")) {
-          return;
-        }
-        var params = new URLSearchParams(window.location.search);
-        params.set("events_page", page);
-        params.set("partial", "recent_events");
-        fetch(window.location.pathname + "?" + params.toString(), {
-          headers: { "X-Requested-With": "XMLHttpRequest" }
-        })
-          .then(function (response) { return response.text(); })
-          .then(function (html) {
-            container.innerHTML = html;
-            params.delete("partial");
-            history.replaceState(null, "", window.location.pathname + "?" + params.toString());
-          });
-      });
-    })();
-
-    function initDragDrop() {
-      var grid = document.getElementById("rotas-grid");
-      var status = document.getElementById("rotas-order-status");
-      if (!grid) {
-        return;
-      }
-      if (grid.dataset.dragReady === "1") {
-        return;
-      }
-      grid.dataset.dragReady = "1";
-      var dragged = null;
-      var moved = false;
-      var suppressClick = false;
-
-      function getCsrfToken() {
-        var match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-        return match ? decodeURIComponent(match[1]) : "";
-      }
-
-      function cardList() {
-        return Array.prototype.slice.call(grid.querySelectorAll(".rota-card[data-prefix]"));
-      }
-
-      function persistOrder() {
-        var prefixos = cardList().map(function (el) { return el.getAttribute("data-prefix"); });
-        fetch("{% url 'app_rotas_ordenar' %}", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-            "X-CSRFToken": getCsrfToken()
-          },
-          body: JSON.stringify({ prefixos: prefixos })
-        })
-          .then(function (response) { return response.json(); })
-          .then(function (data) {
-            if (!status) { return; }
-            if (data && data.ok) {
-              status.textContent = "Ordem salva.";
-            } else {
-              status.textContent = "Falha ao salvar a ordem.";
-            }
-            setTimeout(function () { status.textContent = ""; }, 1800);
-          })
-          .catch(function () {
-            if (!status) { return; }
-            status.textContent = "Falha ao salvar a ordem.";
-            setTimeout(function () { status.textContent = ""; }, 1800);
-          });
-      }
-
-      grid.addEventListener("dragstart", function (event) {
-        var card = event.target.closest(".rota-card[data-prefix]");
-        if (!card) {
-          return;
-        }
-        dragged = card;
-        moved = false;
-        suppressClick = false;
-        card.classList.add("is-dragging");
-        if (event.dataTransfer) {
-          event.dataTransfer.effectAllowed = "move";
-        }
-      });
-
-      grid.addEventListener("dragover", function (event) {
-        if (!dragged) {
-          return;
-        }
-        event.preventDefault();
-        var target = event.target.closest(".rota-card[data-prefix]");
-        if (!target || target === dragged) {
-          return;
-        }
-        var rect = target.getBoundingClientRect();
-        var after = event.clientY > rect.top + rect.height / 2;
-        grid.insertBefore(dragged, after ? target.nextSibling : target);
-        moved = true;
-      });
-
-      grid.addEventListener("drop", function (event) {
-        if (!dragged) {
-          return;
-        }
-        event.preventDefault();
-      });
-
-      grid.addEventListener("dragend", function () {
-        if (!dragged) {
-          return;
-        }
-        dragged.classList.remove("is-dragging");
-        dragged = null;
-        if (moved) {
-          suppressClick = true;
-          persistOrder();
-          setTimeout(function () { suppressClick = false; }, 120);
-        }
-      });
-
-      grid.addEventListener("click", function (event) {
-        if (!suppressClick) {
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-      }, true);
-    }
-    initDragDrop();
-  </script>
+  {{ dashboard_state|json_script:"app-rotas-dashboard-state" }}
+  <script
+    src="{% static 'core/app_rotas_dashboard.js' %}"
+    defer
+    data-dashboard-state-id="app-rotas-dashboard-state"
+    data-dashboard-state-url="{{ request.path }}"
+    data-order-url="{% url 'app_rotas_ordenar' %}"
+  ></script>
 {% endblock %}
+
+
+
+
+
+

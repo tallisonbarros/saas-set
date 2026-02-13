@@ -50,3 +50,27 @@ class AppMilhaoBlaIngestConfigTests(TestCase):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["value"], 10.0)
 
+    def test_cards_data_endpoint_returns_live_payload(self):
+        now_iso = timezone.now().isoformat()
+        IngestRecord.objects.create(
+            source_id="bla-3",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="balanca_acumulado_hora",
+            payload={"TagName": "LIMBL01", "Hora": now_iso, "ProducaoHora": "10"},
+        )
+        IngestRecord.objects.create(
+            source_id="bla-4",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="balanca_acumulado_hora",
+            payload={"TagName": "SECBL01", "Hora": now_iso, "ProducaoHora": "5"},
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("app_milhao_bla_cards_data"))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["total_value_display"], "10")
+        self.assertGreaterEqual(len(payload["composition"]), 1)

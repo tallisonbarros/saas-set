@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 
 from core.models import App, IngestRecord
 from core.views import _get_cliente
@@ -56,13 +56,24 @@ def _format_kg(value):
     return f"{rounded:,.0f}".replace(",", ".")
 
 
-@login_required
-def dashboard(request):
+def _get_app_if_allowed(request):
     app = get_object_or_404(App, slug="appmilhaobla", ativo=True)
     cliente = _get_cliente(request.user)
-    if not request.user.is_staff:
-        if not cliente or not cliente.apps.filter(pk=app.pk).exists():
-            return HttpResponseForbidden("Sem permissao.")
+    if request.user.is_staff:
+        return app
+    if not cliente or not cliente.apps.filter(pk=app.pk).exists():
+        return None
+    return app
+
+
+def _build_dashboard_context(request, app):
+    balance_labels = {
+        "LIMBL01": "MILHO",
+        "SECBL01": "GERMEN",
+        "SECBL02": "RESIDUO",
+        "CLABL01": "MIUDO",
+        "CLABL02": "GRAUDO",
+    }
 
     ingest_client_id = (app.ingest_client_id or "").strip() or DEFAULT_CLIENT_ID
     ingest_agent_id = (app.ingest_agent_id or "").strip() or DEFAULT_AGENT_ID
@@ -72,14 +83,6 @@ def dashboard(request):
         agent_id=ingest_agent_id,
         source__in=ingest_sources,
     ).order_by("-created_at")[:2000]
-
-    balance_labels = {
-        "LIMBL01": "MILHO",
-        "SECBL01": "GERMEN",
-        "SECBL02": "RESIDUO",
-        "CLABL01": "MIUDO",
-        "CLABL02": "GRAUDO",
-    }
     entries = []
     for record in records:
         payload = record.payload if isinstance(record.payload, dict) else {}
@@ -270,29 +273,79 @@ def dashboard(request):
         for item in totals_by_balance
     ]
 
-    return render(
-        request,
-        "core/apps/app_milhao_bla/dashboard.html",
+    return {
+        "entries": filtered,
+        "dates": dates,
+        "balances": balances,
+        "selected_date": selected_date,
+        "selected_balances": selected_balances,
+        "total_value": total_value,
+        "total_value_display": total_value_display,
+        "totals_by_balance": totals_by_balance,
+        "avg_total_14": avg_total_14,
+        "avg_total_14_display": _format_kg(avg_total_14),
+        "composition": composition,
+        "prev_date": prev_date,
+        "next_date": next_date,
+        "last_ingests": last_ingests,
+        "ingest_client_id": ingest_client_id,
+        "ingest_agent_id": ingest_agent_id,
+        "ingest_sources_display": ", ".join(ingest_sources),
+    }
+
+
+@login_required
+def dashboard(request):
+    app = _get_app_if_allowed(request)
+    if not app:
+        return HttpResponseForbidden("Sem permissao.")
+    context = _build_dashboard_context(request, app)
+    context.update(
         {
             "app": app,
             "theme_color": app.theme_color,
             "icon": app.icon,
-            "entries": filtered,
-            "dates": dates,
-            "balances": balances,
-            "selected_date": selected_date,
-            "selected_balances": selected_balances,
-            "total_value": total_value,
-            "total_value_display": total_value_display,
-            "totals_by_balance": totals_by_balance,
-            "avg_total_14": avg_total_14,
-            "avg_total_14_display": _format_kg(avg_total_14),
-            "composition": composition,
-            "prev_date": prev_date,
-            "next_date": next_date,
-            "last_ingests": last_ingests,
-            "ingest_client_id": ingest_client_id,
-            "ingest_agent_id": ingest_agent_id,
-            "ingest_sources_display": ", ".join(ingest_sources),
-        },
+        }
+    )
+    return render(request, "core/apps/app_milhao_bla/dashboard.html", context)
+
+
+@login_required
+def dashboard_cards_data(request):
+    app = _get_app_if_allowed(request)
+    if not app:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    context = _build_dashboard_context(request, app)
+    return JsonResponse(
+        {
+            "ok": True,
+            "updated_at": timezone.localtime(timezone.now()).strftime("%H:%M:%S"),
+            "total_value_display": context["total_value_display"],
+            "avg_total_14_display": context["avg_total_14_display"],
+            "totals_by_balance": [
+                {
+                    "balance": item["balance"],
+                    "label": item["label"],
+                    "total_display": item["total_display"],
+                    "avg_14_display": item["avg_14_display"],
+                }
+                for item in context["totals_by_balance"]
+            ],
+            "composition": [
+                {
+                    "balance": item["balance"],
+                    "label": item["label"],
+                    "percent_str": item["percent_str"],
+                }
+                for item in context["composition"]
+            ],
+            "last_ingests": [
+                {
+                    "balance": item["balance"],
+                    "label": item["label"],
+                    "time": item["time"],
+                }
+                for item in context["last_ingests"]
+            ],
+        }
     )

@@ -1,0 +1,689 @@
+(function () {
+  var scriptEl = document.currentScript || document.querySelector("script[data-dashboard-state-id]");
+  if (!scriptEl) {
+    return;
+  }
+
+  var stateNode = document.getElementById(scriptEl.dataset.dashboardStateId || "");
+  if (!stateNode) {
+    return;
+  }
+
+  var stateUrl = scriptEl.dataset.dashboardStateUrl || window.location.pathname;
+  var orderUrl = scriptEl.dataset.orderUrl || "";
+
+  var state = {};
+  try {
+    state = JSON.parse(stateNode.textContent || "{}");
+  } catch (error) {
+    return;
+  }
+
+  var pollDelays = [2500, 5000, 10000];
+  var backoffIndex = 0;
+  var pollTimer = null;
+  var inFlight = false;
+  var activeController = null;
+  var timelineDebounce = null;
+
+  var els = {
+    dayForm: document.getElementById("day-nav-form"),
+    daySelect: document.getElementById("day-select"),
+    dayPrevButton: document.getElementById("day-prev-button"),
+    dayNextButton: document.getElementById("day-next-button"),
+    timelineRange: document.getElementById("timeline-range"),
+    timelineAtField: document.getElementById("timeline-at"),
+    timelineReadLabel: document.getElementById("timeline-read-label"),
+    timelineBackNow: document.getElementById("timeline-back-now"),
+    lifebitBadge: document.getElementById("lifebit-badge"),
+    lifebitLastSeen: document.getElementById("lifebit-last-seen"),
+    totalEventsNote: document.getElementById("total-events-note"),
+    selectedAtNote: document.getElementById("selected-at-note"),
+    globalLigadaTrack: document.getElementById("global-ligada-track"),
+    cardsContainer: document.getElementById("rotas-cards-container"),
+    eventsContainer: document.getElementById("recent-events-container"),
+    syncStatus: document.getElementById("dashboard-sync-status"),
+  };
+
+  function createElement(tagName, className, text) {
+    var node = document.createElement(tagName);
+    if (className) {
+      node.className = className;
+    }
+    if (typeof text !== "undefined") {
+      node.textContent = text;
+    }
+    return node;
+  }
+
+  function formatDayLabel(dayIso) {
+    if (!dayIso) {
+      return "--/--/----";
+    }
+    var parts = dayIso.split("-");
+    if (parts.length !== 3) {
+      return dayIso;
+    }
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function setSyncStatus(mode) {
+    if (!els.syncStatus) {
+      return;
+    }
+    if (mode === "updating") {
+      els.syncStatus.textContent = "atualizando...";
+      return;
+    }
+    if (mode === "error") {
+      els.syncStatus.textContent = "erro de sincronizacao";
+      return;
+    }
+    els.syncStatus.textContent = "";
+  }
+
+  function updateTimelineNote() {
+    if (els.selectedAtNote) {
+      els.selectedAtNote.textContent = state.selected_at_label || "-";
+    }
+    if (els.totalEventsNote) {
+      els.totalEventsNote.textContent = String(state.total_events || 0);
+    }
+  }
+
+  function renderLifebit() {
+    if (els.lifebitBadge) {
+      els.lifebitBadge.textContent = state.lifebit_label || (state.lifebit_connected ? "Conectado" : "Desconectado");
+      els.lifebitBadge.classList.toggle("comm-on", !!state.lifebit_connected);
+      els.lifebitBadge.classList.toggle("comm-off", !state.lifebit_connected);
+      els.lifebitBadge.title = "Ultimo LIFEBIT: " + (state.lifebit_last_seen || "-");
+    }
+    if (els.lifebitLastSeen) {
+      els.lifebitLastSeen.textContent = "Ultima conexao lida: " + (state.lifebit_last_seen || "-");
+      els.lifebitLastSeen.classList.toggle("is-hidden", !!state.lifebit_connected);
+    }
+  }
+
+  function renderDayNavigation() {
+    if (els.daySelect) {
+      var fragment = document.createDocumentFragment();
+      var availableDays = Array.isArray(state.available_days) ? state.available_days.slice() : [];
+      if (!availableDays.length && state.selected_day) {
+        availableDays = [state.selected_day];
+      }
+      for (var i = 0; i < availableDays.length; i += 1) {
+        var dayIso = availableDays[i];
+        var option = createElement("option");
+        option.value = dayIso;
+        option.textContent = formatDayLabel(dayIso);
+        if (dayIso === state.selected_day) {
+          option.selected = true;
+        }
+        fragment.appendChild(option);
+      }
+      els.daySelect.replaceChildren(fragment);
+    }
+
+    if (els.dayPrevButton) {
+      if (state.prev_day) {
+        els.dayPrevButton.disabled = false;
+        els.dayPrevButton.type = "submit";
+        els.dayPrevButton.name = "nav_dia";
+        els.dayPrevButton.value = state.prev_day;
+      } else {
+        els.dayPrevButton.disabled = true;
+        els.dayPrevButton.type = "button";
+        els.dayPrevButton.value = "";
+      }
+    }
+
+    if (els.dayNextButton) {
+      if (state.next_day) {
+        els.dayNextButton.disabled = false;
+        els.dayNextButton.type = "submit";
+        els.dayNextButton.name = "nav_dia";
+        els.dayNextButton.value = state.next_day;
+      } else {
+        els.dayNextButton.disabled = true;
+        els.dayNextButton.type = "button";
+        els.dayNextButton.value = "";
+      }
+    }
+  }
+
+  function renderTimeline() {
+    if (els.timelineRange) {
+      var timelineLength = Array.isArray(state.timeline) ? state.timeline.length : 0;
+      var max = Math.max(0, timelineLength - 1);
+      els.timelineRange.max = String(max);
+      els.timelineRange.disabled = max < 1;
+      if (typeof state.selected_index === "number" && state.selected_index >= 0) {
+        els.timelineRange.value = String(state.selected_index);
+      }
+    }
+
+    if (els.timelineAtField) {
+      els.timelineAtField.value = state.selected_at_iso || state.selected_at || "";
+    }
+
+    if (els.timelineReadLabel) {
+      els.timelineReadLabel.textContent = state.selected_at_label || "-";
+    }
+
+    if (els.globalLigadaTrack && state.global_ligada_gradient) {
+      els.globalLigadaTrack.style.background = state.global_ligada_gradient;
+    }
+
+    if (els.timelineBackNow) {
+      if (state.now_day && state.now_at_iso) {
+        els.timelineBackNow.setAttribute("href", "?dia=" + state.now_day + "&at=" + encodeURIComponent(state.now_at_iso));
+      }
+      els.timelineBackNow.classList.toggle("is-hidden", !!state.showing_now);
+    }
+  }
+
+  function renderCards() {
+    if (!els.cardsContainer) {
+      return;
+    }
+
+    var cards = Array.isArray(state.cards) ? state.cards : [];
+    if (!cards.length) {
+      els.cardsContainer.replaceChildren(createElement("p", "muted", "Nenhuma rota encontrada para o dia selecionado."));
+      return;
+    }
+
+    var grid = createElement("div", "rotas-grid");
+    grid.id = "rotas-grid";
+
+    for (var i = 0; i < cards.length; i += 1) {
+      var rota = cards[i];
+      var cardClass = "panel-card rota-card";
+      if (rota.play_blink) {
+        cardClass += " is-play-blink";
+      } else if (rota.play_on) {
+        cardClass += " is-play-on";
+      }
+      if (rota.pause_on) {
+        cardClass += " is-pause-on";
+      }
+      if (!state.lifebit_connected) {
+        cardClass += " is-comm-down";
+      }
+
+      var card = createElement("a", cardClass);
+      card.href = rota.detail_url || "#";
+      card.dataset.prefix = rota.prefixo || "";
+      card.draggable = true;
+
+      var top = createElement("div", "panel-card-top");
+      var left = createElement("div");
+      left.appendChild(createElement("div", "panel-title", rota.titulo || rota.prefixo || "-"));
+      if (rota.nome_exibicao) {
+        left.appendChild(createElement("div", "muted rota-prefix", rota.prefixo || ""));
+      }
+      top.appendChild(left);
+      top.appendChild(createElement("div", "rota-drag-hint", "::"));
+      card.appendChild(top);
+
+      card.appendChild(createElement("div", "rota-main", (rota.origem_display || "--") + " > " + (rota.destino_display || "--")));
+
+      var status = createElement("div", "rota-status");
+      var play = createElement("span", "status-chip", "Play");
+      if (rota.play_blink) {
+        play.classList.add("is-blink");
+      } else if (rota.play_on) {
+        play.classList.add("is-active");
+      }
+      status.appendChild(play);
+
+      var pause = createElement("span", "status-chip", "Pause");
+      if (rota.pause_on) {
+        pause.classList.add("is-active");
+        pause.classList.add("pause");
+      }
+      status.appendChild(pause);
+      card.appendChild(status);
+
+      card.appendChild(createElement("div", "muted rota-context-status", rota.context_status || "Estado indefinido"));
+
+      if (!state.lifebit_connected) {
+        var overlay = createElement("div", "rota-comm-overlay");
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.appendChild(createElement("span", "rota-comm-icon", "X"));
+        overlay.appendChild(createElement("span", "rota-comm-last-seen", "Ultima conexao lida: " + (state.lifebit_last_seen || "-")));
+        card.appendChild(overlay);
+      }
+
+      grid.appendChild(card);
+    }
+
+    els.cardsContainer.replaceChildren(grid);
+  }
+
+  function renderEvents() {
+    if (!els.eventsContainer) {
+      return;
+    }
+
+    var payload = state.eventos_recentes || {};
+    var items = Array.isArray(payload.items) ? payload.items : [];
+    var page = payload.page || {};
+
+    if (!items.length) {
+      els.eventsContainer.replaceChildren(createElement("p", "muted", "Sem eventos para listar."));
+      return;
+    }
+
+    var wrapper = createElement("div", "table-wrap");
+    var table = createElement("table", "table");
+    var thead = createElement("thead");
+    var headerRow = createElement("tr");
+    ["Data/Hora", "Rota", "Atributo", "Valor", "Tag"].forEach(function (label) {
+      headerRow.appendChild(createElement("th", "", label));
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    var tbody = createElement("tbody");
+    for (var i = 0; i < items.length; i += 1) {
+      var item = items[i];
+      var row = createElement("tr");
+      row.appendChild(createElement("td", "", item.timestamp_display || "-"));
+      row.appendChild(createElement("td", "", item.prefixo || "-"));
+      row.appendChild(createElement("td", "", item.atributo || "-"));
+      row.appendChild(createElement("td", "", String(item.valor_display == null ? "-" : item.valor_display)));
+      var tagCell = createElement("td");
+      tagCell.appendChild(createElement("code", "", item.tag || "-"));
+      row.appendChild(tagCell);
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+
+    var fragment = document.createDocumentFragment();
+    fragment.appendChild(wrapper);
+
+    if ((page.num_pages || 0) > 1) {
+      var pagination = createElement("div", "events-pagination");
+      pagination.style.display = "flex";
+      pagination.style.gap = "8px";
+      pagination.style.alignItems = "center";
+      pagination.style.marginTop = "10px";
+
+      var prevButton = createElement("button", "btn btn-ghost", "Anterior");
+      prevButton.type = "button";
+      if (page.has_previous && page.previous_page) {
+        prevButton.dataset.eventsPage = String(page.previous_page);
+      } else {
+        prevButton.disabled = true;
+      }
+      pagination.appendChild(prevButton);
+
+      pagination.appendChild(createElement("span", "panel-tag", "Pagina " + (page.number || 1) + " de " + (page.num_pages || 1)));
+
+      var nextButton = createElement("button", "btn btn-ghost", "Proxima");
+      nextButton.type = "button";
+      if (page.has_next && page.next_page) {
+        nextButton.dataset.eventsPage = String(page.next_page);
+      } else {
+        nextButton.disabled = true;
+      }
+      pagination.appendChild(nextButton);
+      fragment.appendChild(pagination);
+    }
+
+    els.eventsContainer.replaceChildren(fragment);
+  }
+
+  function renderDashboard() {
+    renderLifebit();
+    renderDayNavigation();
+    renderTimeline();
+    updateTimelineNote();
+    renderCards();
+    renderEvents();
+    initDragDrop();
+  }
+
+  function syncBrowserUrl() {
+    var params = new URLSearchParams(window.location.search);
+    if (state.selected_day) {
+      params.set("dia", state.selected_day);
+    } else {
+      params.delete("dia");
+    }
+    if (state.selected_at_iso || state.selected_at) {
+      params.set("at", state.selected_at_iso || state.selected_at);
+    } else {
+      params.delete("at");
+    }
+    if (state.events_page && Number(state.events_page) > 1) {
+      params.set("events_page", String(state.events_page));
+    } else {
+      params.delete("events_page");
+    }
+    params.delete("partial");
+    params.delete("follow_now");
+    var query = params.toString();
+    history.replaceState(null, "", query ? window.location.pathname + "?" + query : window.location.pathname);
+  }
+
+  function buildRequestParams(overrides) {
+    var params = new URLSearchParams();
+    params.set("partial", "state");
+
+    var selectedDay = overrides.selected_day || state.selected_day;
+    if (selectedDay) {
+      params.set("dia", selectedDay);
+    }
+
+    var selectedAt = overrides.selected_at_iso || overrides.selected_at || state.selected_at_iso || state.selected_at;
+    if (selectedAt) {
+      params.set("at", selectedAt);
+    }
+
+    var eventsPage = Number(overrides.events_page || state.events_page || 1);
+    if (eventsPage > 1) {
+      params.set("events_page", String(eventsPage));
+    }
+
+    var followNow = typeof overrides.follow_now === "boolean" ? overrides.follow_now : !!state.follow_now;
+    if (followNow) {
+      params.set("follow_now", "1");
+    }
+
+    return params;
+  }
+
+  function currentDelay() {
+    return pollDelays[Math.min(backoffIndex, pollDelays.length - 1)];
+  }
+
+  function scheduleNextPoll(delayMs) {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+    }
+    if (state.config_missing) {
+      return;
+    }
+    pollTimer = setTimeout(function () {
+      if (document.hidden) {
+        scheduleNextPoll(currentDelay());
+        return;
+      }
+      refreshState({}, { poll: true, abortPrevious: false });
+    }, delayMs);
+  }
+
+  function refreshState(overrides, options) {
+    var requestOverrides = overrides || {};
+    var requestOptions = options || {};
+
+    if (inFlight && requestOptions.poll) {
+      return Promise.resolve();
+    }
+
+    if (activeController && requestOptions.abortPrevious !== false) {
+      activeController.abort();
+    }
+
+    var controller = new AbortController();
+    activeController = controller;
+    inFlight = true;
+    setSyncStatus("updating");
+
+    var params = buildRequestParams(requestOverrides);
+    var requestUrl = stateUrl + "?" + params.toString();
+
+    return fetch(requestUrl, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      signal: controller.signal,
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          throw new Error("invalid-payload");
+        }
+        state = Object.assign({}, state, data);
+        backoffIndex = 0;
+        setSyncStatus("");
+        renderDashboard();
+        syncBrowserUrl();
+      })
+      .catch(function (error) {
+        if (error && error.name === "AbortError") {
+          return;
+        }
+        backoffIndex = Math.min(backoffIndex + 1, pollDelays.length - 1);
+        setSyncStatus("error");
+      })
+      .finally(function () {
+        if (activeController === controller) {
+          activeController = null;
+        }
+        inFlight = false;
+        scheduleNextPoll(currentDelay());
+      });
+  }
+
+  function handleDayChange(nextDay) {
+    if (!nextDay) {
+      return;
+    }
+    state.follow_now = false;
+    refreshState({ selected_day: nextDay, selected_at_iso: "", events_page: 1, follow_now: false });
+  }
+
+  if (els.dayForm) {
+    els.dayForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var submitter = event.submitter;
+      var nextDay = null;
+      if (submitter && submitter.name === "nav_dia" && submitter.value) {
+        nextDay = submitter.value;
+      } else if (els.daySelect && els.daySelect.value) {
+        nextDay = els.daySelect.value;
+      }
+      handleDayChange(nextDay);
+    });
+  }
+
+  if (els.daySelect) {
+    els.daySelect.addEventListener("change", function () {
+      handleDayChange(els.daySelect.value);
+    });
+  }
+
+  if (els.timelineRange) {
+    els.timelineRange.addEventListener("input", function () {
+      var index = Number(els.timelineRange.value);
+      var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+      var point = timeline[index];
+      if (!point) {
+        return;
+      }
+      if (els.timelineReadLabel) {
+        els.timelineReadLabel.textContent = point.label;
+      }
+      if (timelineDebounce) {
+        clearTimeout(timelineDebounce);
+      }
+      timelineDebounce = setTimeout(function () {
+        state.follow_now = false;
+        refreshState({ selected_at_iso: point.iso, events_page: 1, follow_now: false });
+      }, 110);
+    });
+  }
+
+  if (els.timelineBackNow) {
+    els.timelineBackNow.addEventListener("click", function (event) {
+      event.preventDefault();
+      state.follow_now = true;
+      refreshState(
+        {
+          selected_day: state.now_day || state.selected_day,
+          selected_at_iso: state.now_at_iso || state.selected_at_iso,
+          events_page: 1,
+          follow_now: true,
+        },
+        { abortPrevious: true }
+      );
+    });
+  }
+
+  if (els.eventsContainer) {
+    els.eventsContainer.addEventListener("click", function (event) {
+      var target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      var button = target.closest("[data-events-page]");
+      if (!button || button.disabled) {
+        return;
+      }
+      event.preventDefault();
+      var page = Number(button.dataset.eventsPage || "1");
+      if (page < 1) {
+        return;
+      }
+      refreshState({ events_page: page, follow_now: state.follow_now });
+    });
+  }
+
+  function getCsrfToken() {
+    var match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  function initDragDrop() {
+    var grid = document.getElementById("rotas-grid");
+    var status = document.getElementById("rotas-order-status");
+    if (!grid || !orderUrl) {
+      return;
+    }
+    if (grid.dataset.dragReady === "1") {
+      return;
+    }
+    grid.dataset.dragReady = "1";
+
+    var dragged = null;
+    var moved = false;
+    var suppressClick = false;
+
+    function cardList() {
+      return Array.prototype.slice.call(grid.querySelectorAll(".rota-card[data-prefix]"));
+    }
+
+    function persistOrder() {
+      var prefixos = cardList()
+        .map(function (el) {
+          return el.getAttribute("data-prefix");
+        })
+        .filter(Boolean);
+
+      fetch(orderUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": getCsrfToken(),
+        },
+        body: JSON.stringify({ prefixos: prefixos }),
+      })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          if (!status) {
+            return;
+          }
+          status.textContent = data && data.ok ? "Ordem salva." : "Falha ao salvar a ordem.";
+          setTimeout(function () {
+            status.textContent = "";
+          }, 1800);
+        })
+        .catch(function () {
+          if (!status) {
+            return;
+          }
+          status.textContent = "Falha ao salvar a ordem.";
+          setTimeout(function () {
+            status.textContent = "";
+          }, 1800);
+        });
+    }
+
+    grid.addEventListener("dragstart", function (event) {
+      var card = event.target.closest(".rota-card[data-prefix]");
+      if (!card) {
+        return;
+      }
+      dragged = card;
+      moved = false;
+      suppressClick = false;
+      card.classList.add("is-dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+      }
+    });
+
+    grid.addEventListener("dragover", function (event) {
+      if (!dragged) {
+        return;
+      }
+      event.preventDefault();
+      var target = event.target.closest(".rota-card[data-prefix]");
+      if (!target || target === dragged) {
+        return;
+      }
+      var rect = target.getBoundingClientRect();
+      var after = event.clientY > rect.top + rect.height / 2;
+      grid.insertBefore(dragged, after ? target.nextSibling : target);
+      moved = true;
+    });
+
+    grid.addEventListener("drop", function (event) {
+      if (!dragged) {
+        return;
+      }
+      event.preventDefault();
+    });
+
+    grid.addEventListener("dragend", function () {
+      if (!dragged) {
+        return;
+      }
+      dragged.classList.remove("is-dragging");
+      dragged = null;
+      if (moved) {
+        suppressClick = true;
+        persistOrder();
+        setTimeout(function () {
+          suppressClick = false;
+        }, 120);
+      }
+    });
+
+    grid.addEventListener(
+      "click",
+      function (event) {
+        if (!suppressClick) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      true
+    );
+  }
+
+  renderDashboard();
+  syncBrowserUrl();
+  scheduleNextPoll(currentDelay());
+})();

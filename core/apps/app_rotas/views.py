@@ -1,5 +1,6 @@
 ﻿import json
 from datetime import datetime, time, timedelta, timezone as dt_timezone
+from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -612,19 +613,59 @@ def _ligada_gradient(intervals, day_start, day_end):
     return "linear-gradient(to right, " + ", ".join(parts) + ")"
 
 
-@login_required
-def dashboard(request):
-    app = _get_rotas_app()
-    if not _has_access(request.user, app):
-        return HttpResponseForbidden("Sem permissao.")
+def _parse_positive_page(value, default=1):
+    text = str(value or "").strip()
+    try:
+        page = int(text)
+    except (TypeError, ValueError):
+        return default
+    return page if page > 0 else default
 
+
+def _parse_follow_now(value):
+    return str(value or "").strip() in {"1", "true", "True", "on", "ON"}
+
+
+def _format_last_seen_label(dt_value):
+    if not dt_value:
+        return "-"
+    return timezone.localtime(dt_value).strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _serialize_recent_events(page):
+    eventos = []
+    for event in page.object_list:
+        eventos.append(
+            {
+                "timestamp_display": event["timestamp_display"],
+                "prefixo": event["prefixo"],
+                "atributo": event["atributo"],
+                "valor_display": event["valor_display"],
+                "tag": event["tag"],
+            }
+        )
+    return {
+        "items": eventos,
+        "page": {
+            "number": page.number,
+            "num_pages": page.paginator.num_pages,
+            "has_previous": page.has_previous(),
+            "has_next": page.has_next(),
+            "previous_page": page.previous_page_number() if page.has_previous() else None,
+            "next_page": page.next_page_number() if page.has_next() else None,
+        },
+    }
+
+
+def _build_dashboard_payload(app, query_params):
     config_missing = not app.ingest_client_id or not app.ingest_agent_id
     lifebit_connected = False
     lifebit_last_seen = None
     if not config_missing:
         lifebit_connected, lifebit_last_seen = _lifebit_status(app)
+
     available_days = [] if config_missing else _available_days(app)
-    selected_day = _parse_query_date(request.GET.get("nav_dia")) or _parse_query_date(request.GET.get("dia"))
+    selected_day = _parse_query_date(query_params.get("nav_dia")) or _parse_query_date(query_params.get("dia"))
     if not selected_day:
         today = timezone.localdate()
         selected_day = today if today in available_days else (available_days[0] if available_days else today)
@@ -646,18 +687,20 @@ def dashboard(request):
         known_prefixes = set(seed_states.keys()) | day_prefixes
 
     timeline = _build_timeline_with_events(day_start, timeline_end_point, events_today)
-    selected_at = _parse_query_datetime(request.GET.get("at"))
+    selected_at = _parse_query_datetime(query_params.get("at"))
     if not selected_at:
         now = timezone.localtime(timezone.now())
         selected_at = now if selected_day == timezone.localdate() else timeline_end_point
     selected_at = _clamp_datetime(selected_at, day_start, day_end_exclusive)
     if selected_at and selected_at > timeline_end_point:
         selected_at = timeline_end_point
+
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
         selected_at = selected_point["timestamp"]
-    follow_now = request.GET.get("follow_now") == "1"
-    if follow_now and selected_day == timezone.localdate():
+
+    requested_follow_now = _parse_follow_now(query_params.get("follow_now"))
+    if requested_follow_now and selected_day == timezone.localdate():
         selected_point, selected_index = _selected_timeline_point(timeline, timeline_end_point)
         if selected_point:
             selected_at = selected_point["timestamp"]
@@ -676,6 +719,7 @@ def dashboard(request):
         known_prefixes=known_prefixes,
         route_configs=route_configs,
     )
+
     initial_ligada_prefixes = {
         prefixo for prefixo, state in seed_states.items() if _is_active(state["attrs"].get("LIGADA"))
     }
@@ -688,7 +732,7 @@ def dashboard(request):
     global_ligada_gradient = _ligada_gradient(global_ligada_intervals, day_start, timeline_end_point)
 
     recent_events = [event for event in reversed(events_today) if event["timestamp"] <= selected_at][:200]
-    events_page_num = request.GET.get("events_page", "1")
+    events_page_num = _parse_positive_page(query_params.get("events_page"), default=1)
     recent_events_paginator = Paginator(recent_events, RECENT_EVENTS_PAGE_SIZE)
     recent_events_page = recent_events_paginator.get_page(events_page_num)
     for event in recent_events_page.object_list:
@@ -698,97 +742,96 @@ def dashboard(request):
             value_display = f"{value_display:.3f}".rstrip("0").rstrip(".")
         event["valor_display"] = value_display
 
-    partial_mode = request.GET.get("partial")
-    if partial_mode == "recent_events" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return render(
-            request,
-            "core/apps/app_rotas/_eventos_recentes.html",
+    prev_day, next_day = _day_navigation(available_days, selected_day)
+    showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
+    selected_at_iso = selected_at.isoformat() if selected_at else ""
+    selected_day_str = selected_day.strftime("%Y-%m-%d")
+
+    cards_payload = []
+    for rota in cards:
+        route_url = reverse("app_rotas_detalhe", args=[rota["prefixo"]])
+        route_query = urlencode({"dia": selected_day_str, "at": selected_at_iso})
+        cards_payload.append(
             {
-                "eventos_recentes": recent_events_page.object_list,
-                "recent_events_page": recent_events_page,
-            },
-        )
-    if partial_mode in {"timeline", "live"} and request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
-        cards_html = render_to_string(
-            "core/apps/app_rotas/_rotas_cards.html",
-            {
-                "cards": cards,
-                "selected_day": selected_day,
-                "selected_at_iso": selected_at.isoformat() if selected_at else "",
-                "lifebit_connected": lifebit_connected,
-                "lifebit_last_seen": (
-                    timezone.localtime(lifebit_last_seen).strftime("%d/%m/%Y %H:%M:%S") if lifebit_last_seen else "-"
-                ),
-            },
-            request=request,
-        )
-        events_html = render_to_string(
-            "core/apps/app_rotas/_eventos_recentes.html",
-            {
-                "eventos_recentes": recent_events_page.object_list,
-                "recent_events_page": recent_events_page,
-            },
-            request=request,
-        )
-        return JsonResponse(
-            {
-                "ok": True,
-                "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
-                "showing_now": showing_now,
-                "now_day": now_day.strftime("%Y-%m-%d"),
-                "now_at_iso": now_target.isoformat() if now_target else "",
-                "lifebit_connected": lifebit_connected,
-                "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
-                "lifebit_last_seen": (
-                    timezone.localtime(lifebit_last_seen).strftime("%d/%m/%Y %H:%M:%S") if lifebit_last_seen else "-"
-                ),
-                "cards_html": cards_html,
-                "events_html": events_html,
-                "total_events": len(events_today),
-                "selected_at_iso": selected_at.isoformat() if selected_at else "",
-                "timeline_total": len(timeline),
-                "selected_index": selected_index,
-                "global_ligada_gradient": global_ligada_gradient,
+                "prefixo": rota["prefixo"],
+                "nome_exibicao": rota["nome_exibicao"],
+                "titulo": rota["titulo"],
+                "origem_display": rota["origem_display"],
+                "destino_display": rota["destino_display"],
+                "play_blink": rota["play_blink"],
+                "play_on": rota["play_on"],
+                "pause_on": rota["pause_on"],
+                "context_status": rota["context_status"],
+                "detail_url": f"{route_url}?{route_query}",
             }
         )
 
-    prev_day, next_day = _day_navigation(available_days, selected_day)
-    showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
+    timeline_payload = [{"iso": point["iso"], "label": point["label"]} for point in timeline]
+    lifebit_last_seen_label = _format_last_seen_label(lifebit_last_seen)
+    state_payload = {
+        "selected_day": selected_day_str,
+        "selected_at": selected_at_iso,
+        "selected_at_iso": selected_at_iso,
+        "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
+        "timeline": timeline_payload,
+        "selected_index": selected_index,
+        "timeline_total": len(timeline_payload),
+        "lifebit_connected": lifebit_connected,
+        "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
+        "lifebit_last_seen": lifebit_last_seen_label,
+        "total_events": len(events_today),
+        "global_ligada_gradient": global_ligada_gradient,
+        "cards": cards_payload,
+        "eventos_recentes": _serialize_recent_events(recent_events_page),
+        "events_page": recent_events_page.number,
+        "available_days": [item.strftime("%Y-%m-%d") for item in available_days],
+        "prev_day": prev_day.strftime("%Y-%m-%d") if prev_day else None,
+        "next_day": next_day.strftime("%Y-%m-%d") if next_day else None,
+        "showing_now": showing_now,
+        "follow_now": bool(showing_now),
+        "now_day": now_day.strftime("%Y-%m-%d"),
+        "now_at_iso": now_target.isoformat() if now_target else "",
+        "config_missing": config_missing,
+    }
 
-    return render(
-        request,
-        "core/apps/app_rotas/dashboard.html",
-        {
-            "app": app,
-            "cards": cards,
-            "selected_day": selected_day,
-            "available_days": available_days,
-            "prev_day": prev_day,
-            "next_day": next_day,
-            "timeline": timeline,
-            "timeline_total": len(timeline),
-            "timeline_json": json.dumps([{"iso": point["iso"], "label": point["label"]} for point in timeline]),
-            "selected_index": selected_index,
-            "selected_point": selected_point,
-            "selected_at_iso": selected_at.isoformat() if selected_at else "",
-            "selected_at_label": timezone.localtime(selected_at).strftime("%d/%m/%Y %H:%M:%S") if selected_at else "-",
-            "showing_now": showing_now,
-            "now_day": now_day,
-            "now_at_iso": now_target.isoformat() if now_target else "",
-            "eventos_recentes": recent_events_page.object_list,
-            "recent_events_page": recent_events_page,
-            "config_missing": config_missing,
-            "total_events": len(events_today),
-            "max_records": MAX_DASHBOARD_RECORDS,
-            "global_ligada_gradient": global_ligada_gradient,
-            "lifebit_connected": lifebit_connected,
-            "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
-            "lifebit_last_seen": (
-                timezone.localtime(lifebit_last_seen).strftime("%d/%m/%Y %H:%M:%S") if lifebit_last_seen else "-"
-            ),
-        },
-    )
+    return {
+        "app": app,
+        "cards": cards,
+        "selected_day": selected_day,
+        "available_days": available_days,
+        "prev_day": prev_day,
+        "next_day": next_day,
+        "timeline": timeline,
+        "timeline_total": len(timeline),
+        "selected_index": selected_index,
+        "selected_point": selected_point,
+        "selected_at_iso": selected_at_iso,
+        "selected_at_label": state_payload["selected_at_label"],
+        "showing_now": showing_now,
+        "now_day": now_day,
+        "now_at_iso": state_payload["now_at_iso"],
+        "eventos_recentes": recent_events_page.object_list,
+        "recent_events_page": recent_events_page,
+        "config_missing": config_missing,
+        "total_events": len(events_today),
+        "max_records": MAX_DASHBOARD_RECORDS,
+        "global_ligada_gradient": global_ligada_gradient,
+        "lifebit_connected": lifebit_connected,
+        "lifebit_label": state_payload["lifebit_label"],
+        "lifebit_last_seen": lifebit_last_seen_label,
+        "dashboard_state": state_payload,
+    }
+
+
+@login_required
+def dashboard(request):
+    app = _get_rotas_app()
+    if not _has_access(request.user, app):
+        return HttpResponseForbidden("Sem permissao.")
+    context = _build_dashboard_payload(app, request.GET)
+    if request.GET.get("partial") == "state":
+        return JsonResponse({"ok": True, **context["dashboard_state"]})
+    return render(request, "core/apps/app_rotas/dashboard.html", context)
 
 
 @login_required

@@ -113,6 +113,7 @@
       {% for item in composition %}
         <span
           class="composition-segment"
+          data-comp-segment="{{ item.balance }}"
           style="
             flex: 0 0 {{ item.percent_str }}%; min-width: 2px;
             {% if item.balance == 'SECBL01' %}--segment-color: #10b981; --segment-color-2: #34d399;
@@ -140,7 +141,7 @@
             ></span>
             <div class="composition-label">{{ item.label }}</div>
           </div>
-          <div class="composition-value">{{ item.percent|floatformat:1 }}%</div>
+          <div class="composition-value" data-comp-value="{{ item.balance }}">{{ item.percent|floatformat:1 }}%</div>
         </div>
       {% endfor %}
     </div>
@@ -203,16 +204,15 @@
         {% if selected_date %}
           <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
         {% endif %}
+        <div id="milhao-rt-status" class="panel-tag">Atualizacao automatica ativa</div>
         <div class="muted" style="font-size: 12px; opacity: 0.7;">Media calculada dos ultimos 14 dias (dias sem leitura nao entram)</div>
       </div>
     </div>
     <div class="metrics-overview grid-2 metric-grid">
       <div class="panel-card panel-card-compact metric-card metric-card-primary">
         <div class="metric-label">Total do dia</div>
-        <div class="metric-value">{{ total_value_display }} <span class="metric-unit">kg</span></div>
-        {% if avg_total_14_display %}
-          <div class="panel-tag">MEDIA {{ avg_total_14_display }} kg</div>
-        {% endif %}
+        <div class="metric-value"><span id="metric-total-number">{{ total_value_display }}</span> <span class="metric-unit">kg</span></div>
+        <div id="metric-avg-total" class="panel-tag{% if not avg_total_14_display %} is-hidden{% endif %}">{% if avg_total_14_display %}MEDIA {{ avg_total_14_display }} kg{% endif %}</div>
         <div class="metric-note">Soma das leituras no periodo.</div>
       </div>
     </div>
@@ -221,15 +221,13 @@
         <div class="metrics-subtitle">Totais por balanca</div>
         <div class="panel-grid metric-grid metric-grid-compact">
           {% for item in totals_by_balance %}
-            <div class="panel-card panel-card-compact metric-card">
+            <div class="panel-card panel-card-compact metric-card" data-balance-card="{{ item.balance }}">
               <div class="panel-card-top">
                 <div class="panel-title">{{ item.label }}</div>
                 <div class="panel-tag">{{ item.balance }}</div>
               </div>
-              <div class="metric-value">{{ item.total_display }} <span class="metric-unit">kg</span></div>
-              {% if item.avg_14_display %}
-                <div class="panel-tag">MEDIA {{ item.avg_14_display }} kg</div>
-              {% endif %}
+              <div class="metric-value"><span data-balance-total-number="{{ item.balance }}">{{ item.total_display }}</span> <span class="metric-unit">kg</span></div>
+              <div class="panel-tag{% if not item.avg_14_display %} is-hidden{% endif %}" data-balance-avg="{{ item.balance }}">{% if item.avg_14_display %}MEDIA {{ item.avg_14_display }} kg{% endif %}</div>
             </div>
           {% endfor %}
         </div>
@@ -243,9 +241,9 @@
         <h2 class="io-title">Leituras por hora</h2>
         <p class="muted">Valores acumulados recebidos ao longo do dia.</p>
         {% if last_ingests %}
-          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+          <div id="last-ingests-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
             {% for item in last_ingests %}
-              <span class="panel-tag">Ultima Leitura {{ item.label }}: {{ item.time }}</span>
+              <span class="panel-tag" data-last-ingest="{{ item.balance }}">Ultima Leitura {{ item.label }}: {{ item.time }}</span>
             {% endfor %}
           </div>
         {% endif %}
@@ -286,6 +284,14 @@
   </section>
 
   </div>
+  <style>
+    .is-hidden { display: none !important; }
+    .rt-pulse { animation: rtPulse 0.45s ease; }
+    @keyframes rtPulse {
+      0% { opacity: 0.72; transform: translateY(1px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+  </style>
   <script>
     (function () {
       var grid = document.getElementById("balance-chip-grid");
@@ -297,6 +303,10 @@
       var hiddenContainer = document.getElementById("balance-hidden-inputs");
       var selectedRaw = (grid.getAttribute("data-selected") || "").split(",");
       var selected = selectedRaw.map(function (item) { return item.trim(); }).filter(Boolean);
+      var cardsDataUrl = "{% url 'app_milhao_bla_cards_data' %}";
+      var rtStatus = document.getElementById("milhao-rt-status");
+      var rtIntervalMs = 15000;
+      var rtTimer = null;
 
       function setHiddenInputs(values) {
         if (!hiddenContainer) {
@@ -346,6 +356,146 @@
         if (form) {
           form.submit();
         }
+      }
+
+      function pulseElement(el) {
+        if (!el) {
+          return;
+        }
+        el.classList.remove("rt-pulse");
+        void el.offsetWidth;
+        el.classList.add("rt-pulse");
+      }
+
+      function setTextIfChanged(el, nextText) {
+        if (!el) {
+          return;
+        }
+        var normalized = (nextText || "").trim();
+        if (el.textContent.trim() === normalized) {
+          return;
+        }
+        el.textContent = normalized;
+        pulseElement(el);
+      }
+
+      function setTagText(tag, text) {
+        if (!tag) {
+          return;
+        }
+        var normalized = (text || "").trim();
+        if (!normalized) {
+          tag.textContent = "";
+          tag.classList.add("is-hidden");
+          return;
+        }
+        tag.classList.remove("is-hidden");
+        if (tag.textContent.trim() !== normalized) {
+          tag.textContent = normalized;
+          pulseElement(tag);
+        }
+      }
+
+      function getFilters() {
+        var dateValue = "";
+        if (dateSelects.length) {
+          dateValue = dateSelects[0].value || "";
+        }
+        return {
+          date: dateValue,
+          balances: selected.slice(),
+        };
+      }
+
+      function applyRealtimeData(payload) {
+        if (!payload || !payload.ok) {
+          return;
+        }
+        setTextIfChanged(document.getElementById("metric-total-number"), payload.total_value_display || "0");
+        setTagText(
+          document.getElementById("metric-avg-total"),
+          payload.avg_total_14_display ? ("MEDIA " + payload.avg_total_14_display + " kg") : ""
+        );
+
+        var totalsMap = {};
+        (payload.totals_by_balance || []).forEach(function (item) {
+          totalsMap[item.balance] = item;
+        });
+        document.querySelectorAll("[data-balance-total-number]").forEach(function (node) {
+          var balance = node.getAttribute("data-balance-total-number");
+          var item = totalsMap[balance];
+          setTextIfChanged(node, item ? (item.total_display || "0") : "0");
+        });
+        document.querySelectorAll("[data-balance-avg]").forEach(function (tag) {
+          var balance = tag.getAttribute("data-balance-avg");
+          var item = totalsMap[balance];
+          setTagText(tag, item && item.avg_14_display ? ("MEDIA " + item.avg_14_display + " kg") : "");
+        });
+
+        var compositionMap = {};
+        (payload.composition || []).forEach(function (item) {
+          compositionMap[item.balance] = item;
+        });
+        document.querySelectorAll("[data-comp-segment]").forEach(function (seg) {
+          var balance = seg.getAttribute("data-comp-segment");
+          var item = compositionMap[balance];
+          var nextPercent = item ? (item.percent_str || "0.0") : "0.0";
+          var nextFlex = nextPercent + "%";
+          if (seg.style.flexBasis !== nextFlex) {
+            seg.style.flexBasis = nextFlex;
+            pulseElement(seg);
+          }
+        });
+        document.querySelectorAll("[data-comp-value]").forEach(function (label) {
+          var balance = label.getAttribute("data-comp-value");
+          var item = compositionMap[balance];
+          setTextIfChanged(label, (item ? item.percent_str : "0.0") + "%");
+        });
+
+        var ingestMap = {};
+        (payload.last_ingests || []).forEach(function (item) {
+          ingestMap[item.balance] = item;
+        });
+        document.querySelectorAll("[data-last-ingest]").forEach(function (tag) {
+          var balance = tag.getAttribute("data-last-ingest");
+          var item = ingestMap[balance];
+          if (!item) {
+            return;
+          }
+          setTextIfChanged(tag, "Ultima Leitura " + item.label + ": " + item.time);
+        });
+
+        if (rtStatus) {
+          rtStatus.textContent = "Atualizado " + (payload.updated_at || "--:--:--");
+        }
+      }
+
+      function refreshCardsRealtime() {
+        var filters = getFilters();
+        var params = new URLSearchParams();
+        if (filters.date) {
+          params.set("date", filters.date);
+        }
+        filters.balances.forEach(function (balance) {
+          params.append("balance", balance);
+        });
+        fetch(cardsDataUrl + "?" + params.toString(), { headers: { "X-Requested-With": "XMLHttpRequest" } })
+          .then(function (response) { return response.json(); })
+          .then(function (payload) {
+            applyRealtimeData(payload);
+          })
+          .catch(function () {
+            if (rtStatus) {
+              rtStatus.textContent = "Atualizacao indisponivel";
+            }
+          });
+      }
+
+      function startRealtime() {
+        if (rtTimer) {
+          clearInterval(rtTimer);
+        }
+        rtTimer = setInterval(refreshCardsRealtime, rtIntervalMs);
       }
 
       grid.addEventListener("click", function (event) {
@@ -401,6 +551,8 @@
       }
 
       updateUI();
+      refreshCardsRealtime();
+      startRealtime();
     })();
   </script>
 {% endblock %}
