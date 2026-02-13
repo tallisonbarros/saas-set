@@ -19,6 +19,8 @@
   var dateInput = null;
   var availableDates = [];
   var selected = [];
+  var shimmerCleanupTimers = new WeakMap();
+  var shimmerLastRunAt = new WeakMap();
 
   function hydrateElements() {
     dynamicRoot = document.getElementById("milhao-dashboard-dynamic");
@@ -136,6 +138,53 @@
       });
   }
 
+  function clearShimmerState(host) {
+    if (!host) {
+      return;
+    }
+    host.classList.remove("rt-shimmer");
+    var timerId = shimmerCleanupTimers.get(host);
+    if (timerId) {
+      clearTimeout(timerId);
+      shimmerCleanupTimers.delete(host);
+    }
+  }
+
+  function resolveShimmerHost(el) {
+    if (!el) {
+      return null;
+    }
+    return (
+      el.closest("[data-rt-shimmer-host]") ||
+      el.closest(".panel-card") ||
+      el.closest(".metrics-card") ||
+      el.closest(".composition-card") ||
+      el.closest(".card")
+    );
+  }
+
+  function runShimmer(host) {
+    if (!host) {
+      return;
+    }
+    var now = Date.now();
+    var lastRun = shimmerLastRunAt.get(host) || 0;
+    if (now - lastRun < 140) {
+      return;
+    }
+    shimmerLastRunAt.set(host, now);
+
+    host.classList.add("rt-shimmer-host");
+    clearShimmerState(host);
+    void host.offsetWidth;
+    host.classList.add("rt-shimmer");
+
+    var fallbackTimer = setTimeout(function () {
+      clearShimmerState(host);
+    }, 650);
+    shimmerCleanupTimers.set(host, fallbackTimer);
+  }
+
   function pulseElement(el) {
     if (!el) {
       return;
@@ -143,14 +192,7 @@
     el.classList.remove("rt-pop-value");
     void el.offsetWidth;
     el.classList.add("rt-pop-value");
-
-    var shimmerHost = el.closest(".panel-card, .metrics-card, .composition-card, .metrics-card-primary");
-    if (shimmerHost) {
-      shimmerHost.classList.add("rt-shimmer-host");
-      shimmerHost.classList.remove("rt-shimmer");
-      void shimmerHost.offsetWidth;
-      shimmerHost.classList.add("rt-shimmer");
-    }
+    runShimmer(resolveShimmerHost(el));
   }
 
   function setTextIfChanged(el, nextText) {
@@ -320,6 +362,17 @@
       return;
     }
     dynamicRoot.setAttribute("data-js-bound", "1");
+
+    dynamicRoot.addEventListener("animationend", function (event) {
+      if (!event || event.animationName !== "rtShimmerSweep") {
+        return;
+      }
+      var target = event.target;
+      if (!target || !target.classList || !target.classList.contains("rt-shimmer-host")) {
+        return;
+      }
+      clearShimmerState(target);
+    });
 
     dynamicRoot.addEventListener("click", function (event) {
       var directDateInput = event.target.closest("#milhao-date-input");

@@ -85,7 +85,7 @@
   </section>
 
   {% if composition %}
-  <section class="card composition-card milhao-section">
+  <section class="card composition-card milhao-section" data-rt-shimmer-host>
     <div class="io-card-head composition-head">
       <div>
         <h2 class="io-title">Proporcao de composicao do dia</h2>
@@ -177,7 +177,7 @@
     </form>
   </section>
 
-  <section class="card app-accent metrics-card milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }}; padding: 16px;"{% endif %}>
+  <section class="card app-accent metrics-card milhao-section" data-rt-shimmer-host {% if theme_color %}style="--app-accent: {{ theme_color }}; padding: 16px;"{% endif %}>
     <div class="io-card-head metrics-head">
       <div>
         <h2 class="io-title">Indicadores do dia</h2>
@@ -192,7 +192,7 @@
       </div>
     </div>
     <div class="metrics-overview grid-2 metric-grid">
-      <div class="panel-card panel-card-compact metric-card metric-card-primary">
+      <div class="panel-card panel-card-compact metric-card metric-card-primary" data-rt-shimmer-host>
         <div class="metric-label">Total do dia</div>
         <div class="metric-value"><span id="metric-total-number">{{ total_value_display }}</span> <span class="metric-unit">kg</span></div>
         <div id="metric-avg-total" class="panel-tag{% if not avg_total_14_display %} is-hidden{% endif %}">{% if avg_total_14_display %}MEDIA {{ avg_total_14_display }} kg{% endif %}</div>
@@ -204,7 +204,7 @@
         <div class="metrics-subtitle">Totais por balanca</div>
         <div class="panel-grid metric-grid metric-grid-compact">
           {% for item in totals_by_balance %}
-            <div class="panel-card panel-card-compact metric-card" data-balance-card="{{ item.balance }}">
+            <div class="panel-card panel-card-compact metric-card" data-balance-card="{{ item.balance }}" data-rt-shimmer-host>
               <div class="panel-card-top">
                 <div class="panel-title">{{ item.label }}</div>
                 <div class="panel-tag">{{ item.balance }}</div>
@@ -218,7 +218,7 @@
     {% endif %}
   </section>
 
-  <section class="card app-accent milhao-readings milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="card app-accent milhao-readings milhao-section" data-rt-shimmer-host {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Leituras por hora</h2>
@@ -359,12 +359,13 @@
     .rt-shimmer-host.rt-shimmer::after {
       content: "";
       position: absolute;
-      inset: -18% -45%;
-      background: linear-gradient(112deg, rgba(255,255,255,0) 38%, rgba(255, 190, 126, 0.26) 50%, rgba(255,255,255,0) 62%);
+      inset: -22% -45%;
+      background: linear-gradient(108deg, rgba(255,255,255,0) 36%, rgba(255, 188, 116, 0.38) 50%, rgba(255,255,255,0) 64%);
       transform: translateX(-56%) skewX(-14deg);
-      animation: rtShimmerSweep 320ms ease-out;
+      animation: rtShimmerSweep 420ms ease-out;
       pointer-events: none;
-      z-index: 1;
+      mix-blend-mode: screen;
+      z-index: 3;
     }
     @media (max-width: 700px) {
       .milhao-section { margin: 0 auto 10px; }
