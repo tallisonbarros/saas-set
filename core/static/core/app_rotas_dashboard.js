@@ -38,6 +38,10 @@
     dayPrevButton: document.getElementById("day-prev-button"),
     dayNextButton: document.getElementById("day-next-button"),
     timelineRange: document.getElementById("timeline-range"),
+    timelineSliderShell: document.getElementById("timeline-slider-shell"),
+    timelineSliderBase: document.getElementById("timeline-slider-base"),
+    timelineSliderProgress: document.getElementById("timeline-slider-progress"),
+    timelineSliderThumb: document.getElementById("timeline-slider-thumb"),
     timelineNowMarker: document.getElementById("timeline-now-marker"),
     timelineTooltip: document.getElementById("timeline-thumb-tooltip"),
     timelinePlayToggle: document.getElementById("timeline-play-toggle"),
@@ -371,12 +375,15 @@
     var max = Number(els.timelineRange.max || "0");
     var value = Number(els.timelineRange.value || "0");
     var pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
-    var progress = "var(--timeline-progress-color, rgba(56, 189, 248, 0.68))";
-    var baseGradient = state.global_ligada_gradient || "linear-gradient(90deg, var(--timeline-track-1), var(--timeline-track-2))";
-    els.timelineRange.style.backgroundImage = "linear-gradient(90deg, " + progress + " 0% " + pct.toFixed(2) + "%, transparent " + pct.toFixed(2) + "% 100%), " + baseGradient;
-    els.timelineRange.style.backgroundSize = "100% 100%, 100% 100%";
-    els.timelineRange.style.backgroundPosition = "0 0, 0 0";
-    els.timelineRange.style.backgroundRepeat = "no-repeat, no-repeat";
+    if (els.timelineSliderBase) {
+      els.timelineSliderBase.style.background = state.global_ligada_gradient || "linear-gradient(90deg, var(--timeline-track-1), var(--timeline-track-2))";
+    }
+    if (els.timelineSliderProgress) {
+      els.timelineSliderProgress.style.width = pct.toFixed(2) + "%";
+    }
+    if (els.timelineSliderThumb) {
+      els.timelineSliderThumb.style.left = pct.toFixed(2) + "%";
+    }
   }
 
   function indexToPct(index, total) {
@@ -401,7 +408,7 @@
 
     if (els.timelineNowMarker) {
       els.timelineNowMarker.style.left = nowPct.toFixed(3) + "%";
-      els.timelineNowMarker.style.display = state.selected_day === state.now_day ? "" : "none";
+      els.timelineNowMarker.style.display = "none";
     }
   }
 
@@ -427,12 +434,12 @@
       return;
     }
     var wrapRect = wrap.getBoundingClientRect();
-    var rangeRect = els.timelineRange.getBoundingClientRect();
+    var rangeRect = (els.timelineSliderShell || els.timelineRange).getBoundingClientRect();
     var min = Number(els.timelineRange.min || "0");
     var max = Number(els.timelineRange.max || "0");
     var value = Number(els.timelineRange.value || "0");
     var pct = max > min ? (value - min) / (max - min) : 0;
-    var thumbWidth = 34;
+    var thumbWidth = els.timelineSliderThumb ? els.timelineSliderThumb.offsetWidth : 24;
     var x = rangeRect.left - wrapRect.left + pct * (rangeRect.width - thumbWidth) + thumbWidth / 2;
     els.timelineTooltip.style.left = x.toFixed(1) + "px";
   }

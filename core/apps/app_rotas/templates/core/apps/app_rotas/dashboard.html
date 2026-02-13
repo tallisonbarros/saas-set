@@ -119,8 +119,12 @@
           <input type="hidden" name="dia" value="{{ selected_day|date:'Y-m-d' }}">
           <input type="hidden" name="at" id="timeline-at" value="{{ selected_at_iso }}">
           <div class="timeline-track-wrap">
-            <div id="timeline-now-marker" class="timeline-now-marker"></div>
             <div class="timeline-controls">
+              <div id="timeline-slider-shell" class="timeline-slider-shell" aria-hidden="true">
+                <div id="timeline-slider-base" class="timeline-slider-base"></div>
+                <div id="timeline-slider-progress" class="timeline-slider-progress"></div>
+                <div id="timeline-slider-thumb" class="timeline-slider-thumb"></div>
+              </div>
               <input id="timeline-range" type="range" min="0" max="{{ timeline_total|add:'-1' }}" value="{{ selected_index }}" {% if timeline_total < 2 %}disabled{% endif %}>
             </div>
             <div id="timeline-thumb-tooltip" class="timeline-thumb-tooltip is-hidden" aria-hidden="true"></div>
@@ -520,9 +524,6 @@
       margin: 0 auto;
       padding: 0 6px;
     }
-    .timeline-now-marker {
-      display: none !important;
-    }
     .timeline-controls {
       display: flex;
       align-items: center;
@@ -531,24 +532,67 @@
       position: relative;
       z-index: 2;
       width: 100%;
+      min-height: var(--timeline-thumb-height);
     }
-    .timeline-controls input[type="range"] {
-      display: block;
+    .timeline-slider-shell {
+      position: relative;
       width: 100%;
-      -webkit-appearance: none;
-      appearance: none;
+      height: var(--timeline-thumb-height);
+    }
+    .timeline-slider-base,
+    .timeline-slider-progress {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
       height: var(--timeline-track-height);
       border-radius: 999px;
-      background: linear-gradient(90deg, var(--timeline-track-1), var(--timeline-track-2));
+      pointer-events: none;
+    }
+    .timeline-slider-base {
+      width: 100%;
       border: 1px solid var(--timeline-border);
+      background: linear-gradient(90deg, var(--timeline-track-1), var(--timeline-track-2));
+      overflow: hidden;
+    }
+    .timeline-slider-progress {
+      width: 0;
+      background: var(--timeline-progress-color, rgba(56, 189, 248, 0.68));
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12) inset;
+    }
+    .timeline-slider-thumb {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 24px;
+      height: var(--timeline-thumb-height);
+      transform: translate(-50%, -50%);
+      border: 1px solid var(--timeline-thumb-border);
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.2), transparent 45%),
+        linear-gradient(180deg, var(--timeline-thumb-bg), #0f172a);
+      box-shadow: 0 3px 10px var(--timeline-thumb-shadow), 0 0 0 1px rgba(15, 23, 42, .6) inset;
+      pointer-events: none;
+    }
+    .timeline-controls input[type="range"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: var(--timeline-thumb-height);
+      margin: 0;
+      opacity: 0;
+      cursor: ew-resize;
+      z-index: 3;
     }
     .timeline-controls input[type="range"]:focus-visible {
       outline: none;
       box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
     }
     .timeline-controls input[type="range"]::-webkit-slider-runnable-track {
-      height: var(--timeline-track-height);
-      border-radius: 999px;
+      background: transparent;
+      border: 0;
+    }
+    .timeline-controls input[type="range"]::-moz-range-track {
       background: transparent;
       border: 0;
     }
@@ -556,29 +600,13 @@
       -webkit-appearance: none;
       width: 24px;
       height: var(--timeline-thumb-height);
-      margin-top: calc((var(--timeline-track-height) - var(--timeline-thumb-height)) / 2 - 1px);
-      border: 1px solid var(--timeline-thumb-border);
-      border-radius: 999px;
-      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.2), transparent 45%),
-        linear-gradient(180deg, var(--timeline-thumb-bg), #0f172a);
-      box-shadow: 0 3px 10px var(--timeline-thumb-shadow), 0 0 0 1px rgba(15, 23, 42, .6) inset;
-      cursor: ew-resize;
-    }
-    .timeline-controls input[type="range"]::-moz-range-track {
-      height: var(--timeline-track-height);
-      border-radius: 999px;
-      background: transparent;
-      border: 0;
+      opacity: 0;
     }
     .timeline-controls input[type="range"]::-moz-range-thumb {
       width: 24px;
       height: var(--timeline-thumb-height);
-      border: 1px solid var(--timeline-thumb-border);
-      border-radius: 999px;
-      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.2), transparent 45%),
-        linear-gradient(180deg, var(--timeline-thumb-bg), #0f172a);
-      box-shadow: 0 3px 10px var(--timeline-thumb-shadow), 0 0 0 1px rgba(15, 23, 42, .6) inset;
-      cursor: ew-resize;
+      opacity: 0;
+      border: 0;
     }
     .timeline-scale-hint {
       margin-top: 10px;
