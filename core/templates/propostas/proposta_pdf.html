@@ -6,124 +6,157 @@
   <title>Proposta Comercial - {{ codigo }}</title>
 </head>
 <body>
-  <div class="doc-footer-left">Gerado em {{ gerado_em_display }} | SET</div>
+  <div class="footer-left">Gerado em {{ gerado_em_display }}</div>
 
   <main class="proposal-doc">
-    <header class="doc-header card avoid-break">
-      <div class="brand-block">
-        {% if logo_uri %}
-          <img class="brand-logo" src="{{ logo_uri }}" alt="Logo SET">
-        {% endif %}
-        <div>
-          <div class="brand-name">SET</div>
-          <h1>Proposta Comercial</h1>
-          <p class="subtitle">Documento comercial consolidado</p>
+    <header class="doc-header avoid-break">
+      <div class="brand-bar">
+        <div class="brand-pattern" aria-hidden="true"></div>
+        <div class="brand-left">
+          {% if logo_uri %}
+            <img class="brand-logo" src="{{ logo_uri }}" alt="Logo SET">
+          {% endif %}
+        </div>
+        <div class="brand-right">
+          <div class="brand-meta-label">Status</div>
+          <div class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</div>
+          <div class="brand-meta-label">Codigo da proposta</div>
+          <div class="brand-code mono">{{ codigo }}</div>
         </div>
       </div>
-      <div class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</div>
+
+      <div class="context-bar">
+        <h1>Proposta Comercial</h1>
+        <p class="context-subtitle">SET - Industria & Tecnologia</p>
+        <div class="context-divider"></div>
+        <div class="mini-metrics">
+          <div class="mini-metric">
+            <div class="mini-label">Valor</div>
+            <div class="mini-value value-strong">{{ valor_display }}</div>
+          </div>
+          <div class="mini-metric">
+            <div class="mini-label">Prioridade</div>
+            <div class="mini-value">{{ proposta.prioridade }}</div>
+          </div>
+          <div class="mini-metric">
+            <div class="mini-label">Criada em</div>
+            <div class="mini-value">{{ criada_em_display }}</div>
+          </div>
+        </div>
+      </div>
     </header>
 
-    <section class="card section avoid-break">
+    <section class="kpi-grid avoid-break">
+      <article class="kpi-card">
+        <div class="kpi-label">Valor</div>
+        <div class="kpi-value value-strong">{{ valor_display }}</div>
+      </article>
+      <article class="kpi-card">
+        <div class="kpi-label">Status</div>
+        <div class="kpi-value">
+          <span class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</span>
+        </div>
+      </article>
+      <article class="kpi-card">
+        <div class="kpi-label">Codigo / Proposta</div>
+        <div class="kpi-value mono">{{ codigo }}</div>
+        {% if proposta.nome %}
+          <div class="kpi-subvalue">{{ proposta.nome }}</div>
+        {% endif %}
+      </article>
+      <article class="kpi-card">
+        <div class="kpi-label">Criada em / Prioridade</div>
+        <div class="kpi-value">{{ criada_em_display }}</div>
+        <div class="kpi-subvalue">Prioridade {{ proposta.prioridade }}</div>
+      </article>
+    </section>
+
+    <section class="content-card section avoid-break">
       <h2 class="section-title">Identificacao</h2>
-      <div class="id-grid">
+      <div class="table-grid">
         <table class="meta-table">
           <tbody>
-            <tr>
-              <th>Codigo</th>
-              <td>{{ codigo }}</td>
-            </tr>
-            <tr>
-              <th>Proposta</th>
-              <td>{{ proposta.nome }}</td>
-            </tr>
-            <tr>
-              <th>Prioridade</th>
-              <td>{{ proposta.prioridade }}</td>
-            </tr>
-            <tr>
-              <th>Criada em</th>
-              <td>{{ criada_em_display }}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <table class="meta-table">
-          <tbody>
-            <tr>
-              <th>Para</th>
-              <td>
-                <div>{{ para_nome }}</div>
-                <div class="mono subtle">{{ para_email }}</div>
-              </td>
-            </tr>
-            <tr>
-              <th>De</th>
-              <td class="mono">{{ de_display }}</td>
-            </tr>
-            <tr>
-              <th>Status</th>
-              <td>{{ status_label }}</td>
-            </tr>
-            <tr>
-              <th>Valor</th>
-              <td class="value-highlight">{{ valor_display }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card section">
-      <h2 class="section-title">Descricao</h2>
-      <div class="text-block">{{ proposta.descricao|linebreaksbr }}</div>
-    </section>
-
-    <section class="card section avoid-break">
-      <h2 class="section-title">Origem tecnica</h2>
-      {% if origem_rows %}
-        <table class="meta-table origin-table">
-          <tbody>
-            {% for label, value in origem_rows %}
+            {% for row in identificacao_esquerda %}
               <tr>
-                <th>{{ label }}</th>
-                <td>{{ value }}</td>
+                <th>{{ row.label }}</th>
+                <td class="{% if row.mono %}mono{% endif %} {% if row.highlight %}value-strong{% endif %}">{{ row.value }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
-      {% else %}
-        <div class="text-block subtle">Sem origem tecnica vinculada.</div>
-      {% endif %}
+        <table class="meta-table">
+          <tbody>
+            {% for row in identificacao_direita %}
+              <tr>
+                <th>{{ row.label }}</th>
+                <td class="{% if row.mono %}mono{% endif %} {% if row.highlight %}value-strong{% endif %}">{{ row.value }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </section>
 
-    <section class="card section">
+    {% if origem_rows %}
+      <section class="content-card section avoid-break">
+        <h2 class="section-title">Origem tecnica</h2>
+        <table class="meta-table">
+          <tbody>
+            {% for row in origem_rows %}
+              <tr>
+                <th>{{ row.label }}</th>
+                <td>{{ row.value }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endif %}
+
+    <section class="content-card section">
+      <h2 class="section-title">Descricao</h2>
+      <div class="description-flow">
+        {% for block in descricao_blocks %}
+          {% if block.type == "p" %}
+            <p>{{ block.text }}</p>
+          {% elif block.type == "ul" %}
+            <ul class="description-list">
+              {% for item in block.items %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="content-card section">
       <h2 class="section-title">Resumo das atividades</h2>
-      <ul class="activities-list">
+      <ol class="activities-list">
         {% for atividade in atividades %}
           <li class="activity-item avoid-break">
-            <span class="activity-dot"></span>
-            <div>
-              <div class="activity-name">{{ atividade.nome }}</div>
-              {% if atividade.descricao %}
-                <div class="activity-desc">{{ atividade.descricao }}</div>
-              {% endif %}
-            </div>
+            <div class="activity-name">{{ atividade.nome }}</div>
+            {% if atividade.descricao %}
+              <div class="activity-desc">{{ atividade.descricao }}</div>
+            {% endif %}
           </li>
         {% endfor %}
-      </ul>
+      </ol>
     </section>
 
     {% if has_observacao %}
-      <section class="card section observation-box avoid-break">
+      <section class="content-card section observation-box avoid-break">
         <h2 class="section-title">Observacao</h2>
-        <div class="text-block">{{ observacao|linebreaksbr }}</div>
+        <div class="description-flow">
+          <p>{{ observacao }}</p>
+        </div>
       </section>
     {% endif %}
 
     {% if anexos %}
-      <section class="card section avoid-break">
+      <section class="content-card section avoid-break">
         <h2 class="section-title">Anexos</h2>
-        <table class="meta-table attachments-table">
+        <table class="meta-table">
           <thead>
             <tr>
               <th>Tipo</th>

@@ -1987,6 +1987,70 @@ def _status_badge_class(status_label):
     }.get(normalized, "status-pendente")
 
 
+def _clean_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _append_pdf_row(rows, label, value, mono=False, highlight=False):
+    text = _clean_text(value)
+    if not text:
+        return
+    rows.append(
+        {
+            "label": label,
+            "value": text,
+            "mono": bool(mono),
+            "highlight": bool(highlight),
+        }
+    )
+
+
+def _descricao_blocks(text):
+    raw = _clean_text(text)
+    if not raw:
+        return [{"type": "p", "text": "Sem descricao informada."}]
+
+    blocks = []
+    bullet_items = []
+    paragraph_lines = []
+
+    def flush_paragraph():
+        nonlocal paragraph_lines
+        if paragraph_lines:
+            merged = " ".join(line.strip() for line in paragraph_lines if line.strip()).strip()
+            if merged:
+                blocks.append({"type": "p", "text": merged})
+            paragraph_lines = []
+
+    def flush_bullets():
+        nonlocal bullet_items
+        if bullet_items:
+            blocks.append({"type": "ul", "items": bullet_items[:]})
+            bullet_items = []
+
+    for line in raw.splitlines():
+        item = line.strip()
+        if not item:
+            flush_paragraph()
+            flush_bullets()
+            continue
+        if item.startswith("> "):
+            flush_paragraph()
+            bullet_text = item[2:].strip()
+            if bullet_text:
+                bullet_items.append(bullet_text)
+            continue
+        flush_bullets()
+        paragraph_lines.append(item)
+
+    flush_paragraph()
+    flush_bullets()
+
+    return blocks or [{"type": "p", "text": "Sem descricao informada."}]
+
+
 def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
     origem = proposta.origem_trabalho if include_origem else None
     origem_rows = []
@@ -2026,6 +2090,30 @@ def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
         }
         for anexo in proposta.anexos.all()
     ]
+    identificacao_esquerda = []
+    _append_pdf_row(identificacao_esquerda, "Codigo", proposta.codigo or f"ID {proposta.id}", mono=True)
+    _append_pdf_row(identificacao_esquerda, "Proposta", proposta.nome)
+    _append_pdf_row(identificacao_esquerda, "Prioridade", proposta.prioridade)
+    _append_pdf_row(identificacao_esquerda, "Criada em", _format_ptbr_datetime(proposta.criado_em))
+    if proposta.decidido_em:
+        _append_pdf_row(identificacao_esquerda, "Decidida em", _format_ptbr_datetime(proposta.decidido_em))
+    if proposta.finalizada_em:
+        _append_pdf_row(identificacao_esquerda, "Finalizada em", _format_ptbr_datetime(proposta.finalizada_em))
+
+    identificacao_direita = []
+    if proposta.cliente and proposta.cliente.nome:
+        _append_pdf_row(identificacao_direita, "Para", proposta.cliente.nome)
+    if proposta.cliente and proposta.cliente.email:
+        _append_pdf_row(identificacao_direita, "Email (para)", proposta.cliente.email, mono=True)
+    de_contato = ""
+    if proposta.criada_por:
+        de_contato = proposta.criada_por.email or proposta.criada_por.username
+    _append_pdf_row(identificacao_direita, "De", de_contato, mono=True)
+    _append_pdf_row(identificacao_direita, "Status", status_label)
+    if proposta.aprovado_por:
+        _append_pdf_row(identificacao_direita, "Decidida por", proposta.aprovado_por.username)
+
+    origem_rows_fmt = [{"label": label, "value": value} for label, value in origem_rows if _clean_text(value)]
     logo_path = finders.find("core/logoset.png") or finders.find("core/FAVICON_PRETO.png")
     logo_uri = Path(logo_path).as_uri() if logo_path else ""
     return {
@@ -2038,8 +2126,11 @@ def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
         "de_display": proposta.criada_por.username if proposta.criada_por else "Sistema",
         "para_nome": proposta.cliente.nome if proposta.cliente else "-",
         "para_email": proposta.cliente.email if proposta.cliente else "-",
-        "origem_rows": origem_rows,
+        "identificacao_esquerda": identificacao_esquerda,
+        "identificacao_direita": identificacao_direita,
+        "origem_rows": origem_rows_fmt,
         "atividades": atividades,
+        "descricao_blocks": _descricao_blocks(proposta.descricao),
         "anexos": anexos,
         "has_observacao": bool((proposta.observacao_cliente or "").strip()),
         "observacao": (proposta.observacao_cliente or "").strip(),
@@ -4167,7 +4258,7 @@ def proposta_export_pdf(request, pk):
     status_label = _proposta_status_label(proposta)
     pdf_buffer = _render_proposta_pdf(proposta, status_label, include_origem=radar_schema_ready)
     if not pdf_buffer:
-        return HttpResponse("Biblioteca de PDF indisponivel (reportlab).", status=500)
+        return HttpResponse("Biblioteca de PDF indisponivel (WeasyPrint).", status=500)
     base_name = proposta.codigo or f"proposta_{proposta.id}"
     filename = re.sub(r"[^A-Za-z0-9_-]+", "_", str(base_name)).strip("_") or f"proposta_{proposta.id}"
     response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")

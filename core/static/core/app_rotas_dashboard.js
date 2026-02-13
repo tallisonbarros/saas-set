@@ -326,6 +326,23 @@
     return best;
   }
 
+  function requestTimelineIso(nextIso) {
+    if (!nextIso) {
+      return;
+    }
+    var currentIso = state.selected_at_iso || state.selected_at || "";
+    if (nextIso === currentIso) {
+      return;
+    }
+    enterHistoricalMode();
+    timelinePendingIso = null;
+    setTimelineCardsLoading(true);
+    refreshState(
+      { selected_at_iso: nextIso, events_page: 1, follow_now: false },
+      { timeline_loading: true, abortPrevious: true }
+    );
+  }
+
   function goToLiveNow() {
     state.follow_now = true;
     refreshState(
@@ -821,6 +838,20 @@
       updateTimelineTooltip(point ? point.label : "");
       setTimelineTooltipVisible(true);
     });
+    els.timelineRange.addEventListener("mousedown", function () {
+      var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+      var index = Number(els.timelineRange.value);
+      var point = timeline[index];
+      updateTimelineTooltip(point ? point.label : "");
+      setTimelineTooltipVisible(true);
+    });
+    els.timelineRange.addEventListener("touchstart", function () {
+      var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+      var index = Number(els.timelineRange.value);
+      var point = timeline[index];
+      updateTimelineTooltip(point ? point.label : "");
+      setTimelineTooltipVisible(true);
+    }, { passive: true });
     els.timelineRange.addEventListener("input", function () {
       applyTimelinePreview();
       setTimelineTooltipVisible(true);
@@ -842,20 +873,28 @@
         if (!timeline.length) {
           return;
         }
-        enterHistoricalMode();
         var baseIndex = Number(els.timelineRange.value || state.selected_index || 0);
-        var basePoint = timeline[Math.max(0, Math.min(baseIndex, timeline.length - 1))];
+        baseIndex = Math.max(0, Math.min(baseIndex, timeline.length - 1));
+        var basePoint = timeline[baseIndex];
         var baseMs = Date.parse(basePoint.iso);
         if (!Number.isFinite(baseMs)) {
           return;
         }
-        var targetIndex = findClosestTimelineIndexByMs(baseMs - 15 * 60 * 1000);
+        var targetMs = baseMs - 15 * 60 * 1000;
+        var targetIndex = findClosestTimelineIndexByMs(targetMs);
         if (targetIndex < 0) {
           return;
         }
         els.timelineRange.value = String(targetIndex);
-        applyTimelinePreview();
-        commitTimelineSelection();
+        updateRangeProgress();
+        var point = timeline[targetIndex];
+        if (els.timelineReadLabel) {
+          els.timelineReadLabel.textContent = point.label;
+        }
+        if (els.selectedAtNote) {
+          els.selectedAtNote.textContent = point.label;
+        }
+        requestTimelineIso(point.iso);
       });
     }
 
@@ -865,8 +904,8 @@
         if (!timeline.length) {
           return;
         }
-        enterHistoricalMode();
         var baseIndex = Number(els.timelineRange.value || state.selected_index || 0);
+        baseIndex = Math.max(0, Math.min(baseIndex, timeline.length - 1));
         var basePoint = timeline[Math.max(0, Math.min(baseIndex, timeline.length - 1))];
         var baseMs = Date.parse(basePoint.iso);
         if (!Number.isFinite(baseMs)) {
@@ -877,10 +916,17 @@
           return;
         }
         els.timelineRange.value = String(targetIndex);
-        applyTimelinePreview();
-        commitTimelineSelection();
+        updateRangeProgress();
+        var point = timeline[targetIndex];
+        if (els.timelineReadLabel) {
+          els.timelineReadLabel.textContent = point.label;
+        }
+        if (els.selectedAtNote) {
+          els.selectedAtNote.textContent = point.label;
+        }
+        requestTimelineIso(point.iso);
       });
-    });
+    }
   }
 
   if (els.timelineBackNow) {
@@ -891,7 +937,9 @@
   }
 
   if (els.timelineNowMini) {
-    els.timelineNowMini.addEventListener("click", function () {
+    els.timelineNowMini.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
       goToLiveNow();
     });
   }
