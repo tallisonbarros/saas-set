@@ -41,7 +41,7 @@
   </section>
 
   <div id="milhao-dashboard-dynamic" data-cards-url="{% url 'app_milhao_bla_cards_data' %}">
-  <section class="card app-accent composition-card date-nav-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <section class="app-accent date-nav-card milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <form method="get" class="io-form milhao-date-nav-form">
       {% for bal in selected_balances %}
         <input type="hidden" name="balance" value="{{ bal }}" />
@@ -136,7 +136,7 @@
     {% if selected_date %}
       <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
     {% endif %}
-    <div class="field metrics-balance-filter">
+    <label class="field metrics-balance-filter">
       <span>Balancas</span>
       <div
         id="balance-chip-grid"
@@ -173,7 +173,7 @@
         {% endfor %}
       </div>
       <div id="balance-hidden-inputs"></div>
-    </div>
+    </label>
     </form>
   </section>
 
@@ -270,7 +270,7 @@
   </div>
   <style>
     .is-hidden { display: none !important; }
-    .milhao-section { margin: 0 auto 14px; }
+    .milhao-section { width: 100%; margin: 0 auto 14px; }
     .card-stack > .milhao-section:last-child { margin-bottom: 0; }
     .date-nav-card {
       padding: 12px 14px;
@@ -345,17 +345,6 @@
         linear-gradient(135deg, #ff7a1a, #ffbe73) border-box;
     }
     .milhao-date-arrow.is-disabled { opacity: 0.4; pointer-events: none; }
-    .metrics-balance-filter { margin: 0; }
-    .metrics-balance-filter > span { display: block; margin-bottom: 8px; }
-    .balance-chip.is-selected {
-      border-color: rgba(255, 122, 26, 0.65);
-      background: linear-gradient(180deg, rgba(255, 122, 26, 0.22), rgba(255, 122, 26, 0.1));
-      box-shadow: 0 0 0 1px rgba(255, 122, 26, 0.28);
-    }
-    .balance-chip-main.is-selected .balance-title,
-    .balance-chip-main.is-selected .balance-subtitle {
-      color: #ffd7b6;
-    }
     #milhao-dashboard-dynamic.is-loading { opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease; }
     .rt-pulse { animation: rtPulse 0.45s ease; }
     @media (max-width: 700px) {

@@ -6,7 +6,16 @@
   <title>Proposta Comercial - {{ codigo }}</title>
 </head>
 <body>
-  <div class="footer-left">Gerado em {{ gerado_em_display }}</div>
+  <div class="footer-left">
+    <span>Gerado em {{ gerado_em_display }}</span>
+    <span class="footer-sep">|</span>
+    <span class="footer-site">www.setbrasil.com</span>
+    <span class="footer-sep">|</span>
+    <span class="footer-flag" aria-label="Bandeira do Brasil">
+      <span class="flag-diamond"></span>
+      <span class="flag-core"></span>
+    </span>
+  </div>
 
   <main class="proposal-doc">
     <header class="doc-header avoid-break">

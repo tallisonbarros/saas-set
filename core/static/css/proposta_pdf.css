@@ -18,6 +18,14 @@
   box-sizing: border-box;
 }
 
+:root {
+  --accent-50: #fff7ed;
+  --accent-100: #ffedd5;
+  --accent-300: #fdba74;
+  --accent-500: #f97316;
+  --accent-700: #c2410c;
+}
+
 html,
 body {
   margin: 0;
@@ -33,6 +41,47 @@ body {
   position: running(footer-left);
   color: #6b7280;
   font-size: 9px;
+}
+
+.footer-sep {
+  margin: 0 6px;
+  color: #9ca3af;
+}
+
+.footer-site {
+  color: #4b5563;
+}
+
+.footer-flag {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 1px;
+  border: 1px solid #d1d5db;
+  background: #229e45;
+  vertical-align: -1px;
+  overflow: hidden;
+}
+
+.flag-diamond {
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 6px;
+  height: 6px;
+  background: #ffda44;
+  transform: rotate(45deg);
+}
+
+.flag-core {
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #0052b4;
 }
 
 .proposal-doc {
@@ -196,7 +245,7 @@ h1 {
 }
 
 .value-strong {
-  color: #2563eb;
+  color: var(--accent-500);
   font-size: 17px;
   font-weight: 800;
 }
@@ -237,7 +286,7 @@ h1 {
   height: 12px;
   margin-right: 7px;
   border-radius: 2px;
-  background: #2563eb;
+  background: var(--accent-500);
   vertical-align: -1px;
 }
 
@@ -334,9 +383,9 @@ h1 {
   width: 19px;
   height: 19px;
   border-radius: 999px;
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid var(--accent-300);
+  background: var(--accent-50);
+  color: var(--accent-700);
   font-size: 9px;
   font-weight: 700;
   text-align: center;
@@ -361,6 +410,7 @@ h1 {
 .status-badge {
   display: inline-block;
   padding: 5px 10px;
+  margin-bottom: 8px;
   border-radius: 999px;
   font-size: 9px;
   font-weight: 800;
@@ -370,22 +420,22 @@ h1 {
 }
 
 .status-pendente {
-  background: #fffbeb;
-  color: #92400e;
-  border-color: #fcd34d;
+  background: var(--accent-50);
+  color: var(--accent-700);
+  border-color: var(--accent-300);
 }
 
 .status-executando {
-  background: #ecfdf5;
-  color: #166534;
-  border-color: #86efac;
+  background: var(--accent-50);
+  color: var(--accent-700);
+  border-color: var(--accent-300);
 }
 
 .status-aprovada,
 .status-finalizada {
-  background: #ecfdf5;
-  color: #166534;
-  border-color: #86efac;
+  background: var(--accent-50);
+  color: var(--accent-700);
+  border-color: var(--accent-300);
 }
 
 .status-reprovada {
