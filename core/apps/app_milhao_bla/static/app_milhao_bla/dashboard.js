@@ -218,6 +218,7 @@
     }
     return (
       el.closest("[data-rt-shimmer-host]") ||
+      el.closest(".balance-chip") ||
       el.closest(".panel-card") ||
       el.closest(".metrics-card") ||
       el.closest(".composition-card") ||
@@ -314,31 +315,46 @@
 
   function setTextIfChanged(el, nextText) {
     if (!el) {
-      return;
+      return false;
     }
     var normalized = (nextText || "").trim();
     if (el.textContent.trim() === normalized) {
-      return;
+      return false;
     }
     el.textContent = normalized;
     pulseElement(el);
+    return true;
   }
 
   function setTagText(tag, text) {
     if (!tag) {
-      return;
+      return false;
     }
     var normalized = (text || "").trim();
     if (!normalized) {
       tag.textContent = "";
       tag.classList.add("is-hidden");
-      return;
+      return false;
     }
     tag.classList.remove("is-hidden");
     if (tag.textContent.trim() !== normalized) {
       tag.textContent = normalized;
       pulseElement(tag);
+      return true;
     }
+    return false;
+  }
+
+  function pulseBalanceChip(balance) {
+    if (!grid || !balance) {
+      return;
+    }
+    var chip = grid.querySelector('.balance-chip[data-balance="' + balance + '"]');
+    if (!chip) {
+      return;
+    }
+    var target = chip.querySelector(".balance-chip-main") || chip;
+    pulseElement(target);
   }
 
   function getFilters() {
@@ -387,6 +403,7 @@
     if (!payload || !payload.ok) {
       return;
     }
+    var changedBalances = {};
     setTextIfChanged(document.getElementById("metric-total-number"), payload.total_value_display || "0");
     setTagText(
       document.getElementById("metric-avg-total"),
@@ -400,12 +417,16 @@
     document.querySelectorAll("[data-balance-total-number]").forEach(function (node) {
       var balance = node.getAttribute("data-balance-total-number");
       var item = totalsMap[balance];
-      setTextIfChanged(node, item ? (item.total_display || "0") : "0");
+      if (setTextIfChanged(node, item ? (item.total_display || "0") : "0")) {
+        changedBalances[balance] = true;
+      }
     });
     document.querySelectorAll("[data-balance-avg]").forEach(function (tag) {
       var balance = tag.getAttribute("data-balance-avg");
       var item = totalsMap[balance];
-      setTagText(tag, item && item.avg_14_display ? ("MEDIA " + item.avg_14_display + " kg") : "");
+      if (setTagText(tag, item && item.avg_14_display ? ("MEDIA " + item.avg_14_display + " kg") : "")) {
+        changedBalances[balance] = true;
+      }
     });
 
     var compositionMap = {};
@@ -425,7 +446,9 @@
     document.querySelectorAll("[data-comp-value]").forEach(function (label) {
       var balance = label.getAttribute("data-comp-value");
       var item = compositionMap[balance];
-      setTextIfChanged(label, (item ? item.percent_str : "0.0") + "%");
+      if (setTextIfChanged(label, (item ? item.percent_str : "0.0") + "%")) {
+        changedBalances[balance] = true;
+      }
     });
 
     var ingestMap = {};
@@ -438,7 +461,13 @@
       if (!item) {
         return;
       }
-      setTextIfChanged(tag, "Ultima Leitura " + item.label + ": " + item.time);
+      if (setTextIfChanged(tag, "Ultima Leitura " + item.label + ": " + item.time)) {
+        changedBalances[balance] = true;
+      }
+    });
+
+    Object.keys(changedBalances).forEach(function (balance) {
+      pulseBalanceChip(balance);
     });
 
     if (rtStatus) {

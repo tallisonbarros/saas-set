@@ -358,6 +358,45 @@ h1 {
   margin-bottom: 5px;
 }
 
+.commercial-flow {
+  display: block;
+}
+
+.commercial-block {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.commercial-block:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.commercial-block h3 {
+  margin: 0 0 6px;
+  font-size: 10.8px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.commercial-intro {
+  margin: 0 0 6px;
+  color: #4b5563;
+  font-size: 10px;
+}
+
+.commercial-block ul {
+  margin: 0 0 0 16px;
+  padding: 0;
+}
+
+.commercial-block li {
+  margin-bottom: 4px;
+  color: #1f2937;
+}
+
 .activities-list {
   counter-reset: activity;
   list-style: none;

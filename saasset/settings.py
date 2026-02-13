@@ -133,6 +133,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [
+    BASE_DIR / "core" / "apps" / "app_milhao_bla" / "static",
+]
 
 
 MEDIA_URL = "/media/"

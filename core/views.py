@@ -2024,6 +2024,144 @@ def _descricao_blocks(text):
     return blocks or [{"type": "p", "text": "Sem descricao informada."}]
 
 
+def _sanitize_proposta_descricao(text):
+    raw = _clean_text(text)
+    if not raw:
+        return ""
+
+    lines = raw.splitlines()
+    normalized = [line.strip().lower() for line in lines]
+    has_old_block = (
+        any(item == "origem tecnica" for item in normalized)
+        and any(item.startswith("radar:") for item in normalized)
+        and any(item.startswith("trabalho:") for item in normalized)
+    )
+    if not has_old_block:
+        return raw
+
+    prefixes = (
+        "origem tecnica",
+        "radar:",
+        "trabalho:",
+        "descricao do trabalho:",
+        "setor:",
+        "solicitante:",
+        "responsavel:",
+        "contrato:",
+        "classificacao:",
+        "data de registro:",
+        "resumo das atividades",
+    )
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if not stripped:
+            cleaned_lines.append("")
+            continue
+        if lowered.startswith(prefixes):
+            continue
+        if lowered.startswith("- ") and cleaned_lines and not cleaned_lines[-1].strip():
+            # evita trazer lista antiga de atividades quando veio do prefill tecnico.
+            continue
+        cleaned_lines.append(line)
+
+    cleaned = "\n".join(cleaned_lines).strip()
+    return cleaned
+
+
+def _first_attr(obj, names, default=None):
+    for name in names:
+        if hasattr(obj, name):
+            value = getattr(obj, name)
+            if value not in (None, ""):
+                return value
+    return default
+
+
+def _proposta_condicoes_comerciais(proposta):
+    validade = _first_attr(proposta, ("validade_dias", "validade_proposta_dias"), 10)
+    prazo_ddl = _first_attr(proposta, ("prazo_pagamento_ddl", "prazo_pagamento_dias"), 30)
+    condicao_pagamento = _first_attr(
+        proposta,
+        ("condicoes_pagamento", "condicao_pagamento"),
+        "Deposito em conta nominal da contratada.",
+    )
+
+    validade_txt = f"{int(validade)} dias" if str(validade).isdigit() else str(validade)
+    prazo_txt = f"{int(prazo_ddl)} DDL" if str(prazo_ddl).isdigit() else str(prazo_ddl)
+
+    return [
+        {
+            "titulo": "A) Obrigacoes da Contratada (SET)",
+            "itens": [
+                "Fornecer mao de obra tecnica compativel com o escopo contratado.",
+                "Disponibilizar ferramental basico e EPIs necessarios a execucao.",
+                "Cumprir normas internas, tecnicas, eticas e legislacao vigente.",
+                "Manter organizacao e limpeza nos locais de trabalho.",
+                "Disponibilizar responsavel tecnico para coordenacao e acompanhamento quando aplicavel.",
+                "Emitir registros/relatorios basicos de atendimento quando aplicavel.",
+                "Substituir profissional cuja permanencia seja considerada inadequada pela contratante.",
+            ],
+        },
+        {
+            "titulo": "B) Obrigacoes da Contratante (Cliente)",
+            "itens": [
+                "Disponibilizar acesso, local e infraestrutura para execucao dos servicos.",
+                "Fornecer informacoes necessarias e apoio para bom andamento do trabalho.",
+                "Disponibilizar local seguro para guarda de ferramentas, materiais e instrumentos (quando aplicavel).",
+                "Validar e assinar relatorios/termos de aceite quando aplicavel.",
+                "Comunicar imediatamente problemas referentes a equipe e/ou condicoes de execucao.",
+            ],
+        },
+        {
+            "titulo": "C) Exclusoes (itens nao inclusos)",
+            "intro": "Salvo quando descrito expressamente no escopo:",
+            "itens": [
+                "Licenciamento de softwares de engenharia e desenvolvimento.",
+                "Fornecimento de materiais, equipamentos, laudos, projetos e paineis.",
+                "Servicos civis, mecanicos ou estruturais (alvenaria, suportacoes, pipe rack, etc.).",
+                "Andaimes, plataformas elevatorias, guindastes ou caminhao munck.",
+                "Energia eletrica, utilidades, rede e infraestrutura predial.",
+                "Ferramental especial e equipamentos de diagnostico nao citados no escopo.",
+                "Expansoes estruturais de logica/arquitetura nao descritas no escopo.",
+            ],
+        },
+        {
+            "titulo": "D) Direitos sobre Softwares",
+            "itens": [
+                "Os softwares desenvolvidos pela SET sao cedidos a contratante exclusivamente para uso no ambiente de instalacao acordado, com a finalidade de operacao e manutencao local ou descentralizada.",
+                "E vedada a reproducao, distribuicao, compartilhamento, ou utilizacao dos softwares em outros ambientes/finalidades, salvo autorizacao formal da SET.",
+                "Sistemas supervisorios (SCADA) e interfaces homem-maquina (IHMs) sao fornecidos no modo Run-Time, nao incluindo licencas de desenvolvimento/edicao, salvo se especificado em contrato.",
+            ],
+        },
+        {
+            "titulo": "E) Garantia de Software",
+            "itens": [
+                "Garantia de 360 dias para correcoes relacionadas a falhas de programacao dentro do escopo contratado.",
+                "Alteracoes por terceiros, mudancas de processo/planta, mudancas de hardware nao previstas ou uso indevido invalidam a garantia.",
+            ],
+        },
+        {
+            "titulo": "F) Tributacao",
+            "itens": [
+                "A contratada e optante pelo Simples Nacional, estando tributos federais e previdenciarios inclusos no preco.",
+                "O ISS sera destacado conforme legislacao vigente.",
+                "Nao ha necessidade de retencao de outros encargos.",
+                "Se materiais forem faturados separadamente dos servicos, a contratante deve sinalizar previamente para incidencia de ICMS.",
+            ],
+        },
+        {
+            "titulo": "G) Validade e Pagamento",
+            "itens": [
+                f"Prazo de validade da proposta comercial: {validade_txt}.",
+                f"Prazo de pagamento: {prazo_txt}.",
+                f"Condicao padrao: {condicao_pagamento}",
+            ],
+        },
+    ]
+
+
 def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
     origem = proposta.origem_trabalho if include_origem else None
     origem_rows = []
@@ -2089,6 +2227,7 @@ def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
     origem_rows_fmt = [{"label": label, "value": value} for label, value in origem_rows if _clean_text(value)]
     logo_path = finders.find("core/logoset.png") or finders.find("core/FAVICON_PRETO.png")
     logo_uri = Path(logo_path).as_uri() if logo_path else ""
+    descricao_limpa = _sanitize_proposta_descricao(proposta.descricao)
     return {
         "proposta": proposta,
         "status_label": status_label,
@@ -2103,10 +2242,11 @@ def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
         "identificacao_direita": identificacao_direita,
         "origem_rows": origem_rows_fmt,
         "atividades": atividades,
-        "descricao_blocks": _descricao_blocks(proposta.descricao),
+        "descricao_blocks": _descricao_blocks(descricao_limpa),
         "anexos": anexos,
         "has_observacao": bool((proposta.observacao_cliente or "").strip()),
         "observacao": (proposta.observacao_cliente or "").strip(),
+        "condicoes_comerciais": _proposta_condicoes_comerciais(proposta),
         "gerado_em_display": _format_ptbr_datetime(timezone.now()),
         "logo_uri": logo_uri,
     }

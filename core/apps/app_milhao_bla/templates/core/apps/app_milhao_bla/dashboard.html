@@ -144,11 +144,11 @@
         data-selected="{% for bal in selected_balances %}{{ bal }}{% if not forloop.last %},{% endif %}{% endfor %}"
         style="gap: 8px;"
       >
-        <div class="balance-chip balance-chip-all" data-balance="__all__">
+        <div class="balance-chip balance-chip-all" data-balance="__all__" data-rt-shimmer-host>
           <button type="button" class="balance-chip-main">Selecionar todas</button>
         </div>
         {% for balanca in balances %}
-          <div class="balance-chip" data-balance="{{ balanca }}">
+          <div class="balance-chip" data-balance="{{ balanca }}" data-rt-shimmer-host>
             <button
               type="button"
               class="balance-chip-main{% if balanca in selected_balances %} is-selected{% endif %}"
@@ -397,5 +397,5 @@
 
 {% block scripts %}
   {{ block.super }}
-  <script src="{% static 'core/apps/app_milhao_bla/dashboard.js' %}?v=20260213-rt3"></script>
+  <script src="{% static 'app_milhao_bla/dashboard.js' %}?v=20260213-rt5"></script>
 {% endblock %}

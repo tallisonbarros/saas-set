@@ -162,6 +162,25 @@
       </section>
     {% endif %}
 
+    <section class="content-card section">
+      <h2 class="section-title">Condicoes Comerciais e Contratuais</h2>
+      <div class="commercial-flow">
+        {% for bloco in condicoes_comerciais %}
+          <div class="commercial-block avoid-break">
+            <h3>{{ bloco.titulo }}</h3>
+            {% if bloco.intro %}
+              <p class="commercial-intro">{{ bloco.intro }}</p>
+            {% endif %}
+            <ul>
+              {% for item in bloco.itens %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
     {% if anexos %}
       <section class="content-card section avoid-break">
         <h2 class="section-title">Anexos</h2>
