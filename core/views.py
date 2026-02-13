@@ -512,6 +512,56 @@ def _sync_trabalho_status(trabalho):
         trabalho.save(update_fields=["status"])
 
 
+def _get_radar_trabalho_acessivel(user, trabalho_pk):
+    cliente = _get_cliente(user)
+    trabalhos = RadarTrabalho.objects.select_related(
+        "radar",
+        "radar__cliente",
+        "radar__id_radar",
+        "classificacao",
+        "contrato",
+    ).prefetch_related("atividades")
+    if user.is_staff and not cliente:
+        return trabalhos.filter(pk=trabalho_pk).first()
+    if not cliente:
+        return None
+    return trabalhos.filter(
+        Q(pk=trabalho_pk),
+        Q(radar__cliente=cliente) | Q(radar__id_radar__in=cliente.radares.all()),
+    ).first()
+
+
+def _descricao_proposta_de_trabalho(trabalho):
+    linhas = [
+        "Origem tecnica",
+        f"Radar: {trabalho.radar.nome}",
+        f"Trabalho: {trabalho.nome}",
+    ]
+    if trabalho.descricao:
+        linhas.append(f"Descricao do trabalho: {trabalho.descricao}")
+    if trabalho.setor:
+        linhas.append(f"Setor: {trabalho.setor}")
+    if trabalho.solicitante:
+        linhas.append(f"Solicitante: {trabalho.solicitante}")
+    if trabalho.responsavel:
+        linhas.append(f"Responsavel: {trabalho.responsavel}")
+    if trabalho.contrato:
+        linhas.append(f"Contrato: {trabalho.contrato.nome}")
+    if trabalho.classificacao:
+        linhas.append(f"Classificacao: {trabalho.classificacao.nome}")
+    linhas.append(f"Data de registro: {trabalho.data_registro.strftime('%d/%m/%Y')}")
+    linhas.append("")
+    linhas.append("Resumo das atividades")
+    atividades = list(trabalho.atividades.all())
+    if atividades:
+        for atividade in atividades:
+            descricao = atividade.descricao or "Sem descricao"
+            linhas.append(f"- {atividade.nome}: {descricao}")
+    else:
+        linhas.append("- Nenhuma atividade cadastrada.")
+    return "\n".join(linhas)
+
+
 def home(request):
     if request.user.is_authenticated:
         logout(request)
@@ -3777,10 +3827,16 @@ def proposta_busca(request):
 def proposta_detail(request, pk):
     cliente = _get_cliente(request.user)
     if cliente:
-        proposta_qs = Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
+        proposta_qs = Proposta.objects.select_related("origem_trabalho", "origem_trabalho__radar").filter(
+            Q(criada_por=request.user) | Q(cliente=cliente)
+        )
         proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
-        proposta = get_object_or_404(Proposta, pk=pk, criada_por=request.user)
+        proposta = get_object_or_404(
+            Proposta.objects.select_related("origem_trabalho", "origem_trabalho__radar"),
+            pk=pk,
+            criada_por=request.user,
+        )
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
@@ -3907,7 +3963,9 @@ def proposta_nova_vendedor(request):
         "prioridade": "50",
         "codigo": "",
         "observacao": "",
+        "origem_trabalho_id": "",
     }
+    source_trabalho = None
     if request.method == "POST":
         email = request.POST.get("email", "").strip().lower()
         nome = request.POST.get("nome", "").strip()
@@ -3916,6 +3974,7 @@ def proposta_nova_vendedor(request):
         prioridade_raw = request.POST.get("prioridade", "").strip()
         codigo = request.POST.get("codigo", "").strip()
         observacao = request.POST.get("observacao", "").strip()
+        origem_trabalho_id = request.POST.get("origem_trabalho_id", "").strip()
         anexo_tipo = request.POST.get("anexo_tipo") or PropostaAnexo.Tipo.OUTROS
         anexo_arquivo = request.FILES.get("anexo_arquivo")
         form_data = {
@@ -3926,12 +3985,21 @@ def proposta_nova_vendedor(request):
             "prioridade": prioridade_raw or "50",
             "codigo": codigo,
             "observacao": observacao,
+            "origem_trabalho_id": origem_trabalho_id,
         }
 
+        origem_trabalho = None
+        if origem_trabalho_id:
+            origem_trabalho = _get_radar_trabalho_acessivel(request.user, origem_trabalho_id)
+            if not origem_trabalho:
+                message = "Origem de trabalho invalida para o seu acesso."
+            else:
+                source_trabalho = origem_trabalho
+
         destinatario = PerfilUsuario.objects.filter(email__iexact=email).first() if email else None
-        if not destinatario:
+        if not message and not destinatario:
             message = "Usuario nao encontrado para este email."
-        else:
+        elif not message:
             valor = None
             if valor_raw:
                 try:
@@ -3957,6 +4025,7 @@ def proposta_nova_vendedor(request):
                     prioridade=prioridade,
                     codigo=codigo,
                     observacao_cliente=observacao,
+                    origem_trabalho=origem_trabalho,
                 )
                 if anexo_arquivo:
                     PropostaAnexo.objects.create(
@@ -3973,6 +4042,34 @@ def proposta_nova_vendedor(request):
             "message": message,
             "form_data": form_data,
             "tipos_anexo": PropostaAnexo.Tipo.choices,
+            "source_trabalho": source_trabalho,
+        },
+    )
+
+
+@login_required
+def proposta_nova_de_trabalho(request, trabalho_pk):
+    trabalho = _get_radar_trabalho_acessivel(request.user, trabalho_pk)
+    if not trabalho:
+        return HttpResponseForbidden("Sem permissao.")
+    form_data = {
+        "email": trabalho.radar.cliente.email if trabalho.radar and trabalho.radar.cliente else "",
+        "nome": trabalho.nome,
+        "descricao": _descricao_proposta_de_trabalho(trabalho),
+        "valor": "",
+        "prioridade": "50",
+        "codigo": "",
+        "observacao": f"Origem: Radar #{trabalho.radar_id} / Trabalho #{trabalho.id}",
+        "origem_trabalho_id": str(trabalho.id),
+    }
+    return render(
+        request,
+        "core/proposta_nova.html",
+        {
+            "message": None,
+            "form_data": form_data,
+            "tipos_anexo": PropostaAnexo.Tipo.choices,
+            "source_trabalho": trabalho,
         },
     )
 

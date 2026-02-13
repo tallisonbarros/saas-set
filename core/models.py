@@ -211,6 +211,13 @@ class Proposta(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="propostas_aprovadas"
     )
     observacao_cliente = models.TextField(blank=True)
+    origem_trabalho = models.ForeignKey(
+        "RadarTrabalho",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="propostas_origem",
+    )
 
     def __str__(self):
         return f"{self.cliente.nome} - {self.valor} ({self.status})"

@@ -24,6 +24,9 @@
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar ao radar</a>
           {% if can_manage %}
+            <a class="hud-menu-pill" href="{% url 'proposta_nova_de_trabalho' trabalho.id %}">Criar proposta</a>
+          {% endif %}
+          {% if can_manage %}
             <form method="post" style="display: inline;">
               {% csrf_token %}
               <input type="hidden" name="action" value="duplicate_trabalho">

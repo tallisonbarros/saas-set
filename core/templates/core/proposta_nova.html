@@ -33,8 +33,26 @@
     {% if message %}
       <div class="alert alert-warning">{{ message }}</div>
     {% endif %}
-    <form class="stack" method="post" enctype="multipart/form-data">
+    <form class="stack" method="post" action="{% url 'proposta_nova_vendedor' %}" enctype="multipart/form-data">
       {% csrf_token %}
+      <input type="hidden" name="origem_trabalho_id" value="{{ form_data.origem_trabalho_id|default:'' }}">
+      {% if source_trabalho %}
+        <div class="proposal-form-card">
+          <div class="proposal-form-head">
+            <h2>Origem do pre-preenchimento</h2>
+            <p class="muted">Dados compilados a partir do trabalho tecnico.</p>
+          </div>
+          <div class="proposal-meta-list">
+            <div><strong>Radar:</strong> {{ source_trabalho.radar.nome }}</div>
+            <div><strong>Trabalho:</strong> {{ source_trabalho.nome }}</div>
+            <div>
+              <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' source_trabalho.radar.id source_trabalho.id %}">
+                Abrir trabalho de origem
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endif %}
       <div class="proposal-form-card">
         <div class="proposal-form-head">
           <h2>Dados principais</h2>

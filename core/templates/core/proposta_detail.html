@@ -81,6 +81,14 @@
             {% if proposta.criada_por %}
               <div><strong>De:</strong> {{ proposta.criada_por.username }}</div>
             {% endif %}
+            {% if proposta.origem_trabalho %}
+              <div>
+                <strong>Origem:</strong>
+                <a href="{% url 'radar_trabalho_detail' proposta.origem_trabalho.radar.id proposta.origem_trabalho.id %}">
+                  {{ proposta.origem_trabalho.nome }}
+                </a>
+              </div>
+            {% endif %}
             <div><strong>Criada em:</strong> {{ proposta.criado_em|date:"d/m/Y H:i" }}</div>
             {% if proposta.finalizada_em %}
               <div><strong>Finalizada em:</strong> {{ proposta.finalizada_em|date:"d/m/Y H:i" }}</div>

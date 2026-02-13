@@ -47,6 +47,11 @@ urlpatterns = [
     path('propostas/data/', views.proposta_data, name="propostas_data"),
     path('propostas/finalizadas/', views.proposta_finalizadas_arquivo, name="propostas_finalizadas_arquivo"),
     path('propostas/busca/', views.proposta_busca, name="propostas_busca"),
+    path(
+        'propostas/nova/de-trabalho/<int:trabalho_pk>/',
+        views.proposta_nova_de_trabalho,
+        name="proposta_nova_de_trabalho",
+    ),
     path('propostas/nova/', views.proposta_nova_vendedor, name="proposta_nova_vendedor"),
     path('propostas/<int:pk>/', views.proposta_detail, name="proposta_detail"),
     path('propostas/<int:pk>/aprovar/', views.aprovar_proposta, name="aprovar_proposta"),
