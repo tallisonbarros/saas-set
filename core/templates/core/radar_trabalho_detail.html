@@ -129,6 +129,20 @@
                   <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
+                  <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <input type="hidden" name="direcao" value="up">
+                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.first %}disabled{% endif %} title="Mover para cima">↑</button>
+                  </form>
+                  <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <input type="hidden" name="direcao" value="down">
+                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">↓</button>
+                  </form>
                   <button
                     class="btn btn-ghost btn-compact js-editar-atividade"
                     type="button"
@@ -162,6 +176,20 @@
                   <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
+                  <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <input type="hidden" name="direcao" value="up">
+                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.first %}disabled{% endif %} title="Mover para cima">↑</button>
+                  </form>
+                  <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <input type="hidden" name="direcao" value="down">
+                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">↓</button>
+                  </form>
                   <button
                     class="btn btn-ghost btn-compact js-editar-atividade"
                     type="button"
@@ -195,6 +223,20 @@
                   <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
+                  <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <input type="hidden" name="direcao" value="up">
+                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.first %}disabled{% endif %} title="Mover para cima">↑</button>
+                  </form>
+                  <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="move_atividade">
+                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                    <input type="hidden" name="direcao" value="down">
+                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">↓</button>
+                  </form>
                   <button
                     class="btn btn-ghost btn-compact js-editar-atividade"
                     type="button"

@@ -35,12 +35,12 @@
     {% endif %}
     <form class="stack" method="post" action="{% url 'proposta_nova_vendedor' %}" enctype="multipart/form-data">
       {% csrf_token %}
-      <input type="hidden" name="origem_trabalho_id" value="{{ form_data.origem_trabalho_id|default:'' }}">
+      <input type="hidden" name="trabalho_id" value="{{ form_data.trabalho_id|default:'' }}">
       {% if source_trabalho %}
         <div class="proposal-form-card">
           <div class="proposal-form-head">
-            <h2>Origem do pre-preenchimento</h2>
-            <p class="muted">Dados compilados a partir do trabalho tecnico.</p>
+            <h2>Vinculo com trabalho</h2>
+            <p class="muted">Dados tecnicos serao lidos do trabalho vinculado em tempo real.</p>
           </div>
           <div class="proposal-meta-list">
             <div><strong>Radar:</strong> {{ source_trabalho.radar.nome }}</div>
@@ -85,7 +85,7 @@
       <div class="proposal-form-card proposal-form-card-highlight">
         <div class="proposal-form-head">
           <h2>Descricao da proposta</h2>
-          <p class="muted">Campo principal para contexto tecnico e comercial.</p>
+          <p class="muted">Use apenas conteudo comercial. Os dados tecnicos vem da secao Trabalho.</p>
         </div>
         <label for="id_descricao">Descricao</label>
         <textarea id="id_descricao" name="descricao" rows="12" required>{{ form_data.descricao }}</textarea>

@@ -1287,6 +1287,60 @@ body {
   font-size: 13px;
 }
 
+.proposal-link-badge {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 122, 26, 0.35);
+  background: rgba(255, 122, 26, 0.08);
+  color: #9f4100;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.proposal-block-trabalho {
+  border-color: rgba(255, 102, 0, 0.32);
+  background: linear-gradient(140deg, #fffaf5 0%, #ffffff 100%);
+}
+
+.proposal-trabalho-atividades {
+  border-top: 1px dashed rgba(255, 102, 0, 0.24);
+  padding-top: 10px;
+}
+
+.proposal-trabalho-atividades-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8a3a00;
+}
+
+.proposal-trabalho-atividades-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.proposal-trabalho-atividade-item {
+  display: grid;
+  gap: 3px;
+}
+
+.proposal-trabalho-atividade-nome {
+  font-weight: 600;
+}
+
+.proposal-trabalho-atividade-descricao {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 @media (max-width: 900px) {
   .proposal-detail-layout {
     grid-template-columns: 1fr;

@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Max
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
@@ -211,12 +212,12 @@ class Proposta(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="propostas_aprovadas"
     )
     observacao_cliente = models.TextField(blank=True)
-    origem_trabalho = models.ForeignKey(
+    trabalho = models.ForeignKey(
         "RadarTrabalho",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="propostas_origem",
+        related_name="propostas_vinculadas",
     )
 
     def __str__(self):
@@ -253,6 +254,14 @@ class Proposta(models.Model):
         if not self.codigo:
             self.codigo = self._proximo_codigo()
         super().save(*args, **kwargs)
+
+    @property
+    def origem_trabalho(self):
+        return self.trabalho
+
+    @origem_trabalho.setter
+    def origem_trabalho(self, value):
+        self.trabalho = value
 
 
 class PropostaAnexo(models.Model):
@@ -491,13 +500,25 @@ class RadarAtividade(models.Model):
     descricao = models.TextField(blank=True)
     horas_trabalho = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    ordem = models.PositiveIntegerField(default=0, db_index=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-criado_em"]
+        ordering = ["ordem", "criado_em", "id"]
 
     def __str__(self):
         return self.nome
+
+    def save(self, *args, **kwargs):
+        if self.ordem <= 0 and self.trabalho_id:
+            max_ordem = (
+                RadarAtividade.objects.filter(trabalho_id=self.trabalho_id, status=self.status).aggregate(
+                    max_ordem=Max("ordem")
+                )["max_ordem"]
+                or 0
+            )
+            self.ordem = max_ordem + 1
+        super().save(*args, **kwargs)
 
 
 class Inventario(models.Model):

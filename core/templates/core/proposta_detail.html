@@ -26,6 +26,11 @@
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">{{ proposta.nome }}</h1>
+          {% if proposta.trabalho_id %}
+            <div class="proposal-link-badge">
+              Vinculada ao Trabalho #{{ proposta.trabalho_id }}
+            </div>
+          {% endif %}
         </div>
       </div>
       <a class="proposal-hud-pdf-corner" href="{% url 'proposta_export_pdf' proposta.pk %}" target="_blank" rel="noopener noreferrer" title="Exportar PDF" aria-label="Exportar proposta em PDF">
@@ -54,7 +59,7 @@
           <div class="proposal-block-head">
             <div>
               <h2 class="proposal-block-title">Descricao</h2>
-              <p class="muted">Conteudo principal da proposta.</p>
+              <p class="muted">Conteudo comercial da proposta.</p>
             </div>
             <div class="proposal-badge-row">
               <span class="badge badge-{{ status_label|lower }}">{{ status_label }}</span>
@@ -67,8 +72,53 @@
               {% endif %}
             </div>
           </div>
-          <div class="proposal-description proposal-description-spotlight">{{ proposta.descricao|linebreaksbr }}</div>
+          <div class="proposal-description proposal-description-spotlight">{{ descricao_comercial|linebreaksbr }}</div>
         </div>
+        {% if proposta.trabalho_id %}
+          <div class="proposal-block proposal-block-trabalho">
+            <div class="proposal-block-head">
+              <div>
+                <h2 class="proposal-block-title">Trabalho</h2>
+                <p class="muted">Origem tecnica oficial da proposta.</p>
+              </div>
+            </div>
+            {% if trabalho_indisponivel %}
+              <div class="alert alert-warning">trabalho indisponivel</div>
+            {% elif trabalho_vinculado %}
+              <div class="proposal-meta-list">
+                <div><strong>Radar:</strong> {{ trabalho_vinculado.radar.nome }}</div>
+                <div>
+                  <strong>Trabalho:</strong>
+                  <a href="{% url 'radar_trabalho_detail' trabalho_vinculado.radar.id trabalho_vinculado.id %}">
+                    {{ trabalho_vinculado.nome }}
+                  </a>
+                </div>
+                <div><strong>Descricao do trabalho:</strong> {{ trabalho_vinculado.descricao|default:"-" }}</div>
+                <div><strong>Setor:</strong> {{ trabalho_vinculado.setor|default:"-" }}</div>
+                <div><strong>Solicitante:</strong> {{ trabalho_vinculado.solicitante|default:"-" }}</div>
+                <div><strong>Responsavel:</strong> {{ trabalho_vinculado.responsavel|default:"-" }}</div>
+                <div><strong>Contrato:</strong> {% if trabalho_vinculado.contrato %}{{ trabalho_vinculado.contrato.nome }}{% else %}-{% endif %}</div>
+                <div><strong>Classificacao:</strong> {% if trabalho_vinculado.classificacao %}{{ trabalho_vinculado.classificacao.nome }}{% else %}-{% endif %}</div>
+                <div><strong>Data de registro:</strong> {{ trabalho_vinculado.data_registro|date:"d/m/Y" }}</div>
+              </div>
+              <div class="proposal-trabalho-atividades">
+                <h3 class="proposal-trabalho-atividades-title">Atividades</h3>
+                {% if trabalho_vinculado.atividades.all %}
+                  <ol class="proposal-trabalho-atividades-list">
+                    {% for atividade in trabalho_vinculado.atividades.all %}
+                      <li class="proposal-trabalho-atividade-item">
+                        <div class="proposal-trabalho-atividade-nome">{{ atividade.nome }}</div>
+                        <div class="proposal-trabalho-atividade-descricao">{{ atividade.descricao|default:"Sem descricao" }}</div>
+                      </li>
+                    {% endfor %}
+                  </ol>
+                {% else %}
+                  <p class="muted">Sem atividades vinculadas.</p>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
         <div class="proposal-block">
           <div class="proposal-block-head">
             <h2 class="proposal-block-title">Resumo</h2>
@@ -81,14 +131,6 @@
             <div><strong>Para:</strong> {{ proposta.cliente.nome }} ({{ proposta.cliente.email }})</div>
             {% if proposta.criada_por %}
               <div><strong>De:</strong> {{ proposta.criada_por.username }}</div>
-            {% endif %}
-            {% if show_origem_tecnica and proposta.origem_trabalho %}
-              <div>
-                <strong>Origem:</strong>
-                <a href="{% url 'radar_trabalho_detail' proposta.origem_trabalho.radar.id proposta.origem_trabalho.id %}">
-                  {{ proposta.origem_trabalho.nome }}
-                </a>
-              </div>
             {% endif %}
             <div><strong>Criada em:</strong> {{ proposta.criado_em|date:"d/m/Y H:i" }}</div>
             {% if proposta.finalizada_em %}
@@ -167,7 +209,7 @@
               <label>Nome</label>
               <input type="text" name="nome" value="{{ proposta.nome }}">
               <label>Descricao</label>
-              <textarea name="descricao" rows="4">{{ proposta.descricao }}</textarea>
+              <textarea name="descricao" rows="4">{{ descricao_comercial }}</textarea>
               <label>Codigo</label>
               <input type="text" name="codigo" value="{{ proposta.codigo }}">
               <button class="btn btn-primary" type="submit">Atualizar</button>

@@ -26,7 +26,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 
 from django.contrib.auth.models import User
-from django.db import DatabaseError, connections
+from django.db import DatabaseError, connections, transaction
 from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, TextField, Value, When
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.functions import Cast
@@ -543,6 +543,20 @@ def _sync_trabalho_status(trabalho):
         trabalho.save(update_fields=["status"])
 
 
+def _normalizar_ordem_atividades(trabalho, status=None):
+    atividades = RadarAtividade.objects.filter(trabalho=trabalho)
+    if status:
+        atividades = atividades.filter(status=status)
+    atividades = list(atividades.order_by("ordem", "criado_em", "id"))
+    changed = []
+    for idx, atividade in enumerate(atividades, start=1):
+        if atividade.ordem != idx:
+            atividade.ordem = idx
+            changed.append(atividade)
+    if changed:
+        RadarAtividade.objects.bulk_update(changed, ["ordem"])
+
+
 def _get_radar_trabalho_acessivel(user, trabalho_pk):
     if not _radar_trabalho_schema_ready():
         return None
@@ -565,8 +579,17 @@ def _get_radar_trabalho_acessivel(user, trabalho_pk):
 
 
 def _db_column_exists(table_name, column_name):
+    connection = connections["default"]
+    if connection.vendor == "sqlite":
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(f"PRAGMA table_info({table_name})")
+                columns = [row[1] for row in cursor.fetchall()]
+                return column_name in columns
+        except DatabaseError:
+            return False
     try:
-        with connections["default"].cursor() as cursor:
+        with connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT 1
@@ -2041,9 +2064,11 @@ def _sanitize_proposta_descricao(text):
 
     prefixes = (
         "origem tecnica",
+        "origem do trabalho",
         "radar:",
         "trabalho:",
         "descricao do trabalho:",
+        "resumo de atividades",
         "setor:",
         "solicitante:",
         "responsavel:",
@@ -2068,6 +2093,15 @@ def _sanitize_proposta_descricao(text):
 
     cleaned = "\n".join(cleaned_lines).strip()
     return cleaned
+
+
+def _resolve_proposta_trabalho(proposta, user):
+    if not proposta.trabalho_id:
+        return None, False
+    trabalho = _get_radar_trabalho_acessivel(user, proposta.trabalho_id)
+    if trabalho:
+        return trabalho, False
+    return None, True
 
 
 def _first_attr(obj, names, default=None):
@@ -2162,8 +2196,15 @@ def _proposta_condicoes_comerciais(proposta):
     ]
 
 
-def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
-    origem = proposta.origem_trabalho if include_origem else None
+def _build_proposta_pdf_context(
+    proposta,
+    status_label,
+    include_origem=True,
+    trabalho=None,
+    trabalho_indisponivel=False,
+):
+    origem = (trabalho if trabalho is not None else proposta.trabalho) if include_origem else None
+    has_trabalho_vinculado = bool(include_origem and (proposta.trabalho_id or trabalho_indisponivel))
     origem_rows = []
     atividades = []
     if origem:
@@ -2192,7 +2233,7 @@ def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
             }
             for atividade in origem.atividades.order_by("-criado_em")
         ]
-    if not atividades:
+    if has_trabalho_vinculado and not atividades and not trabalho_indisponivel:
         atividades = [{"nome": "Sem atividades vinculadas", "descricao": ""}]
     anexos = [
         {
@@ -2241,6 +2282,8 @@ def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
         "identificacao_esquerda": identificacao_esquerda,
         "identificacao_direita": identificacao_direita,
         "origem_rows": origem_rows_fmt,
+        "has_trabalho_vinculado": has_trabalho_vinculado,
+        "trabalho_indisponivel": bool(trabalho_indisponivel),
         "atividades": atividades,
         "descricao_blocks": _descricao_blocks(descricao_limpa),
         "anexos": anexos,
@@ -2252,13 +2295,25 @@ def _build_proposta_pdf_context(proposta, status_label, include_origem=True):
     }
 
 
-def _render_proposta_pdf(proposta, status_label, include_origem=True):
+def _render_proposta_pdf(
+    proposta,
+    status_label,
+    include_origem=True,
+    trabalho=None,
+    trabalho_indisponivel=False,
+):
     try:
         from weasyprint import CSS, HTML
     except ImportError:
         return None
 
-    context = _build_proposta_pdf_context(proposta, status_label, include_origem=include_origem)
+    context = _build_proposta_pdf_context(
+        proposta,
+        status_label,
+        include_origem=include_origem,
+        trabalho=trabalho,
+        trabalho_indisponivel=trabalho_indisponivel,
+    )
     html = render_to_string("propostas/proposta_pdf.html", context)
     css_path = finders.find("css/proposta_pdf.css")
     stylesheets = [CSS(filename=css_path)] if css_path else None
@@ -3460,6 +3515,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "duplicate_trabalho",
             "update_atividade",
             "delete_atividade",
+            "move_atividade",
             "create_contrato",
             "create_classificacao",
         }:
@@ -3597,6 +3653,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                             descricao=atividade.descricao,
                             horas_trabalho=atividade.horas_trabalho,
                             status=atividade.status,
+                            ordem=atividade.ordem,
                         )
                         for atividade in atividades
                     ]
@@ -3632,6 +3689,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
         if action == "update_atividade":
             atividade_id = request.POST.get("atividade_id")
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            status_anterior = atividade.status
             atividade.nome = request.POST.get("nome", "").strip()
             atividade.descricao = request.POST.get("descricao", "").strip()
             horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
@@ -3645,14 +3703,19 @@ def radar_trabalho_detail(request, radar_pk, pk):
             status_raw = request.POST.get("status", "").strip()
             if status_raw in dict(RadarAtividade.Status.choices):
                 atividade.status = status_raw
+            if atividade.status != status_anterior:
+                atividade.ordem = 0
             atividade.save(
                 update_fields=[
                     "nome",
                     "descricao",
                     "horas_trabalho",
                     "status",
+                    "ordem",
                 ]
             )
+            if atividade.status != status_anterior:
+                _normalizar_ordem_atividades(trabalho, status=status_anterior)
             _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(
@@ -3670,7 +3733,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
         if action == "delete_atividade":
             atividade_id = request.POST.get("atividade_id")
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            status_removido = atividade.status
             atividade.delete()
+            _normalizar_ordem_atividades(trabalho, status=status_removido)
             _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(
@@ -3679,6 +3744,31 @@ def radar_trabalho_detail(request, radar_pk, pk):
                         "id": atividade_id,
                     }
                 )
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "move_atividade":
+            atividade_id = request.POST.get("atividade_id")
+            direcao = request.POST.get("direcao", "").strip().lower()
+            atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            if direcao in {"up", "down"}:
+                with transaction.atomic():
+                    _normalizar_ordem_atividades(trabalho, status=atividade.status)
+                    atividades_status = list(
+                        RadarAtividade.objects.select_for_update()
+                        .filter(trabalho=trabalho, status=atividade.status)
+                        .order_by("ordem", "criado_em", "id")
+                    )
+                    ids = [item.id for item in atividades_status]
+                    try:
+                        idx = ids.index(atividade.id)
+                    except ValueError:
+                        idx = -1
+                    offset = -1 if direcao == "up" else 1
+                    neighbor_idx = idx + offset
+                    if 0 <= idx < len(atividades_status) and 0 <= neighbor_idx < len(atividades_status):
+                        atual = atividades_status[idx]
+                        vizinho = atividades_status[neighbor_idx]
+                        atual.ordem, vizinho.ordem = vizinho.ordem, atual.ordem
+                        RadarAtividade.objects.bulk_update([atual, vizinho], ["ordem"])
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
 
     contratos = RadarContrato.objects.order_by("nome")
@@ -3689,8 +3779,12 @@ def radar_trabalho_detail(request, radar_pk, pk):
     base_params.pop("finalizados", None)
     toggle_params = base_params.copy()
     toggle_params["finalizados"] = "all"
-    atividades_execucao = atividades_base.filter(status=RadarAtividade.Status.EXECUTANDO).order_by("-criado_em")
-    atividades_pendentes = atividades_base.filter(status=RadarAtividade.Status.PENDENTE).order_by("-criado_em")
+    atividades_execucao = atividades_base.filter(status=RadarAtividade.Status.EXECUTANDO).order_by(
+        "ordem", "criado_em", "id"
+    )
+    atividades_pendentes = atividades_base.filter(status=RadarAtividade.Status.PENDENTE).order_by(
+        "ordem", "criado_em", "id"
+    )
     atividades_finalizadas = atividades_base.filter(status=RadarAtividade.Status.FINALIZADA)
     atividades_finalizadas_mes = atividades_finalizadas.filter(
         criado_em__year=today.year,
@@ -3702,7 +3796,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
     )
     if show_all_finalizados:
         atividades_finalizadas_mes = atividades_finalizadas
-    atividades_finalizadas_mes = atividades_finalizadas_mes.order_by("-criado_em")
+    atividades_finalizadas_mes = atividades_finalizadas_mes.order_by("ordem", "criado_em", "id")
     has_finalizadas_antigas = atividades_finalizadas_antigas.exists()
     edit_atividade = None
     edit_atividade_id = request.GET.get("editar", "").strip()
@@ -3963,7 +4057,7 @@ def _proposta_status_annotations(queryset):
 
 
 def _proposta_base_qs(user, cliente):
-    base = Proposta.objects.select_related("cliente", "criada_por")
+    base = Proposta.objects.select_related("cliente", "criada_por", "trabalho", "trabalho__radar")
     if cliente:
         return base.filter(Q(criada_por=user) | Q(cliente=cliente)).distinct()
     return base.filter(criada_por=user)
@@ -4236,10 +4330,15 @@ def proposta_busca(request):
 @login_required
 def proposta_detail(request, pk):
     cliente = _get_cliente(request.user)
-    radar_schema_ready = _radar_trabalho_schema_ready()
-    proposta_qs_base = Proposta.objects.all()
-    if radar_schema_ready:
-        proposta_qs_base = proposta_qs_base.select_related("origem_trabalho", "origem_trabalho__radar")
+    proposta_qs_base = Proposta.objects.select_related(
+        "cliente",
+        "criada_por",
+        "aprovado_por",
+        "trabalho",
+        "trabalho__radar",
+        "trabalho__classificacao",
+        "trabalho__contrato",
+    ).prefetch_related("anexos", "trabalho__atividades")
     if cliente:
         proposta_qs = proposta_qs_base.filter(Q(criada_por=request.user) | Q(cliente=cliente))
         proposta = get_object_or_404(proposta_qs, pk=pk)
@@ -4271,7 +4370,7 @@ def proposta_detail(request, pk):
             if proposta.criada_por_id != request.user.id:
                 return HttpResponseForbidden("Sem permissao.")
             nome = request.POST.get("nome", "").strip()
-            descricao = request.POST.get("descricao", "").strip()
+            descricao = _sanitize_proposta_descricao(request.POST.get("descricao", "").strip())
             codigo = request.POST.get("codigo", "").strip()
             update_fields = []
             if nome:
@@ -4336,6 +4435,7 @@ def proposta_detail(request, pk):
             else:
                 proposta.delete()
                 return redirect("propostas")
+    trabalho_vinculado, trabalho_indisponivel = _resolve_proposta_trabalho(proposta, request.user)
     status_label = _proposta_status_label(proposta)
     return render(
         request,
@@ -4345,7 +4445,9 @@ def proposta_detail(request, pk):
             "proposta": proposta,
             "message": message,
             "status_label": status_label,
-            "show_origem_tecnica": radar_schema_ready,
+            "descricao_comercial": _sanitize_proposta_descricao(proposta.descricao),
+            "trabalho_vinculado": trabalho_vinculado,
+            "trabalho_indisponivel": trabalho_indisponivel,
         },
     )
 
@@ -4353,23 +4455,37 @@ def proposta_detail(request, pk):
 @login_required
 def proposta_export_pdf(request, pk):
     cliente = _get_cliente(request.user)
-    radar_schema_ready = _radar_trabalho_schema_ready()
-    select_related_fields = ["cliente", "criada_por"]
-    if radar_schema_ready:
-        select_related_fields.extend(["origem_trabalho", "origem_trabalho__radar"])
+    select_related_fields = [
+        "cliente",
+        "criada_por",
+        "trabalho",
+        "trabalho__radar",
+        "trabalho__classificacao",
+        "trabalho__contrato",
+    ]
+    prefetch_related_fields = ["anexos", "trabalho__atividades"]
     if cliente:
-        proposta_qs = Proposta.objects.select_related(*select_related_fields).prefetch_related("anexos").filter(
+        proposta_qs = Proposta.objects.select_related(*select_related_fields).prefetch_related(
+            *prefetch_related_fields
+        ).filter(
             Q(criada_por=request.user) | Q(cliente=cliente)
         )
         proposta = get_object_or_404(proposta_qs, pk=pk)
     else:
         proposta = get_object_or_404(
-            Proposta.objects.select_related(*select_related_fields).prefetch_related("anexos"),
+            Proposta.objects.select_related(*select_related_fields).prefetch_related(*prefetch_related_fields),
             pk=pk,
             criada_por=request.user,
         )
     status_label = _proposta_status_label(proposta)
-    pdf_buffer = _render_proposta_pdf(proposta, status_label, include_origem=radar_schema_ready)
+    trabalho_vinculado, trabalho_indisponivel = _resolve_proposta_trabalho(proposta, request.user)
+    pdf_buffer = _render_proposta_pdf(
+        proposta,
+        status_label,
+        include_origem=True,
+        trabalho=trabalho_vinculado,
+        trabalho_indisponivel=trabalho_indisponivel,
+    )
     if not pdf_buffer:
         return HttpResponse("Biblioteca de PDF indisponivel (WeasyPrint).", status=500)
     base_name = proposta.codigo or f"proposta_{proposta.id}"
@@ -4390,18 +4506,18 @@ def proposta_nova_vendedor(request):
         "prioridade": "50",
         "codigo": "",
         "observacao": "",
-        "origem_trabalho_id": "",
+        "trabalho_id": "",
     }
     source_trabalho = None
     if request.method == "POST":
         email = request.POST.get("email", "").strip().lower()
         nome = request.POST.get("nome", "").strip()
-        descricao = request.POST.get("descricao", "").strip()
+        descricao = _sanitize_proposta_descricao(request.POST.get("descricao", "").strip())
         valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
         prioridade_raw = request.POST.get("prioridade", "").strip()
         codigo = request.POST.get("codigo", "").strip()
         observacao = request.POST.get("observacao", "").strip()
-        origem_trabalho_id = request.POST.get("origem_trabalho_id", "").strip()
+        trabalho_id = request.POST.get("trabalho_id", "").strip() or request.POST.get("origem_trabalho_id", "").strip()
         anexo_tipo = request.POST.get("anexo_tipo") or PropostaAnexo.Tipo.OUTROS
         anexo_arquivo = request.FILES.get("anexo_arquivo")
         form_data = {
@@ -4412,18 +4528,18 @@ def proposta_nova_vendedor(request):
             "prioridade": prioridade_raw or "50",
             "codigo": codigo,
             "observacao": observacao,
-            "origem_trabalho_id": origem_trabalho_id,
+            "trabalho_id": trabalho_id,
         }
 
-        origem_trabalho = None
-        if origem_trabalho_id:
-            origem_trabalho = _get_radar_trabalho_acessivel(request.user, origem_trabalho_id)
-            if not origem_trabalho:
+        trabalho = None
+        if trabalho_id:
+            trabalho = _get_radar_trabalho_acessivel(request.user, trabalho_id)
+            if not trabalho:
                 message = "Origem de trabalho invalida para o seu acesso."
-            elif origem_trabalho.criado_por_id != request.user.id:
+            elif trabalho.criado_por_id != request.user.id:
                 message = "Somente quem criou o trabalho pode gerar proposta a partir dele."
             else:
-                source_trabalho = origem_trabalho
+                source_trabalho = trabalho
 
         destinatario = PerfilUsuario.objects.filter(email__iexact=email).first() if email else None
         if not message and not destinatario:
@@ -4454,7 +4570,7 @@ def proposta_nova_vendedor(request):
                     prioridade=prioridade,
                     codigo=codigo,
                     observacao_cliente=observacao,
-                    origem_trabalho=origem_trabalho,
+                    trabalho=trabalho,
                 )
                 if anexo_arquivo:
                     PropostaAnexo.objects.create(
@@ -4486,12 +4602,12 @@ def proposta_nova_de_trabalho(request, trabalho_pk):
     form_data = {
         "email": "",
         "nome": trabalho.nome,
-        "descricao": _descricao_proposta_de_trabalho(trabalho),
+        "descricao": "",
         "valor": "",
         "prioridade": "50",
         "codigo": "",
         "observacao": f"Origem: Radar {trabalho.radar.nome} / Trabalho {trabalho.nome}",
-        "origem_trabalho_id": str(trabalho.id),
+        "trabalho_id": str(trabalho.id),
     }
     return render(
         request,

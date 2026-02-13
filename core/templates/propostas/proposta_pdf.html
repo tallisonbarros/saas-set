@@ -106,19 +106,23 @@
       </div>
     </section>
 
-    {% if origem_rows %}
+    {% if has_trabalho_vinculado %}
       <section class="content-card section avoid-break">
-        <h2 class="section-title">Origem tecnica</h2>
-        <table class="meta-table">
-          <tbody>
-            {% for row in origem_rows %}
-              <tr>
-                <th>{{ row.label }}</th>
-                <td>{{ row.value }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <h2 class="section-title">Trabalho</h2>
+        {% if trabalho_indisponivel %}
+          <p>trabalho indisponivel</p>
+        {% else %}
+          <table class="meta-table">
+            <tbody>
+              {% for row in origem_rows %}
+                <tr>
+                  <th>{{ row.label }}</th>
+                  <td>{{ row.value }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
       </section>
     {% endif %}
 
@@ -139,19 +143,21 @@
       </div>
     </section>
 
-    <section class="content-card section">
-      <h2 class="section-title">Resumo das atividades</h2>
-      <ol class="activities-list">
-        {% for atividade in atividades %}
-          <li class="activity-item avoid-break">
-            <div class="activity-name">{{ atividade.nome }}</div>
-            {% if atividade.descricao %}
-              <div class="activity-desc">{{ atividade.descricao }}</div>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ol>
-    </section>
+    {% if has_trabalho_vinculado and not trabalho_indisponivel %}
+      <section class="content-card section">
+        <h2 class="section-title">Resumo das atividades</h2>
+        <ol class="activities-list">
+          {% for atividade in atividades %}
+            <li class="activity-item avoid-break">
+              <div class="activity-name">{{ atividade.nome }}</div>
+              {% if atividade.descricao %}
+                <div class="activity-desc">{{ atividade.descricao }}</div>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ol>
+      </section>
+    {% endif %}
 
     {% if has_observacao %}
       <section class="content-card section observation-box avoid-break">
