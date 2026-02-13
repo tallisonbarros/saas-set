@@ -27,29 +27,33 @@
           {% endif %}
         </div>
         <div class="brand-right">
-          <div class="brand-meta-label">Status</div>
-          <div class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</div>
+          <div class="brand-status-stack">
+            <div class="brand-meta-label">Status</div>
+            <div class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</div>
+          </div>
         </div>
       </div>
 
       <div class="context-bar">
-        <div class="context-head">
-          <div class="context-title-block">
+        <div class="context-split">
+          <div class="context-left">
             <h1>Proposta Comercial</h1>
             <p class="context-subtitle">SET - Industria & Tecnologia</p>
           </div>
-          <div class="mini-metrics mini-metrics-right">
-            <div class="mini-metric">
-              <div class="mini-label">Codigo / Proposta</div>
-              <div class="mini-value mono">{{ codigo }}</div>
-              {% if proposta.nome %}
-                <div class="kpi-subvalue">{{ proposta.nome }}</div>
-              {% endif %}
-            </div>
-            <div class="mini-metric">
-              <div class="mini-label">Criada em / Prioridade</div>
-              <div class="mini-value">{{ criada_em_display }}</div>
-              <div class="kpi-subvalue">Prioridade {{ proposta.prioridade }}</div>
+          <div class="context-right">
+            <div class="mini-metrics mini-metrics-right">
+              <div class="mini-metric">
+                <div class="mini-label">Codigo / Proposta</div>
+                <div class="mini-value mono">{{ codigo }}</div>
+                {% if proposta.nome %}
+                  <div class="kpi-subvalue">{{ proposta.nome }}</div>
+                {% endif %}
+              </div>
+              <div class="mini-metric">
+                <div class="mini-label">Criada em / Prioridade</div>
+                <div class="mini-value">{{ criada_em_display }}</div>
+                <div class="kpi-subvalue">Prioridade {{ proposta.prioridade }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -115,7 +119,7 @@
       </div>
     </section>
 
-    <section class="content-card section">
+    <section class="content-card section page-break-before">
       <h2 class="section-title">Resumo das atividades</h2>
       <ol class="activities-list">
         {% for atividade in atividades %}
@@ -142,17 +146,19 @@
       <h2 class="section-title">Condicoes Comerciais e Contratuais</h2>
       <div class="commercial-flow">
         {% for bloco in condicoes_comerciais %}
-          <div class="commercial-block avoid-break">
-            <h3>{{ bloco.titulo }}</h3>
-            {% if bloco.intro %}
-              <p class="commercial-intro">{{ bloco.intro }}</p>
-            {% endif %}
-            <ul>
-              {% for item in bloco.itens %}
-                <li>{{ item }}</li>
-              {% endfor %}
-            </ul>
-          </div>
+          {% if bloco.titulo != "F) Tributacao" and bloco.titulo != "G) Validade e Pagamento" %}
+            <div class="commercial-block avoid-break">
+              <h3>{{ bloco.titulo }}</h3>
+              {% if bloco.intro %}
+                <p class="commercial-intro">{{ bloco.intro }}</p>
+              {% endif %}
+              <ul>
+                {% for item in bloco.itens %}
+                  <li>{{ item }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
         {% endfor %}
       </div>
     </section>
@@ -183,8 +189,12 @@
       <h2 class="section-title">Valor e Condicoes de Pagamento</h2>
       <div class="payment-summary-value">{{ valor_display }}</div>
       {% for bloco in condicoes_comerciais %}
-        {% if bloco.titulo == "G) Validade e Pagamento" %}
+        {% if bloco.titulo == "F) Tributacao" or bloco.titulo == "G) Validade e Pagamento" %}
           <div class="payment-summary-list">
+            <h3 class="payment-summary-subtitle">{{ bloco.titulo }}</h3>
+            {% if bloco.intro %}
+              <p>{{ bloco.intro }}</p>
+            {% endif %}
             {% for item in bloco.itens %}
               <p>{{ item }}</p>
             {% endfor %}
