@@ -115,7 +115,7 @@
                   <ol class="proposal-trabalho-atividades-list">
                     {% for atividade in trabalho_vinculado.atividades.all %}
                       <li class="proposal-trabalho-atividade-item">
-                        <div class="proposal-trabalho-atividade-nome">{{ atividade.nome }}</div>
+                        <div class="proposal-trabalho-atividade-nome">{{ atividade.ordem }}. {{ atividade.nome }}</div>
                         <div class="proposal-trabalho-atividade-descricao">{{ atividade.descricao|default:"Sem descricao" }}</div>
                       </li>
                     {% endfor %}

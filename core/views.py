@@ -2255,7 +2255,7 @@ def _build_proposta_pdf_context(
                 "nome": atividade.nome,
                 "descricao": atividade.descricao or "Sem descricao",
             }
-            for atividade in origem.atividades.order_by("-criado_em")
+            for atividade in origem.atividades.order_by("criado_em", "id")
         ]
     if has_trabalho_vinculado and not atividades and not trabalho_indisponivel:
         atividades = [{"nome": "Sem atividades vinculadas", "descricao": ""}]

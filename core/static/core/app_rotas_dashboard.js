@@ -713,7 +713,8 @@
     if (rota.pause_on) {
       card.classList.add("is-pause-on");
     }
-    if (!state.lifebit_connected) {
+    var commBlocked = !state.lifebit_connected && isLiveMode();
+    if (commBlocked) {
       card.classList.add("is-comm-down");
     }
     if (timelineLoadingCards) {
@@ -756,7 +757,7 @@
       }
     }
 
-    if (!state.lifebit_connected) {
+    if (commBlocked) {
       var overlay = ensureCommOverlay(card);
       var lastSeen = overlay.querySelector('[data-role="overlay-last-seen"]');
       if (lastSeen) {

@@ -759,7 +759,7 @@ def _build_dashboard_payload(app, query_params):
         selected_at = selected_point["timestamp"]
 
     requested_follow_now = _parse_follow_now(query_params.get("follow_now"))
-    if requested_follow_now and selected_day == timezone.localdate():
+    if requested_follow_now and lifebit_connected and selected_day == timezone.localdate():
         selected_point, selected_index = _selected_timeline_point(timeline, available_until)
         if selected_point:
             selected_at = selected_point["timestamp"]
@@ -810,7 +810,8 @@ def _build_dashboard_payload(app, query_params):
         event["valor_display"] = value_display
 
     prev_day, next_day = _day_navigation(available_days, selected_day)
-    showing_now, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
+    showing_now_raw, now_target, now_day = _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive)
+    showing_now = bool(showing_now_raw and lifebit_connected)
     selected_at_iso = selected_at.isoformat() if selected_at else ""
     selected_day_str = selected_day.strftime("%Y-%m-%d")
 
