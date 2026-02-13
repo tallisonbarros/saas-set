@@ -500,24 +500,27 @@ body {
 }
 
 .activity-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  align-items: start;
+}
+
+.activity-row-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 14px;
+  gap: 12px;
 }
 
 .activity-row .proposal-title {
   font-size: 15px;
+  margin: 0;
 }
 
 .activity-row .proposal-meta {
-  font-size: 12px;
-  margin-top: 2px;
-}
-
-.activity-row-main {
-  min-width: 0;
+  font-size: 13px;
+  margin-top: 0;
 }
 
 .activity-row-meta {
@@ -526,17 +529,11 @@ body {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-
-@media (min-width: 720px) {
-  .activity-row-meta {
-    min-width: 180px;
-    justify-content: flex-end;
-  }
+  row-gap: 6px;
 }
 
 @media (max-width: 640px) {
-  .activity-row {
+  .activity-row-top {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -583,6 +580,35 @@ body {
   font-size: 12px;
   color: var(--muted);
   margin-top: 4px;
+}
+
+@keyframes aprovar-nudge {
+  0%, 70%, 100% {
+    transform: translateX(0);
+  }
+  74% {
+    transform: translateX(-1px);
+  }
+  78% {
+    transform: translateX(1px);
+  }
+  82% {
+    transform: translateX(-1px);
+  }
+  86% {
+    transform: translateX(0);
+  }
+}
+
+.btn-aprovar-pulse {
+  animation: aprovar-nudge 2.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-aprovar-pulse {
+    animation: none;
+  }
 }
 
 .io-group-subtitle {
@@ -1057,6 +1083,11 @@ body {
 }
 
 .proposal-detail-sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.proposal-detail-flow {
   display: grid;
   gap: 16px;
 }

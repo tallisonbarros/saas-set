@@ -4053,7 +4053,7 @@ def proposta_nova_de_trabalho(request, trabalho_pk):
     if not trabalho:
         return HttpResponseForbidden("Sem permissao.")
     form_data = {
-        "email": trabalho.radar.cliente.email if trabalho.radar and trabalho.radar.cliente else "",
+        "email": "",
         "nome": trabalho.nome,
         "descricao": _descricao_proposta_de_trabalho(trabalho),
         "valor": "",

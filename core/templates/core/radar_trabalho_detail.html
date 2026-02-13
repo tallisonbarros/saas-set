@@ -24,7 +24,14 @@
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar ao radar</a>
           {% if can_manage %}
-            <a class="hud-menu-pill" href="{% url 'proposta_nova_de_trabalho' trabalho.id %}">Criar proposta</a>
+            <a
+              class="hud-menu-pill"
+              href="{% url 'proposta_nova_de_trabalho' trabalho.id %}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Criar proposta
+            </a>
           {% endif %}
           {% if can_manage %}
             <form method="post" style="display: inline;">
@@ -114,29 +121,29 @@
         <div class="muted status-label">Executando</div>
         {% for atividade in atividades_execucao %}
           <article class="proposal-card io-proposal-card proposal-card-executando activity-row" data-atividade-id="{{ atividade.id }}">
-            <div class="activity-row-main">
+            <div class="activity-row-top">
               <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
-              <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
+              <div class="activity-row-meta">
+                <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
+                {% if atividade.horas_trabalho %}
+                  <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
+                {% endif %}
+                {% if can_manage %}
+                  <button
+                    class="btn btn-ghost btn-compact js-editar-atividade"
+                    type="button"
+                    data-atividade-id="{{ atividade.id }}"
+                    data-atividade-nome="{{ atividade.nome|default:'' }}"
+                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                    data-atividade-status="{{ atividade.status }}"
+                  >
+                    Editar
+                  </button>
+                {% endif %}
+              </div>
             </div>
-            <div class="activity-row-meta">
-              <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
-              {% if atividade.horas_trabalho %}
-                <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
-              {% endif %}
-              {% if can_manage %}
-                <button
-                  class="btn btn-ghost btn-compact js-editar-atividade"
-                  type="button"
-                  data-atividade-id="{{ atividade.id }}"
-                  data-atividade-nome="{{ atividade.nome|default:'' }}"
-                  data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                  data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                  data-atividade-status="{{ atividade.status }}"
-                >
-                  Editar
-                </button>
-              {% endif %}
-            </div>
+            <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
           </article>
         {% empty %}
           <div class="muted">Nenhuma atividade executando.</div>
@@ -147,29 +154,29 @@
         <div class="muted status-label">Pendentes</div>
         {% for atividade in atividades_pendentes %}
           <article class="proposal-card io-proposal-card activity-row" data-atividade-id="{{ atividade.id }}">
-            <div class="activity-row-main">
+            <div class="activity-row-top">
               <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
-              <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
+              <div class="activity-row-meta">
+                <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
+                {% if atividade.horas_trabalho %}
+                  <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
+                {% endif %}
+                {% if can_manage %}
+                  <button
+                    class="btn btn-ghost btn-compact js-editar-atividade"
+                    type="button"
+                    data-atividade-id="{{ atividade.id }}"
+                    data-atividade-nome="{{ atividade.nome|default:'' }}"
+                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                    data-atividade-status="{{ atividade.status }}"
+                  >
+                    Editar
+                  </button>
+                {% endif %}
+              </div>
             </div>
-            <div class="activity-row-meta">
-              <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
-              {% if atividade.horas_trabalho %}
-                <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
-              {% endif %}
-              {% if can_manage %}
-                <button
-                  class="btn btn-ghost btn-compact js-editar-atividade"
-                  type="button"
-                  data-atividade-id="{{ atividade.id }}"
-                  data-atividade-nome="{{ atividade.nome|default:'' }}"
-                  data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                  data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                  data-atividade-status="{{ atividade.status }}"
-                >
-                  Editar
-                </button>
-              {% endif %}
-            </div>
+            <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
           </article>
         {% empty %}
           <div class="muted">Nenhuma atividade pendente.</div>
@@ -180,29 +187,29 @@
         <div class="muted status-label">Finalizadas{% if not show_all_finalizados %} (mes atual){% endif %}</div>
         {% for atividade in atividades_finalizadas %}
           <article class="proposal-card io-proposal-card activity-row" data-atividade-id="{{ atividade.id }}">
-            <div class="activity-row-main">
+            <div class="activity-row-top">
               <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
-              <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
+              <div class="activity-row-meta">
+                <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
+                {% if atividade.horas_trabalho %}
+                  <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
+                {% endif %}
+                {% if can_manage %}
+                  <button
+                    class="btn btn-ghost btn-compact js-editar-atividade"
+                    type="button"
+                    data-atividade-id="{{ atividade.id }}"
+                    data-atividade-nome="{{ atividade.nome|default:'' }}"
+                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
+                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
+                    data-atividade-status="{{ atividade.status }}"
+                  >
+                    Editar
+                  </button>
+                {% endif %}
+              </div>
             </div>
-            <div class="activity-row-meta">
-              <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
-              {% if atividade.horas_trabalho %}
-                <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
-              {% endif %}
-              {% if can_manage %}
-                <button
-                  class="btn btn-ghost btn-compact js-editar-atividade"
-                  type="button"
-                  data-atividade-id="{{ atividade.id }}"
-                  data-atividade-nome="{{ atividade.nome|default:'' }}"
-                  data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                  data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                  data-atividade-status="{{ atividade.status }}"
-                >
-                  Editar
-                </button>
-              {% endif %}
-            </div>
+            <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
           </article>
         {% empty %}
           <div class="muted">Nenhuma atividade finalizada.</div>
@@ -559,7 +566,7 @@
           if (!horasEl) {
             horasEl = document.createElement("span");
             horasEl.className = "slot-badge slot-badge-compact js-atividade-horas";
-            var meta = card.querySelector(".module-meta");
+            var meta = card.querySelector(".activity-row-meta");
             if (meta) {
               meta.insertBefore(horasEl, meta.querySelector(".js-editar-atividade"));
             }

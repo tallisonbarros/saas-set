@@ -26,27 +26,13 @@
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">{{ proposta.nome }}</h1>
-          <p class="page-subtitle">{{ proposta.descricao|linebreaksbr }}</p>
         </div>
-      </div>
-      <div class="hud-meta">
-        <span class="proposal-origin{% if proposta.criada_por_id == request.user.id %} sent{% else %} received{% endif %}">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-            {% if proposta.criada_por_id == request.user.id %}
-              <path d="M5 12h12m0 0-4-4m4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-            {% else %}
-              <path d="M12 5v12m0 0-4-4m4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-            {% endif %}
-          </svg>
-          {% if proposta.criada_por_id == request.user.id %}Enviada{% else %}Recebida{% endif %}
-        </span>
       </div>
     </div>
     {% if message %}
       <p class="muted">{{ message }}</p>
     {% endif %}
-    <div class="proposal-detail-layout">
-      <div class="proposal-detail-main">
+    <div class="proposal-detail-flow">
         <div class="proposal-block proposal-block-description">
           <div class="proposal-block-head">
             <div>
@@ -66,8 +52,6 @@
           </div>
           <div class="proposal-description proposal-description-spotlight">{{ proposta.descricao|linebreaksbr }}</div>
         </div>
-      </div>
-      <aside class="proposal-detail-sidebar">
         <div class="proposal-block">
           <div class="proposal-block-head">
             <h2 class="proposal-block-title">Resumo</h2>
@@ -230,7 +214,6 @@
             </div>
           </div>
         {% endif %}
-      </aside>
     </div>
   </section>
 {% endblock %}
