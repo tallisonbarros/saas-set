@@ -16,11 +16,17 @@
 {% endblock %}
 
 {% block content %}
+  <div class="radar-mode {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
   <section class="card">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Trabalho</div>
         <div class="hud-pill">Atividades</div>
+        {% if can_manage %}
+          <div class="radar-mode-badge radar-mode-badge-creator">Modo criador</div>
+        {% else %}
+          <div class="radar-mode-badge radar-mode-badge-viewer">Somente visualizacao</div>
+        {% endif %}
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar ao radar</a>
           {% if can_create_proposta_from_trabalho %}
@@ -85,9 +91,15 @@
           <div class="meta-label">Acesso</div>
           <div class="meta-value">
             {% if is_radar_creator %}
-              <span class="slot-badge slot-badge-compact">Criador</span>
+              <span class="slot-badge slot-badge-compact">Criador do radar</span>
             {% elif has_id_radar_access %}
-              <span class="slot-badge slot-badge-compact">ID_RADAR</span>
+              <span class="slot-badge slot-badge-compact slot-badge-readonly" aria-label="Leitura">
+                <svg class="badge-eye" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.2"></circle>
+                </svg>
+                Leitura
+              </span>
             {% else %}
               -
             {% endif %}
@@ -106,21 +118,13 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Atividades</h2>
-          <p class="muted">Executando, pendentes e finalizadas.</p>
-        </div>
-        <div class="module-meta">
-          {% if has_finalizadas_antigas and not show_all_finalizados %}
-            <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}{% if finalizados_toggle_query %}?{{ finalizados_toggle_query }}{% endif %}">Mostrar todas finalizadas</a>
-          {% elif show_all_finalizados %}
-            <a class="btn btn-ghost btn-compact" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Mostrar finalizadas do mes</a>
-          {% endif %}
+          <p class="muted">Ordem unica de execucao. Status mostrado no badge de cada card.</p>
         </div>
       </div>
 
       <div class="proposal-grid status-group status-list">
-        <div class="muted status-label">Executando</div>
-        {% for atividade in atividades_execucao %}
-          <article class="proposal-card io-proposal-card proposal-card-executando activity-row" data-atividade-id="{{ atividade.id }}">
+        {% for atividade in atividades_ordenadas %}
+          <article class="proposal-card io-proposal-card activity-row{% if atividade.status == 'EXECUTANDO' %} proposal-card-executando{% endif %}" data-atividade-id="{{ atividade.id }}">
             <div class="activity-row-top">
               <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
               <div class="activity-row-meta">
@@ -129,20 +133,8 @@
                   <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
-                  <form method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="move_atividade">
-                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
-                    <input type="hidden" name="direcao" value="up">
-                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.first %}disabled{% endif %} title="Mover para cima">↑</button>
-                  </form>
-                  <form method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="move_atividade">
-                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
-                    <input type="hidden" name="direcao" value="down">
-                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">↓</button>
-                  </form>
+                  <button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-direcao="up" {% if forloop.first %}disabled{% endif %} title="Mover para cima">Subir</button>
+                  <button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-direcao="down" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">Descer</button>
                   <button
                     class="btn btn-ghost btn-compact js-editar-atividade"
                     type="button"
@@ -151,6 +143,8 @@
                     data-atividade-descricao="{{ atividade.descricao|default:'' }}"
                     data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
                     data-atividade-status="{{ atividade.status }}"
+                    data-atividade-inicio="{{ atividade.inicio_execucao_em|date:'d/m/Y H:i' }}"
+                    data-atividade-finalizada="{{ atividade.finalizada_em|date:'d/m/Y H:i' }}"
                   >
                     Editar
                   </button>
@@ -158,103 +152,13 @@
               </div>
             </div>
             <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
-          </article>
-        {% empty %}
-          <div class="muted">Nenhuma atividade executando.</div>
-        {% endfor %}
-      </div>
-
-      <div class="proposal-grid status-group status-list">
-        <div class="muted status-label">Pendentes</div>
-        {% for atividade in atividades_pendentes %}
-          <article class="proposal-card io-proposal-card activity-row" data-atividade-id="{{ atividade.id }}">
-            <div class="activity-row-top">
-              <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
-              <div class="activity-row-meta">
-                <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
-                {% if atividade.horas_trabalho %}
-                  <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
-                {% endif %}
-                {% if can_manage %}
-                  <form method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="move_atividade">
-                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
-                    <input type="hidden" name="direcao" value="up">
-                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.first %}disabled{% endif %} title="Mover para cima">↑</button>
-                  </form>
-                  <form method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="move_atividade">
-                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
-                    <input type="hidden" name="direcao" value="down">
-                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">↓</button>
-                  </form>
-                  <button
-                    class="btn btn-ghost btn-compact js-editar-atividade"
-                    type="button"
-                    data-atividade-id="{{ atividade.id }}"
-                    data-atividade-nome="{{ atividade.nome|default:'' }}"
-                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                    data-atividade-status="{{ atividade.status }}"
-                  >
-                    Editar
-                  </button>
-                {% endif %}
-              </div>
+            <div class="proposal-meta activity-dates">
+              <span class="js-atividade-inicio"><strong>Inicio:</strong> {{ atividade.inicio_execucao_em|date:"d/m/Y H:i"|default:"-" }}</span>
+              <span class="js-atividade-finalizada"><strong>Finalizacao:</strong> {{ atividade.finalizada_em|date:"d/m/Y H:i"|default:"-" }}</span>
             </div>
-            <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
           </article>
         {% empty %}
-          <div class="muted">Nenhuma atividade pendente.</div>
-        {% endfor %}
-      </div>
-
-      <div class="proposal-grid status-group status-list">
-        <div class="muted status-label">Finalizadas{% if not show_all_finalizados %} (mes atual){% endif %}</div>
-        {% for atividade in atividades_finalizadas %}
-          <article class="proposal-card io-proposal-card activity-row" data-atividade-id="{{ atividade.id }}">
-            <div class="activity-row-top">
-              <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
-              <div class="activity-row-meta">
-                <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
-                {% if atividade.horas_trabalho %}
-                  <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
-                {% endif %}
-                {% if can_manage %}
-                  <form method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="move_atividade">
-                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
-                    <input type="hidden" name="direcao" value="up">
-                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.first %}disabled{% endif %} title="Mover para cima">↑</button>
-                  </form>
-                  <form method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="move_atividade">
-                    <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
-                    <input type="hidden" name="direcao" value="down">
-                    <button class="btn btn-ghost btn-compact" type="submit" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">↓</button>
-                  </form>
-                  <button
-                    class="btn btn-ghost btn-compact js-editar-atividade"
-                    type="button"
-                    data-atividade-id="{{ atividade.id }}"
-                    data-atividade-nome="{{ atividade.nome|default:'' }}"
-                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                    data-atividade-status="{{ atividade.status }}"
-                  >
-                    Editar
-                  </button>
-                {% endif %}
-              </div>
-            </div>
-            <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
-          </article>
-        {% empty %}
-          <div class="muted">Nenhuma atividade finalizada.</div>
+          <div class="muted">Nenhuma atividade cadastrada.</div>
         {% endfor %}
       </div>
     </section>
@@ -293,6 +197,14 @@
                   {% endfor %}
                 </select>
               </label>
+              <label class="field">
+                <span>Inicio de execucao</span>
+                <input type="text" name="inicio_execucao_display" value="{{ edit_atividade.inicio_execucao_em|date:'d/m/Y H:i' }}" readonly>
+              </label>
+              <label class="field">
+                <span>Data de finalizacao</span>
+                <input type="text" name="finalizada_display" value="{{ edit_atividade.finalizada_em|date:'d/m/Y H:i' }}" readonly>
+              </label>
             </div>
             <div class="form-actions">
               <button class="btn btn-primary" type="submit">Salvar atividade</button>
@@ -319,7 +231,7 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
-        <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
+        <div class="muted">Permissao: somente criador do radar.</div>
         <div id="cadastro-message" class="notice" style="display: none;"></div>
         <form class="io-form" method="post">
           {% csrf_token %}
@@ -351,7 +263,7 @@
           </div>
         </form>
       {% else %}
-        <div class="muted">Apenas usuarios com ID_RADAR podem cadastrar atividades.</div>
+        <div class="muted">Somente visualizacao. Apenas o criador do radar pode cadastrar atividades.</div>
       {% endif %}
     </div>
   </details>
@@ -363,7 +275,7 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_edit_trabalho_by_creator %}
-        <div class="muted">Permissao: apenas quem criou o trabalho.</div>
+        <div class="muted">Permissao: somente criador do radar.</div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_trabalho">
@@ -453,7 +365,7 @@
           </div>
         </form>
       {% else %}
-        <div class="muted">Somente quem criou o trabalho pode editar.</div>
+        <div class="muted">Somente visualizacao. Apenas o criador do radar pode editar.</div>
       {% endif %}
     </div>
   </details>
@@ -603,6 +515,14 @@
           statusEl.textContent = payload.status_label || payload.status;
           statusEl.className = "badge badge-" + payload.status.toLowerCase() + " js-atividade-status";
         }
+        var inicioEl = card.querySelector(".js-atividade-inicio");
+        if (inicioEl) {
+          inicioEl.innerHTML = "<strong>Inicio:</strong> " + (payload.inicio_execucao_display || "-");
+        }
+        var finalizadaEl = card.querySelector(".js-atividade-finalizada");
+        if (finalizadaEl) {
+          finalizadaEl.innerHTML = "<strong>Finalizacao:</strong> " + (payload.finalizada_display || "-");
+        }
         var horasEl = card.querySelector(".js-atividade-horas");
         if (payload.horas_trabalho) {
           if (!horasEl) {
@@ -623,6 +543,8 @@
           editButton.dataset.atividadeDescricao = payload.descricao || "";
           editButton.dataset.atividadeHoras = payload.horas_trabalho || "";
           editButton.dataset.atividadeStatus = payload.status || "";
+          editButton.dataset.atividadeInicio = payload.inicio_execucao_display || "";
+          editButton.dataset.atividadeFinalizada = payload.finalizada_display || "";
         }
       }
       function removeCard(id) {
@@ -631,9 +553,73 @@
           card.remove();
         }
       }
+      function refreshMoveButtonsInList(listEl) {
+        if (!listEl) {
+          return;
+        }
+        var cards = Array.from(listEl.querySelectorAll("article.activity-row"));
+        cards.forEach(function (card, index) {
+          var upButton = card.querySelector(".js-move-atividade[data-direcao='up']");
+          var downButton = card.querySelector(".js-move-atividade[data-direcao='down']");
+          if (upButton) {
+            upButton.disabled = index === 0;
+          }
+          if (downButton) {
+            downButton.disabled = index === cards.length - 1;
+          }
+        });
+      }
+      function swapCards(idA, idB) {
+        if (!idA || !idB) {
+          return;
+        }
+        var cardA = document.querySelector("[data-atividade-id='" + idA + "']");
+        var cardB = document.querySelector("[data-atividade-id='" + idB + "']");
+        if (!cardA || !cardB || cardA.parentNode !== cardB.parentNode) {
+          return;
+        }
+        var parent = cardA.parentNode;
+        var marker = document.createElement("span");
+        parent.insertBefore(marker, cardA);
+        parent.insertBefore(cardA, cardB);
+        parent.insertBefore(cardB, marker);
+        parent.removeChild(marker);
+        refreshMoveButtonsInList(parent);
+      }
+      var moveButtons = document.querySelectorAll(".js-move-atividade");
+      moveButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          if (button.disabled) {
+            return;
+          }
+          var atividadeId = button.dataset.atividadeId;
+          var direcao = button.dataset.direcao;
+          if (!atividadeId || !direcao) {
+            return;
+          }
+          var data = new FormData();
+          data.set("action", "move_atividade");
+          data.set("atividade_id", atividadeId);
+          data.set("direcao", direcao);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.ok && payload.moved && payload.swap_with_id) {
+                swapCards(payload.id, payload.swap_with_id);
+              }
+            });
+        });
+      });
       var buttons = document.querySelectorAll(".js-editar-atividade");
       var editor = document.getElementById("editar-atividade");
-      if (!buttons.length || !editor) {
+      if (!editor) {
         return;
       }
       buttons.forEach(function (button) {
@@ -648,6 +634,8 @@
           setField(form, "descricao", button.dataset.atividadeDescricao);
           setField(form, "horas_trabalho", button.dataset.atividadeHoras);
           setField(form, "status", button.dataset.atividadeStatus);
+          setField(form, "inicio_execucao_display", button.dataset.atividadeInicio);
+          setField(form, "finalizada_display", button.dataset.atividadeFinalizada);
           var deleteForm = editor.querySelector("form[method='post']:not(.io-form)");
           if (deleteForm) {
             setField(deleteForm, "atividade_id", button.dataset.atividadeId);
@@ -716,4 +704,5 @@
       }
     })();
   </script>
+  </div>
 {% endblock %}

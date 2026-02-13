@@ -14,11 +14,17 @@
 {% endblock %}
 
 {% block content %}
+  <div class="radar-mode {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
   <section class="card">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Radar de atividades</div>
         <div class="hud-pill">Trabalhos</div>
+        {% if can_manage %}
+          <div class="radar-mode-badge radar-mode-badge-creator">Modo criador</div>
+        {% else %}
+          <div class="radar-mode-badge radar-mode-badge-viewer">Somente visualizacao</div>
+        {% endif %}
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_list' %}">Inicio do modulo</a>
         </div>
@@ -56,7 +62,13 @@
             {% if is_radar_creator %}
               <span class="slot-badge slot-badge-compact">Criador</span>
             {% elif has_id_radar_access %}
-              <span class="slot-badge slot-badge-compact">ID_RADAR</span>
+              <span class="slot-badge slot-badge-compact slot-badge-readonly" aria-label="Leitura">
+                <svg class="badge-eye" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.2"></circle>
+                </svg>
+                Leitura
+              </span>
             {% else %}
               -
             {% endif %}
@@ -198,7 +210,7 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
-        <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
+        <div class="muted">Permissao: somente criador do radar.</div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="create_trabalho">
@@ -279,7 +291,7 @@
           <input type="hidden" name="action" value="create_contrato">
         </form>
       {% else %}
-        <div class="muted">Apenas usuarios com ID_RADAR podem criar trabalhos.</div>
+        <div class="muted">Somente visualizacao. Apenas o criador do radar pode criar trabalhos.</div>
       {% endif %}
     </div>
   </details>
@@ -291,7 +303,7 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
-        <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
+        <div class="muted">Permissao: somente criador do radar.</div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_radar">
@@ -325,10 +337,11 @@
           </div>
         </form>
       {% else %}
-        <div class="muted">Apenas usuarios com ID_RADAR podem editar este radar.</div>
+        <div class="muted">Somente visualizacao. Apenas o criador do radar pode editar.</div>
       {% endif %}
     </div>
   </details>
+  </div>
   <script>
     (function () {
       function getCookie(name) {

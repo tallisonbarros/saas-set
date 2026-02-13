@@ -500,6 +500,8 @@ class RadarAtividade(models.Model):
     descricao = models.TextField(blank=True)
     horas_trabalho = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    inicio_execucao_em = models.DateTimeField(null=True, blank=True)
+    finalizada_em = models.DateTimeField(null=True, blank=True)
     ordem = models.PositiveIntegerField(default=0, db_index=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 

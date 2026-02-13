@@ -27,7 +27,7 @@ from django.utils import timezone
 
 from django.contrib.auth.models import User
 from django.db import DatabaseError, connections, transaction
-from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, TextField, Value, When
+from django.db.models import Case, Count, DecimalField, F, IntegerField, Max, OuterRef, Q, Subquery, Sum, TextField, Value, When
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.functions import Cast
 
@@ -543,6 +543,25 @@ def _sync_trabalho_status(trabalho):
         trabalho.save(update_fields=["status"])
 
 
+def _apply_atividade_status_dates(atividade, previous_status=None):
+    status_atual = atividade.status
+    now = timezone.now()
+    if status_atual == RadarAtividade.Status.PENDENTE:
+        atividade.inicio_execucao_em = None
+        atividade.finalizada_em = None
+        return
+    if status_atual == RadarAtividade.Status.EXECUTANDO:
+        if not atividade.inicio_execucao_em:
+            atividade.inicio_execucao_em = now
+        atividade.finalizada_em = None
+        return
+    if status_atual == RadarAtividade.Status.FINALIZADA:
+        if not atividade.inicio_execucao_em:
+            atividade.inicio_execucao_em = now
+        if previous_status != RadarAtividade.Status.FINALIZADA or not atividade.finalizada_em:
+            atividade.finalizada_em = now
+
+
 def _normalizar_ordem_atividades(trabalho, status=None):
     atividades = RadarAtividade.objects.filter(trabalho=trabalho)
     if status:
@@ -612,6 +631,11 @@ def _radar_trabalho_schema_ready():
 
 def _descricao_proposta_de_trabalho(trabalho):
     return (trabalho.descricao or "").strip()
+
+
+def _is_radar_creator_user(user, radar):
+    cliente = _get_cliente(user)
+    return bool(cliente and radar and radar.cliente_id == cliente.id)
 
 
 def home(request):
@@ -3202,7 +3226,7 @@ def lista_ip_detail(request, pk):
             "total_ips": total_ips,
             "total_preenchidos": total_preenchidos,
             "search_term": search_term,
-            "can_manage": can_manage or request.user.is_staff,
+            "can_manage": can_manage,
             "message": message,
             "message_level": message_level,
             "nomes_repetidos": nomes_repetidos,
@@ -3278,18 +3302,18 @@ def radar_detail(request, pk):
         radar = get_object_or_404(Radar, pk=pk)
         is_creator = False
         has_id_radar_access = False
-        can_manage = True
+        can_manage = False
     else:
         radar = get_object_or_404(
             Radar,
             Q(pk=pk),
             Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
         )
-        is_creator = bool(cliente) and radar.cliente_id == cliente.id
+        is_creator = _is_radar_creator_user(request.user, radar)
         has_id_radar_access = bool(cliente) and (
             radar.id_radar_id and cliente.radares.filter(pk=radar.id_radar_id).exists()
         )
-        can_manage = bool(cliente)
+        can_manage = is_creator
 
     message = None
     message_level = "info"
@@ -3304,8 +3328,8 @@ def radar_detail(request, pk):
             "create_classificacao",
             "create_contrato",
         }:
-            if not can_manage and not request.user.is_staff:
-                return HttpResponseForbidden("Sem permissao.")
+            if not can_manage:
+                return HttpResponseForbidden("Somente quem criou o radar pode alterar.")
         if action == "create_classificacao":
             nome = request.POST.get("classificacao_nome", "").strip()
             if not nome:
@@ -3487,7 +3511,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
         trabalho = get_object_or_404(RadarTrabalho, pk=pk, radar=radar)
         is_creator = False
         has_id_radar_access = False
-        can_manage = True
+        can_manage = False
     else:
         radar = get_object_or_404(
             Radar,
@@ -3495,16 +3519,18 @@ def radar_trabalho_detail(request, radar_pk, pk):
             Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
         )
         trabalho = get_object_or_404(RadarTrabalho, pk=pk, radar=radar)
-        is_creator = bool(cliente) and radar.cliente_id == cliente.id
+        is_creator = _is_radar_creator_user(request.user, radar)
         has_id_radar_access = bool(cliente) and (
             radar.id_radar_id and cliente.radares.filter(pk=radar.id_radar_id).exists()
         )
-        can_manage = bool(cliente)
+        can_manage = is_creator
 
     message = request.GET.get("msg", "").strip()
     message_level = request.GET.get("level", "").strip() or "info"
     classificacoes = RadarClassificacao.objects.order_by("nome")
     classificacao_filter = request.GET.get("classificacao", "").strip()
+
+    can_edit_trabalho_by_creator = can_manage
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -3519,8 +3545,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "create_contrato",
             "create_classificacao",
         }:
-            if not can_manage and not request.user.is_staff:
-                return HttpResponseForbidden("Sem permissao.")
+            if not can_manage:
+                return HttpResponseForbidden("Somente quem criou o radar pode alterar.")
         if action == "create_classificacao":
             nome = request.POST.get("classificacao_nome", "").strip()
             if not nome:
@@ -3576,8 +3602,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             params = {"cadastro": "contrato", "msg": msg, "level": level}
             return redirect(f"{reverse('radar_trabalho_detail', args=[radar.pk, trabalho.pk])}?{urlencode(params)}")
         if action == "update_trabalho":
-            if trabalho.criado_por_id != request.user.id:
-                return HttpResponseForbidden("Somente quem criou o trabalho pode editar.")
+            if not can_edit_trabalho_by_creator:
+                return HttpResponseForbidden("Somente quem criou o radar pode editar.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             setor = request.POST.get("setor", "").strip()
@@ -3603,6 +3629,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
                     trabalho.contrato = RadarContrato.objects.filter(pk=contrato_id).first()
                 else:
                     trabalho.contrato = None
+                if not trabalho.criado_por_id and is_creator:
+                    trabalho.criado_por = request.user
                 trabalho.nome = nome
                 trabalho.descricao = descricao
                 trabalho.setor = setor
@@ -3610,6 +3638,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 trabalho.responsavel = responsavel
                 trabalho.save(
                     update_fields=[
+                        "criado_por",
                         "nome",
                         "descricao",
                         "data_registro",
@@ -3623,13 +3652,13 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_trabalho":
-            if trabalho.criado_por_id != request.user.id:
-                return HttpResponseForbidden("Somente quem criou o trabalho pode excluir.")
+            if not can_edit_trabalho_by_creator:
+                return HttpResponseForbidden("Somente quem criou o radar pode excluir.")
             trabalho.delete()
             return redirect("radar_detail", pk=radar.pk)
         if action == "duplicate_trabalho":
-            if trabalho.criado_por_id != request.user.id:
-                return HttpResponseForbidden("Somente quem criou o trabalho pode duplicar.")
+            if not can_edit_trabalho_by_creator:
+                return HttpResponseForbidden("Somente quem criou o radar pode duplicar.")
             nome_copia = f"{trabalho.nome} - COPIA"
             novo_trabalho = RadarTrabalho.objects.create(
                 radar=radar,
@@ -3653,6 +3682,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
                             descricao=atividade.descricao,
                             horas_trabalho=atividade.horas_trabalho,
                             status=atividade.status,
+                            inicio_execucao_em=atividade.inicio_execucao_em,
+                            finalizada_em=atividade.finalizada_em,
                             ordem=atividade.ordem,
                         )
                         for atividade in atividades
@@ -3677,12 +3708,18 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 message = "Informe um nome para a atividade."
                 message_level = "error"
             else:
+                proxima_ordem = (
+                    RadarAtividade.objects.filter(trabalho=trabalho).aggregate(max_ordem=Max("ordem"))["max_ordem"] or 0
+                ) + 1
                 RadarAtividade.objects.create(
                     trabalho=trabalho,
                     nome=nome,
                     descricao=descricao,
                     horas_trabalho=horas,
                     status=status_raw,
+                    inicio_execucao_em=timezone.now() if status_raw in {RadarAtividade.Status.EXECUTANDO, RadarAtividade.Status.FINALIZADA} else None,
+                    finalizada_em=timezone.now() if status_raw == RadarAtividade.Status.FINALIZADA else None,
+                    ordem=proxima_ordem,
                 )
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
@@ -3703,19 +3740,17 @@ def radar_trabalho_detail(request, radar_pk, pk):
             status_raw = request.POST.get("status", "").strip()
             if status_raw in dict(RadarAtividade.Status.choices):
                 atividade.status = status_raw
-            if atividade.status != status_anterior:
-                atividade.ordem = 0
+            _apply_atividade_status_dates(atividade, previous_status=status_anterior)
             atividade.save(
                 update_fields=[
                     "nome",
                     "descricao",
                     "horas_trabalho",
                     "status",
-                    "ordem",
+                    "inicio_execucao_em",
+                    "finalizada_em",
                 ]
             )
-            if atividade.status != status_anterior:
-                _normalizar_ordem_atividades(trabalho, status=status_anterior)
             _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(
@@ -3727,15 +3762,16 @@ def radar_trabalho_detail(request, radar_pk, pk):
                         "status": atividade.status,
                         "status_label": atividade.get_status_display(),
                         "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
+                        "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
+                        "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
                     }
                 )
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_atividade":
             atividade_id = request.POST.get("atividade_id")
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
-            status_removido = atividade.status
             atividade.delete()
-            _normalizar_ordem_atividades(trabalho, status=status_removido)
+            _normalizar_ordem_atividades(trabalho)
             _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(
@@ -3749,12 +3785,14 @@ def radar_trabalho_detail(request, radar_pk, pk):
             atividade_id = request.POST.get("atividade_id")
             direcao = request.POST.get("direcao", "").strip().lower()
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            moved = False
+            swap_with_id = None
             if direcao in {"up", "down"}:
                 with transaction.atomic():
-                    _normalizar_ordem_atividades(trabalho, status=atividade.status)
+                    _normalizar_ordem_atividades(trabalho)
                     atividades_status = list(
                         RadarAtividade.objects.select_for_update()
-                        .filter(trabalho=trabalho, status=atividade.status)
+                        .filter(trabalho=trabalho)
                         .order_by("ordem", "criado_em", "id")
                     )
                     ids = [item.id for item in atividades_status]
@@ -3769,59 +3807,43 @@ def radar_trabalho_detail(request, radar_pk, pk):
                         vizinho = atividades_status[neighbor_idx]
                         atual.ordem, vizinho.ordem = vizinho.ordem, atual.ordem
                         RadarAtividade.objects.bulk_update([atual, vizinho], ["ordem"])
+                        moved = True
+                        swap_with_id = vizinho.id
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "id": atividade.id,
+                        "direcao": direcao,
+                        "moved": moved,
+                        "swap_with_id": swap_with_id,
+                    }
+                )
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
 
     contratos = RadarContrato.objects.order_by("nome")
     atividades_base = trabalho.atividades.all()
-    today = timezone.localdate()
-    show_all_finalizados = request.GET.get("finalizados") == "all"
-    base_params = request.GET.copy()
-    base_params.pop("finalizados", None)
-    toggle_params = base_params.copy()
-    toggle_params["finalizados"] = "all"
-    atividades_execucao = atividades_base.filter(status=RadarAtividade.Status.EXECUTANDO).order_by(
-        "ordem", "criado_em", "id"
-    )
-    atividades_pendentes = atividades_base.filter(status=RadarAtividade.Status.PENDENTE).order_by(
-        "ordem", "criado_em", "id"
-    )
-    atividades_finalizadas = atividades_base.filter(status=RadarAtividade.Status.FINALIZADA)
-    atividades_finalizadas_mes = atividades_finalizadas.filter(
-        criado_em__year=today.year,
-        criado_em__month=today.month,
-    )
-    atividades_finalizadas_antigas = atividades_finalizadas.exclude(
-        criado_em__year=today.year,
-        criado_em__month=today.month,
-    )
-    if show_all_finalizados:
-        atividades_finalizadas_mes = atividades_finalizadas
-    atividades_finalizadas_mes = atividades_finalizadas_mes.order_by("ordem", "criado_em", "id")
-    has_finalizadas_antigas = atividades_finalizadas_antigas.exists()
+    _normalizar_ordem_atividades(trabalho)
+    atividades_ordenadas = atividades_base.order_by("ordem", "criado_em", "id")
     edit_atividade = None
     edit_atividade_id = request.GET.get("editar", "").strip()
     if edit_atividade_id:
         edit_atividade = RadarAtividade.objects.filter(pk=edit_atividade_id, trabalho=trabalho).first()
     total_atividades = atividades_base.count()
-    can_create_proposta_from_trabalho = bool(trabalho.criado_por_id and trabalho.criado_por_id == request.user.id)
-    can_duplicate_trabalho = bool(trabalho.criado_por_id and trabalho.criado_por_id == request.user.id)
-    can_edit_trabalho_by_creator = bool(trabalho.criado_por_id and trabalho.criado_por_id == request.user.id)
+    can_create_proposta_from_trabalho = can_edit_trabalho_by_creator
+    can_duplicate_trabalho = can_edit_trabalho_by_creator
     return render(
         request,
         "core/radar_trabalho_detail.html",
         {
             "radar": radar,
             "trabalho": trabalho,
-            "atividades_execucao": atividades_execucao,
-            "atividades_pendentes": atividades_pendentes,
-            "atividades_finalizadas": atividades_finalizadas_mes,
-            "show_all_finalizados": show_all_finalizados,
-            "has_finalizadas_antigas": has_finalizadas_antigas,
+            "atividades_ordenadas": atividades_ordenadas,
             "total_atividades": total_atividades,
             "contratos": contratos,
             "classificacoes": classificacoes,
             "status_choices": RadarAtividade.Status.choices,
-            "can_manage": can_manage or request.user.is_staff,
+            "can_manage": can_manage,
             "is_radar_creator": is_creator,
             "has_id_radar_access": has_id_radar_access,
             "message": message,
@@ -3831,8 +3853,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "can_create_proposta_from_trabalho": can_create_proposta_from_trabalho,
             "can_duplicate_trabalho": can_duplicate_trabalho,
             "can_edit_trabalho_by_creator": can_edit_trabalho_by_creator,
-            "finalizados_toggle_query": toggle_params.urlencode() if toggle_params else "finalizados=all",
-            "finalizados_reset_query": base_params.urlencode() if base_params else "",
         },
     )
 
@@ -4536,8 +4556,8 @@ def proposta_nova_vendedor(request):
             trabalho = _get_radar_trabalho_acessivel(request.user, trabalho_id)
             if not trabalho:
                 message = "Origem de trabalho invalida para o seu acesso."
-            elif trabalho.criado_por_id != request.user.id:
-                message = "Somente quem criou o trabalho pode gerar proposta a partir dele."
+            elif not _is_radar_creator_user(request.user, trabalho.radar):
+                message = "Somente quem criou o radar pode gerar proposta a partir do trabalho."
             else:
                 source_trabalho = trabalho
 
@@ -4597,8 +4617,9 @@ def proposta_nova_de_trabalho(request, trabalho_pk):
     trabalho = _get_radar_trabalho_acessivel(request.user, trabalho_pk)
     if not trabalho:
         return HttpResponseForbidden("Sem permissao.")
-    if trabalho.criado_por_id != request.user.id:
-        return HttpResponseForbidden("Somente quem criou o trabalho pode gerar proposta a partir dele.")
+    can_manage_trabalho = _is_radar_creator_user(request.user, trabalho.radar)
+    if not can_manage_trabalho:
+        return HttpResponseForbidden("Somente quem criou o radar pode gerar proposta a partir do trabalho.")
     form_data = {
         "email": "",
         "nome": trabalho.nome,

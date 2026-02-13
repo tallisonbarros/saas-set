@@ -5,7 +5,7 @@ from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_visual_flags
-from core.models import PerfilUsuario, Proposta, Radar, RadarAtividade, RadarClassificacao, RadarContrato, RadarTrabalho
+from core.models import PerfilUsuario, Proposta, Radar, RadarAtividade, RadarClassificacao, RadarContrato, RadarID, RadarTrabalho
 from core.views import _build_proposta_pdf_context, _sanitize_proposta_descricao
 
 
@@ -166,3 +166,73 @@ class PropostaTrabalhoVinculoTests(TestCase):
         self.assertEqual(response.status_code, 200)
         proposta = Proposta.objects.filter(nome="Proposta sem permissao").first()
         self.assertIsNone(proposta)
+
+
+class RadarCreatorPermissionTests(TestCase):
+    def setUp(self):
+        self.client_http = Client()
+        self.owner_user = User.objects.create_user(username="owner", email="owner@set.local", password="123456")
+        self.viewer_user = User.objects.create_user(username="viewer", email="viewer@set.local", password="123456")
+        self.owner = PerfilUsuario.objects.create(nome="Owner", email="owner@set.local", usuario=self.owner_user)
+        self.viewer = PerfilUsuario.objects.create(nome="Viewer", email="viewer@set.local", usuario=self.viewer_user)
+        self.radar_id = RadarID.objects.create(codigo="R-001")
+        self.viewer.radares.add(self.radar_id)
+        self.radar = Radar.objects.create(
+            cliente=self.owner,
+            id_radar=self.radar_id,
+            nome="Radar Permissao",
+            criador=self.owner_user,
+        )
+        self.trabalho = RadarTrabalho.objects.create(
+            radar=self.radar,
+            nome="Trabalho Permissao",
+            criado_por=self.owner_user,
+        )
+
+    def test_usuario_com_id_radar_nao_altera_radar_trabalho_atividade(self):
+        self.client_http.force_login(self.viewer_user)
+        resp_radar = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/",
+            {"action": "create_trabalho", "nome": "Nao deve criar"},
+        )
+        self.assertEqual(resp_radar.status_code, 403)
+        resp_trabalho = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {"action": "create_atividade", "nome": "Nao deve criar"},
+        )
+        self.assertEqual(resp_trabalho.status_code, 403)
+
+    def test_criador_do_radar_pode_alterar(self):
+        self.client_http.force_login(self.owner_user)
+        resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/",
+            {"action": "create_trabalho", "nome": "Pode criar"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(RadarTrabalho.objects.filter(radar=self.radar, nome="Pode criar").exists())
+
+    def test_datas_inicio_execucao_e_finalizacao_da_atividade(self):
+        self.client_http.force_login(self.owner_user)
+        create_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {"action": "create_atividade", "nome": "Ativ X", "status": "EXECUTANDO"},
+        )
+        self.assertEqual(create_resp.status_code, 302)
+        atividade = RadarAtividade.objects.get(trabalho=self.trabalho, nome="Ativ X")
+        self.assertIsNotNone(atividade.inicio_execucao_em)
+        self.assertIsNone(atividade.finalizada_em)
+
+        update_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_atividade",
+                "atividade_id": str(atividade.id),
+                "nome": atividade.nome,
+                "descricao": atividade.descricao or "",
+                "status": "FINALIZADA",
+            },
+        )
+        self.assertEqual(update_resp.status_code, 302)
+        atividade.refresh_from_db()
+        self.assertIsNotNone(atividade.inicio_execucao_em)
+        self.assertIsNotNone(atividade.finalizada_em)

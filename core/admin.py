@@ -39,6 +39,62 @@ admin.site.site_title = "SET Admin"
 admin.site.index_title = "Painel administrativo"
 
 
+def _admin_get_perfil(user):
+    if not user or not user.is_authenticated:
+        return None
+    try:
+        return user.perfilusuario
+    except PerfilUsuario.DoesNotExist:
+        return None
+
+
+class RadarOwnershipAdminMixin:
+    owner_lookup = "cliente_id"
+
+    def _owner_id(self, request):
+        perfil = _admin_get_perfil(request.user)
+        return perfil.id if perfil else None
+
+    def _owns_obj(self, request, obj):
+        if request.user.is_superuser:
+            return True
+        owner_id = self._owner_id(request)
+        if not owner_id or obj is None:
+            return False
+        return getattr(obj, self.owner_lookup, None) == owner_id
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        owner_id = self._owner_id(request)
+        if not owner_id:
+            return qs.none()
+        return qs.filter(**{self.owner_lookup: owner_id})
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return bool(self._owner_id(request))
+        return self._owns_obj(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return bool(self._owner_id(request))
+        return self._owns_obj(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_change_permission(request, obj=obj)
+
+    def has_add_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return bool(self._owner_id(request))
+
+
 @admin.register(PerfilUsuario)
 class PerfilUsuarioAdmin(admin.ModelAdmin):
     form = PerfilUsuarioAdminForm
@@ -160,13 +216,28 @@ class RadarClassificacaoAdmin(admin.ModelAdmin):
 
 
 @admin.register(Radar)
-class RadarAdmin(admin.ModelAdmin):
+class RadarAdmin(RadarOwnershipAdminMixin, admin.ModelAdmin):
+    owner_lookup = "cliente_id"
     list_display = ("nome", "cliente", "id_radar", "local", "criado_em")
     search_fields = ("nome", "cliente__nome", "id_radar__codigo", "local")
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "cliente" and not request.user.is_superuser:
+            owner_id = self._owner_id(request)
+            kwargs["queryset"] = PerfilUsuario.objects.filter(pk=owner_id) if owner_id else PerfilUsuario.objects.none()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if not request.user.is_superuser:
+            owner_id = self._owner_id(request)
+            if owner_id:
+                obj.cliente_id = owner_id
+        super().save_model(request, obj, form, change)
+
 
 @admin.register(RadarTrabalho)
-class RadarTrabalhoAdmin(admin.ModelAdmin):
+class RadarTrabalhoAdmin(RadarOwnershipAdminMixin, admin.ModelAdmin):
+    owner_lookup = "radar__cliente_id"
     list_display = (
         "nome",
         "radar",
@@ -181,12 +252,27 @@ class RadarTrabalhoAdmin(admin.ModelAdmin):
     list_filter = ("status",)
     search_fields = ("nome", "radar__nome")
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "radar" and not request.user.is_superuser:
+            owner_id = self._owner_id(request)
+            kwargs["queryset"] = Radar.objects.filter(cliente_id=owner_id) if owner_id else Radar.objects.none()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 @admin.register(RadarAtividade)
-class RadarAtividadeAdmin(admin.ModelAdmin):
-    list_display = ("nome", "trabalho", "status", "horas_trabalho", "criado_em")
+class RadarAtividadeAdmin(RadarOwnershipAdminMixin, admin.ModelAdmin):
+    owner_lookup = "trabalho__radar__cliente_id"
+    list_display = ("nome", "trabalho", "status", "inicio_execucao_em", "finalizada_em", "horas_trabalho", "criado_em")
     list_filter = ("status",)
     search_fields = ("nome", "trabalho__nome")
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "trabalho" and not request.user.is_superuser:
+            owner_id = self._owner_id(request)
+            kwargs["queryset"] = (
+                RadarTrabalho.objects.filter(radar__cliente_id=owner_id) if owner_id else RadarTrabalho.objects.none()
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(Inventario)
