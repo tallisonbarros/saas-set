@@ -27,6 +27,8 @@
   var timelinePendingIso = null;
   var timelineLoadingCards = false;
   var isTimelineDragging = false;
+  var autoplayTimer = null;
+  var autoplayRunning = false;
 
   var els = {
     dayForm: document.getElementById("day-nav-form"),
@@ -34,7 +36,11 @@
     dayPrevButton: document.getElementById("day-prev-button"),
     dayNextButton: document.getElementById("day-next-button"),
     timelineRange: document.getElementById("timeline-range"),
+    timelineFutureMask: document.getElementById("timeline-future-mask"),
+    timelineNowMarker: document.getElementById("timeline-now-marker"),
     timelineTooltip: document.getElementById("timeline-thumb-tooltip"),
+    timelinePlayToggle: document.getElementById("timeline-play-toggle"),
+    timelinePlayLabel: document.getElementById("timeline-play-label"),
     timelineMinus15: document.getElementById("timeline-minus-15"),
     timelinePlus15: document.getElementById("timeline-plus-15"),
     timelineNowMini: document.getElementById("timeline-now-mini"),
@@ -102,6 +108,27 @@
     }
     timelineLoadingCards = next;
     renderCards();
+  }
+
+  function stopAutoplay() {
+    autoplayRunning = false;
+    if (autoplayTimer) {
+      clearTimeout(autoplayTimer);
+      autoplayTimer = null;
+    }
+    syncPlayUi();
+  }
+
+  function syncPlayUi() {
+    if (!els.timelinePlayToggle) {
+      return;
+    }
+    els.timelinePlayToggle.classList.toggle("is-running", autoplayRunning);
+    if (els.timelinePlayLabel) {
+      els.timelinePlayLabel.textContent = autoplayRunning ? "Pause" : "Play";
+    }
+    els.timelinePlayToggle.setAttribute("aria-label", autoplayRunning ? "Pausar timeline" : "Reproduzir timeline");
+    els.timelinePlayToggle.setAttribute("title", autoplayRunning ? "Pausar timeline" : "Reproduzir timeline");
   }
 
   function setSyncStatus(mode) {
@@ -250,6 +277,8 @@
       }
     }
 
+    renderTimelineAvailability();
+
     var jumpsDisabled = timeline.length < 2 || !els.timelineRange || els.timelineRange.disabled;
     if (els.timelineMinus15) {
       els.timelineMinus15.disabled = jumpsDisabled;
@@ -273,6 +302,39 @@
     var progress = "var(--timeline-progress-color, rgba(56, 189, 248, 0.68))";
     var base = "var(--timeline-track-2)";
     els.timelineRange.style.background = "linear-gradient(90deg, " + progress + " 0% " + pct.toFixed(2) + "%, " + base + " " + pct.toFixed(2) + "% 100%)";
+  }
+
+  function indexToPct(index, total) {
+    if (total <= 1) {
+      return 0;
+    }
+    var clamped = Math.max(0, Math.min(index, total - 1));
+    return (clamped / (total - 1)) * 100;
+  }
+
+  function renderTimelineAvailability() {
+    var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+    var total = timeline.length;
+    if (!total) {
+      return;
+    }
+    var availableIndex = Number(state.available_index);
+    if (!Number.isFinite(availableIndex) || availableIndex < 0) {
+      availableIndex = total - 1;
+    }
+    var nowPct = indexToPct(availableIndex, total);
+
+    if (els.timelineFutureMask) {
+      var futureWidth = Math.max(0, 100 - nowPct);
+      els.timelineFutureMask.style.width = futureWidth.toFixed(3) + "%";
+      els.timelineFutureMask.style.left = nowPct.toFixed(3) + "%";
+      els.timelineFutureMask.style.display = futureWidth > 0.1 ? "" : "none";
+    }
+
+    if (els.timelineNowMarker) {
+      els.timelineNowMarker.style.left = nowPct.toFixed(3) + "%";
+      els.timelineNowMarker.style.display = state.selected_day === state.now_day ? "" : "none";
+    }
   }
 
   function setTimelineTooltipVisible(visible) {
@@ -361,6 +423,7 @@
   }
 
   function goToLiveNow() {
+    stopAutoplay();
     state.follow_now = true;
     refreshState(
       {
@@ -371,6 +434,63 @@
       },
       { timeline_loading: true, abortPrevious: true }
     );
+  }
+
+  function autoplayStep() {
+    if (!autoplayRunning || !els.timelineRange) {
+      stopAutoplay();
+      return;
+    }
+    var timeline = Array.isArray(state.timeline) ? state.timeline : [];
+    if (!timeline.length) {
+      stopAutoplay();
+      return;
+    }
+    var currentIndex = Number(els.timelineRange.value || state.selected_index || 0);
+    if (!Number.isFinite(currentIndex)) {
+      currentIndex = 0;
+    }
+    currentIndex = Math.max(0, Math.min(currentIndex, timeline.length - 1));
+
+    var maxIndex = Number(state.available_index);
+    if (!Number.isFinite(maxIndex) || maxIndex < 0) {
+      maxIndex = timeline.length - 1;
+    }
+    maxIndex = Math.max(0, Math.min(maxIndex, timeline.length - 1));
+
+    if (currentIndex >= maxIndex) {
+      stopAutoplay();
+      return;
+    }
+
+    var nextIndex = Math.min(maxIndex, currentIndex + 1);
+    var point = timeline[nextIndex];
+    if (!point || !point.iso) {
+      stopAutoplay();
+      return;
+    }
+
+    els.timelineRange.value = String(nextIndex);
+    updateRangeProgress();
+    if (els.timelineReadLabel) {
+      els.timelineReadLabel.textContent = point.label;
+    }
+    if (els.selectedAtNote) {
+      els.selectedAtNote.textContent = point.label;
+    }
+    requestTimelineIso(point.iso);
+    autoplayTimer = setTimeout(autoplayStep, 450);
+  }
+
+  function toggleAutoplay() {
+    if (autoplayRunning) {
+      stopAutoplay();
+      return;
+    }
+    enterHistoricalMode();
+    autoplayRunning = true;
+    syncPlayUi();
+    autoplayStep();
   }
 
   function buildCardNode() {
@@ -811,6 +931,7 @@
         return null;
       }
       enterHistoricalMode();
+      stopAutoplay();
       timelinePendingIso = point.iso;
       if (els.timelineReadLabel) {
         els.timelineReadLabel.textContent = point.label;
@@ -855,6 +976,7 @@
     els.timelineRange.addEventListener("pointerdown", function () {
       isTimelineDragging = true;
       enterHistoricalMode();
+      stopAutoplay();
       setTimelineCardsLoading(true);
       var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
@@ -862,12 +984,14 @@
     });
     els.timelineRange.addEventListener("mousedown", function () {
       isTimelineDragging = true;
+      stopAutoplay();
       var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
       setTimelineTooltipVisible(true);
     });
     els.timelineRange.addEventListener("touchstart", function () {
       isTimelineDragging = true;
+      stopAutoplay();
       var point = pointFromCurrentRange();
       updateTimelineTooltip(point ? point.label : "");
       setTimelineTooltipVisible(true);
@@ -911,6 +1035,7 @@
 
     if (els.timelineMinus15) {
       els.timelineMinus15.addEventListener("click", function () {
+        stopAutoplay();
         var timeline = Array.isArray(state.timeline) ? state.timeline : [];
         if (!timeline.length) {
           return;
@@ -942,6 +1067,7 @@
 
     if (els.timelinePlus15) {
       els.timelinePlus15.addEventListener("click", function () {
+        stopAutoplay();
         var timeline = Array.isArray(state.timeline) ? state.timeline : [];
         if (!timeline.length) {
           return;
@@ -983,6 +1109,12 @@
       event.preventDefault();
       event.stopPropagation();
       goToLiveNow();
+    });
+  }
+
+  if (els.timelinePlayToggle) {
+    els.timelinePlayToggle.addEventListener("click", function () {
+      toggleAutoplay();
     });
   }
 
@@ -1134,6 +1266,7 @@
   }
 
   renderDashboard();
+  syncPlayUi();
   syncBrowserUrl();
   scheduleNextPoll(currentDelay());
 })();

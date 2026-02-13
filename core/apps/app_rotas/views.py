@@ -676,7 +676,8 @@ def _build_dashboard_payload(app, query_params):
         selected_day = today if today in available_days else (available_days[0] if available_days else today)
 
     day_start, day_end_exclusive = _day_bounds(selected_day)
-    timeline_end_point = _timeline_end_for_day(selected_day, day_start, day_end_exclusive)
+    day_end_point = day_end_exclusive - timedelta(seconds=1)
+    available_until = _timeline_end_for_day(selected_day, day_start, day_end_exclusive)
 
     events_today = []
     seed_states = {}
@@ -691,14 +692,14 @@ def _build_dashboard_payload(app, query_params):
         seed_states = _seed_states_from_events(baseline_events)
         known_prefixes = set(seed_states.keys()) | day_prefixes
 
-    timeline = _build_timeline_with_events(day_start, timeline_end_point, events_today)
+    timeline = _build_timeline_with_events(day_start, day_end_point, events_today)
     selected_at = _parse_query_datetime(query_params.get("at"))
     if not selected_at:
         now = timezone.localtime(timezone.now())
-        selected_at = now if selected_day == timezone.localdate() else timeline_end_point
+        selected_at = now if selected_day == timezone.localdate() else day_end_point
     selected_at = _clamp_datetime(selected_at, day_start, day_end_exclusive)
-    if selected_at and selected_at > timeline_end_point:
-        selected_at = timeline_end_point
+    if selected_at and selected_at > day_end_point:
+        selected_at = day_end_point
 
     selected_point, selected_index = _selected_timeline_point(timeline, selected_at)
     if selected_point:
@@ -706,9 +707,13 @@ def _build_dashboard_payload(app, query_params):
 
     requested_follow_now = _parse_follow_now(query_params.get("follow_now"))
     if requested_follow_now and selected_day == timezone.localdate():
-        selected_point, selected_index = _selected_timeline_point(timeline, timeline_end_point)
+        selected_point, selected_index = _selected_timeline_point(timeline, available_until)
         if selected_point:
             selected_at = selected_point["timestamp"]
+
+    available_point, available_index = _selected_timeline_point(timeline, available_until)
+    if available_point:
+        available_until = available_point["timestamp"]
 
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
     origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
@@ -724,6 +729,13 @@ def _build_dashboard_payload(app, query_params):
         known_prefixes=known_prefixes,
         route_configs=route_configs,
     )
+    is_future_selected = bool(selected_day == timezone.localdate() and selected_at and selected_at > available_until)
+    if is_future_selected:
+        for card in cards:
+            card["play_blink"] = False
+            card["play_on"] = False
+            card["pause_on"] = False
+            card["context_status"] = "Sem leitura futura"
 
     initial_ligada_prefixes = {
         prefixo for prefixo, state in seed_states.items() if _is_active(state["attrs"].get("LIGADA"))
@@ -731,10 +743,10 @@ def _build_dashboard_payload(app, query_params):
     global_ligada_intervals = _build_global_ligada_intervals(
         events_today,
         day_start,
-        timeline_end_point,
+        available_until,
         initial_ligada_prefixes=initial_ligada_prefixes,
     )
-    global_ligada_gradient = _ligada_gradient(global_ligada_intervals, day_start, timeline_end_point)
+    global_ligada_gradient = _ligada_gradient(global_ligada_intervals, day_start, day_end_point)
 
     recent_events = [event for event in reversed(events_today) if event["timestamp"] <= selected_at][:200]
     events_page_num = _parse_positive_page(query_params.get("events_page"), default=1)
@@ -781,6 +793,8 @@ def _build_dashboard_payload(app, query_params):
         "timeline": timeline_payload,
         "selected_index": selected_index,
         "timeline_total": len(timeline_payload),
+        "available_until_iso": available_until.isoformat() if available_until else "",
+        "available_index": available_index,
         "lifebit_connected": lifebit_connected,
         "lifebit_label": "Conectado" if lifebit_connected else "Desconectado",
         "lifebit_last_seen": lifebit_last_seen_label,
@@ -796,6 +810,7 @@ def _build_dashboard_payload(app, query_params):
         "follow_now": bool(showing_now),
         "now_day": now_day.strftime("%Y-%m-%d"),
         "now_at_iso": now_target.isoformat() if now_target else "",
+        "is_future_selected": is_future_selected,
         "config_missing": config_missing,
     }
 

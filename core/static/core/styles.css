@@ -742,6 +742,38 @@ body {
   padding: 12px 14px;
 }
 
+.proposal-card-finalizada-mini {
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.proposal-card-finalizada-mini .proposal-title {
+  font-size: 1.02rem;
+}
+
+.proposal-card-finalizada-mini .proposal-card-meta {
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.proposal-card-finalizada-mini .meta-label {
+  font-size: 10px;
+}
+
+.proposal-card-finalizada-mini .meta-value {
+  font-size: 12px;
+}
+
+.proposal-card-finalizada-mini .proposal-card-footer {
+  margin-top: 2px;
+  padding-top: 6px;
+}
+
+.proposal-card-finalizada-mini .proposal-code {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+
 .proposal-card-group {
   padding: 10px 12px;
 }

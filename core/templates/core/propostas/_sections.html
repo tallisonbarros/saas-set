@@ -146,50 +146,6 @@
     </div>
   </div>
 
-  <div class="proposal-section proposal-section-compact">
-    <div class="proposal-section-head">
-      <div>
-        <div class="proposal-section-title">Levantamento</div>
-        <div class="proposal-section-subtitle">
-          {% if tipo_ativo == "enviadas" %}
-            Propostas enviadas em levantamento.
-          {% else %}
-            Propostas recebidas em levantamento.
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    <div class="proposal-grid proposal-grid-compact">
-      {% if propostas_levantamento %}
-        {% for proposta in propostas_levantamento %}
-          <article class="proposal-card proposal-card-compact proposal-card-standby{% if tipo_ativo == 'enviadas' %} proposal-card-sent{% endif %}">
-            <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
-            <div class="proposal-card-head">
-              <div class="proposal-title-line">
-                <span class="proposal-title">{{ proposta.nome }}</span>
-              </div>
-              <div class="proposal-card-badges">
-                <span class="badge badge-levantamento">Levantamento</span>
-                <span class="proposal-tag">{% if tipo_ativo == "enviadas" %}Enviada{% else %}Recebida{% endif %}</span>
-              </div>
-            </div>
-          </article>
-        {% endfor %}
-      {% else %}
-        <div class="proposal-card proposal-card-empty">
-          <div class="proposal-title">Sem levantamento</div>
-          <div class="proposal-meta">
-            {% if tipo_ativo == "enviadas" %}
-              Nenhuma proposta enviada em levantamento.
-            {% else %}
-              Nenhuma proposta recebida em levantamento.
-            {% endif %}
-          </div>
-        </div>
-      {% endif %}
-    </div>
-  </div>
-
   {% if tipo_ativo == "recebidas" %}
     <div class="proposal-section proposal-section-compact">
       <div class="proposal-section-head">
@@ -232,27 +188,19 @@
       </div>
       <a class="btn btn-ghost btn-compact" href="{% url 'propostas_finalizadas_arquivo' %}?mode={{ tipo_ativo }}">Ver todas finalizadas</a>
     </div>
-      <div class="proposal-grid">
+      <div class="proposal-grid proposal-grid-compact">
       {% if propostas_finalizadas %}
         {% for proposta in propostas_finalizadas %}
-          <article class="proposal-card proposal-card-compact{% if tipo_ativo == 'enviadas' %} proposal-card-sent{% endif %}">
+          <article class="proposal-card proposal-card-compact proposal-card-finalizada-mini{% if tipo_ativo == 'enviadas' %} proposal-card-sent{% endif %}">
             <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
             <div class="proposal-card-head">
               <div class="proposal-title-line">
                 <span class="proposal-title">{{ proposta.nome }}</span>
               </div>
-              <div class="proposal-card-badges">
-                <span class="badge badge-finalizada">Finalizada</span>
-                <span class="proposal-tag">{% if tipo_ativo == "enviadas" %}Enviada{% else %}Recebida{% endif %}</span>
-              </div>
             </div>
             <div class="proposal-card-meta">
               <div class="proposal-meta-item">
-                {% if tipo_ativo != "enviadas" %}<span class="meta-label">Valor</span>{% endif %}
-                <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
-              </div>
-              <div class="proposal-meta-item">
-                {% if tipo_ativo != "enviadas" %}<span class="meta-label">De</span>{% endif %}
+                <span class="meta-label">De</span>
                 <span class="meta-value">
                   {% if tipo_ativo == "enviadas" %}
                     {{ proposta.cliente.nome|default:"Sistema" }}
@@ -262,16 +210,12 @@
                 </span>
               </div>
               <div class="proposal-meta-item">
-                {% if tipo_ativo != "enviadas" %}<span class="meta-label">Para</span>{% endif %}
-                <span class="meta-value">Voce</span>
-              </div>
-              <div class="proposal-meta-item">
-                <span class="meta-label">Finalizada em</span>
-                <span class="meta-value">{{ proposta.finalizada_em|date:"d/m/Y" }}</span>
+                <span class="meta-label">Criada em</span>
+                <span class="meta-value proposal-meta-date">{{ proposta.criado_em|date:"d/m/Y" }}</span>
               </div>
             </div>
             <div class="proposal-card-footer">
-              <span class="proposal-code">{{ proposta.codigo }}</span>
+              <span class="proposal-code">Finalizada em {{ proposta.finalizada_em|date:"d/m/Y" }}</span>
             </div>
           </article>
         {% endfor %}
@@ -283,6 +227,50 @@
               Nenhuma proposta enviada foi finalizada nos ultimos 90 dias.
             {% else %}
               Nenhuma proposta recebida foi finalizada nos ultimos 90 dias.
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="proposal-section proposal-section-compact">
+    <div class="proposal-section-head">
+      <div>
+        <div class="proposal-section-title">Levantamento</div>
+        <div class="proposal-section-subtitle">
+          {% if tipo_ativo == "enviadas" %}
+            Propostas enviadas em levantamento.
+          {% else %}
+            Propostas recebidas em levantamento.
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="proposal-grid proposal-grid-compact">
+      {% if propostas_levantamento %}
+        {% for proposta in propostas_levantamento %}
+          <article class="proposal-card proposal-card-compact proposal-card-standby{% if tipo_ativo == 'enviadas' %} proposal-card-sent{% endif %}">
+            <a class="proposal-link" href="{% url 'proposta_detail' proposta.pk %}" aria-label="Abrir detalhes da proposta"></a>
+            <div class="proposal-card-head">
+              <div class="proposal-title-line">
+                <span class="proposal-title">{{ proposta.nome }}</span>
+              </div>
+              <div class="proposal-card-badges">
+                <span class="badge badge-levantamento">Levantamento</span>
+                <span class="proposal-tag">{% if tipo_ativo == "enviadas" %}Enviada{% else %}Recebida{% endif %}</span>
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      {% else %}
+        <div class="proposal-card proposal-card-empty">
+          <div class="proposal-title">Sem levantamento</div>
+          <div class="proposal-meta">
+            {% if tipo_ativo == "enviadas" %}
+              Nenhuma proposta enviada em levantamento.
+            {% else %}
+              Nenhuma proposta recebida em levantamento.
             {% endif %}
           </div>
         </div>
