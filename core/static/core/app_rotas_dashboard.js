@@ -30,7 +30,6 @@
   var autoplayTimer = null;
   var autoplayRunning = false;
   var lastTimelineRequestedIso = null;
-  var pendingDayNavValue = null;
 
   var els = {
     dayForm: document.getElementById("day-nav-form"),
@@ -982,29 +981,47 @@
   }
 
   if (els.dayForm) {
-    els.dayForm.addEventListener("click", function (event) {
-      var navButton = event.target.closest("button[name='nav_dia']");
-      pendingDayNavValue = navButton && navButton.value ? navButton.value : null;
-    });
     els.dayForm.addEventListener("submit", function (event) {
       event.preventDefault();
-      var submitter = event.submitter;
-      var nextDay = null;
-      if (submitter && submitter.name === "nav_dia" && submitter.value) {
-        nextDay = submitter.value;
-      } else if (pendingDayNavValue) {
-        nextDay = pendingDayNavValue;
-      } else if (els.daySelect && els.daySelect.value) {
-        nextDay = els.daySelect.value;
+      if (els.daySelect && els.daySelect.value) {
+        var nextDayFromSubmit = resolveClosestDay(els.daySelect.value);
+        if (nextDayFromSubmit && els.daySelect.value !== nextDayFromSubmit) {
+          els.daySelect.value = nextDayFromSubmit;
+        }
+        handleDayChange(nextDayFromSubmit);
       }
-      pendingDayNavValue = null;
-      handleDayChange(nextDay);
+    });
+  }
+
+  if (els.dayPrevButton) {
+    els.dayPrevButton.addEventListener("click", function (event) {
+      if (els.dayPrevButton.disabled || !els.dayPrevButton.value) {
+        return;
+      }
+      event.preventDefault();
+      handleDayChange(els.dayPrevButton.value);
+    });
+  }
+
+  if (els.dayNextButton) {
+    els.dayNextButton.addEventListener("click", function (event) {
+      if (els.dayNextButton.disabled || !els.dayNextButton.value) {
+        return;
+      }
+      event.preventDefault();
+      handleDayChange(els.dayNextButton.value);
     });
   }
 
   if (els.daySelect) {
     var dayPickerField = els.daySelect.closest(".day-picker-field");
     if (dayPickerField) {
+      dayPickerField.addEventListener("pointerdown", function (event) {
+        if (event.target === els.daySelect) {
+          return;
+        }
+        openDayPicker();
+      });
       dayPickerField.addEventListener("click", function (event) {
         if (event.target === els.daySelect) {
           return;
