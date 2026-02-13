@@ -23,7 +23,7 @@
         <div class="hud-pill">Atividades</div>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar ao radar</a>
-          {% if can_manage %}
+          {% if can_create_proposta_from_trabalho %}
             <a
               class="hud-menu-pill"
               href="{% url 'proposta_nova_de_trabalho' trabalho.id %}"
@@ -33,7 +33,7 @@
               Criar proposta
             </a>
           {% endif %}
-          {% if can_manage %}
+          {% if can_duplicate_trabalho %}
             <form method="post" style="display: inline;">
               {% csrf_token %}
               <input type="hidden" name="action" value="duplicate_trabalho">
@@ -320,8 +320,8 @@
       <span class="muted">Ajuste dados do trabalho.</span>
     </summary>
     <div class="io-discrete-body">
-      {% if can_manage %}
-        <div class="muted">Permissao: criador ou usuarios com ID_RADAR.</div>
+      {% if can_edit_trabalho_by_creator %}
+        <div class="muted">Permissao: apenas quem criou o trabalho.</div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_trabalho">
@@ -411,7 +411,7 @@
           </div>
         </form>
       {% else %}
-        <div class="muted">Apenas usuarios com ID_RADAR podem editar este trabalho.</div>
+        <div class="muted">Somente quem criou o trabalho pode editar.</div>
       {% endif %}
     </div>
   </details>

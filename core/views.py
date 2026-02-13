@@ -3111,6 +3111,7 @@ def radar_detail(request, pk):
                     contrato=contrato,
                     data_registro=data_registro or timezone.localdate(),
                     classificacao=classificacao,
+                    criado_por=request.user,
                 )
                 return redirect("radar_detail", pk=radar.pk)
         if action == "update_radar":
@@ -3290,6 +3291,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             params = {"cadastro": "contrato", "msg": msg, "level": level}
             return redirect(f"{reverse('radar_trabalho_detail', args=[radar.pk, trabalho.pk])}?{urlencode(params)}")
         if action == "update_trabalho":
+            if trabalho.criado_por_id != request.user.id:
+                return HttpResponseForbidden("Somente quem criou o trabalho pode editar.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             setor = request.POST.get("setor", "").strip()
@@ -3335,9 +3338,13 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_trabalho":
+            if trabalho.criado_por_id != request.user.id:
+                return HttpResponseForbidden("Somente quem criou o trabalho pode excluir.")
             trabalho.delete()
             return redirect("radar_detail", pk=radar.pk)
         if action == "duplicate_trabalho":
+            if trabalho.criado_por_id != request.user.id:
+                return HttpResponseForbidden("Somente quem criou o trabalho pode duplicar.")
             nome_copia = f"{trabalho.nome} - COPIA"
             novo_trabalho = RadarTrabalho.objects.create(
                 radar=radar,
@@ -3349,6 +3356,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 setor=trabalho.setor,
                 solicitante=trabalho.solicitante,
                 responsavel=trabalho.responsavel,
+                criado_por=request.user,
             )
             atividades = list(trabalho.atividades.all())
             if atividades:
@@ -3472,6 +3480,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
     if edit_atividade_id:
         edit_atividade = RadarAtividade.objects.filter(pk=edit_atividade_id, trabalho=trabalho).first()
     total_atividades = atividades_base.count()
+    can_create_proposta_from_trabalho = bool(trabalho.criado_por_id and trabalho.criado_por_id == request.user.id)
+    can_duplicate_trabalho = bool(trabalho.criado_por_id and trabalho.criado_por_id == request.user.id)
+    can_edit_trabalho_by_creator = bool(trabalho.criado_por_id and trabalho.criado_por_id == request.user.id)
     return render(
         request,
         "core/radar_trabalho_detail.html",
@@ -3494,6 +3505,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
             "edit_atividade": edit_atividade,
+            "can_create_proposta_from_trabalho": can_create_proposta_from_trabalho,
+            "can_duplicate_trabalho": can_duplicate_trabalho,
+            "can_edit_trabalho_by_creator": can_edit_trabalho_by_creator,
             "finalizados_toggle_query": toggle_params.urlencode() if toggle_params else "finalizados=all",
             "finalizados_reset_query": base_params.urlencode() if base_params else "",
         },
@@ -4182,6 +4196,8 @@ def proposta_nova_vendedor(request):
             origem_trabalho = _get_radar_trabalho_acessivel(request.user, origem_trabalho_id)
             if not origem_trabalho:
                 message = "Origem de trabalho invalida para o seu acesso."
+            elif origem_trabalho.criado_por_id != request.user.id:
+                message = "Somente quem criou o trabalho pode gerar proposta a partir dele."
             else:
                 source_trabalho = origem_trabalho
 
@@ -4241,6 +4257,8 @@ def proposta_nova_de_trabalho(request, trabalho_pk):
     trabalho = _get_radar_trabalho_acessivel(request.user, trabalho_pk)
     if not trabalho:
         return HttpResponseForbidden("Sem permissao.")
+    if trabalho.criado_por_id != request.user.id:
+        return HttpResponseForbidden("Somente quem criou o trabalho pode gerar proposta a partir dele.")
     form_data = {
         "email": "",
         "nome": trabalho.nome,

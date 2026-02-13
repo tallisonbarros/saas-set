@@ -464,6 +464,13 @@ class RadarTrabalho(models.Model):
     responsavel = models.CharField(max_length=120, blank=True)
     data_registro = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    criado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="radar_trabalhos_criados",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
