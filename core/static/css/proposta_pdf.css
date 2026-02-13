@@ -90,6 +90,11 @@ body {
   width: 100%;
 }
 
+.page-break-before {
+  page-break-before: always;
+  break-before: page;
+}
+
 .avoid-break {
   page-break-inside: avoid;
   break-inside: avoid;
