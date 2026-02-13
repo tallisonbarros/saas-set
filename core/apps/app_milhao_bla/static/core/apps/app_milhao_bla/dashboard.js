@@ -21,6 +21,26 @@
   var selected = [];
   var shimmerCleanupTimers = new WeakMap();
   var shimmerLastRunAt = new WeakMap();
+  var shimmerRafHandles = new WeakMap();
+  var rtDebug = false;
+  try {
+    var debugFromUrl = new URLSearchParams(window.location.search).get("rtdebug");
+    var debugFromStorage = window.localStorage ? window.localStorage.getItem("bla_rt_debug") : "";
+    rtDebug = debugFromUrl === "1" || debugFromStorage === "1";
+  } catch (error) {
+    rtDebug = false;
+  }
+
+  function debugLog(message, data) {
+    if (!rtDebug || !window.console) {
+      return;
+    }
+    if (typeof data === "undefined") {
+      console.log("[BLA-RT]", message);
+      return;
+    }
+    console.log("[BLA-RT]", message, data);
+  }
 
   function hydrateElements() {
     dynamicRoot = document.getElementById("milhao-dashboard-dynamic");
@@ -143,6 +163,7 @@
       return;
     }
     host.classList.remove("rt-shimmer");
+    host.classList.remove("rt-shimmer-active");
     var layer = null;
     Array.prototype.some.call(host.children || [], function (child) {
       if (child && child.classList && child.classList.contains("rt-shimmer-layer")) {
@@ -153,12 +174,20 @@
     });
     if (layer) {
       layer.classList.remove("is-running");
+      layer.style.opacity = "";
+      layer.style.transform = "";
     }
     var timerId = shimmerCleanupTimers.get(host);
     if (timerId) {
       clearTimeout(timerId);
       shimmerCleanupTimers.delete(host);
     }
+    var rafHandle = shimmerRafHandles.get(host);
+    if (rafHandle) {
+      cancelAnimationFrame(rafHandle);
+      shimmerRafHandles.delete(host);
+    }
+    host.style.removeProperty("box-shadow");
   }
 
   function ensureShimmerLayer(host) {
@@ -198,28 +227,78 @@
 
   function runShimmer(host) {
     if (!host) {
+      debugLog("shimmer skipped: no host");
       return;
     }
     var now = Date.now();
     var lastRun = shimmerLastRunAt.get(host) || 0;
-    if (now - lastRun < 140) {
+    if (now - lastRun < 90) {
+      debugLog("shimmer throttled", host);
       return;
     }
     shimmerLastRunAt.set(host, now);
+    host.setAttribute("data-rt-shimmer-last", String(now));
 
     host.classList.add("rt-shimmer-host");
     var layer = ensureShimmerLayer(host);
     clearShimmerState(host);
-    if (layer) {
-      void layer.offsetWidth;
-      layer.classList.add("is-running");
-    }
-    void host.offsetWidth;
     host.classList.add("rt-shimmer");
+    host.classList.add("rt-shimmer-active");
+    if (!layer) {
+      debugLog("shimmer layer missing", host);
+      return;
+    }
+    layer.classList.add("is-running");
+    debugLog("shimmer start", host);
+
+    var duration = 620;
+    var startTs = null;
+    function step(ts) {
+      if (startTs === null) {
+        startTs = ts;
+      }
+      var progress = Math.min(1, (ts - startTs) / duration);
+      var translate = -128 + (256 * progress);
+      var opacity = 0;
+      if (progress < 0.16) {
+        opacity = (progress / 0.16) * 0.6;
+      } else if (progress < 0.56) {
+        opacity = 0.6 + ((progress - 0.16) / 0.4) * 0.4;
+      } else {
+        opacity = ((1 - progress) / 0.44) * 0.98;
+      }
+      if (opacity < 0) {
+        opacity = 0;
+      }
+      if (opacity > 1) {
+        opacity = 1;
+      }
+
+      layer.style.transform = "translate3d(" + translate.toFixed(2) + "%, 0, 0) skewX(-16deg)";
+      layer.style.opacity = opacity.toFixed(3);
+
+      var glow = progress <= 0.5 ? (progress / 0.5) : ((1 - progress) / 0.5);
+      if (glow < 0) {
+        glow = 0;
+      }
+      host.style.boxShadow =
+        "0 0 0 1px rgba(255,156,83," + (0.28 * glow).toFixed(3) + "), 0 10px 28px rgba(255,156,83," + (0.18 * glow).toFixed(3) + ")";
+
+      if (progress >= 1) {
+        debugLog("shimmer end", host);
+        clearShimmerState(host);
+        return;
+      }
+      var nextHandle = requestAnimationFrame(step);
+      shimmerRafHandles.set(host, nextHandle);
+    }
+
+    var firstHandle = requestAnimationFrame(step);
+    shimmerRafHandles.set(host, firstHandle);
 
     var fallbackTimer = setTimeout(function () {
       clearShimmerState(host);
-    }, 800);
+    }, 1000);
     shimmerCleanupTimers.set(host, fallbackTimer);
   }
 
@@ -400,27 +479,6 @@
       return;
     }
     dynamicRoot.setAttribute("data-js-bound", "1");
-
-    dynamicRoot.addEventListener("animationend", function (event) {
-      if (!event) {
-        return;
-      }
-      if (event.animationName !== "rtShimmerSweepLayer" && event.animationName !== "rtCardGlow") {
-        return;
-      }
-      var target = event.target;
-      var host = null;
-      if (target && target.classList) {
-        if (target.classList.contains("rt-shimmer-layer")) {
-          host = target.parentElement;
-        } else if (target.classList.contains("rt-shimmer-host")) {
-          host = target;
-        }
-      }
-      if (host && host.classList && host.classList.contains("rt-shimmer-host")) {
-        clearShimmerState(host);
-      }
-    });
 
     dynamicRoot.addEventListener("click", function (event) {
       var directDateInput = event.target.closest("#milhao-date-input");
