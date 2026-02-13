@@ -18,100 +18,94 @@
   </div>
 
   <main class="proposal-doc">
-    <header class="doc-header avoid-break">
-      <div class="brand-bar">
-        <div class="brand-pattern" aria-hidden="true"></div>
-        <div class="brand-left">
-          {% if logo_uri %}
-            <img class="brand-logo" src="{{ logo_uri }}" alt="Logo SET">
-          {% endif %}
-        </div>
-        <div class="brand-right">
-          <div class="brand-meta-label">Status</div>
-          <div class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</div>
-          <div class="brand-meta-label">Codigo da proposta</div>
-          <div class="brand-code mono">{{ codigo }}</div>
-        </div>
-      </div>
-
-      <div class="context-bar">
-        <h1>Proposta Comercial</h1>
-        <p class="context-subtitle">SET - Industria & Tecnologia</p>
-        <div class="context-divider"></div>
-        <div class="mini-metrics">
-          <div class="mini-metric">
-            <div class="mini-label">Valor</div>
-            <div class="mini-value value-strong">{{ valor_display }}</div>
+    <section class="pdf-page page-cover">
+      <header class="doc-header avoid-break">
+        <div class="brand-bar">
+          <div class="brand-pattern" aria-hidden="true"></div>
+          <div class="brand-left">
+            {% if logo_uri %}
+              <img class="brand-logo" src="{{ logo_uri }}" alt="Logo SET">
+            {% endif %}
           </div>
-          <div class="mini-metric">
-            <div class="mini-label">Prioridade</div>
-            <div class="mini-value">{{ proposta.prioridade }}</div>
-          </div>
-          <div class="mini-metric">
-            <div class="mini-label">Criada em</div>
-            <div class="mini-value">{{ criada_em_display }}</div>
+          <div class="brand-right">
+            <div class="brand-meta-label">Status</div>
+            <div class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</div>
+            <div class="brand-meta-label">Codigo da proposta</div>
+            <div class="brand-code mono">{{ codigo }}</div>
           </div>
         </div>
-      </div>
-    </header>
 
-    <section class="kpi-grid avoid-break">
-      <article class="kpi-card">
-        <div class="kpi-label">Valor</div>
-        <div class="kpi-value value-strong">{{ valor_display }}</div>
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-label">Status</div>
-        <div class="kpi-value">
-          <span class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</span>
-        </div>
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-label">Codigo / Proposta</div>
-        <div class="kpi-value mono">{{ codigo }}</div>
-        {% if proposta.nome %}
-          <div class="kpi-subvalue">{{ proposta.nome }}</div>
-        {% endif %}
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-label">Criada em / Prioridade</div>
-        <div class="kpi-value">{{ criada_em_display }}</div>
-        <div class="kpi-subvalue">Prioridade {{ proposta.prioridade }}</div>
-      </article>
-    </section>
-
-    <section class="content-card section avoid-break">
-      <h2 class="section-title">Identificacao</h2>
-      <div class="table-grid">
-        <table class="meta-table">
-          <tbody>
-            {% for row in identificacao_esquerda %}
-              <tr>
-                <th>{{ row.label }}</th>
-                <td class="{% if row.mono %}mono{% endif %} {% if row.highlight %}value-strong{% endif %}">{{ row.value }}</td>
-              </tr>
+        <div class="context-bar">
+          <h1>PROPOSTA COMERCIAL</h1>
+          <p class="context-subtitle">{{ proposta.nome|default:"-" }}</p>
+          <div class="cover-summary-row">
+            <span><strong>Cliente:</strong> {{ para_nome|default:"-" }}</span>
+            {% for row in origem_rows %}
+              {% if row.label == "Setor" or row.label == "Solicitante" or row.label == "Responsavel" %}
+                <span><strong>{{ row.label }}:</strong> {{ row.value }}</span>
+              {% endif %}
             {% endfor %}
-          </tbody>
-        </table>
-        <table class="meta-table">
-          <tbody>
-            {% for row in identificacao_direita %}
-              <tr>
-                <th>{{ row.label }}</th>
-                <td class="{% if row.mono %}mono{% endif %} {% if row.highlight %}value-strong{% endif %}">{{ row.value }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
+          </div>
+        </div>
+      </header>
 
-    {% if has_trabalho_vinculado %}
+      <section class="cover-value-card avoid-break">
+        <div class="cover-value-label">Valor da Proposta</div>
+        <div class="cover-value">{{ valor_display }}</div>
+        <div class="cover-meta-line">
+          <span><strong>Status:</strong> {{ status_label }}</span>
+          <span><strong>Codigo:</strong> <span class="mono">{{ codigo }}</span></span>
+          <span><strong>Data:</strong> {{ criada_em_display }}</span>
+          <span><strong>Prioridade:</strong> {{ proposta.prioridade }}</span>
+        </div>
+      </section>
+
       <section class="content-card section avoid-break">
-        <h2 class="section-title">Trabalho</h2>
-        {% if trabalho_indisponivel %}
-          <p>trabalho indisponivel</p>
-        {% else %}
+        <h2 class="section-title">Resumo Descritivo</h2>
+        <div class="description-flow">
+          {% for block in descricao_blocks %}
+            {% if block.type == "p" %}
+              <p>{{ block.text }}</p>
+            {% elif block.type == "ul" %}
+              <ul class="description-list">
+                {% for item in block.items %}
+                  <li>{{ item }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+    </section>
+
+    <section class="pdf-page page-scope page-break-before">
+      <section class="section-head">
+        <h2 class="page-title">ESCOPO DO SERVICO</h2>
+        <p class="page-subtitle">Resumo das atividades previstas.</p>
+      </section>
+
+      <section class="content-card section">
+        <div class="scope-list">
+          {% for atividade in atividades %}
+            <article class="scope-item avoid-break">
+              <h3>{{ atividade.nome }}</h3>
+              {% if atividade.descricao %}
+                <p>{{ atividade.descricao }}</p>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    </section>
+
+    <section class="pdf-page page-tech page-break-before">
+      <section class="section-head">
+        <h2 class="page-title">INFORMACOES DO PROJETO</h2>
+      </section>
+
+      {% if origem_rows %}
+        <section class="content-card section avoid-break">
+          <h2 class="section-title">Origem Tecnica</h2>
           <table class="meta-table">
             <tbody>
               {% for row in origem_rows %}
@@ -122,92 +116,97 @@
               {% endfor %}
             </tbody>
           </table>
-        {% endif %}
-      </section>
-    {% endif %}
+        </section>
+      {% endif %}
 
-    <section class="content-card section">
-      <h2 class="section-title">Descricao</h2>
-      <div class="description-flow">
-        {% for block in descricao_blocks %}
-          {% if block.type == "p" %}
-            <p>{{ block.text }}</p>
-          {% elif block.type == "ul" %}
-            <ul class="description-list">
-              {% for item in block.items %}
-                <li>{{ item }}</li>
+      <section class="content-card section avoid-break">
+        <h2 class="section-title">Identificacao</h2>
+        <div class="table-grid">
+          <table class="meta-table">
+            <tbody>
+              {% for row in identificacao_esquerda %}
+                <tr>
+                  <th>{{ row.label }}</th>
+                  <td class="{% if row.mono %}mono{% endif %} {% if row.highlight %}value-strong{% endif %}">{{ row.value }}</td>
+                </tr>
               {% endfor %}
-            </ul>
-          {% endif %}
-        {% endfor %}
-      </div>
-    </section>
-
-    {% if has_trabalho_vinculado and not trabalho_indisponivel %}
-      <section class="content-card section">
-        <h2 class="section-title">Resumo das atividades</h2>
-        <ol class="activities-list">
-          {% for atividade in atividades %}
-            <li class="activity-item avoid-break">
-              <div class="activity-name">{{ atividade.nome }}</div>
-              {% if atividade.descricao %}
-                <div class="activity-desc">{{ atividade.descricao }}</div>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ol>
-      </section>
-    {% endif %}
-
-    {% if has_observacao %}
-      <section class="content-card section observation-box avoid-break">
-        <h2 class="section-title">Observacao</h2>
-        <div class="description-flow">
-          <p>{{ observacao }}</p>
+            </tbody>
+          </table>
+          <table class="meta-table">
+            <tbody>
+              {% for row in identificacao_direita %}
+                <tr>
+                  <th>{{ row.label }}</th>
+                  <td class="{% if row.mono %}mono{% endif %} {% if row.highlight %}value-strong{% endif %}">{{ row.value }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </section>
-    {% endif %}
 
-    <section class="content-card section">
-      <h2 class="section-title">Condicoes Comerciais e Contratuais</h2>
-      <div class="commercial-flow">
+      {% if has_observacao %}
+        <section class="content-card section observation-box avoid-break">
+          <h2 class="section-title">Observacao</h2>
+          <div class="description-flow">
+            <p>{{ observacao }}</p>
+          </div>
+        </section>
+      {% endif %}
+
+      {% if anexos %}
+        <section class="content-card section avoid-break">
+          <h2 class="section-title">Anexos</h2>
+          <table class="meta-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Arquivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for anexo in anexos %}
+                <tr>
+                  <td>{{ anexo.tipo }}</td>
+                  <td class="mono">{{ anexo.nome }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endif %}
+    </section>
+
+    <section class="pdf-page page-commercial page-break-before">
+      <section class="section-head">
+        <h2 class="page-title">CONDICOES COMERCIAIS</h2>
+        <p class="page-subtitle">Resumo executivo de regras comerciais.</p>
+      </section>
+
+      <section class="commercial-grid">
         {% for bloco in condicoes_comerciais %}
-          <div class="commercial-block avoid-break">
-            <h3>{{ bloco.titulo }}</h3>
+          <article class="content-card section commercial-card avoid-break">
+            <h3 class="commercial-title">{{ bloco.titulo }}</h3>
             {% if bloco.intro %}
               <p class="commercial-intro">{{ bloco.intro }}</p>
             {% endif %}
-            <ul>
-              {% for item in bloco.itens %}
-                <li>{{ item }}</li>
-              {% endfor %}
-            </ul>
-          </div>
+            {% if forloop.counter <= 3 %}
+              <ul class="commercial-bullets">
+                {% for item in bloco.itens %}
+                  <li>{{ item }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="commercial-paragraph">
+                {% for item in bloco.itens %}
+                  {% if not forloop.first %} {% endif %}{{ item }}
+                {% endfor %}
+              </p>
+            {% endif %}
+          </article>
         {% endfor %}
-      </div>
-    </section>
-
-    {% if anexos %}
-      <section class="content-card section avoid-break">
-        <h2 class="section-title">Anexos</h2>
-        <table class="meta-table">
-          <thead>
-            <tr>
-              <th>Tipo</th>
-              <th>Arquivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for anexo in anexos %}
-              <tr>
-                <td>{{ anexo.tipo }}</td>
-                <td class="mono">{{ anexo.nome }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
       </section>
-    {% endif %}
+    </section>
   </main>
 </body>
 </html>
