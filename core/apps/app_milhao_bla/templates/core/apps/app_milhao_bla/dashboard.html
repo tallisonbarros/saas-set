@@ -346,7 +346,26 @@
     }
     .milhao-date-arrow.is-disabled { opacity: 0.4; pointer-events: none; }
     #milhao-dashboard-dynamic.is-loading { opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease; }
-    .rt-pulse { animation: rtPulse 0.45s ease; }
+    .rt-pop-value {
+      animation: rtModernPop 280ms cubic-bezier(.2,.85,.28,1);
+      transform-origin: center;
+      will-change: transform, filter;
+    }
+    .rt-shimmer-host {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .rt-shimmer-host.rt-shimmer::after {
+      content: "";
+      position: absolute;
+      inset: -18% -45%;
+      background: linear-gradient(112deg, rgba(255,255,255,0) 38%, rgba(255, 190, 126, 0.26) 50%, rgba(255,255,255,0) 62%);
+      transform: translateX(-56%) skewX(-14deg);
+      animation: rtShimmerSweep 320ms ease-out;
+      pointer-events: none;
+      z-index: 1;
+    }
     @media (max-width: 700px) {
       .milhao-section { margin: 0 auto 10px; }
       .card-stack > .milhao-section:last-child { margin-bottom: 0; }
@@ -360,9 +379,15 @@
       }
       .milhao-date-input { min-height: 42px; }
     }
-    @keyframes rtPulse {
-      0% { opacity: 0.72; transform: translateY(1px); }
-      100% { opacity: 1; transform: translateY(0); }
+    @keyframes rtModernPop {
+      0% { transform: scale(1); filter: brightness(1); }
+      38% { transform: scale(1.032); filter: brightness(1.18) drop-shadow(0 0 8px rgba(255, 140, 46, 0.28)); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    @keyframes rtShimmerSweep {
+      0% { transform: translateX(-56%) skewX(-14deg); opacity: .08; }
+      38% { opacity: .95; }
+      100% { transform: translateX(58%) skewX(-14deg); opacity: 0; }
     }
   </style>
 {% endblock %}

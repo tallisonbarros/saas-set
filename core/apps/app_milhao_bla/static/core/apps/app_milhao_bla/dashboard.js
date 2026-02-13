@@ -140,9 +140,17 @@
     if (!el) {
       return;
     }
-    el.classList.remove("rt-pulse");
+    el.classList.remove("rt-pop-value");
     void el.offsetWidth;
-    el.classList.add("rt-pulse");
+    el.classList.add("rt-pop-value");
+
+    var shimmerHost = el.closest(".panel-card, .metrics-card, .composition-card, .metrics-card-primary");
+    if (shimmerHost) {
+      shimmerHost.classList.add("rt-shimmer-host");
+      shimmerHost.classList.remove("rt-shimmer");
+      void shimmerHost.offsetWidth;
+      shimmerHost.classList.add("rt-shimmer");
+    }
   }
 
   function setTextIfChanged(el, nextText) {

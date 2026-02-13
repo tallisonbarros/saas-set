@@ -43,6 +43,12 @@ PAYLOAD_WINDOW_MARGIN_DAYS = 1
 AVAILABLE_DAYS_SCAN_LIMIT = 40000
 AVAILABLE_DAYS_CACHE_TTL_SECONDS = 45
 
+ROUTE_ATTR_KEYS = ("LIGAR", "DESLIGAR", "LIGADA", "ORIGEM", "DESTINO")
+
+
+def _empty_route_attrs():
+    return {key: None for key in ROUTE_ATTR_KEYS}
+
 
 def _get_rotas_app():
     return get_object_or_404(App, slug="approtas", ativo=True)
@@ -395,7 +401,7 @@ def _seed_states_from_events(events_before):
             prefixo,
             {
                 "prefixo": prefixo,
-                "attrs": {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None},
+                "attrs": _empty_route_attrs(),
                 "last_update": None,
             },
         )
@@ -413,7 +419,7 @@ def _clone_state(state):
 
 
 def _attrs_at_selected(events, selected_at, baseline_attrs=None):
-    attrs = {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None}
+    attrs = _empty_route_attrs()
     if baseline_attrs:
         for key in attrs:
             attrs[key] = baseline_attrs.get(key)
@@ -422,6 +428,31 @@ def _attrs_at_selected(events, selected_at, baseline_attrs=None):
             break
         attrs[event["atributo"]] = event["valor"]
     return attrs
+
+
+def _route_status(attrs, is_future=False):
+    if is_future:
+        return {
+            "play_blink": False,
+            "play_on": False,
+            "pause_on": False,
+            "context_label": "Sem leitura futura",
+            "visual_on": False,
+        }
+    ligar_on = _is_active(attrs.get("LIGAR"))
+    desligar_on = _is_active(attrs.get("DESLIGAR"))
+    ligada_on = _is_active(attrs.get("LIGADA"))
+    play_blink = ligar_on and not ligada_on and not desligar_on
+    play_on = ligar_on and ligada_on and not desligar_on
+    pause_on = desligar_on
+    return {
+        "play_blink": play_blink,
+        "play_on": play_on,
+        "pause_on": pause_on,
+        "context_label": _context_status_label(attrs.get("LIGAR"), attrs.get("DESLIGAR"), attrs.get("LIGADA")),
+        # Timeline green means same semantic state as textual "Linha ligada".
+        "visual_on": play_on,
+    }
 
 
 def _build_route_cards(
@@ -448,7 +479,7 @@ def _build_route_cards(
             prefixo,
             {
                 "prefixo": prefixo,
-                "attrs": {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None},
+                "attrs": _empty_route_attrs(),
                 "last_update": None,
             },
         )
@@ -465,24 +496,19 @@ def _build_route_cards(
             prefixo,
             {
                 "prefixo": prefixo,
-                "attrs": {"LIGAR": None, "DESLIGAR": None, "LIGADA": None, "ORIGEM": None, "DESTINO": None},
+                "attrs": _empty_route_attrs(),
                 "last_update": None,
             },
         )
         attrs = state["attrs"]
-        ligar_on = _is_active(attrs.get("LIGAR"))
-        desligar_on = _is_active(attrs.get("DESLIGAR"))
-        ligada_on = _is_active(attrs.get("LIGADA"))
-        play_blink = ligar_on and not ligada_on and not desligar_on
-        play_on = ligar_on and ligada_on and not desligar_on
-        pause_on = desligar_on
+        status = _route_status(attrs)
         origem_codigo = _value_to_int(attrs.get("ORIGEM"))
         destino_codigo = _value_to_int(attrs.get("DESTINO"))
         origem_nome = origem_maps.get(origem_codigo) if origem_codigo is not None else None
         destino_nome = destino_maps.get(destino_codigo) if destino_codigo is not None else None
         origem_display = origem_nome or (str(origem_codigo) if origem_codigo is not None else "--")
         destino_display = destino_nome or (str(destino_codigo) if destino_codigo is not None else "--")
-        is_inactive = not (play_blink or play_on or pause_on)
+        is_inactive = not (status["play_blink"] or status["play_on"] or status["pause_on"])
         nome_exibicao = (cfg.nome_exibicao or "").strip() if cfg else ""
         ordem = cfg.ordem if cfg else 0
         cards.append(
@@ -495,10 +521,10 @@ def _build_route_cards(
                 "destino_display": destino_display,
                 "origem_codigo": origem_codigo,
                 "destino_codigo": destino_codigo,
-                "play_blink": play_blink,
-                "play_on": play_on,
-                "pause_on": pause_on,
-                "context_status": _context_status_label(attrs.get("LIGAR"), attrs.get("DESLIGAR"), attrs.get("LIGADA")),
+                "play_blink": status["play_blink"],
+                "play_on": status["play_on"],
+                "pause_on": status["pause_on"],
+                "context_status": status["context_label"],
                 "is_inactive": is_inactive,
                 "last_update": state["last_update"],
                 "last_update_display": (
@@ -567,117 +593,82 @@ def _timeline_end_for_day(selected_day, day_start, day_end_exclusive):
     return min(day_end_point, now_clamped)
 
 
-def _build_ligada_intervals(day_events, day_start, day_end, initial_ligada_on):
-    intervals = []
-    ligada_on = bool(initial_ligada_on)
-    current_start = day_start if ligada_on else None
-    for event in day_events:
-        if event["atributo"] != "LIGADA":
-            continue
-        ev_time = event["timestamp"]
-        if ev_time < day_start or ev_time > day_end:
-            continue
-        new_on = _is_active(event["valor"])
-        if ligada_on and not new_on and current_start is not None:
-            intervals.append((current_start, ev_time))
-            current_start = None
-        elif not ligada_on and new_on:
-            current_start = ev_time
-        ligada_on = new_on
-    if ligada_on and current_start is not None and current_start < day_end:
-        intervals.append((current_start, day_end))
-    return intervals
+def _timeline_visual_gradient(point_flags):
+    off_color = "rgba(148,163,184,0.28)"
+    on_color = "rgba(34,197,94,0.65)"
+    if not point_flags:
+        return f"linear-gradient(to right, {off_color} 0% 100%)"
+    if len(point_flags) == 1:
+        color = on_color if point_flags[0] else off_color
+        return f"linear-gradient(to right, {color} 0% 100%)"
+
+    def color_for(flag):
+        return on_color if flag else off_color
+
+    total = len(point_flags)
+    parts = []
+    # Segment i-1 -> i uses state at point i so the selected point color matches
+    # the exact state computed for that timeline timestamp.
+    first_end = (100.0 / (total - 1))
+    parts.append(f"{color_for(point_flags[0])} 0.000% {first_end:.3f}%")
+    for idx in range(1, total):
+        start_pct = ((idx - 1) / (total - 1)) * 100.0
+        end_pct = (idx / (total - 1)) * 100.0
+        parts.append(f"{color_for(point_flags[idx])} {start_pct:.3f}% {end_pct:.3f}%")
+    return "linear-gradient(to right, " + ", ".join(parts) + ")"
 
 
-def _build_global_ligada_intervals(day_events, day_start, day_end, initial_ligada_prefixes=None):
-    intervals = []
-    ligada_prefixes = set(initial_ligada_prefixes or set())
-    current_start = day_start if ligada_prefixes else None
-
-    for event in day_events:
-        if event["atributo"] != "LIGADA":
-            continue
-        ev_time = event["timestamp"]
-        if ev_time < day_start or ev_time > day_end:
-            continue
-        prefixo = event["prefixo"]
-        was_any = bool(ligada_prefixes)
-        new_on = _is_active(event["valor"])
-        if new_on:
-            ligada_prefixes.add(prefixo)
-        else:
-            ligada_prefixes.discard(prefixo)
-        is_any = bool(ligada_prefixes)
-        if not was_any and is_any:
-            current_start = ev_time
-        elif was_any and not is_any and current_start is not None:
-            intervals.append((current_start, ev_time))
-            current_start = None
-
-    if ligada_prefixes and current_start is not None and current_start < day_end:
-        intervals.append((current_start, day_end))
-    return intervals
-
-
-def _build_global_ligada_intervals_for_timeline(day_events, timeline, available_until, initial_ligada_prefixes=None):
+def _route_point_visual_flags(day_events, timeline, available_until, baseline_attrs=None):
     if not timeline:
         return []
-    capped_points = [point for point in timeline if point["timestamp"] <= available_until]
-    if not capped_points:
-        return []
-
-    intervals = []
-    ligada_prefixes = set(initial_ligada_prefixes or set())
-    current_start = capped_points[0]["timestamp"] if ligada_prefixes else None
+    attrs = _empty_route_attrs()
+    if baseline_attrs:
+        for key in attrs:
+            attrs[key] = baseline_attrs.get(key)
+    flags = []
     event_idx = 0
     total_events = len(day_events)
-
-    for point in capped_points:
+    for point in timeline:
         point_ts = point["timestamp"]
         while event_idx < total_events and day_events[event_idx]["timestamp"] <= point_ts:
             event = day_events[event_idx]
-            if event["atributo"] == "LIGADA":
-                if _is_active(event["valor"]):
-                    ligada_prefixes.add(event["prefixo"])
-                else:
-                    ligada_prefixes.discard(event["prefixo"])
+            attrs[event["atributo"]] = event["valor"]
             event_idx += 1
-
-        is_any = bool(ligada_prefixes)
-        if is_any and current_start is None:
-            current_start = point_ts
-        elif not is_any and current_start is not None:
-            intervals.append((current_start, point_ts))
-            current_start = None
-
-    if current_start is not None:
-        intervals.append((current_start, capped_points[-1]["timestamp"]))
-    return intervals
+        if point_ts > available_until:
+            flags.append(False)
+            continue
+        flags.append(bool(_route_status(attrs)["visual_on"]))
+    return flags
 
 
-def _ligada_gradient(intervals, day_start, day_end):
-    total_seconds = (day_end - day_start).total_seconds()
-    if total_seconds <= 0:
-        return "linear-gradient(to right, rgba(148,163,184,0.28) 0%, rgba(148,163,184,0.28) 100%)"
-
-    def pct(dt):
-        return max(0.0, min(100.0, ((dt - day_start).total_seconds() / total_seconds) * 100.0))
-
-    parts = []
-    cursor = 0.0
-    for start, end in intervals:
-        start_pct = pct(start)
-        end_pct = pct(end)
-        if start_pct > cursor:
-            parts.append(f"rgba(148,163,184,0.28) {cursor:.3f}% {start_pct:.3f}%")
-        if end_pct > start_pct:
-            parts.append(f"rgba(34,197,94,0.65) {start_pct:.3f}% {end_pct:.3f}%")
-        cursor = max(cursor, end_pct)
-    if cursor < 100.0:
-        parts.append(f"rgba(148,163,184,0.28) {cursor:.3f}% 100%")
-    if not parts:
-        parts = ["rgba(148,163,184,0.28) 0% 100%"]
-    return "linear-gradient(to right, " + ", ".join(parts) + ")"
+def _global_point_visual_flags(day_events, timeline, available_until, seed_states=None):
+    if not timeline:
+        return []
+    seed_states = seed_states or {}
+    attrs_by_prefix = {
+        prefixo: dict(state.get("attrs") or _empty_route_attrs()) for prefixo, state in seed_states.items()
+    }
+    flags = []
+    event_idx = 0
+    total_events = len(day_events)
+    for point in timeline:
+        point_ts = point["timestamp"]
+        while event_idx < total_events and day_events[event_idx]["timestamp"] <= point_ts:
+            event = day_events[event_idx]
+            prefixo = event["prefixo"]
+            attrs = attrs_by_prefix.setdefault(prefixo, _empty_route_attrs())
+            attrs[event["atributo"]] = event["valor"]
+            event_idx += 1
+        if point_ts > available_until:
+            flags.append(False)
+            continue
+        any_on = False
+        for attrs in attrs_by_prefix.values():
+            if _route_status(attrs)["visual_on"]:
+                any_on = True
+                break
+        flags.append(any_on)
+    return flags
 
 
 def _parse_positive_page(value, default=1):
@@ -799,16 +790,13 @@ def _build_dashboard_payload(app, query_params):
             card["pause_on"] = False
             card["context_status"] = "Sem leitura futura"
 
-    initial_ligada_prefixes = {
-        prefixo for prefixo, state in seed_states.items() if _is_active(state["attrs"].get("LIGADA"))
-    }
-    global_ligada_intervals = _build_global_ligada_intervals_for_timeline(
+    global_visual_flags = _global_point_visual_flags(
         events_today,
         timeline,
         available_until,
-        initial_ligada_prefixes=initial_ligada_prefixes,
+        seed_states=seed_states,
     )
-    global_ligada_gradient = _ligada_gradient(global_ligada_intervals, day_start, day_end_point)
+    global_ligada_gradient = _timeline_visual_gradient(global_visual_flags)
 
     recent_events = [event for event in reversed(events_today) if event["timestamp"] <= selected_at][:200]
     events_page_num = _parse_positive_page(query_params.get("events_page"), default=1)
@@ -1004,23 +992,10 @@ def rota_detalhe(request, prefixo):
     )["attrs"]
     attrs = _attrs_at_selected(day_events, selected_at, baseline_attrs=seed_attrs)
 
-    ligar_on = _is_active(attrs.get("LIGAR"))
-    desligar_on = _is_active(attrs.get("DESLIGAR"))
-    ligada_on = _is_active(attrs.get("LIGADA"))
-    status = {
-        "play_blink": ligar_on and not ligada_on and not desligar_on,
-        "play_on": ligar_on and ligada_on and not desligar_on,
-        "pause_on": desligar_on,
-        "context_label": _context_status_label(attrs.get("LIGAR"), attrs.get("DESLIGAR"), attrs.get("LIGADA")),
-    }
+    status = _route_status(attrs)
     is_future_selected = bool(selected_day == timezone.localdate() and selected_at and selected_at > available_until)
     if is_future_selected:
-        status = {
-            "play_blink": False,
-            "play_on": False,
-            "pause_on": False,
-            "context_label": "Sem leitura futura",
-        }
+        status = _route_status(attrs, is_future=True)
 
     maps_qs = AppRotasMap.objects.filter(app=app, ativo=True).order_by("tipo", "codigo")
     origem_maps = {item.codigo: item.nome for item in maps_qs if item.tipo == AppRotasMap.Tipo.ORIGEM}
@@ -1066,9 +1041,13 @@ def rota_detalhe(request, prefixo):
     detail_events_paginator = Paginator(timeline_events, ROUTE_EVENTS_PAGE_SIZE)
     detail_events_page = detail_events_paginator.get_page(detail_events_page_num)
 
-    initial_ligada_on = _is_active(seed_attrs.get("LIGADA"))
-    ligada_intervals = _build_ligada_intervals(day_events, day_start, available_until, initial_ligada_on)
-    ligada_gradient = _ligada_gradient(ligada_intervals, day_start, day_end_point)
+    route_visual_flags = _route_point_visual_flags(
+        day_events,
+        timeline,
+        available_until,
+        baseline_attrs=seed_attrs,
+    )
+    ligada_gradient = _timeline_visual_gradient(route_visual_flags)
 
     prev_day, next_day = _day_navigation(available_days, selected_day)
     route_config = AppRotaConfig.objects.filter(app=app, prefixo=prefix_norm).first()
