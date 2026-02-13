@@ -112,15 +112,12 @@
               </div>
               <div class="proposal-card-meta">
                 <div class="proposal-meta-item">
-                  <span class="meta-label">Valor</span>
                   <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
                 </div>
                 <div class="proposal-meta-item">
-                  <span class="meta-label">De</span>
                   <span class="meta-value">{{ proposta.criada_por.username|default:"Sistema" }}</span>
                 </div>
                 <div class="proposal-meta-item">
-                  <span class="meta-label">Criada em</span>
                   <span class="meta-value">{{ proposta.criado_em|date:"d/m/Y" }}</span>
                 </div>
               </div>

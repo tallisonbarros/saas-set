@@ -18,6 +18,7 @@
         pendentes: "Para decidir agora",
         execucao: "Em levantamento",
         total: "Aprovadas para executar",
+        aprovadas_execucao: "Aprovadas em execucao",
         finalizadas_90: "Concluidas (30 dias)",
       },
     },
@@ -28,6 +29,7 @@
         pendentes: "Aguardando cliente",
         execucao: "Em levantamento",
         total: "Em execucao",
+        aprovadas_execucao: "Aprovadas em execucao",
         finalizadas_90: "Taxa de aprovacao (30 dias)",
       },
     },
@@ -48,6 +50,9 @@
       if (key === "finalizadas_90") {
         return `${n} de aprovacao no periodo`;
       }
+      if (key === "aprovadas_execucao") {
+        return `${n} ja em execucao`;
+      }
       return String(n);
     }
     if (key === "pendentes") {
@@ -62,7 +67,21 @@
     if (key === "finalizadas_90") {
       return `${n} concluidas nos ultimos 30 dias`;
     }
+    if (key === "aprovadas_execucao") {
+      return `${n} ja em execucao`;
+    }
     return String(n);
+  };
+
+  const updateSummaryCardsVisibility = (mode) => {
+    if (!summaryWrap) {
+      return;
+    }
+    const aprovadasExecucaoCard = summaryWrap.querySelector('[data-summary-card="aprovadas_execucao"]');
+    if (aprovadasExecucaoCard) {
+      const show = mode === "recebidas";
+      aprovadasExecucaoCard.classList.toggle("summary-card-hidden", !show);
+    }
   };
 
   const getQueryParams = () => {
@@ -241,6 +260,7 @@
     saveModeToStorage(state.mode);
     setActiveTab(state.mode);
     updateHeader(state.mode);
+    updateSummaryCardsVisibility(state.mode);
     syncUrl(state.mode, "", "", pushHistory);
     if (refresh) {
       fetchData(state);

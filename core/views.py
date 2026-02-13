@@ -5,17 +5,20 @@ import logging
 import os
 import ipaddress
 import re
+from pathlib import Path
 from io import BytesIO
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.http import HttpResponse, HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.contrib.staticfiles import finders
 from urllib.parse import urlencode
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -72,6 +75,34 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_module_signal_badges(user, cliente):
+    """
+    Module Signal Badges
+    Estrutura padrão para selos em cards do painel:
+    - visible: bool
+    - count: int
+    - label: str
+    - tone: warning|info|success
+    """
+    propostas_aprovar_count = _pendencias_total(user, cliente)
+    badges = {
+        "propostas": {
+            "count": propostas_aprovar_count,
+            "visible": propostas_aprovar_count > 0,
+            "label": f"{propostas_aprovar_count} proposta{'s' if propostas_aprovar_count != 1 else ''} pra aprovar",
+            "tone": "warning",
+        },
+        "financeiro": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "ios": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "inventarios": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "listas_ip": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "radar": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "nuvem_projetos": {"count": 0, "visible": False, "label": "", "tone": "info"},
+        "planta_conectada": {"count": 0, "visible": False, "label": "", "tone": "info"},
+    }
+    return badges
 
 def _parse_bearer_token(auth_header):
     if not auth_header:
@@ -664,6 +695,7 @@ def painel(request):
         apps = cliente.apps.filter(ativo=True).order_by("nome")
     else:
         apps = App.objects.none()
+    module_signal_badges = _build_module_signal_badges(request.user, cliente)
     return render(
         request,
         "core/painel.html",
@@ -674,6 +706,7 @@ def painel(request):
             "is_cliente": True,
             "is_vendedor": True,
             "apps": apps,
+            "module_signal_badges": module_signal_badges,
         },
     )
 
@@ -1903,171 +1936,105 @@ def _proposta_status_label(proposta):
     return "Pendente"
 
 
+def _format_brl_currency(value):
+    if value is None:
+        return "A definir"
+    number = f"{value:,.2f}"
+    number = number.replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {number}"
+
+
+def _format_ptbr_datetime(value):
+    if not value:
+        return ""
+    return timezone.localtime(value).strftime("%d/%m/%Y %H:%M")
+
+
+def _status_badge_class(status_label):
+    normalized = (status_label or "").strip().lower()
+    return {
+        "pendente": "status-pendente",
+        "executando": "status-executando",
+        "aprovada": "status-aprovada",
+        "reprovada": "status-reprovada",
+        "finalizada": "status-finalizada",
+        "levantamento": "status-levantamento",
+    }.get(normalized, "status-pendente")
+
+
+def _build_proposta_pdf_context(proposta, status_label):
+    origem = proposta.origem_trabalho
+    origem_rows = []
+    atividades = []
+    if origem:
+        if origem.radar and origem.radar.nome:
+            origem_rows.append(("Radar", origem.radar.nome))
+        if origem.nome:
+            origem_rows.append(("Trabalho", origem.nome))
+        if origem.descricao:
+            origem_rows.append(("Descricao do trabalho", origem.descricao))
+        if origem.setor:
+            origem_rows.append(("Setor", origem.setor))
+        if origem.solicitante:
+            origem_rows.append(("Solicitante", origem.solicitante))
+        if origem.responsavel:
+            origem_rows.append(("Responsavel", origem.responsavel))
+        if origem.contrato and origem.contrato.nome:
+            origem_rows.append(("Contrato", origem.contrato.nome))
+        if origem.classificacao and origem.classificacao.nome:
+            origem_rows.append(("Classificacao", origem.classificacao.nome))
+        if origem.data_registro:
+            origem_rows.append(("Data de registro", origem.data_registro.strftime("%d/%m/%Y")))
+        atividades = [
+            {
+                "nome": atividade.nome,
+                "descricao": atividade.descricao or "Sem descricao",
+            }
+            for atividade in origem.atividades.order_by("-criado_em")
+        ]
+    if not atividades:
+        atividades = [{"nome": "Sem atividades vinculadas", "descricao": ""}]
+    anexos = [
+        {
+            "tipo": anexo.get_tipo_display(),
+            "nome": os.path.basename(anexo.arquivo.name) if anexo.arquivo else "-",
+        }
+        for anexo in proposta.anexos.all()
+    ]
+    logo_path = finders.find("core/logoset.png") or finders.find("core/FAVICON_PRETO.png")
+    logo_uri = Path(logo_path).as_uri() if logo_path else ""
+    return {
+        "proposta": proposta,
+        "status_label": status_label,
+        "status_badge_class": _status_badge_class(status_label),
+        "codigo": proposta.codigo or f"ID {proposta.id}",
+        "valor_display": _format_brl_currency(proposta.valor),
+        "criada_em_display": _format_ptbr_datetime(proposta.criado_em),
+        "de_display": proposta.criada_por.username if proposta.criada_por else "Sistema",
+        "para_nome": proposta.cliente.nome if proposta.cliente else "-",
+        "para_email": proposta.cliente.email if proposta.cliente else "-",
+        "origem_rows": origem_rows,
+        "atividades": atividades,
+        "anexos": anexos,
+        "has_observacao": bool((proposta.observacao_cliente or "").strip()),
+        "observacao": (proposta.observacao_cliente or "").strip(),
+        "gerado_em_display": _format_ptbr_datetime(timezone.now()),
+        "logo_uri": logo_uri,
+    }
+
+
 def _render_proposta_pdf(proposta, status_label):
     try:
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.utils import ImageReader
-        from reportlab.pdfbase.pdfmetrics import stringWidth
-        from reportlab.pdfgen import canvas
+        from weasyprint import CSS, HTML
     except ImportError:
         return None
 
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    left = 42
-    right = width - 42
-    usable_width = right - left
-    y = height - 42
-
-    logo_primary = os.path.join(os.path.dirname(__file__), "static", "core", "logoset.png")
-    logo_fallback = os.path.join(os.path.dirname(__file__), "static", "core", "FAVICON_PRETO.png")
-    logo_path = logo_primary if os.path.exists(logo_primary) else logo_fallback
-
-    def split_lines(text, font_name="Helvetica", font_size=10, max_width=usable_width):
-        raw = (text or "").replace("\r\n", "\n").replace("\r", "\n")
-        lines = []
-        for paragraph in raw.split("\n"):
-            chunk = paragraph.strip()
-            if not chunk:
-                lines.append("")
-                continue
-            words = chunk.split()
-            current = words[0]
-            for word in words[1:]:
-                candidate = f"{current} {word}"
-                if stringWidth(candidate, font_name, font_size) <= max_width:
-                    current = candidate
-                else:
-                    lines.append(current)
-                    current = word
-            lines.append(current)
-        return lines
-
-    def ensure_space(required=60):
-        nonlocal y
-        if y < required:
-            pdf.showPage()
-            draw_header()
-
-    def draw_meta_line(label, value, row_height=14):
-        nonlocal y
-        ensure_space(80)
-        pdf.setFont("Helvetica-Bold", 9)
-        pdf.setFillColor(colors.HexColor("#3b3b3b"))
-        pdf.drawString(left, y, f"{label}:")
-        pdf.setFont("Helvetica", 9)
-        pdf.setFillColor(colors.black)
-        lines = split_lines(str(value or "-"), font_size=9, max_width=usable_width - 84)
-        if not lines:
-            lines = ["-"]
-        pdf.drawString(left + 84, y, lines[0])
-        for extra in lines[1:]:
-            y -= row_height
-            ensure_space(80)
-            pdf.drawString(left + 84, y, extra)
-        y -= row_height
-
-    def draw_section(title, text):
-        nonlocal y
-        lines = split_lines(text or "-", font_size=10, max_width=usable_width - 18)
-        section_height = 28 + (len(lines) * 14)
-        ensure_space(section_height + 24)
-        pdf.setFillColor(colors.HexColor("#fff4ea"))
-        pdf.roundRect(left, y - section_height + 8, usable_width, section_height, 8, fill=1, stroke=0)
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.setFillColor(colors.HexColor("#b45309"))
-        pdf.drawString(left + 10, y - 2, title)
-        ty = y - 18
-        pdf.setFillColor(colors.black)
-        pdf.setFont("Helvetica", 10)
-        for line in lines:
-            pdf.drawString(left + 10, ty, line or " ")
-            ty -= 14
-        y = y - section_height - 10
-
-    def draw_header():
-        nonlocal y
-        y = height - 42
-        pdf.setFillColor(colors.HexColor("#ffefe1"))
-        pdf.roundRect(left, y - 40, usable_width, 46, 10, fill=1, stroke=0)
-        pdf.setFillColor(colors.HexColor("#c2410c"))
-        pdf.setFont("Helvetica-Bold", 14)
-        pdf.drawString(left + 12, y - 10, "SET - Proposta Comercial")
-        pdf.setFont("Helvetica", 9)
-        pdf.setFillColor(colors.black)
-        codigo = proposta.codigo or f"ID {proposta.id}"
-        pdf.drawString(left + 12, y - 25, f"Codigo: {codigo} | Status: {status_label}")
-        if logo_path and os.path.exists(logo_path):
-            try:
-                logo = ImageReader(logo_path)
-                pdf.drawImage(
-                    logo,
-                    right - 86,
-                    y - 34,
-                    width=72,
-                    height=28,
-                    preserveAspectRatio=True,
-                    mask="auto",
-                )
-            except Exception:
-                pass
-        y -= 56
-
-    pdf.setTitle(f"Proposta - {proposta.codigo or proposta.id}")
-    draw_header()
-
-    destinatario = proposta.cliente.nome if proposta.cliente and proposta.cliente.nome else "-"
-    destinatario_email = proposta.cliente.email if proposta.cliente and proposta.cliente.email else "-"
-    emissor = proposta.criada_por.username if proposta.criada_por else "Sistema"
-    valor = f"R$ {proposta.valor}" if proposta.valor is not None else "A definir"
-    origem = "-"
-    if proposta.origem_trabalho_id and proposta.origem_trabalho:
-        origem = f"{proposta.origem_trabalho.radar.nome} / {proposta.origem_trabalho.nome}"
-
-    draw_meta_line("Proposta", proposta.nome)
-    draw_meta_line("Para", f"{destinatario} ({destinatario_email})")
-    draw_meta_line("De", emissor)
-    draw_meta_line("Valor", valor)
-    draw_meta_line("Prioridade", proposta.prioridade)
-    draw_meta_line("Criada em", timezone.localtime(proposta.criado_em).strftime("%d/%m/%Y %H:%M"))
-    if proposta.decidido_em:
-        draw_meta_line("Decidida em", timezone.localtime(proposta.decidido_em).strftime("%d/%m/%Y %H:%M"))
-    if proposta.finalizada_em:
-        draw_meta_line("Finalizada em", timezone.localtime(proposta.finalizada_em).strftime("%d/%m/%Y %H:%M"))
-    if origem != "-":
-        draw_meta_line("Origem tecnica", origem)
-
-    draw_section("Descricao", proposta.descricao or "-")
-    if proposta.observacao_cliente:
-        draw_section("Observacao", proposta.observacao_cliente)
-
-    anexos = list(proposta.anexos.all())
-    if anexos:
-        ensure_space(70)
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.setFillColor(colors.HexColor("#b45309"))
-        pdf.drawString(left, y, "Anexos")
-        y -= 14
-        pdf.setFillColor(colors.black)
-        pdf.setFont("Helvetica", 9)
-        for anexo in anexos:
-            ensure_space(60)
-            nome_arquivo = os.path.basename(anexo.arquivo.name) if anexo.arquivo else "-"
-            linha = f"- {anexo.get_tipo_display()}: {nome_arquivo}"
-            for idx, ln in enumerate(split_lines(linha, font_size=9, max_width=usable_width)):
-                pdf.drawString(left + (0 if idx == 0 else 10), y, ln)
-                y -= 12
-
-    pdf.setFont("Helvetica", 8)
-    pdf.setFillColor(colors.HexColor("#6b7280"))
-    pdf.drawRightString(right, 20, f"Gerado em {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}")
-
-    pdf.save()
-    buffer.seek(0)
-    return buffer
+    context = _build_proposta_pdf_context(proposta, status_label)
+    html = render_to_string("propostas/proposta_pdf.html", context)
+    css_path = finders.find("css/proposta_pdf.css")
+    stylesheets = [CSS(filename=css_path)] if css_path else None
+    pdf_content = HTML(string=html, base_url=str(settings.BASE_DIR)).write_pdf(stylesheets=stylesheets)
+    return BytesIO(pdf_content)
 
 
 @login_required
@@ -3882,14 +3849,17 @@ def _proposta_quick_stats(user, cliente, tipo):
             "pendentes": pendentes,
             "em_execucao": levantamento,
             "total": executando,
+            "aprovadas_execucao": 0,
             "finalizadas_90": f"{taxa_aprovacao}%",
         }
     aprovadas_para_execucao = base.filter(aprovada=True, finalizada=False).exclude(andamento="EXECUTANDO").count()
+    aprovadas_em_execucao = base.filter(aprovada=True, andamento="EXECUTANDO", finalizada=False).count()
     concluidas_30 = base.filter(finalizada=True, finalizada_em__gte=cutoff_30).count()
     return {
         "pendentes": pendentes,
         "em_execucao": levantamento,
         "total": aprovadas_para_execucao,
+        "aprovadas_execucao": aprovadas_em_execucao,
         "finalizadas_90": concluidas_30,
     }
 

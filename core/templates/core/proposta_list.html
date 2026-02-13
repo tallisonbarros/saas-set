@@ -74,6 +74,11 @@
           {% endif %}
         </div>
       </div>
+      <div class="summary-card{% if tipo_ativo != 'recebidas' %} summary-card-hidden{% endif %}" data-summary-card="aprovadas_execucao">
+        <div class="summary-label" data-summary-label="aprovadas_execucao">Aprovadas em execucao</div>
+        <div class="summary-value" data-summary-value="aprovadas_execucao">{{ quick_stats.aprovadas_execucao|default:"0" }}</div>
+        <div class="summary-hint" data-summary-hint="aprovadas_execucao">{{ quick_stats.aprovadas_execucao|default:"0" }} ja em execucao</div>
+      </div>
       <div class="summary-card">
         <div class="summary-label" data-summary-label="finalizadas_90">
           {% if tipo_ativo == "enviadas" %}Taxa de aprovacao (30 dias){% else %}Concluidas (30 dias){% endif %}

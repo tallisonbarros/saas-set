@@ -1,0 +1,3 @@
+{% if badge and badge.visible %}
+  <span class="panel-card-signal panel-card-signal-{{ badge.tone|default:'info' }}">{{ badge.label }}</span>
+{% endif %}

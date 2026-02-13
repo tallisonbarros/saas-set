@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proposta Comercial - {{ codigo }}</title>
+</head>
+<body>
+  <div class="doc-footer-left">Gerado em {{ gerado_em_display }} | SET</div>
+
+  <main class="proposal-doc">
+    <header class="doc-header card avoid-break">
+      <div class="brand-block">
+        {% if logo_uri %}
+          <img class="brand-logo" src="{{ logo_uri }}" alt="Logo SET">
+        {% endif %}
+        <div>
+          <div class="brand-name">SET</div>
+          <h1>Proposta Comercial</h1>
+          <p class="subtitle">Documento comercial consolidado</p>
+        </div>
+      </div>
+      <div class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</div>
+    </header>
+
+    <section class="card section avoid-break">
+      <h2 class="section-title">Identificacao</h2>
+      <div class="id-grid">
+        <table class="meta-table">
+          <tbody>
+            <tr>
+              <th>Codigo</th>
+              <td>{{ codigo }}</td>
+            </tr>
+            <tr>
+              <th>Proposta</th>
+              <td>{{ proposta.nome }}</td>
+            </tr>
+            <tr>
+              <th>Prioridade</th>
+              <td>{{ proposta.prioridade }}</td>
+            </tr>
+            <tr>
+              <th>Criada em</th>
+              <td>{{ criada_em_display }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="meta-table">
+          <tbody>
+            <tr>
+              <th>Para</th>
+              <td>
+                <div>{{ para_nome }}</div>
+                <div class="mono subtle">{{ para_email }}</div>
+              </td>
+            </tr>
+            <tr>
+              <th>De</th>
+              <td class="mono">{{ de_display }}</td>
+            </tr>
+            <tr>
+              <th>Status</th>
+              <td>{{ status_label }}</td>
+            </tr>
+            <tr>
+              <th>Valor</th>
+              <td class="value-highlight">{{ valor_display }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card section">
+      <h2 class="section-title">Descricao</h2>
+      <div class="text-block">{{ proposta.descricao|linebreaksbr }}</div>
+    </section>
+
+    <section class="card section avoid-break">
+      <h2 class="section-title">Origem tecnica</h2>
+      {% if origem_rows %}
+        <table class="meta-table origin-table">
+          <tbody>
+            {% for label, value in origem_rows %}
+              <tr>
+                <th>{{ label }}</th>
+                <td>{{ value }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="text-block subtle">Sem origem tecnica vinculada.</div>
+      {% endif %}
+    </section>
+
+    <section class="card section">
+      <h2 class="section-title">Resumo das atividades</h2>
+      <ul class="activities-list">
+        {% for atividade in atividades %}
+          <li class="activity-item avoid-break">
+            <span class="activity-dot"></span>
+            <div>
+              <div class="activity-name">{{ atividade.nome }}</div>
+              {% if atividade.descricao %}
+                <div class="activity-desc">{{ atividade.descricao }}</div>
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    {% if has_observacao %}
+      <section class="card section observation-box avoid-break">
+        <h2 class="section-title">Observacao</h2>
+        <div class="text-block">{{ observacao|linebreaksbr }}</div>
+      </section>
+    {% endif %}
+
+    {% if anexos %}
+      <section class="card section avoid-break">
+        <h2 class="section-title">Anexos</h2>
+        <table class="meta-table attachments-table">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Arquivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for anexo in anexos %}
+              <tr>
+                <td>{{ anexo.tipo }}</td>
+                <td class="mono">{{ anexo.nome }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>

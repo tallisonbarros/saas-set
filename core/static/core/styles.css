@@ -621,9 +621,9 @@ body {
 
 .proposal-summary-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  margin: 16px 0 8px;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+  margin: 12px 0 6px;
 }
 
 .summary-label {
@@ -1219,20 +1219,24 @@ body {
 .summary-card {
   border: 1px solid rgba(255, 102, 0, 0.18);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 9px 11px;
   background: #fff;
 }
 
 .summary-value {
-  font-size: 34px;
+  font-size: 25px;
   line-height: 1;
   font-weight: 700;
 }
 
 .summary-hint {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
-  margin-top: 6px;
+  margin-top: 4px;
+}
+
+.summary-card-hidden {
+  display: none;
 }
 
 .summary-meta {
@@ -2777,6 +2781,39 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.panel-card-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(148, 163, 184, 0.12);
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.panel-card-signal-warning {
+  border-color: rgba(255, 122, 26, 0.35);
+  background: rgba(255, 122, 26, 0.12);
+  color: #c2410c;
+}
+
+.panel-card-signal-info {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.panel-card-signal-success {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
 }
 
 .panel-tag {
