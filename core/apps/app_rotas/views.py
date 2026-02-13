@@ -519,10 +519,15 @@ def _day_navigation(available_days, selected_day):
 
 def _timeline_now_state(selected_day, selected_at, day_start, day_end_exclusive):
     now_local = timezone.localtime(timezone.now())
-    now_target = _clamp_datetime(now_local, day_start, day_end_exclusive)
+    today = timezone.localdate()
+    if selected_day == today:
+        now_target = _clamp_datetime(now_local, day_start, day_end_exclusive)
+    else:
+        # "Voltar ao agora" must always point to the real current time in today's day.
+        now_target = now_local
     tolerance_seconds = TIMELINE_STEP_MINUTES * 60 + 1
-    showing_now = selected_day == timezone.localdate() and abs((selected_at - now_target).total_seconds()) <= tolerance_seconds
-    return showing_now, now_target, timezone.localdate()
+    showing_now = selected_day == today and abs((selected_at - now_target).total_seconds()) <= tolerance_seconds
+    return showing_now, now_target, today
 
 
 def _timeline_end_for_day(selected_day, day_start, day_end_exclusive):

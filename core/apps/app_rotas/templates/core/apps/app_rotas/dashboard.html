@@ -114,7 +114,7 @@
             href="?dia={{ now_day|date:'Y-m-d' }}&at={{ now_at_iso }}"
             aria-label="Voltar para agora"
             title="Voltar para agora"
-          >&larr;</a>
+          ><span class="timeline-back-now-icon" aria-hidden="true">&#x25CE;</span></a>
         </div>
       {% else %}
         <p class="muted">Sem eventos no dia selecionado.</p>
@@ -185,13 +185,42 @@
     .timeline-global-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .lifebit-state-head { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .sync-status { min-height: 14px; font-size: .74rem; opacity: .84; }
-    .live-badge { display: inline-flex; margin-top: 6px; font-weight: 800; letter-spacing: .04em; }
+    .live-badge {
+      display: inline-flex;
+      margin-top: 6px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      position: relative;
+      isolation: isolate;
+      border-radius: 999px;
+    }
     .live-badge.is-live {
-      background: rgba(22, 101, 52, 0.58);
-      border-color: #22c55e;
+      background: linear-gradient(180deg, rgba(6, 95, 70, 0.34), rgba(21, 128, 61, 0.38));
+      border-color: rgba(34, 197, 94, 0.74);
       color: #dcfce7;
-      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25) inset;
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.2) inset;
       animation: livePulse 1.15s ease-in-out infinite;
+    }
+    .live-badge.is-live::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      background: linear-gradient(120deg, #22c55e, #34d399, #2dd4bf, #22c55e);
+      z-index: -1;
+      opacity: .78;
+      filter: blur(.4px);
+      background-size: 220% 220%;
+      animation: liveBorderShift 2.4s linear infinite;
+    }
+    .live-badge.is-live::after {
+      content: "";
+      position: absolute;
+      inset: -7px;
+      border-radius: inherit;
+      border: 1px solid rgba(52, 211, 153, 0.38);
+      z-index: -2;
+      animation: liveHaloPulse 1.6s ease-out infinite;
     }
     .live-badge.is-paused {
       background: rgba(71, 85, 105, 0.45);
@@ -199,6 +228,8 @@
       color: #e2e8f0;
       animation: none;
     }
+    .live-badge.is-paused::before,
+    .live-badge.is-paused::after { content: none; }
     .comm-last-seen { font-size: .76rem; }
     .comm-last-seen.is-hidden { display: none; }
     .comm-pill { font-weight: 700; letter-spacing: .02em; }
@@ -395,7 +426,21 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
       cursor: ew-resize;
     }
-    .timeline-back-now { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+    .timeline-back-now {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-color: rgba(52, 211, 153, 0.42);
+      background: radial-gradient(circle at 35% 25%, rgba(45, 212, 191, 0.24), rgba(15, 23, 42, 0.72));
+      box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.2);
+    }
+    .timeline-back-now-icon {
+      color: #99f6e4;
+      text-shadow: 0 0 8px rgba(45, 212, 191, 0.35);
+      font-size: .95rem;
+      line-height: 1;
+    }
     .timeline-back-now.is-hidden { display: none; }
     .timeline-read { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
     .timeline-read--tight { margin: 2px 0 8px; }
@@ -409,6 +454,15 @@
       0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45), 0 0 0 1px rgba(34, 197, 94, 0.25) inset; }
       60% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0), 0 0 0 1px rgba(34, 197, 94, 0.25) inset; }
       100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0), 0 0 0 1px rgba(34, 197, 94, 0.25) inset; }
+    }
+    @keyframes liveBorderShift {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+    @keyframes liveHaloPulse {
+      0% { transform: scale(1); opacity: .65; }
+      70% { transform: scale(1.06); opacity: 0; }
+      100% { transform: scale(1.06); opacity: 0; }
     }
     @keyframes cardClockTick {
       0% { transform: rotate(0deg); }
