@@ -35,50 +35,28 @@
       </div>
 
       <div class="context-bar">
-        <h1>Proposta Comercial</h1>
-        <p class="context-subtitle">SET - Industria & Tecnologia</p>
-        <div class="context-divider"></div>
-        <div class="mini-metrics">
-          <div class="mini-metric">
-            <div class="mini-label">Valor</div>
-            <div class="mini-value value-strong">{{ valor_display }}</div>
+        <div class="context-head">
+          <div class="context-title-block">
+            <h1>Proposta Comercial</h1>
+            <p class="context-subtitle">SET - Industria & Tecnologia</p>
           </div>
-          <div class="mini-metric">
-            <div class="mini-label">Prioridade</div>
-            <div class="mini-value">{{ proposta.prioridade }}</div>
-          </div>
-          <div class="mini-metric">
-            <div class="mini-label">Criada em</div>
-            <div class="mini-value">{{ criada_em_display }}</div>
+          <div class="mini-metrics mini-metrics-right">
+            <div class="mini-metric">
+              <div class="mini-label">Codigo / Proposta</div>
+              <div class="mini-value mono">{{ codigo }}</div>
+              {% if proposta.nome %}
+                <div class="kpi-subvalue">{{ proposta.nome }}</div>
+              {% endif %}
+            </div>
+            <div class="mini-metric">
+              <div class="mini-label">Criada em / Prioridade</div>
+              <div class="mini-value">{{ criada_em_display }}</div>
+              <div class="kpi-subvalue">Prioridade {{ proposta.prioridade }}</div>
+            </div>
           </div>
         </div>
       </div>
     </header>
-
-    <section class="kpi-grid avoid-break">
-      <article class="kpi-card">
-        <div class="kpi-label">Valor</div>
-        <div class="kpi-value value-strong">{{ valor_display }}</div>
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-label">Status</div>
-        <div class="kpi-value">
-          <span class="status-badge {{ status_badge_class }}">{{ status_label|upper }}</span>
-        </div>
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-label">Codigo / Proposta</div>
-        <div class="kpi-value mono">{{ codigo }}</div>
-        {% if proposta.nome %}
-          <div class="kpi-subvalue">{{ proposta.nome }}</div>
-        {% endif %}
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-label">Criada em / Prioridade</div>
-        <div class="kpi-value">{{ criada_em_display }}</div>
-        <div class="kpi-subvalue">Prioridade {{ proposta.prioridade }}</div>
-      </article>
-    </section>
 
     <section class="content-card section avoid-break">
       <h2 class="section-title">Identificacao</h2>
@@ -202,6 +180,20 @@
         </table>
       </section>
     {% endif %}
+
+    <section class="content-card section payment-summary-card avoid-break">
+      <h2 class="section-title">Valor e Condicoes de Pagamento</h2>
+      <div class="payment-summary-value">{{ valor_display }}</div>
+      {% for bloco in condicoes_comerciais %}
+        {% if bloco.titulo == "G) Validade e Pagamento" %}
+          <div class="payment-summary-list">
+            {% for item in bloco.itens %}
+              <p>{{ item }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </section>
   </main>
 </body>
 </html>
