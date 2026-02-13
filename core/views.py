@@ -4059,7 +4059,7 @@ def proposta_nova_de_trabalho(request, trabalho_pk):
         "valor": "",
         "prioridade": "50",
         "codigo": "",
-        "observacao": f"Origem: Radar #{trabalho.radar_id} / Trabalho #{trabalho.id}",
+        "observacao": f"Origem: Radar {trabalho.radar.nome} / Trabalho {trabalho.nome}",
         "origem_trabalho_id": str(trabalho.id),
     }
     return render(

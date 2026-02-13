@@ -70,8 +70,6 @@
         </div>
         <label for="id_nome">Nome</label>
         <input id="id_nome" type="text" name="nome" value="{{ form_data.nome }}" required>
-        <label for="id_descricao">Descricao</label>
-        <textarea id="id_descricao" name="descricao" required>{{ form_data.descricao }}</textarea>
         <div class="proposal-form-grid">
           <div>
             <label for="id_valor">Valor</label>
@@ -83,6 +81,14 @@
             <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ form_data.prioridade }}">
           </div>
         </div>
+      </div>
+      <div class="proposal-form-card proposal-form-card-highlight">
+        <div class="proposal-form-head">
+          <h2>Descricao da proposta</h2>
+          <p class="muted">Campo principal para contexto tecnico e comercial.</p>
+        </div>
+        <label for="id_descricao">Descricao</label>
+        <textarea id="id_descricao" name="descricao" rows="12" required>{{ form_data.descricao }}</textarea>
       </div>
 
       <div class="proposal-form-card">

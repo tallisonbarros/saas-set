@@ -47,7 +47,7 @@
     {% endif %}
     <div class="proposal-detail-layout">
       <div class="proposal-detail-main">
-        <div class="proposal-block">
+        <div class="proposal-block proposal-block-description">
           <div class="proposal-block-head">
             <div>
               <h2 class="proposal-block-title">Descricao</h2>
@@ -64,7 +64,7 @@
               {% endif %}
             </div>
           </div>
-          <div class="proposal-description">{{ proposta.descricao|linebreaksbr }}</div>
+          <div class="proposal-description proposal-description-spotlight">{{ proposta.descricao|linebreaksbr }}</div>
         </div>
       </div>
       <aside class="proposal-detail-sidebar">
