@@ -484,7 +484,8 @@ body {
 .proposal-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 600px));
+  justify-content: flex-start;
 }
 
 .status-group .status-label {
@@ -558,7 +559,8 @@ body {
 }
 
 .proposal-grid-compact {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 600px));
+  justify-content: flex-start;
 }
 
 .proposal-section-head {
