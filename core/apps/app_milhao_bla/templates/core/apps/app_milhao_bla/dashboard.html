@@ -14,8 +14,8 @@
 {% endblock %}
 
 {% block content %}
-  <div class="card-stack" style="display: flex; flex-direction: column; gap: 16px;">
-  <section class="card app-accent milhao-readings milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+  <div class="card-stack" style="display: flex; flex-direction: column; gap: 6px;">
+  <section id="milhao-hud-section" class="card app-accent milhao-readings milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     {% if app.logo %}
       <div class="hud-logo-wrap" style="display: flex; justify-content: center; margin: 6px 0 18px;">
         <img class="hud-logo" src="{{ app.logo.url }}" alt="Logo {{ app.nome }}" style="max-width: 220px; height: auto; display: block;" />
@@ -39,17 +39,17 @@
       </div>
     </div>
   </section>
+  <div class="milhao-mobile-title">
+    <img src="/media/logos/milhao_logo.png" alt="MILHAO - RVD" />
+  </div>
 
   <div id="milhao-dashboard-dynamic" data-cards-url="{% url 'app_milhao_bla_cards_data' %}">
   <section class="app-accent date-nav-card milhao-section" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <form method="get" class="io-form milhao-date-nav-form">
-      {% for bal in selected_balances %}
-        <input type="hidden" name="balance" value="{{ bal }}" />
-      {% endfor %}
       <div class="milhao-date-nav-grid">
         {% if prev_date %}
           <a
-            href="?date={{ prev_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
+            href="?date={{ prev_date|date:'Y-m-d' }}"
             class="milhao-date-arrow"
             aria-label="Dia anterior"
           >&lt;</a>
@@ -73,7 +73,7 @@
         </label>
         {% if next_date %}
           <a
-            href="?date={{ next_date|date:'Y-m-d' }}{% for bal in selected_balances %}&balance={{ bal }}{% endfor %}"
+            href="?date={{ next_date|date:'Y-m-d' }}"
             class="milhao-date-arrow"
             aria-label="Dia seguinte"
           >&gt;</a>
@@ -131,151 +131,178 @@
   </section>
   {% endif %}
 
-  <section class="card milhao-section" style="padding: 12px;">
-    <form method="get" class="io-form metrics-filter-form" style="margin-top: 0; gap: 10px;">
-    {% if selected_date %}
-      <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
-    {% endif %}
-    <label class="field metrics-balance-filter">
-      <span>Balancas</span>
-      <div
-        id="balance-chip-grid"
-        class="balance-toggle-grid balance-toggle-compact"
-        data-selected="{% for bal in selected_balances %}{{ bal }}{% if not forloop.last %},{% endif %}{% endfor %}"
-        style="gap: 8px;"
-      >
-        <div class="balance-chip balance-chip-all" data-balance="__all__" data-rt-shimmer-host>
-          <button type="button" class="balance-chip-main">Selecionar todas</button>
-        </div>
-        {% for balanca in balances %}
-          <div class="balance-chip" data-balance="{{ balanca }}" data-rt-shimmer-host>
-            <button
-              type="button"
-              class="balance-chip-main{% if balanca in selected_balances %} is-selected{% endif %}"
-            >
-              <span class="balance-chip-text">
-                <span class="balance-title">
-                  {% if balanca == "LIMBL01" %}MILHO{% elif balanca == "SECBL01" %}GERMEN{% elif balanca == "SECBL02" %}RESIDUO{% elif balanca == "CLABL01" %}MIUDO{% elif balanca == "CLABL02" %}GRAUDO{% else %}{{ balanca }}{% endif %}
-                </span>
-                <span class="balance-subtitle">{{ balanca }}</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              class="balance-chip-add{% if balanca in selected_balances %} is-selected{% endif %}"
-              aria-label="Adicionar {{ balanca }}"
-            >
-              <span class="balance-chip-symbol">
-                {% if balanca in selected_balances %}-{% else %}+{% endif %}
-              </span>
-            </button>
-          </div>
-        {% endfor %}
-      </div>
-      <div id="balance-hidden-inputs"></div>
-    </label>
-    </form>
-  </section>
-
-  <section class="card app-accent metrics-card milhao-section" data-rt-shimmer-host {% if theme_color %}style="--app-accent: {{ theme_color }}; padding: 16px;"{% endif %}>
+  <section class="card app-accent metrics-card milhao-section" data-rt-shimmer-host {% if theme_color %}style="--app-accent: {{ theme_color }}; padding: 12px;"{% endif %}>
     <div class="io-card-head metrics-head">
       <div>
         <h2 class="io-title">Indicadores do dia</h2>
-        <p class="muted">Resumo das balancas selecionadas.</p>
-      </div>
-      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-        {% if selected_date %}
-          <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
-        {% endif %}
-        <div id="milhao-rt-status" class="panel-tag">Atualizacao automatica ativa</div>
-        <div class="muted" style="font-size: 12px; opacity: 0.7;">Media calculada dos ultimos 14 dias (dias sem leitura nao entram)</div>
       </div>
     </div>
     <div class="metrics-overview grid-2 metric-grid">
       <div class="panel-card panel-card-compact metric-card metric-card-primary" data-rt-shimmer-host>
-        <div class="metric-label">Total do dia</div>
+        <div class="metric-label metric-label-with-arrow">
+          MILHO
+          <span class="metric-update-arrow" data-balance-arrow="LIMBL01" aria-hidden="true">↗</span>
+        </div>
+        <div class="metric-balance-subtitle">LIMBL01</div>
         <div class="metric-value"><span id="metric-total-number">{{ total_value_display }}</span> <span class="metric-unit">kg</span></div>
-        <div id="metric-avg-total" class="panel-tag{% if not avg_total_14_display %} is-hidden{% endif %}">{% if avg_total_14_display %}MEDIA {{ avg_total_14_display }} kg{% endif %}</div>
-        <div class="metric-note">Soma das leituras no periodo.</div>
       </div>
     </div>
-    {% if totals_by_balance and selected_balances|length > 1 %}
+    {% if totals_by_balance %}
       <div class="metrics-breakdown">
-        <div class="metrics-subtitle">Totais por balanca</div>
+        <div class="metrics-subtitle">Totais por balanca (inclui total sem milho)</div>
         <div class="panel-grid metric-grid metric-grid-compact">
           {% for item in totals_by_balance %}
-            <div class="panel-card panel-card-compact metric-card" data-balance-card="{{ item.balance }}" data-rt-shimmer-host>
+            <div class="panel-card panel-card-compact metric-card{% if item.balance == 'TOTAL' %} metric-card-total{% endif %}" data-balance-card="{{ item.balance }}" data-rt-shimmer-host>
               <div class="panel-card-top">
-                <div class="panel-title">{{ item.label }}</div>
-                <div class="panel-tag">{{ item.balance }}</div>
+                <div>
+                  <div class="panel-title metric-label-with-arrow">
+                    {{ item.label }}
+                    <span class="metric-update-arrow" data-balance-arrow="{{ item.balance }}" aria-hidden="true">↗</span>
+                  </div>
+                  <div class="metric-balance-subtitle">{{ item.balance }}</div>
+                </div>
               </div>
               <div class="metric-value"><span data-balance-total-number="{{ item.balance }}">{{ item.total_display }}</span> <span class="metric-unit">kg</span></div>
-              <div class="panel-tag{% if not item.avg_14_display %} is-hidden{% endif %}" data-balance-avg="{{ item.balance }}">{% if item.avg_14_display %}MEDIA {{ item.avg_14_display }} kg{% endif %}</div>
             </div>
           {% endfor %}
         </div>
       </div>
     {% endif %}
+    <div class="metrics-footer-badges">
+      {% if selected_date %}
+        <div class="panel-tag active">Dia {{ selected_date|date:"d/m/Y" }}</div>
+      {% endif %}
+      <div id="milhao-rt-status" class="panel-tag">Atualizacao automatica ativa</div>
+    </div>
   </section>
 
   <section class="card app-accent milhao-readings milhao-section" data-rt-shimmer-host {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Leituras por hora</h2>
-        <p class="muted">Valores acumulados recebidos ao longo do dia.</p>
+    <details class="io-discrete">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Leituras por hora</span>
+        <span class="muted">Valores acumulados recebidos ao longo do dia.</span>
+      </summary>
+      <div class="io-discrete-body">
         {% if last_ingests %}
-          <div id="last-ingests-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+          <div id="last-ingests-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
             {% for item in last_ingests %}
               <span class="panel-tag" data-last-ingest="{{ item.balance }}">Ultima Leitura {{ item.label }}: {{ item.time }}</span>
             {% endfor %}
           </div>
         {% endif %}
+        {% if entries %}
+          <div class="table-wrap">
+            <table class="table">
+              <colgroup>
+                <col style="width: 56px;">
+                <col style="width: 112px;">
+                <col style="width: 78px;">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Balanca</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in entries %}
+                  <tr>
+                    <td>{{ item.hour }}</td>
+                    <td>
+                      <div>{{ item.label }}</div>
+                      <div class="muted">{{ item.balance }}</div>
+                    </td>
+                    <td>{% if item.value_display %}{{ item.value_display }} kg{% else %}-{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="muted">Nenhum dado para o filtro selecionado.</p>
+        {% endif %}
       </div>
-    </div>
-    {% if entries %}
-      <div class="table-wrap">
-        <table class="table">
-          <colgroup>
-            <col style="width: 56px;">
-            <col style="width: 112px;">
-            <col style="width: 78px;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Hora</th>
-              <th>Balanca</th>
-              <th>Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in entries %}
-              <tr>
-                <td>{{ item.hour }}</td>
-                <td>
-                  <div>{{ item.label }}</div>
-                  <div class="muted">{{ item.balance }}</div>
-                </td>
-                <td>{% if item.value_display %}{{ item.value_display }} kg{% else %}-{% endif %}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <p class="muted">Nenhum dado para o filtro selecionado.</p>
-    {% endif %}
+    </details>
   </section>
   </div>
 
   </div>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Audiowide&display=swap');
     .is-hidden { display: none !important; }
-    .milhao-section { width: 100%; margin: 0 auto 14px; }
+    .milhao-section { width: 100%; margin: 0 auto 8px; }
     .card-stack > .milhao-section:last-child { margin-bottom: 0; }
+    .milhao-mobile-title {
+      display: none;
+      text-align: center;
+      margin: 2px 0 0;
+    }
+    .milhao-mobile-title img {
+      width: min(43.2vw, 192px);
+      height: auto;
+      display: inline-block;
+    }
+    .metric-grid .metric-card-total {
+      grid-column: 1 / -1;
+    }
+    .metrics-head { margin-bottom: 6px; }
+    .metrics-overview { gap: 8px; }
+    .metrics-breakdown { margin-top: 8px; }
+    .metrics-subtitle { margin-bottom: 6px; }
+    .panel-grid.metric-grid-compact { gap: 8px; }
+    .panel-card.metric-card { padding: 10px; }
+    .panel-card.metric-card .panel-card-top { margin-bottom: 4px; }
+    .panel-card.metric-card .metric-value { margin-top: 2px; }
+    .metric-label-with-arrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .metric-update-arrow {
+      color: #22c55e;
+      font-size: 11px;
+      line-height: 1;
+      opacity: 0;
+      transform: translateY(1px);
+      transition: opacity 180ms ease, transform 180ms ease;
+      will-change: opacity, transform;
+    }
+    .metric-update-arrow.is-active {
+      opacity: 0.9;
+      transform: translateY(0);
+    }
+    .metric-balance-subtitle {
+      margin-top: 2px;
+      font-size: 11px;
+      line-height: 1.2;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: rgba(226, 232, 240, 0.55);
+      font-weight: 600;
+    }
+    .metrics-footer-badges {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+    }
+    .metric-grid {
+      grid-template-columns: repeat(auto-fit, minmax(130px, 150px));
+      justify-content: center;
+    }
+    .metric-grid .metric-card {
+      max-width: 150px;
+      width: 100%;
+    }
+    .metric-grid .metric-card.metric-card-total {
+      max-width: none;
+    }
     .date-nav-card {
-      padding: 12px 14px;
+      padding: 8px 10px;
       max-width: 420px;
-      margin: 0 auto 14px;
+      margin: 0 auto 8px;
       border: 0;
       background: transparent;
       box-shadow: none;
@@ -286,7 +313,7 @@
       display: grid;
       grid-template-columns: 42px minmax(0, 1fr) 42px;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
     }
     .milhao-date-field {
       margin: 0;
@@ -295,7 +322,7 @@
     }
     .milhao-date-input {
       width: 100%;
-      min-height: 48px;
+      min-height: 42px;
       margin-top: 0;
       border-radius: 999px;
       border: 1px solid rgba(255, 122, 26, 0.38);
@@ -313,8 +340,8 @@
       box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.18), 0 8px 20px rgba(0, 0, 0, 0.3);
     }
     .milhao-date-arrow {
-      width: 42px;
-      height: 42px;
+      width: 38px;
+      height: 38px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -375,17 +402,19 @@
     }
     .rt-shimmer-layer.is-running { opacity: 0; }
     @media (max-width: 700px) {
-      .milhao-section { margin: 0 auto 10px; }
+      #milhao-hud-section { display: none; }
+      .milhao-mobile-title { display: block; }
+      .milhao-section { margin: 0 auto 6px; }
       .card-stack > .milhao-section:last-child { margin-bottom: 0; }
       .milhao-date-nav-grid {
         grid-template-columns: 36px minmax(0, 1fr) 36px;
-        gap: 8px;
+        gap: 6px;
       }
       .milhao-date-arrow {
-        width: 36px;
-        height: 36px;
+        width: 34px;
+        height: 34px;
       }
-      .milhao-date-input { min-height: 42px; }
+      .milhao-date-input { min-height: 38px; }
     }
     @keyframes rtModernPop {
       0% { transform: scale(1); filter: brightness(1); }

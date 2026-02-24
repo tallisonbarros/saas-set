@@ -73,4 +73,6 @@ class AppMilhaoBlaIngestConfigTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["total_value_display"], "10")
+        total_card = next(item for item in payload["totals_by_balance"] if item["balance"] == "TOTAL")
+        self.assertEqual(total_card["total_display"], "5")
         self.assertGreaterEqual(len(payload["composition"]), 1)

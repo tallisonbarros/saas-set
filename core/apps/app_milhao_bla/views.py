@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden, JsonResponse
@@ -123,11 +123,6 @@ def _build_dashboard_context(request, app):
     balances = sorted({item["balance"] for item in entries})
 
     selected_date_raw = request.GET.get("date", "")
-    selected_balance_raw = request.GET.getlist("balance")
-    if not selected_balance_raw:
-        selected_balance_raw = request.GET.get("balance", "").split(",")
-    selected_balances = [item.strip() for item in selected_balance_raw if item.strip()]
-
     selected_date = None
     if selected_date_raw:
         try:
@@ -137,19 +132,13 @@ def _build_dashboard_context(request, app):
     if not selected_date and dates:
         selected_date = dates[-1]
 
-    valid_balances = {balance for balance in balances}
-    selected_balances = [bal for bal in selected_balances if bal in valid_balances]
-    if not selected_balances and balances:
-        if "LIMBL01" in balances:
-            selected_balances = ["LIMBL01"]
-        else:
-            selected_balances = [balances[0]]
+    # Sem seletor de balanca: sempre exibimos todas as balancas disponiveis.
+    selected_balances = list(balances)
 
     filtered = [
         item
         for item in entries
         if (not selected_date or item["date"] == selected_date)
-        and (not selected_balances or item["balance"] in selected_balances)
     ]
 
     last_by_balance = {}
@@ -179,14 +168,16 @@ def _build_dashboard_context(request, app):
                 next_date = dates[idx + 1]
         except ValueError:
             pass
-    total_value = sum(item["value"] or 0 for item in filtered) if filtered else 0
-    total_value_display = _format_kg(total_value)
+    milho_total = sum((item["value"] or 0) for item in filtered if item["balance"] == "LIMBL01") if filtered else 0
+    total_sem_milho = sum((item["value"] or 0) for item in filtered if item["balance"] != "LIMBL01") if filtered else 0
+    total_value = milho_total
+    total_value_display = _format_kg(milho_total)
     totals_by_balance = {}
     for item in filtered:
         balance = item["balance"]
         totals_by_balance.setdefault(balance, 0)
         totals_by_balance[balance] += item["value"] or 0
-    totals_by_balance = [
+    totals_by_balance_items = [
         {
             "balance": balance,
             "label": balance_labels.get(balance, balance),
@@ -194,6 +185,15 @@ def _build_dashboard_context(request, app):
             "total_display": _format_kg(totals_by_balance[balance]),
         }
         for balance in sorted(totals_by_balance.keys())
+        if balance != "LIMBL01"
+    ]
+    totals_by_balance = totals_by_balance_items + [
+        {
+            "balance": "TOTAL",
+            "label": "TOTAL",
+            "total": total_sem_milho,
+            "total_display": _format_kg(total_sem_milho),
+        }
     ]
 
     composition_source = [
@@ -235,44 +235,6 @@ def _build_dashboard_context(request, app):
                 }
             )
 
-    avg_total_14 = None
-    avg_by_balance = {}
-    if selected_date and selected_balances:
-        window_end = selected_date
-        window_start = selected_date - timedelta(days=13)
-        window_dates = [window_start + timedelta(days=offset) for offset in range(14)]
-        window_set = set(window_dates)
-        daily_total = {day: 0.0 for day in window_dates}
-        daily_by_balance = {balance: {day: 0.0 for day in window_dates} for balance in selected_balances}
-        for item in entries:
-            if item["date"] not in window_set:
-                continue
-            if item["balance"] not in selected_balances:
-                continue
-            value = item["value"] or 0
-            daily_total[item["date"]] += value
-            daily_by_balance[item["balance"]][item["date"]] += value
-        total_days = [value for value in daily_total.values() if value > 0]
-        if total_days:
-            avg_total_14 = sum(total_days) / len(total_days)
-        avg_by_balance = {}
-        for balance, totals in daily_by_balance.items():
-            balance_days = [value for value in totals.values() if value > 0]
-            if balance_days:
-                avg_by_balance[balance] = sum(balance_days) / len(balance_days)
-
-    totals_by_balance = [
-        {
-            "balance": item["balance"],
-            "label": item["label"],
-            "total": item["total"],
-            "avg_14": avg_by_balance.get(item["balance"]),
-            "total_display": item["total_display"],
-            "avg_14_display": _format_kg(avg_by_balance.get(item["balance"])),
-        }
-        for item in totals_by_balance
-    ]
-
     return {
         "entries": filtered,
         "dates": dates,
@@ -281,9 +243,9 @@ def _build_dashboard_context(request, app):
         "selected_balances": selected_balances,
         "total_value": total_value,
         "total_value_display": total_value_display,
+        "total_sem_milho": total_sem_milho,
+        "total_sem_milho_display": _format_kg(total_sem_milho),
         "totals_by_balance": totals_by_balance,
-        "avg_total_14": avg_total_14,
-        "avg_total_14_display": _format_kg(avg_total_14),
         "composition": composition,
         "prev_date": prev_date,
         "next_date": next_date,
@@ -321,13 +283,11 @@ def dashboard_cards_data(request):
             "ok": True,
             "updated_at": timezone.localtime(timezone.now()).strftime("%H:%M:%S"),
             "total_value_display": context["total_value_display"],
-            "avg_total_14_display": context["avg_total_14_display"],
             "totals_by_balance": [
                 {
                     "balance": item["balance"],
                     "label": item["label"],
                     "total_display": item["total_display"],
-                    "avg_14_display": item["avg_14_display"],
                 }
                 for item in context["totals_by_balance"]
             ],

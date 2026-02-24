@@ -13,15 +13,12 @@
   var rtIntervalMs = 15000;
   var rtTimer = null;
   var isNavigating = false;
-  var grid = null;
-  var form = null;
-  var hiddenContainer = null;
   var dateInput = null;
   var availableDates = [];
-  var selected = [];
   var shimmerCleanupTimers = new WeakMap();
   var shimmerLastRunAt = new WeakMap();
   var shimmerRafHandles = new WeakMap();
+  var arrowTimers = new WeakMap();
   var rtDebug = false;
   try {
     var debugFromUrl = new URLSearchParams(window.location.search).get("rtdebug");
@@ -44,9 +41,6 @@
 
   function hydrateElements() {
     dynamicRoot = document.getElementById("milhao-dashboard-dynamic");
-    grid = dynamicRoot ? dynamicRoot.querySelector("#balance-chip-grid") : null;
-    form = grid ? grid.closest("form") : null;
-    hiddenContainer = dynamicRoot ? dynamicRoot.querySelector("#balance-hidden-inputs") : null;
     dateInput = dynamicRoot ? dynamicRoot.querySelector("#milhao-date-input") : null;
     rtStatus = document.getElementById("milhao-rt-status");
     cardsDataUrl = dynamicRoot ? (dynamicRoot.getAttribute("data-cards-url") || cardsDataUrl) : cardsDataUrl;
@@ -56,59 +50,6 @@
           .map(function (item) { return item.trim(); })
           .filter(Boolean)
       : [];
-    selected = grid
-      ? (grid.getAttribute("data-selected") || "")
-          .split(",")
-          .map(function (item) { return item.trim(); })
-          .filter(Boolean)
-      : [];
-  }
-
-  function setHiddenInputs(values) {
-    if (!hiddenContainer) {
-      return;
-    }
-    hiddenContainer.innerHTML = "";
-    values.forEach(function (value) {
-      var input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "balance";
-      input.value = value;
-      hiddenContainer.appendChild(input);
-    });
-  }
-
-  function updateUI() {
-    if (!grid) {
-      return;
-    }
-    var chips = Array.from(grid.querySelectorAll(".balance-chip"));
-    var selectableChips = chips.filter(function (chip) {
-      return chip.getAttribute("data-balance") !== "__all__";
-    });
-    selectableChips.forEach(function (chip) {
-      var balance = chip.getAttribute("data-balance");
-      var main = chip.querySelector(".balance-chip-main");
-      var add = chip.querySelector(".balance-chip-add");
-      var symbol = add ? add.querySelector(".balance-chip-symbol") : null;
-      var isSelected = selected.indexOf(balance) >= 0;
-      chip.classList.toggle("is-selected", isSelected);
-      if (main) {
-        main.classList.toggle("is-selected", isSelected);
-      }
-      if (add) {
-        add.classList.toggle("is-selected", isSelected);
-      }
-      if (symbol) {
-        symbol.textContent = isSelected ? "-" : "+";
-      }
-    });
-    var allChip = grid.querySelector(".balance-chip-all");
-    if (allChip) {
-      var allSelected = selectableChips.length > 0 && selected.length === selectableChips.length;
-      allChip.classList.toggle("is-selected", allSelected);
-    }
-    setHiddenInputs(selected);
   }
 
   function buildFormUrl(targetForm) {
@@ -144,7 +85,6 @@
         }
         hydrateElements();
         bindDynamicHandlers();
-        updateUI();
         refreshCardsRealtime();
       })
       .catch(function () {
@@ -218,7 +158,6 @@
     }
     return (
       el.closest("[data-rt-shimmer-host]") ||
-      el.closest(".balance-chip") ||
       el.closest(".panel-card") ||
       el.closest(".metrics-card") ||
       el.closest(".composition-card") ||
@@ -238,8 +177,6 @@
       return;
     }
     shimmerLastRunAt.set(host, now);
-    host.setAttribute("data-rt-shimmer-last", String(now));
-
     host.classList.add("rt-shimmer-host");
     var layer = ensureShimmerLayer(host);
     clearShimmerState(host);
@@ -313,6 +250,26 @@
     runShimmer(resolveShimmerHost(el));
   }
 
+  function flashBalanceArrow(balance) {
+    if (!balance) {
+      return;
+    }
+    var arrow = document.querySelector('[data-balance-arrow=\"' + balance + '\"]');
+    if (!arrow) {
+      return;
+    }
+    arrow.classList.add("is-active");
+    var prevTimer = arrowTimers.get(arrow);
+    if (prevTimer) {
+      clearTimeout(prevTimer);
+    }
+    var timer = setTimeout(function () {
+      arrow.classList.remove("is-active");
+      arrowTimers.delete(arrow);
+    }, 5000);
+    arrowTimers.set(arrow, timer);
+  }
+
   function setTextIfChanged(el, nextText) {
     if (!el) {
       return false;
@@ -326,42 +283,10 @@
     return true;
   }
 
-  function setTagText(tag, text) {
-    if (!tag) {
-      return false;
-    }
-    var normalized = (text || "").trim();
-    if (!normalized) {
-      tag.textContent = "";
-      tag.classList.add("is-hidden");
-      return false;
-    }
-    tag.classList.remove("is-hidden");
-    if (tag.textContent.trim() !== normalized) {
-      tag.textContent = normalized;
-      pulseElement(tag);
-      return true;
-    }
-    return false;
-  }
-
-  function pulseBalanceChip(balance) {
-    if (!grid || !balance) {
-      return;
-    }
-    var chip = grid.querySelector('.balance-chip[data-balance="' + balance + '"]');
-    if (!chip) {
-      return;
-    }
-    var target = chip.querySelector(".balance-chip-main") || chip;
-    pulseElement(target);
-  }
-
   function getFilters() {
     var dateValue = dateInput ? (dateInput.value || "") : "";
     return {
       date: dateValue,
-      balances: selected.slice(),
     };
   }
 
@@ -403,12 +328,9 @@
     if (!payload || !payload.ok) {
       return;
     }
-    var changedBalances = {};
-    setTextIfChanged(document.getElementById("metric-total-number"), payload.total_value_display || "0");
-    setTagText(
-      document.getElementById("metric-avg-total"),
-      payload.avg_total_14_display ? ("MEDIA " + payload.avg_total_14_display + " kg") : ""
-    );
+    if (setTextIfChanged(document.getElementById("metric-total-number"), payload.total_value_display || "0")) {
+      flashBalanceArrow("LIMBL01");
+    }
 
     var totalsMap = {};
     (payload.totals_by_balance || []).forEach(function (item) {
@@ -418,14 +340,7 @@
       var balance = node.getAttribute("data-balance-total-number");
       var item = totalsMap[balance];
       if (setTextIfChanged(node, item ? (item.total_display || "0") : "0")) {
-        changedBalances[balance] = true;
-      }
-    });
-    document.querySelectorAll("[data-balance-avg]").forEach(function (tag) {
-      var balance = tag.getAttribute("data-balance-avg");
-      var item = totalsMap[balance];
-      if (setTagText(tag, item && item.avg_14_display ? ("MEDIA " + item.avg_14_display + " kg") : "")) {
-        changedBalances[balance] = true;
+        flashBalanceArrow(balance);
       }
     });
 
@@ -436,19 +351,25 @@
     document.querySelectorAll("[data-comp-segment]").forEach(function (seg) {
       var balance = seg.getAttribute("data-comp-segment");
       var item = compositionMap[balance];
-      var nextPercent = item ? (item.percent_str || "0.0") : "0.0";
-      var nextFlex = nextPercent + "%";
-      if (seg.style.flexBasis !== nextFlex) {
+      var nextPercent = parseFloat(item ? (item.percent_str || "0.0") : "0.0");
+      if (!isFinite(nextPercent)) {
+        nextPercent = 0;
+      }
+      var currentPercent = parseFloat(seg.getAttribute("data-current-percent") || seg.style.flexBasis || "0");
+      if (!isFinite(currentPercent)) {
+        currentPercent = 0;
+      }
+      if (Math.abs(currentPercent - nextPercent) > 0.05) {
+        var nextFlex = nextPercent.toFixed(1) + "%";
         seg.style.flexBasis = nextFlex;
+        seg.setAttribute("data-current-percent", nextPercent.toFixed(1));
         pulseElement(seg);
       }
     });
     document.querySelectorAll("[data-comp-value]").forEach(function (label) {
       var balance = label.getAttribute("data-comp-value");
       var item = compositionMap[balance];
-      if (setTextIfChanged(label, (item ? item.percent_str : "0.0") + "%")) {
-        changedBalances[balance] = true;
-      }
+      setTextIfChanged(label, (item ? item.percent_str : "0.0") + "%");
     });
 
     var ingestMap = {};
@@ -461,13 +382,7 @@
       if (!item) {
         return;
       }
-      if (setTextIfChanged(tag, "Ultima Leitura " + item.label + ": " + item.time)) {
-        changedBalances[balance] = true;
-      }
-    });
-
-    Object.keys(changedBalances).forEach(function (balance) {
-      pulseBalanceChip(balance);
+      setTextIfChanged(tag, "Ultima Leitura " + item.label + ": " + item.time);
     });
 
     if (rtStatus) {
@@ -481,9 +396,6 @@
     if (filters.date) {
       params.set("date", filters.date);
     }
-    filters.balances.forEach(function (balance) {
-      params.append("balance", balance);
-    });
     fetch(cardsDataUrl + "?" + params.toString(), { headers: { "X-Requested-With": "XMLHttpRequest" } })
       .then(function (response) { return response.json(); })
       .then(function (payload) {
@@ -527,46 +439,6 @@
       if (dateField && dateInput) {
         event.preventDefault();
         openDatePicker(dateInput);
-        return;
-      }
-
-      if (!grid || !form) {
-        return;
-      }
-
-      var mainButton = event.target.closest(".balance-chip-main");
-      var addButton = event.target.closest(".balance-chip-add");
-      if (!mainButton && !addButton) {
-        return;
-      }
-      event.preventDefault();
-      var chip = event.target.closest(".balance-chip");
-      if (!chip) {
-        return;
-      }
-      var balance = chip.getAttribute("data-balance");
-      if (balance === "__all__") {
-        selected = Array.from(grid.querySelectorAll(".balance-chip"))
-          .map(function (item) { return item.getAttribute("data-balance"); })
-          .filter(function (item) { return item && item !== "__all__"; });
-        updateUI();
-        navigatePartial(buildFormUrl(form), true);
-        return;
-      }
-      if (mainButton) {
-        selected = [balance];
-        updateUI();
-        navigatePartial(buildFormUrl(form), true);
-        return;
-      }
-      if (addButton) {
-        if (selected.indexOf(balance) >= 0) {
-          selected = selected.filter(function (item) { return item !== balance; });
-        } else {
-          selected = selected.concat(balance);
-        }
-        updateUI();
-        navigatePartial(buildFormUrl(form), true);
       }
     });
 
@@ -586,7 +458,7 @@
 
     dynamicRoot.addEventListener("submit", function (event) {
       var targetForm = event.target;
-      if (!targetForm || !targetForm.matches(".milhao-date-nav-form, .metrics-filter-form")) {
+      if (!targetForm || !targetForm.matches(".milhao-date-nav-form")) {
         return;
       }
       event.preventDefault();
@@ -600,6 +472,7 @@
       }
       openDatePicker(dateInput);
     });
+
   }
 
   window.addEventListener("popstate", function () {
@@ -608,7 +481,6 @@
 
   hydrateElements();
   bindDynamicHandlers();
-  updateUI();
   refreshCardsRealtime();
   startRealtime();
 })();
