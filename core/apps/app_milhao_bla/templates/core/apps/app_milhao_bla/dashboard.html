@@ -257,6 +257,26 @@
       </div>
     </details>
   </section>
+
+  <section class="card app-accent milhao-section tools-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Ferramentas</h2>
+      </div>
+    </div>
+    <div class="tools-grid">
+      <button type="button" class="tool-btn is-disabled" disabled aria-disabled="true" title="Exportar Excel (em breve)">
+        <span class="tool-btn-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img" focusable="false">
+            <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+            <path d="M14 2v5h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+            <path d="M8.5 15.5l3-5m0 5l-3-5m4.5 0h2.5m-2.5 5h2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+          </svg>
+        </span>
+        <span class="tool-btn-label">Exportar Excel</span>
+      </button>
+    </div>
+  </section>
   </div>
 
   </div>
@@ -525,6 +545,48 @@
       will-change: transform, opacity;
     }
     .rt-shimmer-layer.is-running { opacity: 0; }
+    .tools-card {
+      padding: 10px 12px;
+    }
+    .tools-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .tool-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(30, 41, 59, 0.35);
+      color: rgba(226, 232, 240, 0.9);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .tool-btn.is-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      filter: grayscale(0.15);
+    }
+    .tool-btn-icon {
+      width: 18px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #34d399;
+    }
+    .tool-btn-icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
     @media (max-width: 700px) {
       #milhao-hud-section { display: none; }
       .milhao-mobile-title { display: block; }

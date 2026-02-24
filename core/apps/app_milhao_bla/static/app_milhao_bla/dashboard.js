@@ -424,7 +424,6 @@
     dynamicRoot.addEventListener("click", function (event) {
       var directDateInput = event.target.closest("#milhao-date-input");
       if (directDateInput) {
-        openDatePicker(directDateInput);
         return;
       }
 
@@ -463,14 +462,6 @@
       }
       event.preventDefault();
       navigatePartial(buildFormUrl(targetForm), true);
-    });
-
-    dynamicRoot.addEventListener("pointerdown", function (event) {
-      var field = event.target.closest(".milhao-date-field");
-      if (!field || !dateInput) {
-        return;
-      }
-      openDatePicker(dateInput);
     });
 
   }
