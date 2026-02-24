@@ -40,7 +40,7 @@
     </div>
   </section>
   <div class="milhao-mobile-title">
-    <img src="/media/logos/milhao_logo.png" alt="MILHAO - RVD" />
+    <img src="{% static 'app_milhao_bla/milhao_logo.png' %}" alt="MILHAO - RVD" />
   </div>
 
   <div id="milhao-dashboard-dynamic" data-cards-url="{% url 'app_milhao_bla_cards_data' %}">
@@ -89,7 +89,6 @@
     <div class="io-card-head composition-head">
       <div>
         <h2 class="io-title">Proporcao de composicao do dia</h2>
-        <p class="muted">Percentual por balanca.</p>
       </div>
     </div>
     <div class="composition-bar-stack">
