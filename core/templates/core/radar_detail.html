@@ -26,7 +26,7 @@
           <div class="radar-mode-badge radar-mode-badge-viewer">Somente visualizacao</div>
         {% endif %}
         <div class="hud-menu" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'radar_list' %}">Inicio do modulo</a>
+          <a class="hud-menu-pill" href="{% url 'radar_list' %}">Voltar para radares</a>
         </div>
       </div>
       <div class="page-hud-head">
@@ -43,7 +43,7 @@
           <div class="meta-value">{{ total_trabalhos }}</div>
         </div>
         <div>
-          <div class="meta-label">ID_RADAR</div>
+          <div class="meta-label">Codigo do radar</div>
           <div class="meta-value">{% if radar.id_radar %}{{ radar.id_radar.codigo }}{% else %}-{% endif %}</div>
         </div>
         <div>
@@ -79,13 +79,18 @@
       {% if message %}
         <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
       {% endif %}
+      {% if can_manage %}
+        <p class="notice notice-info">Voce tem permissao de edicao neste radar.</p>
+      {% else %}
+        <p class="notice notice-warning">Acesso somente leitura. Apenas o criador pode alterar este radar.</p>
+      {% endif %}
     </div>
   </section>
 
   <details class="io-card io-discrete hud-filter" {% if classificacao_filter %}open{% endif %}>
     <summary class="io-discrete-summary">
       <span class="io-title">Filtros</span>
-      <span class="muted">Refine os trabalhos por classificacao.</span>
+      <span class="muted">Filtre os trabalhos por classificacao.</span>
     </summary>
     <div class="io-discrete-body">
       <form class="io-form" method="get">
@@ -103,8 +108,8 @@
           </label>
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost btn-compact" type="submit">Aplicar filtros</button>
-          <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}">Limpar</a>
+          <button class="btn btn-ghost btn-compact" type="submit">Aplicar filtro</button>
+          <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}">Limpar filtro</a>
         </div>
       </form>
     </div>
@@ -115,20 +120,20 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Trabalhos</h2>
-          <p class="muted">Executando, pendentes e finalizados.</p>
+          <p class="muted">Fila objetiva por prioridade: agora, em andamento e concluidos.</p>
         </div>
         <div class="module-meta">
           {% if has_finalizados_antigos and not show_all_finalizados %}
-            <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_toggle_query %}?{{ finalizados_toggle_query }}{% endif %}">Mostrar todos finalizados</a>
+            <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_toggle_query %}?{{ finalizados_toggle_query }}{% endif %}">Exibir concluidos antigos</a>
           {% elif show_all_finalizados %}
-            <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Mostrar finalizados do mes</a>
+            <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Exibir concluidos do mes</a>
           {% endif %}
         </div>
       </div>
 
       <div class="proposal-grid status-group">
-        <div class="muted status-label">Executando</div>
-        {% for trabalho in trabalhos_execucao %}
+        <div class="muted status-label">Agora</div>
+        {% for trabalho in trabalhos_agora %}
           <article class="proposal-card io-proposal-card proposal-card-executando">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
             <div class="proposal-head">
@@ -136,6 +141,7 @@
                 <div class="proposal-title">{{ trabalho.nome }}</div>
                 <div class="proposal-meta">{{ trabalho.descricao|default:"Trabalho sem descricao." }}</div>
                 <div class="proposal-meta">Registrado em: {{ trabalho.data_registro|date:"d/m/Y" }}</div>
+                <div class="proposal-meta"><strong>Prioridade:</strong> {{ trabalho.prioridade_motivo }}</div>
                 {% if trabalho.classificacao %}
                   <div class="proposal-meta">Classificacao: {{ trabalho.classificacao.nome }}</div>
                 {% endif %}
@@ -147,13 +153,13 @@
             </div>
           </article>
         {% empty %}
-          <div class="muted">Nenhum trabalho executando.</div>
+          <div class="muted">Nenhum trabalho priorizado agora.</div>
         {% endfor %}
       </div>
 
       <div class="proposal-grid status-group">
-        <div class="muted status-label">Pendentes</div>
-        {% for trabalho in trabalhos_pendentes %}
+        <div class="muted status-label">Em andamento</div>
+        {% for trabalho in trabalhos_em_andamento %}
           <article class="proposal-card io-proposal-card">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
             <div class="proposal-head">
@@ -172,12 +178,12 @@
             </div>
           </article>
         {% empty %}
-          <div class="muted">Nenhum trabalho pendente.</div>
+          <div class="muted">Nenhum trabalho adicional em andamento.</div>
         {% endfor %}
       </div>
 
       <div class="proposal-grid status-group">
-        <div class="muted status-label">Finalizados{% if not show_all_finalizados %} (mes atual){% endif %}</div>
+        <div class="muted status-label">Concluidos{% if not show_all_finalizados %} (mes atual){% endif %}</div>
         {% for trabalho in trabalhos_finalizados %}
           <article class="proposal-card io-proposal-card">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
@@ -197,7 +203,7 @@
             </div>
           </article>
         {% empty %}
-          <div class="muted">Nenhum trabalho finalizado.</div>
+          <div class="muted">Nenhum trabalho concluido.</div>
         {% endfor %}
       </div>
     </section>
@@ -206,11 +212,10 @@
   <details class="io-card io-discrete" id="novo-trabalho" style="margin-top: 18px;">
     <summary class="io-discrete-summary">
       <span class="io-title">Novo trabalho</span>
-      <span class="muted">Cadastre um trabalho e organize atividades.</span>
+      <span class="muted">Cadastre um trabalho para operar o radar.</span>
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
-        <div class="muted">Permissao: somente criador do radar.</div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="create_trabalho">
@@ -236,17 +241,7 @@
               <input type="text" name="responsavel" placeholder="Equipe tecnica">
             </label>
             <label class="field">
-              <div class="field-row">
-                <span>Contrato</span>
-                <details class="inline-pop" id="contrato-pop" {% if open_cadastro == 'contrato' %}open{% endif %}>
-                  <summary>+ novo</summary>
-                  <div class="inline-pop-body">
-                    <label>Contrato</label>
-                    <input type="text" name="contrato_nome" form="create-contrato-form" placeholder="Novo contrato">
-                    <button class="btn btn-ghost btn-compact" type="submit" form="create-contrato-form">Adicionar</button>
-                  </div>
-                </details>
-              </div>
+              <span>Contrato</span>
               <select name="contrato" id="contrato-select">
                 <option value="">Selecione</option>
                 {% for contrato in contratos %}
@@ -259,17 +254,7 @@
               <input type="date" name="data_registro">
             </label>
             <label class="field">
-              <div class="field-row">
-                <span>Classificacao</span>
-                <details class="inline-pop" id="classificacao-pop" {% if open_cadastro == 'classificacao' %}open{% endif %}>
-                  <summary>+ novo</summary>
-                  <div class="inline-pop-body">
-                    <label>Classificacao</label>
-                    <input type="text" name="classificacao_nome" form="create-classificacao-form" placeholder="Nova classificacao">
-                    <button class="btn btn-ghost btn-compact" type="submit" form="create-classificacao-form">Adicionar</button>
-                  </div>
-                </details>
-              </div>
+              <span>Classificacao</span>
               <select name="classificacao" id="classificacao-select">
                 <option value="">Selecione</option>
                 {% for classificacao in classificacoes %}
@@ -282,155 +267,130 @@
             <button class="btn btn-primary" type="submit">Salvar trabalho</button>
           </div>
         </form>
-        <form id="create-classificacao-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_classificacao">
-        </form>
-        <form id="create-contrato-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_contrato">
-        </form>
       {% else %}
-        <div class="muted">Somente visualizacao. Apenas o criador do radar pode criar trabalhos.</div>
+        <div class="muted">Criacao desabilitada para acesso de leitura.</div>
       {% endif %}
     </div>
   </details>
 
-  <details class="io-card io-discrete" style="margin-top: 18px;">
+  <details class="io-card io-discrete" style="margin-top: 18px;" {% if open_cadastro == 'classificacao' or open_cadastro == 'contrato' %}open{% endif %}>
     <summary class="io-discrete-summary">
-      <span class="io-title">Editar radar</span>
-      <span class="muted">Ajuste os dados gerais do radar.</span>
+      <span class="io-title">Configuracoes do radar</span>
+      <span class="muted">Centralize cadastros auxiliares e ajustes gerais.</span>
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
-        <div class="muted">Permissao: somente criador do radar.</div>
-        <form class="io-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_radar">
-          <div class="io-form-grid">
-            <label class="field">
-              <span>Nome</span>
-              <input type="text" name="nome" value="{{ radar.nome }}" required>
-            </label>
-            <label class="field">
-              <span>ID_RADAR</span>
-              <input type="text" name="id_radar" value="{% if radar.id_radar %}{{ radar.id_radar.codigo }}{% endif %}">
-            </label>
-            <label class="field">
-              <span>Local</span>
-              <input type="text" name="local" value="{{ radar.local|default:'' }}">
-            </label>
-            <label class="field" style="grid-column: 1 / -1;">
-              <span>Descricao</span>
-              <textarea name="descricao" rows="3">{{ radar.descricao|default:'' }}</textarea>
-            </label>
+        <details class="io-discrete" id="cadastro-auxiliar" style="margin-bottom: 14px;" {% if open_cadastro == 'classificacao' or open_cadastro == 'contrato' %}open{% endif %}>
+          <summary class="io-discrete-summary compact">
+            <span class="io-title">Cadastros auxiliares</span>
+            <span class="muted">Inclua contratos e classificacoes.</span>
+          </summary>
+          <div class="io-discrete-body">
+            <div class="io-form-grid">
+              <div class="field">
+                <div class="field-row">
+                  <span>Contrato</span>
+                  <details class="inline-pop" id="contrato-pop" {% if open_cadastro == 'contrato' %}open{% endif %}>
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Contrato</label>
+                      <input type="text" name="contrato_nome" form="create-contrato-form" placeholder="Novo contrato">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-contrato-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+              </div>
+              <div class="field">
+                <div class="field-row">
+                  <span>Classificacao</span>
+                  <details class="inline-pop" id="classificacao-pop" {% if open_cadastro == 'classificacao' %}open{% endif %}>
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Classificacao</label>
+                      <input type="text" name="classificacao_nome" form="create-classificacao-form" placeholder="Nova classificacao">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-classificacao-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+            <form id="create-classificacao-form" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="create_classificacao">
+            </form>
+            <form id="create-contrato-form" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="create_contrato">
+            </form>
           </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+        </details>
+
+        <details class="io-discrete" open>
+          <summary class="io-discrete-summary compact">
+            <span class="io-title">Editar radar</span>
+            <span class="muted">Ajuste os dados gerais do radar.</span>
+          </summary>
+          <div class="io-discrete-body">
+            <form class="io-form" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_radar">
+              <div class="io-form-grid">
+                <label class="field">
+                  <span>Nome</span>
+                  <input type="text" name="nome" value="{{ radar.nome }}" required>
+                </label>
+                <label class="field">
+                  <span>Codigo do radar</span>
+                  <input type="text" name="id_radar" value="{% if radar.id_radar %}{{ radar.id_radar.codigo }}{% endif %}">
+                </label>
+                <label class="field">
+                  <span>Local</span>
+                  <input type="text" name="local" value="{{ radar.local|default:'' }}">
+                </label>
+                <label class="field" style="grid-column: 1 / -1;">
+                  <span>Descricao</span>
+                  <textarea name="descricao" rows="3">{{ radar.descricao|default:'' }}</textarea>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Atualizar radar</button>
+              </div>
+            </form>
+            <form method="post" onsubmit="return confirm('Excluir radar? Esta acao nao pode ser desfeita.');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete_radar">
+              <div class="form-actions">
+                <button class="btn btn-outline" type="submit">Excluir radar</button>
+              </div>
+            </form>
           </div>
-        </form>
-        <form method="post" onsubmit="return confirm('Excluir radar? Esta acao nao pode ser desfeita.');">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="delete_radar">
-          <div class="form-actions">
-            <button class="btn btn-outline" type="submit">Excluir radar</button>
-          </div>
-        </form>
+        </details>
       {% else %}
-        <div class="muted">Somente visualizacao. Apenas o criador do radar pode editar.</div>
+        <div class="muted">Configuracoes indisponiveis para acesso de leitura.</div>
       {% endif %}
     </div>
   </details>
   </div>
+  <script src="{% static 'core/radar_shared.js' %}"></script>
   <script>
     (function () {
-      function getCookie(name) {
-        var value = "; " + document.cookie;
-        var parts = value.split("; " + name + "=");
-        if (parts.length === 2) {
-          return parts.pop().split(";").shift();
-        }
-        return "";
+      if (!window.RadarShared) {
+        return;
       }
-      function setMessage(message, level) {
-        var box = document.getElementById("cadastro-message");
-        if (!box) {
-          return;
-        }
-        box.textContent = message;
-        box.className = "notice notice-" + (level || "info");
-        box.style.display = "block";
-      }
-      function bindCadastro(formId, inputSelector, selectId, detailsId) {
-        var formCadastro = document.getElementById(formId);
-        var input = document.querySelector(inputSelector);
-        var select = document.getElementById(selectId);
-        var details = document.getElementById(detailsId);
-        if (!formCadastro || !input || !select || !details) {
-          return;
-        }
-        formCadastro.addEventListener("submit", function (event) {
-          event.preventDefault();
-          var value = input.value.trim();
-          if (!value) {
-            setMessage("Informe um nome valido.", "error");
-            details.open = true;
-            return;
-          }
-          var data = new FormData(formCadastro);
-          if (!data.get(input.name)) {
-            data.set(input.name, value);
-          }
-          fetch(window.location.pathname + window.location.search, {
-            method: "POST",
-            headers: {
-              "X-Requested-With": "XMLHttpRequest",
-              "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: data,
-          })
-            .then(function (resp) { return resp.json(); })
-            .then(function (payload) {
-              if (payload && payload.id && payload.nome) {
-                var exists = Array.from(select.options).some(function (opt) {
-                  return opt.value === String(payload.id);
-                });
-                if (!exists) {
-                  var option = document.createElement("option");
-                  option.value = payload.id;
-                  option.textContent = payload.nome;
-                  select.appendChild(option);
-                }
-                select.value = String(payload.id);
-              }
-              if (payload && payload.message) {
-                setMessage(payload.message, payload.level);
-              }
-              if (payload && payload.ok) {
-                input.value = "";
-                details.open = false;
-              } else {
-                details.open = true;
-              }
-            })
-            .catch(function () {
-              setMessage("Nao foi possivel salvar agora.", "error");
-              details.open = true;
-            });
-        });
-      }
-      bindCadastro(
-        "create-contrato-form",
-        "input[name='contrato_nome'][form='create-contrato-form']",
-        "contrato-select",
-        "contrato-pop"
-      );
-      bindCadastro(
-        "create-classificacao-form",
-        "input[name='classificacao_nome'][form='create-classificacao-form']",
-        "classificacao-select",
-        "classificacao-pop"
-      );
+      window.RadarShared.bindCadastro({
+        formId: "create-contrato-form",
+        inputSelector: "input[name='contrato_nome'][form='create-contrato-form']",
+        selectId: "contrato-select",
+        detailsId: "contrato-pop",
+        messageId: "cadastro-message",
+      });
+      window.RadarShared.bindCadastro({
+        formId: "create-classificacao-form",
+        inputSelector: "input[name='classificacao_nome'][form='create-classificacao-form']",
+        selectId: "classificacao-select",
+        detailsId: "classificacao-pop",
+        messageId: "cadastro-message",
+      });
     })();
   </script>
 {% endblock %}

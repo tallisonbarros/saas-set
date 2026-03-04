@@ -27,7 +27,7 @@
     </div>
     <div class="hud-bottom-actions">
       {% if can_manage %}
-        <a class="btn btn-ghost btn-compact" href="#novo-radar">Novo radar</a>
+        <a class="btn btn-ghost btn-compact" href="#novo-radar">Criar radar</a>
       {% endif %}
     </div>
   </section>
@@ -58,7 +58,7 @@
             <div class="proposal-meta">Atividades: {{ radar.total_atividades }}</div>
             <div class="proposal-meta">Local: {{ radar.local|default:"-" }}</div>
             {% if radar.id_radar %}
-              <div class="proposal-meta">ID_RADAR: {{ radar.id_radar.codigo }}</div>
+              <div class="proposal-meta">Codigo do radar: {{ radar.id_radar.codigo }}</div>
             {% endif %}
           </article>
         {% empty %}
@@ -91,7 +91,7 @@
                 <input type="text" name="local" placeholder="Planta A">
               </label>
               <label class="field">
-                <span>ID_RADAR</span>
+                <span>Codigo do radar</span>
                 <input type="text" name="id_radar" placeholder="RDR-001">
               </label>
             </div>

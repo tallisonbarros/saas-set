@@ -28,7 +28,7 @@
           <div class="radar-mode-badge radar-mode-badge-viewer">Somente visualizacao</div>
         {% endif %}
         <div class="hud-menu" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar ao radar</a>
+          <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar para o radar</a>
           {% if can_create_proposta_from_trabalho %}
             <a
               class="hud-menu-pill"
@@ -36,7 +36,7 @@
               target="_blank"
               rel="noopener noreferrer"
             >
-              Criar proposta
+              Gerar proposta
             </a>
           {% endif %}
           {% if can_duplicate_trabalho %}
@@ -112,13 +112,18 @@
   {% if message %}
     <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
   {% endif %}
+  {% if can_manage %}
+    <p class="notice notice-info">Voce pode atualizar este trabalho e suas atividades.</p>
+  {% else %}
+    <p class="notice notice-warning">Acesso somente leitura. Apenas o criador pode alterar este trabalho.</p>
+  {% endif %}
 
   <div class="io-layout">
     <section class="io-card">
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Atividades</h2>
-          <p class="muted">Ordem unica de execucao. Status mostrado no badge de cada card.</p>
+          <p class="muted">Operacao direta no card: iniciar, concluir, reabrir e editar rapido.</p>
         </div>
       </div>
 
@@ -133,6 +138,15 @@
                   <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
                 {% endif %}
                 {% if can_manage %}
+                  {% if atividade.status != 'EXECUTANDO' %}
+                    <button class="btn btn-ghost btn-compact js-status-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-status="EXECUTANDO">Iniciar</button>
+                  {% endif %}
+                  {% if atividade.status != 'FINALIZADA' %}
+                    <button class="btn btn-ghost btn-compact js-status-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-status="FINALIZADA">Concluir</button>
+                  {% endif %}
+                  {% if atividade.status != 'PENDENTE' %}
+                    <button class="btn btn-ghost btn-compact js-status-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-status="PENDENTE">Reabrir</button>
+                  {% endif %}
                   <button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-direcao="up" {% if forloop.first %}disabled{% endif %} title="Mover para cima">Subir</button>
                   <button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-direcao="down" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">Descer</button>
                   <button
@@ -146,8 +160,9 @@
                     data-atividade-inicio="{{ atividade.inicio_execucao_em|date:'d/m/Y H:i' }}"
                     data-atividade-finalizada="{{ atividade.finalizada_em|date:'d/m/Y H:i' }}"
                   >
-                    Editar
+                    Abrir edicao completa
                   </button>
+                  <button class="btn btn-ghost btn-compact js-toggle-inline-edit" type="button">Editar atividade</button>
                 {% endif %}
               </div>
             </div>
@@ -156,6 +171,39 @@
               <span class="js-atividade-inicio"><strong>Inicio:</strong> {{ atividade.inicio_execucao_em|date:"d/m/Y H:i"|default:"-" }}</span>
               <span class="js-atividade-finalizada"><strong>Finalizacao:</strong> {{ atividade.finalizada_em|date:"d/m/Y H:i"|default:"-" }}</span>
             </div>
+            {% if can_manage %}
+              <form class="io-form js-inline-edit-form" style="display: none; margin-top: 12px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_atividade">
+                <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
+                <div class="io-form-grid">
+                  <label class="field">
+                    <span>Nome</span>
+                    <input type="text" name="nome" value="{{ atividade.nome|default:'' }}" required>
+                  </label>
+                  <label class="field">
+                    <span>Horas</span>
+                    <input type="text" name="horas_trabalho" value="{{ atividade.horas_trabalho|default:'' }}">
+                  </label>
+                  <label class="field" style="grid-column: 1 / -1;">
+                    <span>Descricao</span>
+                    <input type="text" name="descricao" value="{{ atividade.descricao|default:'' }}">
+                  </label>
+                  <label class="field">
+                    <span>Status</span>
+                    <select name="status">
+                      {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if atividade.status == value %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit">Salvar rapido</button>
+                  <button class="btn btn-ghost btn-compact js-cancel-inline-edit" type="button">Cancelar</button>
+                </div>
+              </form>
+            {% endif %}
           </article>
         {% empty %}
           <div class="muted">Nenhuma atividade cadastrada.</div>
@@ -231,7 +279,6 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
-        <div class="muted">Permissao: somente criador do radar.</div>
         <div id="cadastro-message" class="notice" style="display: none;"></div>
         <form class="io-form" method="post">
           {% csrf_token %}
@@ -263,7 +310,7 @@
           </div>
         </form>
       {% else %}
-        <div class="muted">Somente visualizacao. Apenas o criador do radar pode cadastrar atividades.</div>
+        <div class="muted">Criacao de atividade desabilitada para acesso de leitura.</div>
       {% endif %}
     </div>
   </details>
@@ -275,7 +322,6 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_edit_trabalho_by_creator %}
-        <div class="muted">Permissao: somente criador do radar.</div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_trabalho">
@@ -346,7 +392,7 @@
             </label>
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Salvar alteracoes</button>
+            <button class="btn btn-primary" type="submit">Atualizar trabalho</button>
           </div>
         </form>
         <form id="create-classificacao-form" method="post">
@@ -365,22 +411,40 @@
           </div>
         </form>
       {% else %}
-        <div class="muted">Somente visualizacao. Apenas o criador do radar pode editar.</div>
+        <div class="muted">Edicao desabilitada para acesso de leitura.</div>
       {% endif %}
     </div>
   </details>
 
+  <script src="{% static 'core/radar_shared.js' %}"></script>
   <script>
     (function () {
-      function getCookie(name) {
-        var value = "; " + document.cookie;
-        var parts = value.split("; " + name + "=");
-        if (parts.length === 2) {
-          return parts.pop().split(";").shift();
-        }
-        return "";
+      if (!window.RadarShared) {
+        return;
       }
-      function setMessage(message, level) {
+      window.RadarShared.bindCadastro({
+        formId: "create-contrato-form",
+        inputSelector: "input[name='contrato_nome'][form='create-contrato-form']",
+        selectId: "contrato-select",
+        detailsId: "contrato-pop",
+        messageId: "cadastro-message",
+      });
+      window.RadarShared.bindCadastro({
+        formId: "create-classificacao-form",
+        inputSelector: "input[name='classificacao_nome'][form='create-classificacao-form']",
+        selectId: "classificacao-select",
+        detailsId: "classificacao-pop",
+        messageId: "cadastro-message",
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var getCookie = window.RadarShared && window.RadarShared.getCookie
+        ? window.RadarShared.getCookie
+        : function () { return ""; };
+      function setPageMessage(message, level) {
         var box = document.getElementById("cadastro-message");
         if (!box) {
           return;
@@ -389,88 +453,33 @@
         box.className = "notice notice-" + (level || "info");
         box.style.display = "block";
       }
-      function bindCadastro(formId, inputSelector, selectId, detailsId) {
-        var formCadastro = document.getElementById(formId);
-        var input = document.querySelector(inputSelector);
-        var select = document.getElementById(selectId);
-        var details = document.getElementById(detailsId);
-        if (!formCadastro || !input || !select || !details) {
-          return;
-        }
-        formCadastro.addEventListener("submit", function (event) {
-          event.preventDefault();
-          var value = input.value.trim();
-          if (!value) {
-            setMessage("Informe um nome valido.", "error");
-            details.open = true;
-            return;
-          }
-          var data = new FormData(formCadastro);
-          if (!data.get(input.name)) {
-            data.set(input.name, value);
-          }
-          fetch(window.location.pathname + window.location.search, {
-            method: "POST",
-            headers: {
-              "X-Requested-With": "XMLHttpRequest",
-              "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: data,
-          })
-            .then(function (resp) { return resp.json(); })
-            .then(function (payload) {
-              if (payload && payload.id && payload.nome) {
-                var exists = Array.from(select.options).some(function (opt) {
-                  return opt.value === String(payload.id);
-                });
-                if (!exists) {
-                  var option = document.createElement("option");
-                  option.value = payload.id;
-                  option.textContent = payload.nome;
-                  select.appendChild(option);
-                }
-                select.value = String(payload.id);
+      function parseJsonResponse(resp) {
+        return resp
+          .text()
+          .then(function (text) {
+            var payload = {};
+            if (text) {
+              try {
+                payload = JSON.parse(text);
+              } catch (e) {
+                payload = {};
               }
-              if (payload && payload.message) {
-                setMessage(payload.message, payload.level);
-              }
-              if (payload && payload.ok) {
-                input.value = "";
-                details.open = false;
-              } else {
-                details.open = true;
-              }
-            })
-            .catch(function () {
-              setMessage("Nao foi possivel salvar agora.", "error");
-              details.open = true;
-            });
-        });
+            }
+            if (!resp.ok) {
+              throw payload;
+            }
+            return payload;
+          });
       }
-      bindCadastro(
-        "create-contrato-form",
-        "input[name='contrato_nome'][form='create-contrato-form']",
-        "contrato-select",
-        "contrato-pop"
-      );
-      bindCadastro(
-        "create-classificacao-form",
-        "input[name='classificacao_nome'][form='create-classificacao-form']",
-        "classificacao-select",
-        "classificacao-pop"
-      );
-    })();
-  </script>
-
-  <script>
-    (function () {
-      function getCookie(name) {
-        var value = "; " + document.cookie;
-        var parts = value.split("; " + name + "=");
-        if (parts.length === 2) {
-          return parts.pop().split(";").shift();
-        }
-        return "";
+      function postFormData(data) {
+        return fetch(window.location.pathname + window.location.search, {
+          method: "POST",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCookie("csrftoken"),
+          },
+          body: data,
+        }).then(parseJsonResponse);
       }
       function setField(form, name, value) {
         var input = form.querySelector("[name='" + name + "']");
@@ -601,18 +610,98 @@
           data.set("action", "move_atividade");
           data.set("atividade_id", atividadeId);
           data.set("direcao", direcao);
-          fetch(window.location.pathname + window.location.search, {
-            method: "POST",
-            headers: {
-              "X-Requested-With": "XMLHttpRequest",
-              "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: data,
-          })
-            .then(function (resp) { return resp.json(); })
+          button.disabled = true;
+          postFormData(data)
             .then(function (payload) {
               if (payload && payload.ok && payload.moved && payload.swap_with_id) {
                 swapCards(payload.id, payload.swap_with_id);
+              }
+            })
+            .catch(function () {
+              setPageMessage("Nao foi possivel mover a atividade.", "error");
+            })
+            .finally(function () {
+              button.disabled = false;
+            });
+        });
+      });
+      var statusButtons = document.querySelectorAll(".js-status-atividade");
+      statusButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          if (button.disabled) {
+            return;
+          }
+          var atividadeId = button.dataset.atividadeId;
+          var status = button.dataset.status;
+          if (!atividadeId || !status) {
+            return;
+          }
+          var data = new FormData();
+          data.set("action", "quick_status_atividade");
+          data.set("atividade_id", atividadeId);
+          data.set("status", status);
+          button.disabled = true;
+          postFormData(data)
+            .then(function (payload) {
+              if (payload && payload.ok) {
+                window.location.reload();
+              }
+            })
+            .catch(function () {
+              setPageMessage("Nao foi possivel atualizar o status.", "error");
+            })
+            .finally(function () {
+              button.disabled = false;
+            });
+        });
+      });
+      var inlineToggleButtons = document.querySelectorAll(".js-toggle-inline-edit");
+      inlineToggleButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          var card = button.closest("article.activity-row");
+          if (!card) {
+            return;
+          }
+          var form = card.querySelector(".js-inline-edit-form");
+          if (!form) {
+            return;
+          }
+          form.style.display = form.style.display === "none" ? "" : "none";
+        });
+      });
+      var inlineCancelButtons = document.querySelectorAll(".js-cancel-inline-edit");
+      inlineCancelButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          var form = button.closest(".js-inline-edit-form");
+          if (!form) {
+            return;
+          }
+          form.style.display = "none";
+        });
+      });
+      var inlineForms = document.querySelectorAll(".js-inline-edit-form");
+      inlineForms.forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var data = new FormData(form);
+          var submitButton = form.querySelector("button[type='submit']");
+          if (submitButton) {
+            submitButton.disabled = true;
+          }
+          postFormData(data)
+            .then(function (payload) {
+              if (payload && payload.ok) {
+                updateCard(payload);
+                form.style.display = "none";
+              }
+            })
+            .catch(function (errPayload) {
+              var message = (errPayload && errPayload.message) || "Nao foi possivel salvar a atividade.";
+              setPageMessage(message, "error");
+            })
+            .finally(function () {
+              if (submitButton) {
+                submitButton.disabled = false;
               }
             });
         });
@@ -659,19 +748,24 @@
         updateForm.addEventListener("submit", function (event) {
           event.preventDefault();
           var data = new FormData(updateForm);
-          fetch(window.location.pathname + window.location.search, {
-            method: "POST",
-            headers: {
-              "X-Requested-With": "XMLHttpRequest",
-              "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: data,
-          })
-            .then(function (resp) { return resp.json(); })
+          var submitButton = updateForm.querySelector("button[type='submit']");
+          if (submitButton) {
+            submitButton.disabled = true;
+          }
+          postFormData(data)
             .then(function (payload) {
               if (payload && payload.ok) {
                 updateCard(payload);
                 hideEditor(editor);
+              }
+            })
+            .catch(function (errPayload) {
+              var message = (errPayload && errPayload.message) || "Nao foi possivel salvar a atividade.";
+              setPageMessage(message, "error");
+            })
+            .finally(function () {
+              if (submitButton) {
+                submitButton.disabled = false;
               }
             });
         });
@@ -685,19 +779,23 @@
             return;
           }
           var data = new FormData(deleteForm);
-          fetch(window.location.pathname + window.location.search, {
-            method: "POST",
-            headers: {
-              "X-Requested-With": "XMLHttpRequest",
-              "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: data,
-          })
-            .then(function (resp) { return resp.json(); })
+          var submitButton = deleteForm.querySelector("button[type='submit']");
+          if (submitButton) {
+            submitButton.disabled = true;
+          }
+          postFormData(data)
             .then(function (payload) {
               if (payload && payload.ok) {
                 removeCard(payload.id);
                 hideEditor(editor);
+              }
+            })
+            .catch(function () {
+              setPageMessage("Nao foi possivel excluir a atividade.", "error");
+            })
+            .finally(function () {
+              if (submitButton) {
+                submitButton.disabled = false;
               }
             });
         });

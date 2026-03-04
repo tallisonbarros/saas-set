@@ -2031,6 +2031,20 @@ def _format_ptbr_datetime(value):
     return timezone.localtime(value).strftime("%d/%m/%Y %H:%M")
 
 
+def _atividade_response_payload(atividade):
+    return {
+        "ok": True,
+        "id": atividade.id,
+        "nome": atividade.nome,
+        "descricao": atividade.descricao,
+        "status": atividade.status,
+        "status_label": atividade.get_status_display(),
+        "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
+        "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
+        "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
+    }
+
+
 def _status_badge_class(status_label):
     normalized = (status_label or "").strip().lower()
     return {
@@ -3480,7 +3494,11 @@ def radar_detail(request, pk):
             radar.delete()
             return redirect("radar_list")
 
-    trabalhos_base = radar.trabalhos.annotate(total_atividades=Count("atividades")).select_related(
+    trabalhos_base = radar.trabalhos.annotate(
+        total_atividades=Count("atividades"),
+        atividades_pendentes=Count("atividades", filter=Q(atividades__status=RadarAtividade.Status.PENDENTE)),
+        atividades_executando=Count("atividades", filter=Q(atividades__status=RadarAtividade.Status.EXECUTANDO)),
+    ).select_related(
         "classificacao",
         "contrato",
     )
@@ -3493,8 +3511,47 @@ def radar_detail(request, pk):
     toggle_params = base_params.copy()
     toggle_params["finalizados"] = "all"
     total_trabalhos = trabalhos_base.count()
-    trabalhos_execucao = trabalhos_base.filter(status=RadarTrabalho.Status.EXECUTANDO)
-    trabalhos_pendentes = trabalhos_base.filter(status=RadarTrabalho.Status.PENDENTE)
+    trabalhos_nao_finalizados = list(
+        trabalhos_base.exclude(status=RadarTrabalho.Status.FINALIZADA).order_by("data_registro", "nome")
+    )
+
+    def _prioridade_info(trabalho_item):
+        dias_aberto = max((today - trabalho_item.data_registro).days, 0)
+        if trabalho_item.status == RadarTrabalho.Status.PENDENTE:
+            score = 200 + dias_aberto
+            if dias_aberto == 0:
+                motivo = "Pendente criado hoje"
+            elif dias_aberto == 1:
+                motivo = "Pendente ha 1 dia"
+            else:
+                motivo = f"Pendente ha {dias_aberto} dias"
+        else:
+            score = 100 + dias_aberto
+            if trabalho_item.atividades_executando == 0 and trabalho_item.atividades_pendentes > 0:
+                score += 15
+                motivo = "Em andamento sem atividade executando"
+            elif dias_aberto == 0:
+                motivo = "Em andamento iniciado hoje"
+            elif dias_aberto == 1:
+                motivo = "Em andamento ha 1 dia"
+            else:
+                motivo = f"Em andamento ha {dias_aberto} dias"
+        return score, motivo
+
+    for trabalho in trabalhos_nao_finalizados:
+        prioridade_score, prioridade_motivo = _prioridade_info(trabalho)
+        trabalho.prioridade_score = prioridade_score
+        trabalho.prioridade_motivo = prioridade_motivo
+
+    trabalhos_prioritarios = sorted(
+        trabalhos_nao_finalizados,
+        key=lambda item: (-item.prioridade_score, item.data_registro, item.nome.lower()),
+    )
+    agora_limite = 6
+    trabalhos_agora = trabalhos_prioritarios[:agora_limite]
+    trabalhos_agora_ids = {item.id for item in trabalhos_agora}
+    trabalhos_em_andamento = [item for item in trabalhos_prioritarios if item.id not in trabalhos_agora_ids]
+
     trabalhos_finalizados = trabalhos_base.filter(status=RadarTrabalho.Status.FINALIZADA)
     trabalhos_finalizados_mes = trabalhos_finalizados.filter(
         criado_em__year=today.year,
@@ -3506,8 +3563,6 @@ def radar_detail(request, pk):
     )
     if show_all_finalizados:
         trabalhos_finalizados_mes = trabalhos_finalizados
-    trabalhos_execucao = trabalhos_execucao.order_by("-data_registro", "nome")
-    trabalhos_pendentes = trabalhos_pendentes.order_by("-data_registro", "nome")
     trabalhos_finalizados_mes = trabalhos_finalizados_mes.order_by("-data_registro", "nome")
     has_finalizados_antigos = trabalhos_finalizados_antigos.exists()
     return render(
@@ -3515,8 +3570,8 @@ def radar_detail(request, pk):
         "core/radar_detail.html",
         {
             "radar": radar,
-            "trabalhos_execucao": trabalhos_execucao,
-            "trabalhos_pendentes": trabalhos_pendentes,
+            "trabalhos_agora": trabalhos_agora,
+            "trabalhos_em_andamento": trabalhos_em_andamento,
             "trabalhos_finalizados": trabalhos_finalizados_mes,
             "show_all_finalizados": show_all_finalizados,
             "has_finalizados_antigos": has_finalizados_antigos,
@@ -3564,7 +3619,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
     message = request.GET.get("msg", "").strip()
     message_level = request.GET.get("level", "").strip() or "info"
     classificacoes = RadarClassificacao.objects.order_by("nome")
-    classificacao_filter = request.GET.get("classificacao", "").strip()
 
     can_edit_trabalho_by_creator = can_manage
 
@@ -3576,6 +3630,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "delete_trabalho",
             "duplicate_trabalho",
             "update_atividade",
+            "quick_status_atividade",
             "delete_atividade",
             "move_atividade",
             "create_contrato",
@@ -3763,12 +3818,18 @@ def radar_trabalho_detail(request, radar_pk, pk):
             atividade_id = request.POST.get("atividade_id")
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
             status_anterior = atividade.status
-            atividade.nome = request.POST.get("nome", "").strip()
+            nome_atividade = request.POST.get("nome", "").strip()
+            if not nome_atividade:
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse({"ok": False, "message": "Informe um nome para a atividade."}, status=400)
+                return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+            atividade.nome = nome_atividade
             atividade.descricao = request.POST.get("descricao", "").strip()
             horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
             if horas_raw:
                 try:
-                    atividade.horas_trabalho = Decimal(horas_raw)
+                    horas = Decimal(horas_raw)
+                    atividade.horas_trabalho = horas if horas >= 0 else None
                 except InvalidOperation:
                     atividade.horas_trabalho = None
             else:
@@ -3789,19 +3850,21 @@ def radar_trabalho_detail(request, radar_pk, pk):
             )
             _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "ok": True,
-                        "id": atividade.id,
-                        "nome": atividade.nome,
-                        "descricao": atividade.descricao,
-                        "status": atividade.status,
-                        "status_label": atividade.get_status_display(),
-                        "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
-                        "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
-                        "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
-                    }
-                )
+                return JsonResponse(_atividade_response_payload(atividade))
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "quick_status_atividade":
+            atividade_id = request.POST.get("atividade_id")
+            atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            status_raw = request.POST.get("status", "").strip()
+            if status_raw not in dict(RadarAtividade.Status.choices):
+                status_raw = RadarAtividade.Status.PENDENTE
+            status_anterior = atividade.status
+            atividade.status = status_raw
+            _apply_atividade_status_dates(atividade, previous_status=status_anterior)
+            atividade.save(update_fields=["status", "inicio_execucao_em", "finalizada_em"])
+            _sync_trabalho_status(trabalho)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(_atividade_response_payload(atividade))
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_atividade":
             atividade_id = request.POST.get("atividade_id")
