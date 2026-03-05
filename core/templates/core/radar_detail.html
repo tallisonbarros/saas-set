@@ -120,7 +120,7 @@
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Trabalhos</h2>
-          <p class="muted">Fila objetiva por prioridade: agora, em andamento e concluidos.</p>
+          <p class="muted">Agrupado por status: executando, pendentes e concluidos.</p>
         </div>
         <div class="module-meta">
           {% if has_finalizados_antigos and not show_all_finalizados %}
@@ -132,8 +132,8 @@
       </div>
 
       <div class="proposal-grid status-group">
-        <div class="muted status-label">Agora</div>
-        {% for trabalho in trabalhos_agora %}
+        <div class="muted status-label">Executando</div>
+        {% for trabalho in trabalhos_execucao %}
           <article class="proposal-card io-proposal-card proposal-card-executando">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
             <div class="proposal-head">
@@ -141,7 +141,6 @@
                 <div class="proposal-title">{{ trabalho.nome }}</div>
                 <div class="proposal-meta">{{ trabalho.descricao|default:"Trabalho sem descricao." }}</div>
                 <div class="proposal-meta">Registrado em: {{ trabalho.data_registro|date:"d/m/Y" }}</div>
-                <div class="proposal-meta"><strong>Prioridade:</strong> {{ trabalho.prioridade_motivo }}</div>
                 {% if trabalho.classificacao %}
                   <div class="proposal-meta">Classificacao: {{ trabalho.classificacao.nome }}</div>
                 {% endif %}
@@ -153,13 +152,13 @@
             </div>
           </article>
         {% empty %}
-          <div class="muted">Nenhum trabalho priorizado agora.</div>
+          <div class="muted">Nenhum trabalho executando.</div>
         {% endfor %}
       </div>
 
       <div class="proposal-grid status-group">
-        <div class="muted status-label">Em andamento</div>
-        {% for trabalho in trabalhos_em_andamento %}
+        <div class="muted status-label">Pendentes</div>
+        {% for trabalho in trabalhos_pendentes %}
           <article class="proposal-card io-proposal-card">
             <a class="proposal-link" href="{% url 'radar_trabalho_detail' radar.id trabalho.id %}" aria-label="Abrir trabalho"></a>
             <div class="proposal-head">
@@ -178,7 +177,7 @@
             </div>
           </article>
         {% empty %}
-          <div class="muted">Nenhum trabalho adicional em andamento.</div>
+          <div class="muted">Nenhum trabalho pendente.</div>
         {% endfor %}
       </div>
 

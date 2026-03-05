@@ -3494,11 +3494,7 @@ def radar_detail(request, pk):
             radar.delete()
             return redirect("radar_list")
 
-    trabalhos_base = radar.trabalhos.annotate(
-        total_atividades=Count("atividades"),
-        atividades_pendentes=Count("atividades", filter=Q(atividades__status=RadarAtividade.Status.PENDENTE)),
-        atividades_executando=Count("atividades", filter=Q(atividades__status=RadarAtividade.Status.EXECUTANDO)),
-    ).select_related(
+    trabalhos_base = radar.trabalhos.annotate(total_atividades=Count("atividades")).select_related(
         "classificacao",
         "contrato",
     )
@@ -3511,47 +3507,8 @@ def radar_detail(request, pk):
     toggle_params = base_params.copy()
     toggle_params["finalizados"] = "all"
     total_trabalhos = trabalhos_base.count()
-    trabalhos_nao_finalizados = list(
-        trabalhos_base.exclude(status=RadarTrabalho.Status.FINALIZADA).order_by("data_registro", "nome")
-    )
-
-    def _prioridade_info(trabalho_item):
-        dias_aberto = max((today - trabalho_item.data_registro).days, 0)
-        if trabalho_item.status == RadarTrabalho.Status.PENDENTE:
-            score = 200 + dias_aberto
-            if dias_aberto == 0:
-                motivo = "Pendente criado hoje"
-            elif dias_aberto == 1:
-                motivo = "Pendente ha 1 dia"
-            else:
-                motivo = f"Pendente ha {dias_aberto} dias"
-        else:
-            score = 100 + dias_aberto
-            if trabalho_item.atividades_executando == 0 and trabalho_item.atividades_pendentes > 0:
-                score += 15
-                motivo = "Em andamento sem atividade executando"
-            elif dias_aberto == 0:
-                motivo = "Em andamento iniciado hoje"
-            elif dias_aberto == 1:
-                motivo = "Em andamento ha 1 dia"
-            else:
-                motivo = f"Em andamento ha {dias_aberto} dias"
-        return score, motivo
-
-    for trabalho in trabalhos_nao_finalizados:
-        prioridade_score, prioridade_motivo = _prioridade_info(trabalho)
-        trabalho.prioridade_score = prioridade_score
-        trabalho.prioridade_motivo = prioridade_motivo
-
-    trabalhos_prioritarios = sorted(
-        trabalhos_nao_finalizados,
-        key=lambda item: (-item.prioridade_score, item.data_registro, item.nome.lower()),
-    )
-    agora_limite = 6
-    trabalhos_agora = trabalhos_prioritarios[:agora_limite]
-    trabalhos_agora_ids = {item.id for item in trabalhos_agora}
-    trabalhos_em_andamento = [item for item in trabalhos_prioritarios if item.id not in trabalhos_agora_ids]
-
+    trabalhos_execucao = trabalhos_base.filter(status=RadarTrabalho.Status.EXECUTANDO).order_by("-data_registro", "nome")
+    trabalhos_pendentes = trabalhos_base.filter(status=RadarTrabalho.Status.PENDENTE).order_by("-data_registro", "nome")
     trabalhos_finalizados = trabalhos_base.filter(status=RadarTrabalho.Status.FINALIZADA)
     trabalhos_finalizados_mes = trabalhos_finalizados.filter(
         criado_em__year=today.year,
@@ -3570,8 +3527,8 @@ def radar_detail(request, pk):
         "core/radar_detail.html",
         {
             "radar": radar,
-            "trabalhos_agora": trabalhos_agora,
-            "trabalhos_em_andamento": trabalhos_em_andamento,
+            "trabalhos_execucao": trabalhos_execucao,
+            "trabalhos_pendentes": trabalhos_pendentes,
             "trabalhos_finalizados": trabalhos_finalizados_mes,
             "show_all_finalizados": show_all_finalizados,
             "has_finalizados_antigos": has_finalizados_antigos,
