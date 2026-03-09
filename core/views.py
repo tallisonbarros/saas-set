@@ -3556,31 +3556,8 @@ def radar_detail(request, pk):
     )
     if classificacao_filter:
         trabalhos_base = trabalhos_base.filter(classificacao_id=classificacao_filter)
-    today = timezone.localdate()
-    show_all_finalizados = request.GET.get("finalizados") == "all"
-    base_params = request.GET.copy()
-    base_params.pop("finalizados", None)
-    toggle_params = base_params.copy()
-    toggle_params["finalizados"] = "all"
     total_trabalhos = trabalhos_base.count()
-    trabalhos_finalizados = trabalhos_base.filter(status=RadarTrabalho.Status.FINALIZADA)
-    trabalhos_finalizados_antigos = trabalhos_finalizados.exclude(
-        criado_em__year=today.year,
-        criado_em__month=today.month,
-    )
-    has_finalizados_antigos = trabalhos_finalizados_antigos.exists()
-
-    if show_all_finalizados:
-        trabalhos_tabela = trabalhos_base
-    else:
-        trabalhos_tabela = trabalhos_base.filter(
-            Q(status__in=[RadarTrabalho.Status.EXECUTANDO, RadarTrabalho.Status.PENDENTE])
-            | Q(
-                status=RadarTrabalho.Status.FINALIZADA,
-                criado_em__year=today.year,
-                criado_em__month=today.month,
-            )
-        )
+    trabalhos_tabela = trabalhos_base
 
     trabalhos_tabela = trabalhos_tabela.annotate(
         status_ordem=Case(
@@ -3618,8 +3595,6 @@ def radar_detail(request, pk):
         {
             "radar": radar,
             "trabalhos_table_data": trabalhos_table_data,
-            "show_all_finalizados": show_all_finalizados,
-            "has_finalizados_antigos": has_finalizados_antigos,
             "total_trabalhos": total_trabalhos,
             "classificacoes": classificacoes,
             "contratos": RadarContrato.objects.order_by("nome"),
@@ -3630,8 +3605,6 @@ def radar_detail(request, pk):
             "message": message,
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
-            "finalizados_toggle_query": toggle_params.urlencode() if toggle_params else "finalizados=all",
-            "finalizados_reset_query": base_params.urlencode() if base_params else "",
         },
     )
 

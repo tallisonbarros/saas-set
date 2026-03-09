@@ -37,13 +37,6 @@
       <div>
         <h2 class="io-title">Trabalhos</h2>
       </div>
-      <div class="module-meta radar-table-controls">
-        {% if has_finalizados_antigos and not show_all_finalizados %}
-          <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_toggle_query %}?{{ finalizados_toggle_query }}{% endif %}">Exibir concluidos antigos</a>
-        {% elif show_all_finalizados %}
-          <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Exibir concluidos do mes</a>
-        {% endif %}
-      </div>
     </div>
     {% include "core/components/datagrid.html" with grid_id="radar-trabalhos-grid" table_class="radar-work-table" scope=radar.id %}
   </section>
