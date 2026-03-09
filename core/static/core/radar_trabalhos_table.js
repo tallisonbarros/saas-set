@@ -11,6 +11,15 @@
   var tableConfig = window.RadarTrabalhosTableConfig || {};
   var canManage = !!tableConfig.canManage;
   var defaultDate = tableConfig.defaultDate || "";
+  var grid = null;
+  var statusRequestInFlight = false;
+  var activeStatusMenu = null;
+  var activeStatusTrigger = null;
+  var STATUS_OPTIONS = [
+    { value: "EXECUTANDO", label: "Executando" },
+    { value: "PENDENTE", label: "Pendente" },
+    { value: "FINALIZADA", label: "Finalizada" },
+  ];
 
   function parseJsonResponse(resp) {
     return resp.text().then(function (text) {
@@ -45,6 +54,141 @@
     }).then(parseJsonResponse);
   }
 
+  function setPageMessage(message, level) {
+    var box = document.getElementById("cadastro-message");
+    if (!box || !message) {
+      return;
+    }
+    box.textContent = message;
+    box.className = "notice notice-" + (level || "info");
+    box.style.display = "block";
+  }
+
+  function closeStatusMenu() {
+    if (activeStatusTrigger) {
+      activeStatusTrigger.setAttribute("aria-expanded", "false");
+    }
+    if (activeStatusMenu && activeStatusMenu.parentNode) {
+      activeStatusMenu.parentNode.removeChild(activeStatusMenu);
+    }
+    activeStatusMenu = null;
+    activeStatusTrigger = null;
+  }
+
+  function positionStatusMenu(menuEl, triggerEl) {
+    if (!menuEl || !triggerEl) {
+      return;
+    }
+    var triggerRect = triggerEl.getBoundingClientRect();
+    var menuRect = menuEl.getBoundingClientRect();
+    var top = triggerRect.bottom + 6;
+    var left = triggerRect.left;
+    if (left + menuRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - menuRect.width - 8;
+    }
+    if (left < 8) {
+      left = 8;
+    }
+    if (top + menuRect.height > window.innerHeight - 8) {
+      top = triggerRect.top - menuRect.height - 6;
+    }
+    if (top < 8) {
+      top = 8;
+    }
+    menuEl.style.left = left + "px";
+    menuEl.style.top = top + "px";
+    menuEl.style.minWidth = Math.max(140, Math.round(triggerRect.width)) + "px";
+  }
+
+  function updateTrabalhoStatus(rowId, nextStatus) {
+    if (!rowId || !nextStatus || statusRequestInFlight || !grid) {
+      return;
+    }
+    statusRequestInFlight = true;
+    var data = new FormData();
+    data.set("action", "quick_status_trabalho");
+    data.set("trabalho_id", rowId);
+    data.set("status", nextStatus);
+    postFormData(data)
+      .then(function (payload) {
+        if (!payload || !payload.ok) {
+          throw payload || {};
+        }
+        grid.updateRow(payload.id || rowId, {
+          status: payload.status || nextStatus,
+          status_label: payload.status_label || nextStatus,
+        });
+      })
+      .catch(function (err) {
+        setPageMessage((err && err.message) || "Nao foi possivel atualizar o status.", "error");
+      })
+      .finally(function () {
+        statusRequestInFlight = false;
+      });
+  }
+
+  function openStatusMenu(triggerEl) {
+    if (!triggerEl || statusRequestInFlight || !canManage) {
+      return;
+    }
+    if (activeStatusMenu && activeStatusTrigger === triggerEl) {
+      closeStatusMenu();
+      return;
+    }
+
+    closeStatusMenu();
+    activeStatusTrigger = triggerEl;
+    activeStatusTrigger.setAttribute("aria-expanded", "true");
+
+    var rowId = triggerEl.getAttribute("data-row-id") || "";
+    var currentStatus = triggerEl.getAttribute("data-current-status") || "";
+    var menuEl = document.createElement("div");
+    menuEl.className = "radar-status-menu";
+    menuEl.setAttribute("role", "menu");
+
+    STATUS_OPTIONS.forEach(function (option) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "radar-status-option";
+      button.setAttribute("role", "menuitem");
+      button.setAttribute("data-status", option.value);
+      button.textContent = option.label;
+      if (option.value === currentStatus) {
+        button.classList.add("is-current");
+      }
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeStatusMenu();
+        if (option.value === currentStatus) {
+          return;
+        }
+        updateTrabalhoStatus(rowId, option.value);
+      });
+      menuEl.appendChild(button);
+    });
+
+    document.body.appendChild(menuEl);
+    activeStatusMenu = menuEl;
+    positionStatusMenu(menuEl, triggerEl);
+  }
+
+  function renderStatusCell(row, ctx) {
+    var badgeHtml = ctx.statusBadge(row.status, row.status_label);
+    if (!canManage) {
+      return badgeHtml;
+    }
+    return (
+      '<button class="radar-status-trigger js-status-inline-trigger" type="button" data-row-id="' +
+      ctx.esc(row.id) +
+      '" data-current-status="' +
+      ctx.esc(row.status || "") +
+      '" aria-haspopup="menu" aria-expanded="false" aria-label="Alterar status">' +
+      badgeHtml +
+      "</button>"
+    );
+  }
+
   function setupDescriptionMarquees(scopeEl) {
     if (!scopeEl) {
       return;
@@ -75,7 +219,7 @@
   var rows = utils.parseJsonScript("radar-trabalhos-data");
   var radarId = root.getAttribute("data-dg-scope") || "global";
 
-  window.SAASDataGrid.create({
+  grid = window.SAASDataGrid.create({
     rootId: "radar-trabalhos-grid",
     storageKey: "radar-trabalhos:" + radarId,
     rows: rows,
@@ -170,9 +314,7 @@
             { value: "FINALIZADA", label: "Finalizada" },
           ],
         },
-        render: function (row, ctx) {
-          return ctx.statusBadge(row.status, row.status_label);
-        },
+        render: renderStatusCell,
       },
       {
         key: "classificacao",
@@ -240,10 +382,45 @@
       },
     ],
     onAfterRender: function (api) {
+      closeStatusMenu();
       setupDescriptionMarquees(api.root);
     },
     onResize: function (api) {
       setupDescriptionMarquees(api.root);
     },
   });
+
+  if (canManage) {
+    root.addEventListener("click", function (event) {
+      var trigger = event.target.closest(".js-status-inline-trigger");
+      if (!trigger || !root.contains(trigger)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      openStatusMenu(trigger);
+    });
+
+    document.addEventListener("mousedown", function (event) {
+      if (!activeStatusMenu) {
+        return;
+      }
+      if (activeStatusMenu.contains(event.target)) {
+        return;
+      }
+      if (activeStatusTrigger && activeStatusTrigger.contains(event.target)) {
+        return;
+      }
+      closeStatusMenu();
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeStatusMenu();
+      }
+    });
+
+    window.addEventListener("resize", closeStatusMenu);
+    window.addEventListener("scroll", closeStatusMenu, true);
+  }
 })();

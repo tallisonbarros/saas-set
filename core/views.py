@@ -3374,6 +3374,7 @@ def radar_detail(request, pk):
         action = request.POST.get("action")
         if action in {
             "create_trabalho",
+            "quick_status_trabalho",
             "update_radar",
             "delete_radar",
             "create_classificacao",
@@ -3499,6 +3500,34 @@ def radar_detail(request, pk):
                         }
                     )
                 return redirect("radar_detail", pk=radar.pk)
+        if action == "quick_status_trabalho":
+            trabalho_id = request.POST.get("trabalho_id")
+            trabalho = get_object_or_404(RadarTrabalho, pk=trabalho_id, radar=radar)
+            status_raw = request.POST.get("status", "").strip()
+            if status_raw not in dict(RadarTrabalho.Status.choices):
+                return JsonResponse(
+                    {
+                        "ok": False,
+                        "message": "Status invalido.",
+                        "level": "error",
+                    },
+                    status=400,
+                )
+            if trabalho.status != status_raw:
+                trabalho.status = status_raw
+                trabalho.save(update_fields=["status"])
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "id": trabalho.id,
+                        "status": trabalho.status,
+                        "status_label": trabalho.get_status_display(),
+                        "message": "Status atualizado.",
+                        "level": "success",
+                    }
+                )
+            return redirect("radar_detail", pk=radar.pk)
         if action == "update_radar":
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
