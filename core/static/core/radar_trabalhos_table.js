@@ -86,13 +86,14 @@
       return total + " trabalho(s) encontrado(s)";
     },
     create: canManage
-      ? {
+        ? {
           enabled: true,
           submitIcon: true,
           submitAriaLabel: "Salvar trabalho",
+          submitPosition: "end",
           fields: [
             { name: "action", type: "hidden", value: "create_trabalho" },
-            { name: "nome", label: "Novo trabalho", type: "text", placeholder: "Nome do trabalho", required: true },
+            { name: "nome", label: "Nome", type: "text", placeholder: "Nome do trabalho", required: true },
             { name: "data_registro", label: "Data", type: "date", value: defaultDate },
           ],
           onSubmit: function (ctx) {

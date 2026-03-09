@@ -4283,24 +4283,29 @@ select {
   margin: 2px 0 12px;
 }
 
+.datagrid-create[hidden] {
+  display: none;
+}
+
 .datagrid-create-form {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .datagrid-create-fields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .datagrid-create-field {
   min-width: 0;
+  flex: 1 1 220px;
 }
 
 .datagrid-create-field.is-wide {
-  grid-column: 1 / -1;
+  flex: 1 1 100%;
 }
 
 .datagrid-create-field span {
@@ -4318,18 +4323,20 @@ select {
 
 .datagrid-create-actions {
   display: flex;
-  align-items: end;
+  align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  align-self: flex-end;
 }
 
 .datagrid-create-actions.is-inline {
-  align-self: end;
+  align-self: flex-end;
 }
 
 .datagrid-submit-icon {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   padding: 0;
   border-radius: 10px;
 }
@@ -4345,8 +4352,17 @@ select {
 }
 
 .datagrid-create-message {
-  margin-top: 2px;
-  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
+.datagrid-create-message[hidden] {
+  display: none;
+}
+
+.datagrid-create-actions .btn:focus-visible,
+.datagrid-submit-icon:focus-visible {
+  outline: 2px solid rgba(255, 157, 86, 0.9);
+  outline-offset: 2px;
 }
 
 .datagrid-toolbar {
@@ -4645,8 +4661,24 @@ select {
 
 @media (max-width: 980px) {
   .datagrid-create-fields {
+    display: grid;
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .datagrid-create-field {
+    flex: 1 1 auto;
+  }
+
+  .datagrid-create-actions {
+    width: 100%;
+    justify-content: flex-start;
+    align-self: stretch;
+  }
+
+  .datagrid-submit-icon {
+    width: 42px;
+    height: 42px;
   }
 
   .datagrid-wrap {
@@ -4658,6 +4690,34 @@ select {
     width: max-content;
     min-width: 100%;
     table-layout: auto;
+  }
+
+  #radar-trabalhos-grid .datagrid-table th[data-dg-col="nome"],
+  #radar-trabalhos-grid .datagrid-table td[data-dg-col="nome"],
+  #radar-atividades-grid .datagrid-table th[data-dg-col="nome"],
+  #radar-atividades-grid .datagrid-table td[data-dg-col="nome"] {
+    width: min(68vw, 360px) !important;
+    max-width: min(68vw, 360px);
+  }
+
+  #radar-trabalhos-grid .datagrid-table td.radar-col-nome .radar-desc-marquee,
+  #radar-atividades-grid .datagrid-table td.radar-col-nome .radar-desc-marquee {
+    max-width: 100%;
+  }
+
+  #radar-trabalhos-grid .datagrid-table td.radar-col-nome .radar-desc-marquee-text,
+  #radar-atividades-grid .datagrid-table td.radar-col-nome .radar-desc-marquee-text {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #radar-trabalhos-grid .datagrid-table .radar-desc-marquee.is-running .radar-desc-marquee-text,
+  #radar-atividades-grid .datagrid-table .radar-desc-marquee.is-running .radar-desc-marquee-text {
+    animation: none;
+    transform: translateX(0);
   }
 
   .datagrid-column-picker-body {

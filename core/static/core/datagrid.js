@@ -954,12 +954,59 @@
       });
     }
 
-    function renderCreateField(field) {
-      var name = escHtml(field.name || "");
+    function normalizeCreateField(field) {
+      if (!field || typeof field !== "object") {
+        return null;
+      }
+      var name = safeText(field.name).trim();
       if (!name) {
+        return null;
+      }
+      var normalized = Object.assign({}, field);
+      normalized.name = name;
+      normalized.type = safeText(field.type || "text").trim().toLowerCase() || "text";
+      return normalized;
+    }
+
+    function normalizeCreateConfig(raw) {
+      if (!raw || typeof raw !== "object") {
+        return {
+          enabled: false,
+          fields: [],
+          submitIcon: false,
+          submitPosition: "end",
+          submitAriaLabel: "Salvar",
+          submitLabel: "Salvar rapido",
+          onSubmit: null,
+        };
+      }
+
+      var fields = Array.isArray(raw.fields)
+        ? raw.fields
+            .map(normalizeCreateField)
+            .filter(function (field) {
+              return !!field;
+            })
+        : [];
+
+      return {
+        enabled: !!raw.enabled,
+        fields: fields,
+        submitIcon: !!raw.submitIcon,
+        submitPosition: raw.submitPosition === "start" ? "start" : "end",
+        submitAriaLabel: safeText(raw.submitAriaLabel || "Salvar"),
+        submitLabel: safeText(raw.submitLabel || "Salvar rapido"),
+        onSubmit: typeof raw.onSubmit === "function" ? raw.onSubmit : null,
+      };
+    }
+
+    function renderCreateField(field) {
+      var safeName = safeText(field.name).trim();
+      if (!safeName) {
         return "";
       }
-      var label = escHtml(field.label || field.name || "");
+      var name = escHtml(safeName);
+      var label = escHtml(field.label || safeName);
       var type = field.type || "text";
       var required = field.required ? " required" : "";
       var placeholder = field.placeholder ? ' placeholder="' + escHtml(field.placeholder) + '"' : "";
@@ -984,6 +1031,12 @@
           ">" +
           options
             .map(function (option) {
+              if (!option || typeof option !== "object") {
+                option = {
+                  value: safeText(option),
+                  label: safeText(option),
+                };
+              }
               var optionValue = safeText(option.value);
               var selected = optionValue === value ? " selected" : "";
               return '<option value="' + escHtml(optionValue) + '"' + selected + ">" + escHtml(option.label || optionValue) + "</option>";
@@ -1014,26 +1067,29 @@
     }
 
     function bindCreateActions() {
-      var createConfig = config.create;
-      if (!createHost || !createConfig || !createConfig.enabled) {
-        return;
-      }
-      var fields = Array.isArray(createConfig.fields) ? createConfig.fields : [];
-      if (!fields.length) {
+      if (!createHost) {
         return;
       }
 
-      createHost.style.display = "";
+      var createConfig = normalizeCreateConfig(config.create);
+      if (!createConfig.enabled || !createConfig.fields.length) {
+        createHost.hidden = true;
+        createHost.innerHTML = "";
+        return;
+      }
+      var fields = createConfig.fields;
 
-      var iconSubmit = !!createConfig.submitIcon;
-      var submitPosition = createConfig.submitPosition === "start" ? "start" : "end";
+      createHost.hidden = false;
+
+      var iconSubmit = createConfig.submitIcon;
+      var submitPosition = createConfig.submitPosition;
       var submitButtonHtml = "";
       if (iconSubmit) {
         submitButtonHtml =
           '<button class="btn btn-primary btn-compact datagrid-submit-icon" type="submit" data-dg-create-submit aria-label="' +
-          escHtml(createConfig.submitAriaLabel || "Salvar") +
+          escHtml(createConfig.submitAriaLabel) +
           '" title="' +
-          escHtml(createConfig.submitAriaLabel || "Salvar") +
+          escHtml(createConfig.submitAriaLabel) +
           '">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<path d="M4 4h13l3 3v13H4z"></path>' +
@@ -1044,7 +1100,7 @@
       } else {
         submitButtonHtml =
           '<button class="btn btn-primary btn-compact" type="submit" data-dg-create-submit>' +
-          escHtml(createConfig.submitLabel || "Salvar rapido") +
+          escHtml(createConfig.submitLabel) +
           "</button>";
       }
 
@@ -1059,11 +1115,15 @@
       }
 
       var createFormHtml =
-        '<form class="datagrid-create-form" data-dg-create-form>' +
+        '<form class="datagrid-create-form" data-dg-create-form data-dg-submit-position="' +
+        escHtml(submitPosition) +
+        '" data-dg-submit-icon="' +
+        (iconSubmit ? "true" : "false") +
+        '">' +
         '<div class="datagrid-create-fields">' +
         fieldsContent +
         "</div>" +
-        '<div class="datagrid-create-message" data-dg-create-message style="display:none;"></div>' +
+        '<div class="datagrid-create-message" data-dg-create-message role="status" aria-live="polite" hidden></div>' +
         "</form>";
       createHost.innerHTML = createFormHtml;
 
@@ -1080,12 +1140,12 @@
           return;
         }
         if (!message) {
-          createMessage.style.display = "none";
+          createMessage.hidden = true;
           createMessage.textContent = "";
           createMessage.className = "datagrid-create-message";
           return;
         }
-        createMessage.style.display = "block";
+        createMessage.hidden = false;
         createMessage.textContent = message;
         createMessage.className = "datagrid-create-message notice notice-" + (level || "info");
       }
@@ -1100,8 +1160,12 @@
         createSubmit.disabled = true;
 
         var formData = new FormData(createForm);
-        var result = null;
-        if (typeof createConfig.onSubmit === "function") {
+        var result = {
+          ok: false,
+          message: "Configuracao de criacao invalida para este grid.",
+          level: "error",
+        };
+        if (createConfig.onSubmit) {
           result = createConfig.onSubmit({
             formData: formData,
             api: api,
