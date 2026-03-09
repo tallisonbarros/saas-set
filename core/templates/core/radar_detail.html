@@ -43,162 +43,9 @@
         {% elif show_all_finalizados %}
           <a class="btn btn-ghost btn-compact" href="{% url 'radar_detail' radar.id %}{% if finalizados_reset_query %}?{{ finalizados_reset_query }}{% endif %}">Exibir concluidos do mes</a>
         {% endif %}
-        <details class="radar-column-picker" id="radar-column-picker">
-          <summary class="btn btn-ghost btn-compact">Colunas</summary>
-          <div class="radar-column-picker-body" id="radar-column-picker-body"></div>
-        </details>
       </div>
     </div>
-
-    <div class="radar-table-summary">
-      <span id="radar-table-summary">Carregando...</span>
-      <button class="btn btn-ghost btn-compact" type="button" id="radar-clear-filters">Limpar filtros</button>
-    </div>
-
-    <div class="table-wrap radar-table-wrap">
-      <table class="table radar-work-table" id="radar-trabalhos-table" data-radar-id="{{ radar.id }}">
-        <thead>
-          <tr>
-            <th data-col="nome">
-              <div class="radar-head-cell" data-col="nome">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="nome">Nome</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="nome" aria-label="Ordenar Nome">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="nome">
-                  <input class="radar-filter-input js-radar-filter" type="text" data-col="nome" placeholder="Filtrar">
-                </div>
-              </div>
-            </th>
-            <th data-col="descricao">
-              <div class="radar-head-cell" data-col="descricao">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="descricao">Descricao</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="descricao" aria-label="Ordenar Descricao">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="descricao">
-                  <input class="radar-filter-input js-radar-filter" type="text" data-col="descricao" placeholder="Filtrar">
-                </div>
-              </div>
-            </th>
-            <th data-col="status">
-              <div class="radar-head-cell" data-col="status">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="status">Status</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="status" aria-label="Ordenar Status">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="status">
-                  <select class="radar-filter-input js-radar-filter" data-col="status">
-                    <option value="">Todos</option>
-                    <option value="EXECUTANDO">Executando</option>
-                    <option value="PENDENTE">Pendente</option>
-                    <option value="FINALIZADA">Finalizada</option>
-                  </select>
-                </div>
-              </div>
-            </th>
-            <th data-col="classificacao">
-              <div class="radar-head-cell" data-col="classificacao">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="classificacao">Classificacao</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="classificacao" aria-label="Ordenar Classificacao">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="classificacao">
-                  <input class="radar-filter-input js-radar-filter" type="text" data-col="classificacao" placeholder="Filtrar">
-                </div>
-              </div>
-            </th>
-            <th data-col="contrato">
-              <div class="radar-head-cell" data-col="contrato">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="contrato">Contrato</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="contrato" aria-label="Ordenar Contrato">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="contrato">
-                  <input class="radar-filter-input js-radar-filter" type="text" data-col="contrato" placeholder="Filtrar">
-                </div>
-              </div>
-            </th>
-            <th data-col="data_registro">
-              <div class="radar-head-cell" data-col="data_registro">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="data_registro">Data registro</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="data_registro" aria-label="Ordenar Data de registro">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="data_registro">
-                  <input class="radar-filter-input js-radar-filter" type="date" data-col="data_registro">
-                </div>
-              </div>
-            </th>
-            <th data-col="responsavel">
-              <div class="radar-head-cell" data-col="responsavel">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="responsavel">Responsavel</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="responsavel" aria-label="Ordenar Responsavel">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="responsavel">
-                  <input class="radar-filter-input js-radar-filter" type="text" data-col="responsavel" placeholder="Filtrar">
-                </div>
-              </div>
-            </th>
-            <th data-col="setor">
-              <div class="radar-head-cell" data-col="setor">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="setor">Setor</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="setor" aria-label="Ordenar Setor">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="setor">
-                  <input class="radar-filter-input js-radar-filter" type="text" data-col="setor" placeholder="Filtrar">
-                </div>
-              </div>
-            </th>
-            <th data-col="solicitante">
-              <div class="radar-head-cell" data-col="solicitante">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="solicitante">Solicitante</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="solicitante" aria-label="Ordenar Solicitante">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="solicitante">
-                  <input class="radar-filter-input js-radar-filter" type="text" data-col="solicitante" placeholder="Filtrar">
-                </div>
-              </div>
-            </th>
-            <th data-col="total_atividades">
-              <div class="radar-head-cell" data-col="total_atividades">
-                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="total_atividades">Atividades</button>
-                <button class="radar-sort-btn js-radar-sort" type="button" data-col="total_atividades" aria-label="Ordenar Atividades">
-                  <span class="radar-sort-indicator"></span>
-                </button>
-                <div class="radar-head-filter" data-col="total_atividades">
-                  <input class="radar-filter-input js-radar-filter" type="number" min="0" step="1" data-col="total_atividades" placeholder="0">
-                </div>
-              </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody id="radar-trabalhos-body">
-          <tr>
-            <td colspan="10" class="muted">Carregando dados...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="radar-table-pagination">
-      <label class="field radar-page-size">
-        <span>Linhas por pagina</span>
-        <select id="radar-page-size">
-          <option value="10">10</option>
-          <option value="20" selected>20</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
-      </label>
-      <div class="radar-pager-actions">
-        <button class="btn btn-ghost btn-compact" type="button" id="radar-prev-page">Anterior</button>
-        <span id="radar-page-indicator" class="muted">Pagina 1 de 1</span>
-        <button class="btn btn-ghost btn-compact" type="button" id="radar-next-page">Proxima</button>
-      </div>
-    </div>
+    {% include "core/components/datagrid.html" with grid_id="radar-trabalhos-grid" table_class="radar-work-table" scope=radar.id %}
   </section>
 
   <details class="io-card io-discrete" id="novo-trabalho" style="margin-top: 18px;">
@@ -221,6 +68,23 @@
               <input type="text" name="descricao" placeholder="Revisao preventiva">
             </label>
             <label class="field">
+              <span>Data de registro</span>
+              <input type="date" name="data_registro" value="{% now 'Y-m-d' %}">
+            </label>
+          </div>
+          <div class="form-actions" style="margin-top: 10px;">
+            <button
+              class="btn btn-ghost btn-compact"
+              type="button"
+              id="novo-trabalho-avancado-toggle"
+              aria-expanded="false"
+              aria-controls="novo-trabalho-avancado-campos"
+            >
+              Avancado
+            </button>
+          </div>
+          <div class="io-form-grid" id="novo-trabalho-avancado-campos" style="display: none; margin-top: 12px;">
+            <label class="field">
               <span>Setor</span>
               <input type="text" name="setor" placeholder="Utilidades">
             </label>
@@ -240,10 +104,6 @@
                   <option value="{{ contrato.id }}">{{ contrato.nome }}</option>
                 {% endfor %}
               </select>
-            </label>
-            <label class="field">
-              <span>Data de registro</span>
-              <input type="date" name="data_registro">
             </label>
             <label class="field">
               <span>Classificacao</span>
@@ -364,10 +224,22 @@
   </details>
   </div>
   {{ trabalhos_table_data|json_script:"radar-trabalhos-data" }}
+  <script src="{% static 'core/datagrid.js' %}"></script>
   <script src="{% static 'core/radar_shared.js' %}"></script>
   <script src="{% static 'core/radar_trabalhos_table.js' %}"></script>
   <script>
     (function () {
+      var advancedToggle = document.getElementById("novo-trabalho-avancado-toggle");
+      var advancedPanel = document.getElementById("novo-trabalho-avancado-campos");
+      if (advancedToggle && advancedPanel) {
+        advancedToggle.addEventListener("click", function () {
+          var isOpen = advancedPanel.style.display !== "none";
+          advancedPanel.style.display = isOpen ? "none" : "";
+          advancedToggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+          advancedToggle.textContent = isOpen ? "Avancado" : "Ocultar avancado";
+        });
+      }
+
       if (!window.RadarShared) {
         return;
       }

@@ -1,0 +1,45 @@
+<div
+  class="datagrid{% if grid_class %} {{ grid_class }}{% endif %}"
+  id="{{ grid_id }}"
+  data-dg-storage-key="{{ storage_key|default:grid_id }}"
+  {% if scope %}data-dg-scope="{{ scope }}"{% endif %}
+>
+  <div class="datagrid-toolbar">
+    <div class="datagrid-summary">
+      <span data-dg-summary>{{ loading_text|default:"Carregando..." }}</span>
+      <button class="btn btn-ghost btn-compact" type="button" data-dg-clear-filters>Limpar filtros</button>
+    </div>
+    <details class="datagrid-column-picker" data-dg-column-picker>
+      <summary class="btn btn-ghost btn-compact">Colunas</summary>
+      <div class="datagrid-column-picker-body" data-dg-column-picker-body></div>
+    </details>
+  </div>
+
+  <div class="table-wrap datagrid-wrap{% if wrap_class %} {{ wrap_class }}{% endif %}">
+    <table class="table datagrid-table{% if table_class %} {{ table_class }}{% endif %}" data-dg-table>
+      <thead data-dg-head></thead>
+      <tbody data-dg-body>
+        <tr>
+          <td class="muted" colspan="1">{{ loading_text|default:"Carregando dados..." }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="datagrid-pagination">
+    <label class="field datagrid-page-size">
+      <span>Linhas por pagina</span>
+      <select data-dg-page-size>
+        <option value="10">10</option>
+        <option value="20" selected>20</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+    </label>
+    <div class="datagrid-pager-actions">
+      <button class="btn btn-ghost btn-compact" type="button" data-dg-prev-page>Anterior</button>
+      <span class="muted" data-dg-page-indicator>Pagina 1 de 1</span>
+      <button class="btn btn-ghost btn-compact" type="button" data-dg-next-page>Proxima</button>
+    </div>
+  </div>
+</div>

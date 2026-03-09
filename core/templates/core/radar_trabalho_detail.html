@@ -32,97 +32,16 @@
   {% if message %}
     <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
   {% endif %}
+  <div id="cadastro-message" class="notice" style="display: none;"></div>
   <div class="io-layout">
-    <section class="io-card">
+    <section class="io-card radar-table-card">
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Atividades</h2>
-          <p class="muted">Operacao direta no card: iniciar, concluir, reabrir e editar rapido.</p>
+          <p class="muted">Operacao direta na tabela: iniciar, concluir, reabrir e editar.</p>
         </div>
       </div>
-
-      <div class="proposal-grid status-group status-list">
-        {% for atividade in atividades_ordenadas %}
-          <article class="proposal-card io-proposal-card activity-row{% if atividade.status == 'EXECUTANDO' %} proposal-card-executando{% endif %}" data-atividade-id="{{ atividade.id }}">
-            <div class="activity-row-top">
-              <div class="proposal-title js-atividade-nome">{{ atividade.nome }}</div>
-              <div class="activity-row-meta">
-                <span class="badge badge-{{ atividade.status|lower }} js-atividade-status">{{ atividade.get_status_display }}</span>
-                {% if atividade.horas_trabalho %}
-                  <span class="slot-badge slot-badge-compact js-atividade-horas">{{ atividade.horas_trabalho }}h</span>
-                {% endif %}
-                {% if can_manage %}
-                  {% if atividade.status != 'EXECUTANDO' %}
-                    <button class="btn btn-ghost btn-compact js-status-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-status="EXECUTANDO">Iniciar</button>
-                  {% endif %}
-                  {% if atividade.status != 'FINALIZADA' %}
-                    <button class="btn btn-ghost btn-compact js-status-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-status="FINALIZADA">Concluir</button>
-                  {% endif %}
-                  {% if atividade.status != 'PENDENTE' %}
-                    <button class="btn btn-ghost btn-compact js-status-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-status="PENDENTE">Reabrir</button>
-                  {% endif %}
-                  <button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-direcao="up" {% if forloop.first %}disabled{% endif %} title="Mover para cima">Subir</button>
-                  <button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="{{ atividade.id }}" data-direcao="down" {% if forloop.last %}disabled{% endif %} title="Mover para baixo">Descer</button>
-                  <button
-                    class="btn btn-ghost btn-compact js-editar-atividade"
-                    type="button"
-                    data-atividade-id="{{ atividade.id }}"
-                    data-atividade-nome="{{ atividade.nome|default:'' }}"
-                    data-atividade-descricao="{{ atividade.descricao|default:'' }}"
-                    data-atividade-horas="{{ atividade.horas_trabalho|default:'' }}"
-                    data-atividade-status="{{ atividade.status }}"
-                    data-atividade-inicio="{{ atividade.inicio_execucao_em|date:'d/m/Y H:i' }}"
-                    data-atividade-finalizada="{{ atividade.finalizada_em|date:'d/m/Y H:i' }}"
-                  >
-                    Abrir edicao completa
-                  </button>
-                  <button class="btn btn-ghost btn-compact js-toggle-inline-edit" type="button">Editar atividade</button>
-                {% endif %}
-              </div>
-            </div>
-            <div class="proposal-meta js-atividade-descricao">{{ atividade.descricao|default:"Atividade sem descricao." }}</div>
-            <div class="proposal-meta activity-dates">
-              <span class="js-atividade-inicio"><strong>Inicio:</strong> {{ atividade.inicio_execucao_em|date:"d/m/Y H:i"|default:"-" }}</span>
-              <span class="js-atividade-finalizada"><strong>Finalizacao:</strong> {{ atividade.finalizada_em|date:"d/m/Y H:i"|default:"-" }}</span>
-            </div>
-            {% if can_manage %}
-              <form class="io-form js-inline-edit-form" style="display: none; margin-top: 12px;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="update_atividade">
-                <input type="hidden" name="atividade_id" value="{{ atividade.id }}">
-                <div class="io-form-grid">
-                  <label class="field">
-                    <span>Nome</span>
-                    <input type="text" name="nome" value="{{ atividade.nome|default:'' }}" required>
-                  </label>
-                  <label class="field">
-                    <span>Horas</span>
-                    <input type="text" name="horas_trabalho" value="{{ atividade.horas_trabalho|default:'' }}">
-                  </label>
-                  <label class="field" style="grid-column: 1 / -1;">
-                    <span>Descricao</span>
-                    <input type="text" name="descricao" value="{{ atividade.descricao|default:'' }}">
-                  </label>
-                  <label class="field">
-                    <span>Status</span>
-                    <select name="status">
-                      {% for value, label in status_choices %}
-                        <option value="{{ value }}" {% if atividade.status == value %}selected{% endif %}>{{ label }}</option>
-                      {% endfor %}
-                    </select>
-                  </label>
-                </div>
-                <div class="form-actions">
-                  <button class="btn btn-primary" type="submit">Salvar rapido</button>
-                  <button class="btn btn-ghost btn-compact js-cancel-inline-edit" type="button">Cancelar</button>
-                </div>
-              </form>
-            {% endif %}
-          </article>
-        {% empty %}
-          <div class="muted">Nenhuma atividade cadastrada.</div>
-        {% endfor %}
-      </div>
+      {% include "core/components/datagrid.html" with grid_id="radar-atividades-grid" table_class="radar-work-table radar-atividades-table" scope=trabalho.id %}
     </section>
 
     {% if can_manage %}
@@ -130,7 +49,7 @@
         <div class="io-card-head">
           <div>
             <h2 class="io-title">Editar atividade</h2>
-            <p class="muted">Selecione uma atividade para editar no card abaixo.</p>
+            <p class="muted">Selecione uma atividade na tabela para editar.</p>
           </div>
         </div>
         <div class="io-discrete-body">
@@ -193,7 +112,6 @@
     </summary>
     <div class="io-discrete-body">
       {% if can_manage %}
-        <div id="cadastro-message" class="notice" style="display: none;"></div>
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="create_atividade">
@@ -330,7 +248,15 @@
     </div>
   </details>
 
+  {{ atividades_table_data|json_script:"radar-atividades-data" }}
+  <script>
+    window.RadarAtividadesTableConfig = {
+      canManage: {{ can_manage|yesno:"true,false" }}
+    };
+  </script>
+  <script src="{% static 'core/datagrid.js' %}"></script>
   <script src="{% static 'core/radar_shared.js' %}"></script>
+  <script src="{% static 'core/radar_atividades_table.js' %}"></script>
   <script>
     (function () {
       if (!window.RadarShared) {
@@ -350,370 +276,6 @@
         detailsId: "classificacao-pop",
         messageId: "cadastro-message",
       });
-    })();
-  </script>
-
-  <script>
-    (function () {
-      var getCookie = window.RadarShared && window.RadarShared.getCookie
-        ? window.RadarShared.getCookie
-        : function () { return ""; };
-      function setPageMessage(message, level) {
-        var box = document.getElementById("cadastro-message");
-        if (!box) {
-          return;
-        }
-        box.textContent = message;
-        box.className = "notice notice-" + (level || "info");
-        box.style.display = "block";
-      }
-      function parseJsonResponse(resp) {
-        return resp
-          .text()
-          .then(function (text) {
-            var payload = {};
-            if (text) {
-              try {
-                payload = JSON.parse(text);
-              } catch (e) {
-                payload = {};
-              }
-            }
-            if (!resp.ok) {
-              throw payload;
-            }
-            return payload;
-          });
-      }
-      function postFormData(data) {
-        return fetch(window.location.pathname + window.location.search, {
-          method: "POST",
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-            "X-CSRFToken": getCookie("csrftoken"),
-          },
-          body: data,
-        }).then(parseJsonResponse);
-      }
-      function setField(form, name, value) {
-        var input = form.querySelector("[name='" + name + "']");
-        if (input) {
-          input.value = value || "";
-        }
-      }
-      function hideEditor(editor) {
-        var form = editor.querySelector("form.io-form");
-        if (form) {
-          form.reset();
-          setField(form, "atividade_id", "");
-        }
-        var deleteForm = editor.querySelector("form#delete-atividade-form");
-        if (deleteForm) {
-          setField(deleteForm, "atividade_id", "");
-          var deleteButton = deleteForm.querySelector("button[type='submit']");
-          if (deleteButton) {
-            deleteButton.disabled = true;
-          }
-        }
-        editor.style.display = "none";
-      }
-      function updateCard(payload) {
-        if (!payload || !payload.id) {
-          return;
-        }
-        var card = document.querySelector("[data-atividade-id='" + payload.id + "']");
-        if (!card) {
-          return;
-        }
-        var nomeEl = card.querySelector(".js-atividade-nome");
-        if (nomeEl) {
-          nomeEl.textContent = payload.nome || "";
-        }
-        var descricaoEl = card.querySelector(".js-atividade-descricao");
-        if (descricaoEl) {
-          descricaoEl.textContent = payload.descricao || "Atividade sem descricao.";
-        }
-        var statusEl = card.querySelector(".js-atividade-status");
-        if (statusEl && payload.status) {
-          statusEl.textContent = payload.status_label || payload.status;
-          statusEl.className = "badge badge-" + payload.status.toLowerCase() + " js-atividade-status";
-        }
-        var inicioEl = card.querySelector(".js-atividade-inicio");
-        if (inicioEl) {
-          inicioEl.innerHTML = "<strong>Inicio:</strong> " + (payload.inicio_execucao_display || "-");
-        }
-        var finalizadaEl = card.querySelector(".js-atividade-finalizada");
-        if (finalizadaEl) {
-          finalizadaEl.innerHTML = "<strong>Finalizacao:</strong> " + (payload.finalizada_display || "-");
-        }
-        var horasEl = card.querySelector(".js-atividade-horas");
-        if (payload.horas_trabalho) {
-          if (!horasEl) {
-            horasEl = document.createElement("span");
-            horasEl.className = "slot-badge slot-badge-compact js-atividade-horas";
-            var meta = card.querySelector(".activity-row-meta");
-            if (meta) {
-              meta.insertBefore(horasEl, meta.querySelector(".js-editar-atividade"));
-            }
-          }
-          horasEl.textContent = payload.horas_trabalho + "h";
-        } else if (horasEl) {
-          horasEl.remove();
-        }
-        var editButton = card.querySelector(".js-editar-atividade");
-        if (editButton) {
-          editButton.dataset.atividadeNome = payload.nome || "";
-          editButton.dataset.atividadeDescricao = payload.descricao || "";
-          editButton.dataset.atividadeHoras = payload.horas_trabalho || "";
-          editButton.dataset.atividadeStatus = payload.status || "";
-          editButton.dataset.atividadeInicio = payload.inicio_execucao_display || "";
-          editButton.dataset.atividadeFinalizada = payload.finalizada_display || "";
-        }
-      }
-      function removeCard(id) {
-        var card = document.querySelector("[data-atividade-id='" + id + "']");
-        if (card) {
-          card.remove();
-        }
-      }
-      function refreshMoveButtonsInList(listEl) {
-        if (!listEl) {
-          return;
-        }
-        var cards = Array.from(listEl.querySelectorAll("article.activity-row"));
-        cards.forEach(function (card, index) {
-          var upButton = card.querySelector(".js-move-atividade[data-direcao='up']");
-          var downButton = card.querySelector(".js-move-atividade[data-direcao='down']");
-          if (upButton) {
-            upButton.disabled = index === 0;
-          }
-          if (downButton) {
-            downButton.disabled = index === cards.length - 1;
-          }
-        });
-      }
-      function swapCards(idA, idB) {
-        if (!idA || !idB) {
-          return;
-        }
-        var cardA = document.querySelector("[data-atividade-id='" + idA + "']");
-        var cardB = document.querySelector("[data-atividade-id='" + idB + "']");
-        if (!cardA || !cardB || cardA.parentNode !== cardB.parentNode) {
-          return;
-        }
-        var parent = cardA.parentNode;
-        var marker = document.createElement("span");
-        parent.insertBefore(marker, cardA);
-        parent.insertBefore(cardA, cardB);
-        parent.insertBefore(cardB, marker);
-        parent.removeChild(marker);
-        refreshMoveButtonsInList(parent);
-      }
-      var moveButtons = document.querySelectorAll(".js-move-atividade");
-      moveButtons.forEach(function (button) {
-        button.addEventListener("click", function () {
-          if (button.disabled) {
-            return;
-          }
-          var atividadeId = button.dataset.atividadeId;
-          var direcao = button.dataset.direcao;
-          if (!atividadeId || !direcao) {
-            return;
-          }
-          var data = new FormData();
-          data.set("action", "move_atividade");
-          data.set("atividade_id", atividadeId);
-          data.set("direcao", direcao);
-          button.disabled = true;
-          postFormData(data)
-            .then(function (payload) {
-              if (payload && payload.ok && payload.moved && payload.swap_with_id) {
-                swapCards(payload.id, payload.swap_with_id);
-              }
-            })
-            .catch(function () {
-              setPageMessage("Nao foi possivel mover a atividade.", "error");
-            })
-            .finally(function () {
-              button.disabled = false;
-            });
-        });
-      });
-      var statusButtons = document.querySelectorAll(".js-status-atividade");
-      statusButtons.forEach(function (button) {
-        button.addEventListener("click", function () {
-          if (button.disabled) {
-            return;
-          }
-          var atividadeId = button.dataset.atividadeId;
-          var status = button.dataset.status;
-          if (!atividadeId || !status) {
-            return;
-          }
-          var data = new FormData();
-          data.set("action", "quick_status_atividade");
-          data.set("atividade_id", atividadeId);
-          data.set("status", status);
-          button.disabled = true;
-          postFormData(data)
-            .then(function (payload) {
-              if (payload && payload.ok) {
-                window.location.reload();
-              }
-            })
-            .catch(function () {
-              setPageMessage("Nao foi possivel atualizar o status.", "error");
-            })
-            .finally(function () {
-              button.disabled = false;
-            });
-        });
-      });
-      var inlineToggleButtons = document.querySelectorAll(".js-toggle-inline-edit");
-      inlineToggleButtons.forEach(function (button) {
-        button.addEventListener("click", function () {
-          var card = button.closest("article.activity-row");
-          if (!card) {
-            return;
-          }
-          var form = card.querySelector(".js-inline-edit-form");
-          if (!form) {
-            return;
-          }
-          form.style.display = form.style.display === "none" ? "" : "none";
-        });
-      });
-      var inlineCancelButtons = document.querySelectorAll(".js-cancel-inline-edit");
-      inlineCancelButtons.forEach(function (button) {
-        button.addEventListener("click", function () {
-          var form = button.closest(".js-inline-edit-form");
-          if (!form) {
-            return;
-          }
-          form.style.display = "none";
-        });
-      });
-      var inlineForms = document.querySelectorAll(".js-inline-edit-form");
-      inlineForms.forEach(function (form) {
-        form.addEventListener("submit", function (event) {
-          event.preventDefault();
-          var data = new FormData(form);
-          var submitButton = form.querySelector("button[type='submit']");
-          if (submitButton) {
-            submitButton.disabled = true;
-          }
-          postFormData(data)
-            .then(function (payload) {
-              if (payload && payload.ok) {
-                updateCard(payload);
-                form.style.display = "none";
-              }
-            })
-            .catch(function (errPayload) {
-              var message = (errPayload && errPayload.message) || "Nao foi possivel salvar a atividade.";
-              setPageMessage(message, "error");
-            })
-            .finally(function () {
-              if (submitButton) {
-                submitButton.disabled = false;
-              }
-            });
-        });
-      });
-      var buttons = document.querySelectorAll(".js-editar-atividade");
-      var editor = document.getElementById("editar-atividade");
-      if (!editor) {
-        return;
-      }
-      buttons.forEach(function (button) {
-        button.addEventListener("click", function () {
-          var form = editor.querySelector("form.io-form");
-          if (!form) {
-            return;
-          }
-          editor.style.display = "";
-          setField(form, "atividade_id", button.dataset.atividadeId);
-          setField(form, "nome", button.dataset.atividadeNome);
-          setField(form, "descricao", button.dataset.atividadeDescricao);
-          setField(form, "horas_trabalho", button.dataset.atividadeHoras);
-          setField(form, "status", button.dataset.atividadeStatus);
-          setField(form, "inicio_execucao_display", button.dataset.atividadeInicio);
-          setField(form, "finalizada_display", button.dataset.atividadeFinalizada);
-          var deleteForm = editor.querySelector("form[method='post']:not(.io-form)");
-          if (deleteForm) {
-            setField(deleteForm, "atividade_id", button.dataset.atividadeId);
-            var deleteButton = deleteForm.querySelector("button[type='submit']");
-            if (deleteButton) {
-              deleteButton.disabled = false;
-            }
-          }
-          editor.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      });
-      var cancelButton = document.getElementById("cancelar-edicao-atividade");
-      if (cancelButton) {
-        cancelButton.addEventListener("click", function () {
-          hideEditor(editor);
-        });
-      }
-
-      var updateForm = editor.querySelector("form.io-form");
-      if (updateForm) {
-        updateForm.addEventListener("submit", function (event) {
-          event.preventDefault();
-          var data = new FormData(updateForm);
-          var submitButton = updateForm.querySelector("button[type='submit']");
-          if (submitButton) {
-            submitButton.disabled = true;
-          }
-          postFormData(data)
-            .then(function (payload) {
-              if (payload && payload.ok) {
-                updateCard(payload);
-                hideEditor(editor);
-              }
-            })
-            .catch(function (errPayload) {
-              var message = (errPayload && errPayload.message) || "Nao foi possivel salvar a atividade.";
-              setPageMessage(message, "error");
-            })
-            .finally(function () {
-              if (submitButton) {
-                submitButton.disabled = false;
-              }
-            });
-        });
-      }
-
-      var deleteForm = editor.querySelector("form#delete-atividade-form");
-      if (deleteForm) {
-        deleteForm.addEventListener("submit", function (event) {
-          event.preventDefault();
-          if (!confirm("Excluir atividade?")) {
-            return;
-          }
-          var data = new FormData(deleteForm);
-          var submitButton = deleteForm.querySelector("button[type='submit']");
-          if (submitButton) {
-            submitButton.disabled = true;
-          }
-          postFormData(data)
-            .then(function (payload) {
-              if (payload && payload.ok) {
-                removeCard(payload.id);
-                hideEditor(editor);
-              }
-            })
-            .catch(function () {
-              setPageMessage("Nao foi possivel excluir a atividade.", "error");
-            })
-            .finally(function () {
-              if (submitButton) {
-                submitButton.disabled = false;
-              }
-            });
-        });
-      }
     })();
   </script>
   </div>

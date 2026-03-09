@@ -3913,6 +3913,22 @@ def radar_trabalho_detail(request, radar_pk, pk):
     atividades_base = trabalho.atividades.all()
     _normalizar_ordem_atividades(trabalho)
     atividades_ordenadas = atividades_base.order_by("ordem", "criado_em", "id")
+    atividades_table_data = []
+    for atividade in atividades_ordenadas:
+        horas_label = str(atividade.horas_trabalho) if atividade.horas_trabalho is not None else ""
+        atividades_table_data.append(
+            {
+                "id": atividade.id,
+                "nome": atividade.nome or "",
+                "descricao": atividade.descricao or "",
+                "status": atividade.status,
+                "status_label": atividade.get_status_display(),
+                "horas_trabalho": horas_label,
+                "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
+                "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
+                "ordem": atividade.ordem or 0,
+            }
+        )
     edit_atividade = None
     edit_atividade_id = request.GET.get("editar", "").strip()
     if edit_atividade_id:
@@ -3927,6 +3943,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "radar": radar,
             "trabalho": trabalho,
             "atividades_ordenadas": atividades_ordenadas,
+            "atividades_table_data": atividades_table_data,
             "total_atividades": total_atividades,
             "contratos": contratos,
             "classificacoes": classificacoes,
