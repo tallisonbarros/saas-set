@@ -15,77 +15,27 @@
 
 {% block content %}
   <div class="radar-mode {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
-  <section class="card">
     <div class="page-hud">
       <div class="hud-top">
-        <div class="hud-title">Radar de atividades</div>
-        <div class="hud-pill">Trabalhos</div>
-        {% if can_manage %}
-          <div class="radar-mode-badge radar-mode-badge-creator">Modo criador</div>
-        {% else %}
-          <div class="radar-mode-badge radar-mode-badge-viewer">Somente visualizacao</div>
+        <h1 class="page-title">{{ radar.nome }}</h1>
+        {% if is_radar_creator %}
+          <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_list' %}">Voltar para radares</a>
         </div>
       </div>
-      <div class="page-hud-head">
-        <div>
-          <h1 class="page-title">{{ radar.nome }}</h1>
-          <p class="page-subtitle">
-            {{ radar.descricao|default:"Radar para acompanhamento de atividades." }}
-          </p>
-        </div>
-      </div>
-      <div class="rack-status">
-        <div>
-          <div class="meta-label">Trabalhos</div>
-          <div class="meta-value">{{ total_trabalhos }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Codigo do radar</div>
-          <div class="meta-value">{% if radar.id_radar %}{{ radar.id_radar.codigo }}{% else %}-{% endif %}</div>
-        </div>
-        <div>
-          <div class="meta-label">Local</div>
-          <div class="meta-value">{{ radar.local|default:"-" }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Criador</div>
-          <div class="meta-value">
-            {% if radar.criador %}{{ radar.criador.get_full_name|default:radar.criador.username }}{% else %}-{% endif %}
-          </div>
-        </div>
-        <div>
-          <div class="meta-label">Acesso</div>
-          <div class="meta-value">
-            {% if is_radar_creator %}
-              <span class="slot-badge slot-badge-compact">Criador</span>
-            {% elif has_id_radar_access %}
-              <span class="slot-badge slot-badge-compact slot-badge-readonly" aria-label="Leitura">
-                <svg class="badge-eye" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6z"></path>
-                  <circle cx="12" cy="12" r="3.2"></circle>
-                </svg>
-                Leitura
-              </span>
-            {% else %}
-              -
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      <div id="cadastro-message" class="notice" style="display: none;"></div>
-      {% if message %}
-        <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
-      {% endif %}
-      {% if can_manage %}
-        <p class="notice notice-info">Voce tem permissao de edicao neste radar.</p>
-      {% else %}
-        <p class="notice notice-warning">Acesso somente leitura. Apenas o criador pode alterar este radar.</p>
-      {% endif %}
     </div>
-  </section>
+
+  <div id="cadastro-message" class="notice" style="display: none;"></div>
+  {% if message %}
+    <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
+  {% endif %}
+  {% if can_manage %}
+    <p class="notice notice-info">Voce tem permissao de edicao neste radar.</p>
+  {% else %}
+    <p class="notice notice-warning">Acesso somente leitura. Apenas o criador pode alterar este radar.</p>
+  {% endif %}
 
   <section class="io-card radar-table-card">
     <div class="io-card-head">
@@ -145,7 +95,6 @@
             <th data-col="total_atividades">
               <button class="radar-sort-btn js-radar-sort" type="button" data-col="total_atividades">Atividades <span class="radar-sort-indicator"></span></button>
             </th>
-            <th data-col="acoes">Acoes</th>
           </tr>
           <tr class="radar-filter-row">
             <th data-col="nome"><input class="radar-filter-input js-radar-filter" type="text" data-col="nome" placeholder="Filtrar"></th>
@@ -165,12 +114,11 @@
             <th data-col="setor"><input class="radar-filter-input js-radar-filter" type="text" data-col="setor" placeholder="Filtrar"></th>
             <th data-col="solicitante"><input class="radar-filter-input js-radar-filter" type="text" data-col="solicitante" placeholder="Filtrar"></th>
             <th data-col="total_atividades"><input class="radar-filter-input js-radar-filter" type="number" min="0" step="1" data-col="total_atividades" placeholder="0"></th>
-            <th data-col="acoes"></th>
           </tr>
         </thead>
         <tbody id="radar-trabalhos-body">
           <tr>
-            <td colspan="11" class="muted">Carregando dados...</td>
+            <td colspan="10" class="muted">Carregando dados...</td>
           </tr>
         </tbody>
       </table>

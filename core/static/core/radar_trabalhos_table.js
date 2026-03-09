@@ -39,7 +39,7 @@
 
   function buildStorageKey(tableEl) {
     var radarId = tableEl && tableEl.dataset ? tableEl.dataset.radarId : "";
-    return "radar_table_columns_v1:" + (radarId || "global");
+    return "radar_table_columns_v2:" + (radarId || "global");
   }
 
   function loadVisibleColumns(storageKey, columns) {
@@ -132,17 +132,16 @@
     }
 
     var columns = [
-      { key: "nome", label: "Nome", visible: true },
-      { key: "descricao", label: "Descricao", visible: true },
+      { key: "nome", label: "Nome", visible: true, fixed: true },
+      { key: "descricao", label: "Descricao", visible: false },
       { key: "status", label: "Status", visible: true },
-      { key: "classificacao", label: "Classificacao", visible: true },
-      { key: "contrato", label: "Contrato", visible: true },
+      { key: "classificacao", label: "Classificacao", visible: false },
+      { key: "contrato", label: "Contrato", visible: false },
       { key: "data_registro", label: "Data registro", visible: true },
-      { key: "responsavel", label: "Responsavel", visible: true },
-      { key: "setor", label: "Setor", visible: true },
-      { key: "solicitante", label: "Solicitante", visible: true },
-      { key: "total_atividades", label: "Atividades", visible: true },
-      { key: "acoes", label: "Acoes", visible: true, fixed: true },
+      { key: "responsavel", label: "Responsavel", visible: false },
+      { key: "setor", label: "Setor", visible: false },
+      { key: "solicitante", label: "Solicitante", visible: false },
+      { key: "total_atividades", label: "Atividades", visible: false },
     ];
 
     var rows = parseJsonScript("radar-trabalhos-data").map(function (row, index) {
@@ -161,9 +160,16 @@
 
     var storageKey = buildStorageKey(tableEl);
     var visibleColumns = loadVisibleColumns(storageKey, columns);
-    if (visibleColumns.indexOf("acoes") === -1) {
-      visibleColumns.push("acoes");
+
+    function ensureMandatoryColumns() {
+      columns.forEach(function (column) {
+        if (column.fixed && visibleColumns.indexOf(column.key) === -1) {
+          visibleColumns.push(column.key);
+        }
+      });
     }
+
+    ensureMandatoryColumns();
 
     function isColumnVisible(columnKey) {
       return visibleColumns.indexOf(columnKey) >= 0;
@@ -251,12 +257,23 @@
       if (!pageRows.length) {
         renderNoRows(tbody, visibleColumnCount());
         applyColumnVisibility();
+        setupDescriptionMarquees();
         return;
       }
       tbody.innerHTML = pageRows.map(function (row) {
+        var nomeCell = escHtml(row.nome || "-");
+        var descricaoCell = escHtml(row.descricao || "Sem descricao.");
+        if (row.detalhe_url) {
+          nomeCell = '<a class="radar-row-link" href="' + escHtml(row.detalhe_url) + '">' + nomeCell + "</a>";
+        }
         return [
           '<tr data-row-id="' + escHtml(row.id) + '">',
-          '<td data-col="nome">' + escHtml(row.nome || "-") + "</td>",
+          '<td data-col="nome" class="radar-col-nome">' +
+            nomeCell +
+            '<div class="radar-desc-marquee" title="' + descricaoCell + '">' +
+              '<span class="radar-desc-marquee-text">' + descricaoCell + "</span>" +
+            "</div>" +
+          "</td>",
           '<td data-col="descricao" class="radar-cell-wrap">' + escHtml(row.descricao || "-") + "</td>",
           '<td data-col="status">' + statusBadge(row.status, row.status_label) + "</td>",
           '<td data-col="classificacao">' + escHtml(row.classificacao || "-") + "</td>",
@@ -266,11 +283,35 @@
           '<td data-col="setor">' + escHtml(row.setor || "-") + "</td>",
           '<td data-col="solicitante">' + escHtml(row.solicitante || "-") + "</td>",
           '<td data-col="total_atividades"><span class="slot-badge slot-badge-compact">' + escHtml(row.total_atividades || 0) + " atividades</span></td>",
-          '<td data-col="acoes"><a class="btn btn-ghost btn-compact" href="' + escHtml(row.detalhe_url || "#") + '">Abrir</a></td>',
           "</tr>",
         ].join("");
       }).join("");
       applyColumnVisibility();
+      setupDescriptionMarquees();
+    }
+
+    function setupDescriptionMarquees() {
+      var marquees = tbody.querySelectorAll(".radar-desc-marquee");
+      marquees.forEach(function (marquee) {
+        var text = marquee.querySelector(".radar-desc-marquee-text");
+        if (!text) {
+          return;
+        }
+        marquee.classList.remove("is-running");
+        marquee.style.removeProperty("--marquee-distance");
+        marquee.style.removeProperty("--marquee-duration");
+        text.style.removeProperty("transform");
+
+        var distance = text.scrollWidth - marquee.clientWidth;
+        if (distance <= 8) {
+          return;
+        }
+
+        var duration = Math.max(8, Math.round(distance / 20));
+        marquee.style.setProperty("--marquee-distance", distance + "px");
+        marquee.style.setProperty("--marquee-duration", duration + "s");
+        marquee.classList.add("is-running");
+      });
     }
 
     function renderTable() {
@@ -324,18 +365,8 @@
             visibleColumns = visibleColumns.filter(function (item) {
               return item !== col;
             });
-            if (!visibleColumns.length) {
-              visibleColumns = ["acoes"];
-              var acoesToggle = pickerBody.querySelector('.js-radar-column-toggle[data-col="nome"]');
-              if (acoesToggle) {
-                acoesToggle.checked = true;
-                visibleColumns.push("nome");
-              }
-            }
           }
-          if (visibleColumns.indexOf("acoes") === -1) {
-            visibleColumns.push("acoes");
-          }
+          ensureMandatoryColumns();
           saveVisibleColumns(storageKey, visibleColumns);
           renderTable();
         });
@@ -406,6 +437,10 @@
     nextButton.addEventListener("click", function () {
       state.page += 1;
       renderTable();
+    });
+
+    window.addEventListener("resize", function () {
+      setupDescriptionMarquees();
     });
 
     syncColumnPicker();
