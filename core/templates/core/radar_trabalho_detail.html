@@ -17,107 +17,21 @@
 
 {% block content %}
   <div class="radar-mode {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
-  <section class="card">
     <div class="page-hud">
       <div class="hud-top">
-        <div class="hud-title">Trabalho</div>
-        <div class="hud-pill">Atividades</div>
-        {% if can_manage %}
-          <div class="radar-mode-badge radar-mode-badge-creator">Modo criador</div>
-        {% else %}
-          <div class="radar-mode-badge radar-mode-badge-viewer">Somente visualizacao</div>
+        <h1 class="page-title">{{ trabalho.nome }}</h1>
+        {% if is_radar_creator %}
+          <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
-        <div class="hud-menu" aria-label="Menu do modulo">
+        <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar para o radar</a>
-          {% if can_create_proposta_from_trabalho %}
-            <a
-              class="hud-menu-pill"
-              href="{% url 'proposta_nova_de_trabalho' trabalho.id %}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Gerar proposta
-            </a>
-          {% endif %}
-          {% if can_duplicate_trabalho %}
-            <form method="post" style="display: inline;">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="duplicate_trabalho">
-              <button class="hud-menu-pill" type="submit">Duplicar trabalho</button>
-            </form>
-          {% endif %}
-        </div>
-      </div>
-      <div class="page-hud-head">
-        <div>
-          <h1 class="page-title">{{ trabalho.nome }}</h1>
-          <p class="page-subtitle">{{ trabalho.descricao|default:"Detalhes do trabalho e atividades." }}</p>
-        </div>
-      </div>
-      <div class="rack-status">
-        <div>
-          <div class="meta-label">Status</div>
-          <div class="meta-value">{{ trabalho.get_status_display }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Atividades</div>
-          <div class="meta-value">{{ total_atividades }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Data registro</div>
-          <div class="meta-value">{{ trabalho.data_registro|date:"d/m/Y" }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Radar</div>
-          <div class="meta-value">{{ radar.nome }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Setor</div>
-          <div class="meta-value">{{ trabalho.setor|default:"-" }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Solicitante</div>
-          <div class="meta-value">{{ trabalho.solicitante|default:"-" }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Responsavel</div>
-          <div class="meta-value">{{ trabalho.responsavel|default:"-" }}</div>
-        </div>
-        <div>
-          <div class="meta-label">Contrato</div>
-          <div class="meta-value">{% if trabalho.contrato %}{{ trabalho.contrato.nome }}{% else %}-{% endif %}</div>
-        </div>
-        <div>
-          <div class="meta-label">Acesso</div>
-          <div class="meta-value">
-            {% if is_radar_creator %}
-              <span class="slot-badge slot-badge-compact">Criador do radar</span>
-            {% elif has_id_radar_access %}
-              <span class="slot-badge slot-badge-compact slot-badge-readonly" aria-label="Leitura">
-                <svg class="badge-eye" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6z"></path>
-                  <circle cx="12" cy="12" r="3.2"></circle>
-                </svg>
-                Leitura
-              </span>
-            {% else %}
-              -
-            {% endif %}
-          </div>
         </div>
       </div>
     </div>
-  </section>
 
   {% if message %}
     <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
   {% endif %}
-  {% if can_manage %}
-    <p class="notice notice-info">Voce pode atualizar este trabalho e suas atividades.</p>
-  {% else %}
-    <p class="notice notice-warning">Acesso somente leitura. Apenas o criador pode alterar este trabalho.</p>
-  {% endif %}
-
   <div class="io-layout">
     <section class="io-card">
       <div class="io-card-head">

@@ -200,13 +200,45 @@
           return;
         }
         if (state.sortCol !== button.dataset.col) {
-          indicator.textContent = "";
+          indicator.textContent = "^v";
           button.classList.remove("is-sorted");
           return;
         }
         button.classList.add("is-sorted");
         indicator.textContent = state.sortDir === "asc" ? "^" : "v";
       });
+    }
+
+    function closeHeaderFilters() {
+      var opened = tableEl.querySelectorAll(".radar-head-cell.is-filter-open");
+      opened.forEach(function (cell) {
+        cell.classList.remove("is-filter-open");
+      });
+    }
+
+    function openHeaderFilter(col, initialValue) {
+      if (!col) {
+        return;
+      }
+      closeHeaderFilters();
+      var cell = tableEl.querySelector('.radar-head-cell[data-col="' + col + '"]');
+      if (!cell) {
+        return;
+      }
+      cell.classList.add("is-filter-open");
+      var input = cell.querySelector(".js-radar-filter");
+      if (!input) {
+        return;
+      }
+      input.focus();
+      if (initialValue && input.tagName === "INPUT" && input.type === "text") {
+        input.value = initialValue;
+        state.filters[col] = initialValue;
+        state.page = 1;
+        renderTable();
+      } else if (typeof input.select === "function" && input.tagName === "INPUT" && input.type !== "date") {
+        input.select();
+      }
     }
 
     function passFilters(row) {
@@ -376,7 +408,8 @@
     function bindSortActions() {
       var sortButtons = tableEl.querySelectorAll(".js-radar-sort");
       sortButtons.forEach(function (button) {
-        button.addEventListener("click", function () {
+        button.addEventListener("click", function (event) {
+          event.stopPropagation();
           var col = button.dataset.col;
           if (!col) {
             return;
@@ -390,6 +423,55 @@
           state.page = 1;
           renderTable();
         });
+      });
+    }
+
+    function bindHeaderFilterTriggers() {
+      var triggers = tableEl.querySelectorAll(".js-radar-filter-trigger");
+      triggers.forEach(function (trigger) {
+        trigger.addEventListener("click", function (event) {
+          event.stopPropagation();
+          openHeaderFilter(trigger.dataset.col);
+        });
+
+        trigger.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openHeaderFilter(trigger.dataset.col);
+            return;
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeHeaderFilters();
+            return;
+          }
+          if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            var col = trigger.dataset.col;
+            var cell = trigger.closest(".radar-head-cell");
+            var input = cell ? cell.querySelector(".js-radar-filter") : null;
+            if (input && input.tagName === "INPUT" && input.type === "text") {
+              event.preventDefault();
+              openHeaderFilter(col, event.key);
+            }
+          }
+        });
+      });
+
+      var filterPanels = tableEl.querySelectorAll(".radar-head-filter");
+      filterPanels.forEach(function (panel) {
+        panel.addEventListener("click", function (event) {
+          event.stopPropagation();
+        });
+      });
+
+      document.addEventListener("click", function (event) {
+        if (!tableEl.contains(event.target)) {
+          closeHeaderFilters();
+          return;
+        }
+        if (!event.target.closest(".radar-head-cell")) {
+          closeHeaderFilters();
+        }
       });
     }
 
@@ -407,6 +489,18 @@
           state.page = 1;
           renderTable();
         });
+
+        input.addEventListener("keydown", function (event) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeHeaderFilters();
+            var col = input.dataset.col;
+            var trigger = tableEl.querySelector('.js-radar-filter-trigger[data-col="' + col + '"]');
+            if (trigger) {
+              trigger.focus();
+            }
+          }
+        });
       });
 
       clearFiltersButton.addEventListener("click", function () {
@@ -418,6 +512,7 @@
           }
         });
         state.page = 1;
+        closeHeaderFilters();
         renderTable();
       });
     }
@@ -445,6 +540,7 @@
 
     syncColumnPicker();
     bindSortActions();
+    bindHeaderFilterTriggers();
     bindFilterActions();
     renderTable();
   }

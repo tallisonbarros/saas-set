@@ -21,7 +21,7 @@
         {% if is_radar_creator %}
           <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
-        <div class="hud-menu" aria-label="Menu do modulo">
+        <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'radar_list' %}">Voltar para radares</a>
         </div>
       </div>
@@ -31,17 +31,11 @@
   {% if message %}
     <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
   {% endif %}
-  {% if can_manage %}
-    <p class="notice notice-info">Voce tem permissao de edicao neste radar.</p>
-  {% else %}
-    <p class="notice notice-warning">Acesso somente leitura. Apenas o criador pode alterar este radar.</p>
-  {% endif %}
 
   <section class="io-card radar-table-card">
     <div class="io-card-head">
       <div>
         <h2 class="io-title">Trabalhos</h2>
-        <p class="muted">Tabela unica com filtros por cabecalho, ordenacao e selecao de colunas.</p>
       </div>
       <div class="module-meta radar-table-controls">
         {% if has_finalizados_antigos and not show_all_finalizados %}
@@ -66,54 +60,120 @@
         <thead>
           <tr>
             <th data-col="nome">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="nome">Nome <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="nome">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="nome">Nome</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="nome" aria-label="Ordenar Nome">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="nome">
+                  <input class="radar-filter-input js-radar-filter" type="text" data-col="nome" placeholder="Filtrar">
+                </div>
+              </div>
             </th>
             <th data-col="descricao">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="descricao">Descricao <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="descricao">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="descricao">Descricao</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="descricao" aria-label="Ordenar Descricao">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="descricao">
+                  <input class="radar-filter-input js-radar-filter" type="text" data-col="descricao" placeholder="Filtrar">
+                </div>
+              </div>
             </th>
             <th data-col="status">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="status">Status <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="status">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="status">Status</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="status" aria-label="Ordenar Status">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="status">
+                  <select class="radar-filter-input js-radar-filter" data-col="status">
+                    <option value="">Todos</option>
+                    <option value="EXECUTANDO">Executando</option>
+                    <option value="PENDENTE">Pendente</option>
+                    <option value="FINALIZADA">Finalizada</option>
+                  </select>
+                </div>
+              </div>
             </th>
             <th data-col="classificacao">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="classificacao">Classificacao <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="classificacao">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="classificacao">Classificacao</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="classificacao" aria-label="Ordenar Classificacao">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="classificacao">
+                  <input class="radar-filter-input js-radar-filter" type="text" data-col="classificacao" placeholder="Filtrar">
+                </div>
+              </div>
             </th>
             <th data-col="contrato">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="contrato">Contrato <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="contrato">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="contrato">Contrato</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="contrato" aria-label="Ordenar Contrato">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="contrato">
+                  <input class="radar-filter-input js-radar-filter" type="text" data-col="contrato" placeholder="Filtrar">
+                </div>
+              </div>
             </th>
             <th data-col="data_registro">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="data_registro">Data registro <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="data_registro">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="data_registro">Data registro</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="data_registro" aria-label="Ordenar Data de registro">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="data_registro">
+                  <input class="radar-filter-input js-radar-filter" type="date" data-col="data_registro">
+                </div>
+              </div>
             </th>
             <th data-col="responsavel">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="responsavel">Responsavel <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="responsavel">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="responsavel">Responsavel</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="responsavel" aria-label="Ordenar Responsavel">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="responsavel">
+                  <input class="radar-filter-input js-radar-filter" type="text" data-col="responsavel" placeholder="Filtrar">
+                </div>
+              </div>
             </th>
             <th data-col="setor">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="setor">Setor <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="setor">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="setor">Setor</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="setor" aria-label="Ordenar Setor">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="setor">
+                  <input class="radar-filter-input js-radar-filter" type="text" data-col="setor" placeholder="Filtrar">
+                </div>
+              </div>
             </th>
             <th data-col="solicitante">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="solicitante">Solicitante <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="solicitante">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="solicitante">Solicitante</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="solicitante" aria-label="Ordenar Solicitante">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="solicitante">
+                  <input class="radar-filter-input js-radar-filter" type="text" data-col="solicitante" placeholder="Filtrar">
+                </div>
+              </div>
             </th>
             <th data-col="total_atividades">
-              <button class="radar-sort-btn js-radar-sort" type="button" data-col="total_atividades">Atividades <span class="radar-sort-indicator"></span></button>
+              <div class="radar-head-cell" data-col="total_atividades">
+                <button class="radar-head-label js-radar-filter-trigger" type="button" data-col="total_atividades">Atividades</button>
+                <button class="radar-sort-btn js-radar-sort" type="button" data-col="total_atividades" aria-label="Ordenar Atividades">
+                  <span class="radar-sort-indicator"></span>
+                </button>
+                <div class="radar-head-filter" data-col="total_atividades">
+                  <input class="radar-filter-input js-radar-filter" type="number" min="0" step="1" data-col="total_atividades" placeholder="0">
+                </div>
+              </div>
             </th>
-          </tr>
-          <tr class="radar-filter-row">
-            <th data-col="nome"><input class="radar-filter-input js-radar-filter" type="text" data-col="nome" placeholder="Filtrar"></th>
-            <th data-col="descricao"><input class="radar-filter-input js-radar-filter" type="text" data-col="descricao" placeholder="Filtrar"></th>
-            <th data-col="status">
-              <select class="radar-filter-input js-radar-filter" data-col="status">
-                <option value="">Todos</option>
-                <option value="EXECUTANDO">Executando</option>
-                <option value="PENDENTE">Pendente</option>
-                <option value="FINALIZADA">Finalizada</option>
-              </select>
-            </th>
-            <th data-col="classificacao"><input class="radar-filter-input js-radar-filter" type="text" data-col="classificacao" placeholder="Filtrar"></th>
-            <th data-col="contrato"><input class="radar-filter-input js-radar-filter" type="text" data-col="contrato" placeholder="Filtrar"></th>
-            <th data-col="data_registro"><input class="radar-filter-input js-radar-filter" type="date" data-col="data_registro"></th>
-            <th data-col="responsavel"><input class="radar-filter-input js-radar-filter" type="text" data-col="responsavel" placeholder="Filtrar"></th>
-            <th data-col="setor"><input class="radar-filter-input js-radar-filter" type="text" data-col="setor" placeholder="Filtrar"></th>
-            <th data-col="solicitante"><input class="radar-filter-input js-radar-filter" type="text" data-col="solicitante" placeholder="Filtrar"></th>
-            <th data-col="total_atividades"><input class="radar-filter-input js-radar-filter" type="number" min="0" step="1" data-col="total_atividades" placeholder="0"></th>
           </tr>
         </thead>
         <tbody id="radar-trabalhos-body">
@@ -328,3 +388,4 @@
     })();
   </script>
 {% endblock %}
+
