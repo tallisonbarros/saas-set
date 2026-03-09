@@ -4710,6 +4710,11 @@ select {
   background: rgba(116, 224, 194, 0.16);
 }
 
+#radar-trabalhos-grid .datagrid-create-field span,
+#radar-atividades-grid .datagrid-create-field span {
+  display: none;
+}
+
 .atividade-actions {
   display: flex;
   flex-wrap: wrap;
