@@ -3507,29 +3507,61 @@ def radar_detail(request, pk):
     toggle_params = base_params.copy()
     toggle_params["finalizados"] = "all"
     total_trabalhos = trabalhos_base.count()
-    trabalhos_execucao = trabalhos_base.filter(status=RadarTrabalho.Status.EXECUTANDO).order_by("-data_registro", "nome")
-    trabalhos_pendentes = trabalhos_base.filter(status=RadarTrabalho.Status.PENDENTE).order_by("-data_registro", "nome")
     trabalhos_finalizados = trabalhos_base.filter(status=RadarTrabalho.Status.FINALIZADA)
-    trabalhos_finalizados_mes = trabalhos_finalizados.filter(
-        criado_em__year=today.year,
-        criado_em__month=today.month,
-    )
     trabalhos_finalizados_antigos = trabalhos_finalizados.exclude(
         criado_em__year=today.year,
         criado_em__month=today.month,
     )
-    if show_all_finalizados:
-        trabalhos_finalizados_mes = trabalhos_finalizados
-    trabalhos_finalizados_mes = trabalhos_finalizados_mes.order_by("-data_registro", "nome")
     has_finalizados_antigos = trabalhos_finalizados_antigos.exists()
+
+    if show_all_finalizados:
+        trabalhos_tabela = trabalhos_base
+    else:
+        trabalhos_tabela = trabalhos_base.filter(
+            Q(status__in=[RadarTrabalho.Status.EXECUTANDO, RadarTrabalho.Status.PENDENTE])
+            | Q(
+                status=RadarTrabalho.Status.FINALIZADA,
+                criado_em__year=today.year,
+                criado_em__month=today.month,
+            )
+        )
+
+    trabalhos_tabela = trabalhos_tabela.annotate(
+        status_ordem=Case(
+            When(status=RadarTrabalho.Status.EXECUTANDO, then=Value(0)),
+            When(status=RadarTrabalho.Status.PENDENTE, then=Value(1)),
+            When(status=RadarTrabalho.Status.FINALIZADA, then=Value(2)),
+            default=Value(9),
+            output_field=IntegerField(),
+        )
+    ).order_by("status_ordem", "-data_registro", "nome")
+
+    trabalhos_table_data = []
+    for trabalho in trabalhos_tabela:
+        trabalhos_table_data.append(
+            {
+                "id": trabalho.id,
+                "nome": trabalho.nome or "",
+                "descricao": trabalho.descricao or "",
+                "status": trabalho.status,
+                "status_label": trabalho.get_status_display(),
+                "classificacao": trabalho.classificacao.nome if trabalho.classificacao else "",
+                "contrato": trabalho.contrato.nome if trabalho.contrato else "",
+                "data_registro": trabalho.data_registro.isoformat() if trabalho.data_registro else "",
+                "data_registro_label": trabalho.data_registro.strftime("%d/%m/%Y") if trabalho.data_registro else "",
+                "setor": trabalho.setor or "",
+                "solicitante": trabalho.solicitante or "",
+                "responsavel": trabalho.responsavel or "",
+                "total_atividades": trabalho.total_atividades or 0,
+                "detalhe_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.pk]),
+            }
+        )
     return render(
         request,
         "core/radar_detail.html",
         {
             "radar": radar,
-            "trabalhos_execucao": trabalhos_execucao,
-            "trabalhos_pendentes": trabalhos_pendentes,
-            "trabalhos_finalizados": trabalhos_finalizados_mes,
+            "trabalhos_table_data": trabalhos_table_data,
             "show_all_finalizados": show_all_finalizados,
             "has_finalizados_antigos": has_finalizados_antigos,
             "total_trabalhos": total_trabalhos,
