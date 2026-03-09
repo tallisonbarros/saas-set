@@ -220,17 +220,13 @@
     create: canManage
       ? {
           enabled: true,
-          submitLabel: "Salvar rapido",
+          submitIcon: true,
+          submitAriaLabel: "Salvar atividade",
+          submitPosition: "start",
           fields: [
             { name: "action", type: "hidden", value: "create_atividade" },
             { name: "nome", label: "Nova atividade", type: "text", placeholder: "Nome da atividade", required: true },
             { name: "descricao", label: "Descricao", type: "text", placeholder: "Descricao resumida" },
-            { name: "status", label: "Status", type: "select", value: "PENDENTE", options: [
-              { value: "PENDENTE", label: "Pendente" },
-              { value: "EXECUTANDO", label: "Executando" },
-              { value: "FINALIZADA", label: "Finalizada" }
-            ] },
-            { name: "horas_trabalho", label: "Horas", type: "number", min: "0", step: "0.1", placeholder: "0" },
           ],
           onSubmit: function (ctx) {
             return postFormData(ctx.formData)

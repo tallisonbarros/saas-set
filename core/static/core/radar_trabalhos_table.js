@@ -88,7 +88,8 @@
     create: canManage
       ? {
           enabled: true,
-          submitLabel: "Salvar rapido",
+          submitIcon: true,
+          submitAriaLabel: "Salvar trabalho",
           fields: [
             { name: "action", type: "hidden", value: "create_trabalho" },
             { name: "nome", label: "Novo trabalho", type: "text", placeholder: "Nome do trabalho", required: true },

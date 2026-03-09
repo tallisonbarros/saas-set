@@ -1025,15 +1025,43 @@
 
       createHost.style.display = "";
 
+      var iconSubmit = !!createConfig.submitIcon;
+      var submitPosition = createConfig.submitPosition === "start" ? "start" : "end";
+      var submitButtonHtml = "";
+      if (iconSubmit) {
+        submitButtonHtml =
+          '<button class="btn btn-primary btn-compact datagrid-submit-icon" type="submit" data-dg-create-submit aria-label="' +
+          escHtml(createConfig.submitAriaLabel || "Salvar") +
+          '" title="' +
+          escHtml(createConfig.submitAriaLabel || "Salvar") +
+          '">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<path d="M4 4h13l3 3v13H4z"></path>' +
+          '<path d="M8 4h8v6H8z"></path>' +
+          '<path d="M8 14h8v6H8z"></path>' +
+          "</svg>" +
+          "</button>";
+      } else {
+        submitButtonHtml =
+          '<button class="btn btn-primary btn-compact" type="submit" data-dg-create-submit>' +
+          escHtml(createConfig.submitLabel || "Salvar rapido") +
+          "</button>";
+      }
+
+      var actionsHtml = '<div class="datagrid-create-actions is-inline">' + submitButtonHtml + "</div>";
+      var fieldsContent = "";
+      if (submitPosition === "start") {
+        fieldsContent += actionsHtml;
+      }
+      fieldsContent += fields.map(renderCreateField).join("");
+      if (submitPosition !== "start") {
+        fieldsContent += actionsHtml;
+      }
+
       var createFormHtml =
         '<form class="datagrid-create-form" data-dg-create-form>' +
         '<div class="datagrid-create-fields">' +
-        fields.map(renderCreateField).join("") +
-        "</div>" +
-        '<div class="datagrid-create-actions">' +
-        '<button class="btn btn-primary btn-compact" type="submit" data-dg-create-submit>' +
-        escHtml(createConfig.submitLabel || "Salvar rapido") +
-        "</button>" +
+        fieldsContent +
         "</div>" +
         '<div class="datagrid-create-message" data-dg-create-message style="display:none;"></div>' +
         "</form>";
