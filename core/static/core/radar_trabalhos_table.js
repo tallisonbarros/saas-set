@@ -353,6 +353,26 @@
         filter: { type: "text", placeholder: "Filtrar" },
       },
       {
+        key: "colaboradores",
+        label: "Colaboradores",
+        visible: false,
+        width: 220,
+        minWidth: 180,
+        filter: { type: "text", placeholder: "Filtrar" },
+      },
+      {
+        key: "total_colaboradores",
+        label: "Equipe",
+        visible: false,
+        width: 120,
+        minWidth: 110,
+        compareType: "number",
+        filter: { type: "number", min: 0, step: 1, placeholder: "0" },
+        render: function (row, ctx) {
+          return ctx.slotBadge(row.total_colaboradores || 0, "pessoas");
+        },
+      },
+      {
         key: "setor",
         label: "Setor",
         visible: false,

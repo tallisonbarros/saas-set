@@ -57,10 +57,12 @@ from .models import (
     AdminAccessLog,
     Radar,
     RadarAtividade,
+    RadarAtividadeDiaExecucao,
     RadarClassificacao,
     RadarContrato,
     RadarID,
     RadarTrabalho,
+    RadarTrabalhoColaborador,
     PlantaIO,
     Proposta,
     PropostaAnexo,
@@ -579,23 +581,153 @@ def _sync_trabalho_status(trabalho):
         trabalho.save(update_fields=["status"])
 
 
-def _apply_atividade_status_dates(atividade, previous_status=None):
-    status_atual = atividade.status
-    now = timezone.now()
-    if status_atual == RadarAtividade.Status.PENDENTE:
-        atividade.inicio_execucao_em = None
-        atividade.finalizada_em = None
-        return
-    if status_atual == RadarAtividade.Status.EXECUTANDO:
-        if not atividade.inicio_execucao_em:
-            atividade.inicio_execucao_em = now
-        atividade.finalizada_em = None
-        return
-    if status_atual == RadarAtividade.Status.FINALIZADA:
-        if not atividade.inicio_execucao_em:
-            atividade.inicio_execucao_em = now
-        if previous_status != RadarAtividade.Status.FINALIZADA or not atividade.finalizada_em:
-            atividade.finalizada_em = now
+def _parse_colaboradores_input(raw_value, max_items=40):
+    raw = (raw_value or "").strip()
+    if not raw:
+        return []
+    colaboradores = []
+    seen = set()
+    for part in re.split(r"[,;\n\r]+", raw):
+        nome = " ".join((part or "").strip().split())
+        if not nome:
+            continue
+        nome = nome[:120]
+        key = nome.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        colaboradores.append(nome)
+        if len(colaboradores) >= max_items:
+            break
+    return colaboradores
+
+
+def _trabalho_colaboradores_nomes(trabalho):
+    prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
+    if "colaboradores" in prefetched:
+        return [
+            colaborador.nome
+            for colaborador in sorted(
+                prefetched["colaboradores"],
+                key=lambda item: ((item.nome or "").casefold(), item.id),
+            )
+        ]
+    return list(trabalho.colaboradores.order_by("nome", "id").values_list("nome", flat=True))
+
+
+def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes):
+    incoming_by_key = {}
+    ordered_incoming = []
+    for nome in colaboradores_nomes or []:
+        normalized = " ".join((nome or "").strip().split())
+        if not normalized:
+            continue
+        normalized = normalized[:120]
+        key = normalized.casefold()
+        if key in incoming_by_key:
+            continue
+        incoming_by_key[key] = normalized
+        ordered_incoming.append(normalized)
+
+    existing_rows = list(trabalho.colaboradores.all())
+    existing_by_key = {}
+    duplicate_rows = []
+    for row in existing_rows:
+        key = (row.nome or "").strip().casefold()
+        if not key:
+            duplicate_rows.append(row)
+            continue
+        if key in existing_by_key:
+            duplicate_rows.append(row)
+            continue
+        existing_by_key[key] = row
+
+    to_delete_ids = [row.id for row in duplicate_rows if row.id]
+    to_update = []
+    to_create = []
+
+    for key, row in existing_by_key.items():
+        if key not in incoming_by_key and row.id:
+            to_delete_ids.append(row.id)
+
+    for key, incoming_nome in incoming_by_key.items():
+        existing = existing_by_key.get(key)
+        if existing:
+            if existing.nome != incoming_nome:
+                existing.nome = incoming_nome
+                to_update.append(existing)
+            continue
+        to_create.append(RadarTrabalhoColaborador(trabalho=trabalho, nome=incoming_nome))
+
+    if to_delete_ids:
+        RadarTrabalhoColaborador.objects.filter(pk__in=to_delete_ids).delete()
+    if to_update:
+        RadarTrabalhoColaborador.objects.bulk_update(to_update, ["nome"])
+    if to_create:
+        RadarTrabalhoColaborador.objects.bulk_create(to_create, ignore_conflicts=True)
+
+    return ordered_incoming
+
+
+def _parse_agenda_execucao_input(raw_value, max_days=730):
+    raw = (raw_value or "").strip()
+    if not raw:
+        return [], None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = [part for part in re.split(r"[,;\s]+", raw) if part]
+    if isinstance(parsed, str):
+        parsed = [parsed]
+    if not isinstance(parsed, list):
+        return None, "Formato de agenda invalido."
+    datas = []
+    seen = set()
+    for item in parsed:
+        value = str(item or "").strip()
+        if not value:
+            continue
+        try:
+            current = datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            return None, "Data invalida na agenda. Use o formato YYYY-MM-DD."
+        key = current.isoformat()
+        if key in seen:
+            continue
+        seen.add(key)
+        datas.append(current)
+        if len(datas) > max_days:
+            return None, f"Agenda excede limite de {max_days} datas."
+    datas.sort()
+    return datas, None
+
+
+def _atividade_agenda_datas(atividade):
+    prefetched = getattr(atividade, "_prefetched_objects_cache", {})
+    if "dias_execucao" in prefetched:
+        datas = [item.data_execucao for item in prefetched["dias_execucao"] if item.data_execucao]
+        return sorted(datas)
+    return list(
+        atividade.dias_execucao.order_by("data_execucao", "id").values_list("data_execucao", flat=True)
+    )
+
+
+def _atividade_agenda_dias_iso(atividade):
+    return [item.isoformat() for item in _atividade_agenda_datas(atividade)]
+
+
+def _sync_atividade_execucao_dates_from_agenda(atividade, agenda_datas=None):
+    datas = agenda_datas if agenda_datas is not None else _atividade_agenda_datas(atividade)
+    inicio = None
+    fim = None
+    if datas:
+        tz = timezone.get_current_timezone()
+        inicio = timezone.make_aware(datetime.combine(datas[0], datetime.min.time()), tz)
+        fim = timezone.make_aware(datetime.combine(datas[-1], datetime.min.time()), tz)
+    mudou = atividade.inicio_execucao_em != inicio or atividade.finalizada_em != fim
+    atividade.inicio_execucao_em = inicio
+    atividade.finalizada_em = fim
+    return mudou
 
 
 def _normalizar_ordem_atividades(trabalho, status=None):
@@ -622,7 +754,7 @@ def _get_radar_trabalho_acessivel(user, trabalho_pk):
         "radar__id_radar",
         "classificacao",
         "contrato",
-    ).prefetch_related("atividades")
+    ).prefetch_related("atividades", "colaboradores")
     if user.is_staff and not cliente:
         return trabalhos.filter(pk=trabalho_pk).first()
     if not cliente:
@@ -2032,6 +2164,7 @@ def _format_ptbr_datetime(value):
 
 
 def _atividade_response_payload(atividade):
+    agenda_dias = _atividade_agenda_dias_iso(atividade)
     return {
         "ok": True,
         "id": atividade.id,
@@ -2042,6 +2175,8 @@ def _atividade_response_payload(atividade):
         "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
         "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
         "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
+        "agenda_dias": agenda_dias,
+        "agenda_total_dias": len(agenda_dias),
         "ordem": atividade.ordem or 0,
     }
 
@@ -2147,6 +2282,7 @@ def _sanitize_proposta_descricao(text):
         "setor:",
         "solicitante:",
         "responsavel:",
+        "colaboradores:",
         "contrato:",
         "classificacao:",
         "data de registro:",
@@ -2295,6 +2431,9 @@ def _build_proposta_pdf_context(
             origem_rows.append(("Solicitante", origem.solicitante))
         if origem.responsavel:
             origem_rows.append(("Responsavel", origem.responsavel))
+        colaboradores = ", ".join(_trabalho_colaboradores_nomes(origem))
+        if colaboradores:
+            origem_rows.append(("Colaboradores", colaboradores))
         if origem.contrato and origem.contrato.nome:
             origem_rows.append(("Contrato", origem.contrato.nome))
         if origem.classificacao and origem.classificacao.nome:
@@ -3442,6 +3581,7 @@ def radar_detail(request, pk):
             setor = request.POST.get("setor", "").strip()
             solicitante = request.POST.get("solicitante", "").strip()
             responsavel = request.POST.get("responsavel", "").strip()
+            colaboradores_nomes = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
             contrato_id = request.POST.get("contrato")
             data_raw = request.POST.get("data_registro", "").strip()
             classificacao_id = request.POST.get("classificacao")
@@ -3475,6 +3615,7 @@ def radar_detail(request, pk):
                     classificacao=classificacao,
                     criado_por=request.user,
                 )
+                _sync_trabalho_colaboradores(novo_trabalho, colaboradores_nomes)
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
                     return JsonResponse(
                         {
@@ -3494,6 +3635,8 @@ def radar_detail(request, pk):
                                 "setor": novo_trabalho.setor or "",
                                 "solicitante": novo_trabalho.solicitante or "",
                                 "responsavel": novo_trabalho.responsavel or "",
+                                "colaboradores": ", ".join(colaboradores_nomes),
+                                "total_colaboradores": len(colaboradores_nomes),
                                 "total_atividades": 0,
                                 "detalhe_url": reverse("radar_trabalho_detail", args=[radar.pk, novo_trabalho.pk]),
                             },
@@ -3550,9 +3693,13 @@ def radar_detail(request, pk):
             radar.delete()
             return redirect("radar_list")
 
-    trabalhos_base = radar.trabalhos.annotate(total_atividades=Count("atividades")).select_related(
-        "classificacao",
-        "contrato",
+    trabalhos_base = (
+        radar.trabalhos.annotate(total_atividades=Count("atividades"))
+        .select_related(
+            "classificacao",
+            "contrato",
+        )
+        .prefetch_related("colaboradores")
     )
     if classificacao_filter:
         trabalhos_base = trabalhos_base.filter(classificacao_id=classificacao_filter)
@@ -3571,6 +3718,7 @@ def radar_detail(request, pk):
 
     trabalhos_table_data = []
     for trabalho in trabalhos_tabela:
+        colaboradores_nomes = _trabalho_colaboradores_nomes(trabalho)
         trabalhos_table_data.append(
             {
                 "id": trabalho.id,
@@ -3585,6 +3733,8 @@ def radar_detail(request, pk):
                 "setor": trabalho.setor or "",
                 "solicitante": trabalho.solicitante or "",
                 "responsavel": trabalho.responsavel or "",
+                "colaboradores": ", ".join(colaboradores_nomes),
+                "total_colaboradores": len(colaboradores_nomes),
                 "total_atividades": trabalho.total_atividades or 0,
                 "detalhe_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.pk]),
             }
@@ -3649,6 +3799,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "duplicate_trabalho",
             "update_atividade",
             "quick_status_atividade",
+            "set_agenda_atividade",
             "delete_atividade",
             "move_atividade",
             "move_atividade_to",
@@ -3719,6 +3870,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             setor = request.POST.get("setor", "").strip()
             solicitante = request.POST.get("solicitante", "").strip()
             responsavel = request.POST.get("responsavel", "").strip()
+            colaboradores_nomes = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
             data_raw = request.POST.get("data_registro", "").strip()
             classificacao_id = request.POST.get("classificacao")
             contrato_id = request.POST.get("contrato")
@@ -3726,39 +3878,41 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 message = "Informe um nome para o trabalho."
                 message_level = "error"
             else:
-                if data_raw:
-                    try:
-                        trabalho.data_registro = datetime.strptime(data_raw, "%Y-%m-%d").date()
-                    except ValueError:
-                        pass
-                if classificacao_id:
-                    trabalho.classificacao = RadarClassificacao.objects.filter(pk=classificacao_id).first()
-                else:
-                    trabalho.classificacao = None
-                if contrato_id:
-                    trabalho.contrato = RadarContrato.objects.filter(pk=contrato_id).first()
-                else:
-                    trabalho.contrato = None
-                if not trabalho.criado_por_id and is_creator:
-                    trabalho.criado_por = request.user
-                trabalho.nome = nome
-                trabalho.descricao = descricao
-                trabalho.setor = setor
-                trabalho.solicitante = solicitante
-                trabalho.responsavel = responsavel
-                trabalho.save(
-                    update_fields=[
-                        "criado_por",
-                        "nome",
-                        "descricao",
-                        "data_registro",
-                        "classificacao",
-                        "contrato",
-                        "setor",
-                        "solicitante",
-                        "responsavel",
-                    ]
-                )
+                with transaction.atomic():
+                    if data_raw:
+                        try:
+                            trabalho.data_registro = datetime.strptime(data_raw, "%Y-%m-%d").date()
+                        except ValueError:
+                            pass
+                    if classificacao_id:
+                        trabalho.classificacao = RadarClassificacao.objects.filter(pk=classificacao_id).first()
+                    else:
+                        trabalho.classificacao = None
+                    if contrato_id:
+                        trabalho.contrato = RadarContrato.objects.filter(pk=contrato_id).first()
+                    else:
+                        trabalho.contrato = None
+                    if not trabalho.criado_por_id and is_creator:
+                        trabalho.criado_por = request.user
+                    trabalho.nome = nome
+                    trabalho.descricao = descricao
+                    trabalho.setor = setor
+                    trabalho.solicitante = solicitante
+                    trabalho.responsavel = responsavel
+                    trabalho.save(
+                        update_fields=[
+                            "criado_por",
+                            "nome",
+                            "descricao",
+                            "data_registro",
+                            "classificacao",
+                            "contrato",
+                            "setor",
+                            "solicitante",
+                            "responsavel",
+                        ]
+                    )
+                    _sync_trabalho_colaboradores(trabalho, colaboradores_nomes)
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_trabalho":
@@ -3782,6 +3936,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 responsavel=trabalho.responsavel,
                 criado_por=request.user,
             )
+            colaboradores_origem = _trabalho_colaboradores_nomes(trabalho)
+            if colaboradores_origem:
+                _sync_trabalho_colaboradores(novo_trabalho, colaboradores_origem)
             atividades = list(trabalho.atividades.all())
             if atividades:
                 RadarAtividade.objects.bulk_create(
@@ -3829,8 +3986,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
                     descricao=descricao,
                     horas_trabalho=horas,
                     status=status_raw,
-                    inicio_execucao_em=timezone.now() if status_raw in {RadarAtividade.Status.EXECUTANDO, RadarAtividade.Status.FINALIZADA} else None,
-                    finalizada_em=timezone.now() if status_raw == RadarAtividade.Status.FINALIZADA else None,
+                    inicio_execucao_em=None,
+                    finalizada_em=None,
                     ordem=proxima_ordem,
                 )
                 _sync_trabalho_status(trabalho)
@@ -3849,7 +4006,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
         if action == "update_atividade":
             atividade_id = request.POST.get("atividade_id")
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
-            status_anterior = atividade.status
             nome_atividade = request.POST.get("nome", "").strip()
             if not nome_atividade:
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -3869,15 +4025,12 @@ def radar_trabalho_detail(request, radar_pk, pk):
             status_raw = request.POST.get("status", "").strip()
             if status_raw in dict(RadarAtividade.Status.choices):
                 atividade.status = status_raw
-            _apply_atividade_status_dates(atividade, previous_status=status_anterior)
             atividade.save(
                 update_fields=[
                     "nome",
                     "descricao",
                     "horas_trabalho",
                     "status",
-                    "inicio_execucao_em",
-                    "finalizada_em",
                 ]
             )
             _sync_trabalho_status(trabalho)
@@ -3890,12 +4043,46 @@ def radar_trabalho_detail(request, radar_pk, pk):
             status_raw = request.POST.get("status", "").strip()
             if status_raw not in dict(RadarAtividade.Status.choices):
                 status_raw = RadarAtividade.Status.PENDENTE
-            status_anterior = atividade.status
             atividade.status = status_raw
-            _apply_atividade_status_dates(atividade, previous_status=status_anterior)
-            atividade.save(update_fields=["status", "inicio_execucao_em", "finalizada_em"])
+            atividade.save(update_fields=["status"])
             _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(_atividade_response_payload(atividade))
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "set_agenda_atividade":
+            atividade_id = request.POST.get("atividade_id")
+            atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            agenda_raw = request.POST.get("dias_execucao", "")
+            agenda_datas, agenda_error = _parse_agenda_execucao_input(agenda_raw)
+            if agenda_error:
+                return JsonResponse(
+                    {
+                        "ok": False,
+                        "message": agenda_error,
+                        "level": "error",
+                    },
+                    status=400,
+                )
+            with transaction.atomic():
+                atuais = set(atividade.dias_execucao.values_list("data_execucao", flat=True))
+                novos = set(agenda_datas or [])
+                remover = atuais - novos
+                adicionar = novos - atuais
+                if remover:
+                    atividade.dias_execucao.filter(data_execucao__in=remover).delete()
+                if adicionar:
+                    RadarAtividadeDiaExecucao.objects.bulk_create(
+                        [
+                            RadarAtividadeDiaExecucao(atividade=atividade, data_execucao=data_execucao)
+                            for data_execucao in sorted(adicionar)
+                        ],
+                        ignore_conflicts=True,
+                    )
+                mudou_datas = _sync_atividade_execucao_dates_from_agenda(atividade, agenda_datas=sorted(novos))
+                if mudou_datas:
+                    atividade.save(update_fields=["inicio_execucao_em", "finalizada_em"])
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                atividade.refresh_from_db()
                 return JsonResponse(_atividade_response_payload(atividade))
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_atividade":
@@ -3999,12 +4186,13 @@ def radar_trabalho_detail(request, radar_pk, pk):
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
 
     contratos = RadarContrato.objects.order_by("nome")
-    atividades_base = trabalho.atividades.all()
+    atividades_base = trabalho.atividades.prefetch_related("dias_execucao").all()
     _normalizar_ordem_atividades(trabalho)
     atividades_ordenadas = atividades_base.order_by("ordem", "criado_em", "id")
     atividades_table_data = []
     for atividade in atividades_ordenadas:
         horas_label = str(atividade.horas_trabalho) if atividade.horas_trabalho is not None else ""
+        agenda_dias = _atividade_agenda_dias_iso(atividade)
         atividades_table_data.append(
             {
                 "id": atividade.id,
@@ -4015,6 +4203,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 "horas_trabalho": horas_label,
                 "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
                 "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
+                "agenda_dias": agenda_dias,
+                "agenda_total_dias": len(agenda_dias),
                 "ordem": atividade.ordem or 0,
             }
         )
@@ -4047,6 +4237,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "can_create_proposta_from_trabalho": can_create_proposta_from_trabalho,
             "can_duplicate_trabalho": can_duplicate_trabalho,
             "can_edit_trabalho_by_creator": can_edit_trabalho_by_creator,
+            "trabalho_colaboradores": ", ".join(_trabalho_colaboradores_nomes(trabalho)),
         },
     )
 

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
@@ -5,7 +6,18 @@ from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_visual_flags
-from core.models import PerfilUsuario, Proposta, Radar, RadarAtividade, RadarClassificacao, RadarContrato, RadarID, RadarTrabalho
+from core.models import (
+    PerfilUsuario,
+    Proposta,
+    Radar,
+    RadarAtividade,
+    RadarAtividadeDiaExecucao,
+    RadarClassificacao,
+    RadarContrato,
+    RadarID,
+    RadarTrabalho,
+    RadarTrabalhoColaborador,
+)
 from core.views import _build_proposta_pdf_context, _sanitize_proposta_descricao
 
 
@@ -87,6 +99,8 @@ class PropostaTrabalhoVinculoTests(TestCase):
             responsavel="Paulo",
             criado_por=self.vendedor,
         )
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Ana")
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Bruno")
         RadarAtividade.objects.create(trabalho=self.trabalho, nome="Inspecao", descricao="Linha 1")
         self.proposta = Proposta.objects.create(
             cliente=self.destinatario,
@@ -137,6 +151,7 @@ class PropostaTrabalhoVinculoTests(TestCase):
         labels = {row["label"]: row["value"] for row in context["origem_rows"]}
         self.assertEqual(labels.get("Radar"), "Radar Norte")
         self.assertEqual(labels.get("Trabalho"), "Trabalho TEC")
+        self.assertEqual(labels.get("Colaboradores"), "Ana, Bruno")
         self.assertEqual(context["atividades"][0]["nome"], "Inspecao")
 
     def test_proposta_sem_vinculo_permanece_funcional(self):
@@ -211,7 +226,44 @@ class RadarCreatorPermissionTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(RadarTrabalho.objects.filter(radar=self.radar, nome="Pode criar").exists())
 
-    def test_datas_inicio_execucao_e_finalizacao_da_atividade(self):
+    def test_create_trabalho_ajax_persiste_colaboradores(self):
+        self.client_http.force_login(self.owner_user)
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/",
+            {
+                "action": "create_trabalho",
+                "nome": "Trabalho Equipe",
+                "colaboradores": "Ana, Bruno, ana",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["row"]["total_colaboradores"], 2)
+        trabalho = RadarTrabalho.objects.get(radar=self.radar, nome="Trabalho Equipe")
+        nomes = list(trabalho.colaboradores.order_by("nome").values_list("nome", flat=True))
+        self.assertEqual(nomes, ["Ana", "Bruno"])
+
+    def test_update_trabalho_sincroniza_colaboradores(self):
+        self.client_http.force_login(self.owner_user)
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_trabalho",
+                "nome": self.trabalho.nome,
+                "descricao": self.trabalho.descricao or "",
+                "setor": self.trabalho.setor or "",
+                "solicitante": self.trabalho.solicitante or "",
+                "responsavel": self.trabalho.responsavel or "",
+                "colaboradores": "Carlos, Diana, Carlos",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        nomes = list(self.trabalho.colaboradores.order_by("nome").values_list("nome", flat=True))
+        self.assertEqual(nomes, ["Carlos", "Diana"])
+
+    def test_agenda_define_datas_e_status_permanece_manual(self):
         self.client_http.force_login(self.owner_user)
         create_resp = self.client_http.post(
             f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
@@ -219,20 +271,67 @@ class RadarCreatorPermissionTests(TestCase):
         )
         self.assertEqual(create_resp.status_code, 302)
         atividade = RadarAtividade.objects.get(trabalho=self.trabalho, nome="Ativ X")
-        self.assertIsNotNone(atividade.inicio_execucao_em)
+        self.assertIsNone(atividade.inicio_execucao_em)
         self.assertIsNone(atividade.finalizada_em)
 
-        update_resp = self.client_http.post(
+        agenda_resp = self.client_http.post(
             f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
             {
-                "action": "update_atividade",
+                "action": "set_agenda_atividade",
                 "atividade_id": str(atividade.id),
-                "nome": atividade.nome,
-                "descricao": atividade.descricao or "",
-                "status": "FINALIZADA",
+                "dias_execucao": json.dumps(["2026-03-05", "2026-03-07", "2026-03-06"]),
             },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
-        self.assertEqual(update_resp.status_code, 302)
+        self.assertEqual(agenda_resp.status_code, 200)
+        self.assertEqual(agenda_resp.json()["agenda_total_dias"], 3)
         atividade.refresh_from_db()
         self.assertIsNotNone(atividade.inicio_execucao_em)
         self.assertIsNotNone(atividade.finalizada_em)
+        self.assertEqual(atividade.inicio_execucao_em.date().isoformat(), "2026-03-05")
+        self.assertEqual(atividade.finalizada_em.date().isoformat(), "2026-03-07")
+
+        status_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "quick_status_atividade",
+                "atividade_id": str(atividade.id),
+                "status": "FINALIZADA",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(status_resp.status_code, 200)
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.inicio_execucao_em.date().isoformat(), "2026-03-05")
+        self.assertEqual(atividade.finalizada_em.date().isoformat(), "2026-03-07")
+
+        clear_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": "[]",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(clear_resp.status_code, 200)
+        atividade.refresh_from_db()
+        self.assertIsNone(atividade.inicio_execucao_em)
+        self.assertIsNone(atividade.finalizada_em)
+        self.assertFalse(RadarAtividadeDiaExecucao.objects.filter(atividade=atividade).exists())
+
+    def test_set_agenda_atividade_retorna_erro_para_data_invalida(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Y")
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": json.dumps(["2026-02-30"]),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertFalse(payload["ok"])

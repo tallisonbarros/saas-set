@@ -177,6 +177,10 @@
               <span>Responsavel</span>
               <input type="text" name="responsavel" value="{{ trabalho.responsavel|default:'' }}">
             </label>
+            <label class="field" style="grid-column: 1 / -1;">
+              <span>Colaboradores</span>
+              <input type="text" name="colaboradores" value="{{ trabalho_colaboradores|default:'' }}" placeholder="Ana, Bruno, Carla">
+            </label>
             <label class="field">
               <div class="field-row">
                 <span>Classificacao</span>

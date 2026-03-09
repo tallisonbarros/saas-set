@@ -14,13 +14,22 @@
   var rows = utils.parseJsonScript("radar-atividades-data");
   var trabalhoId = root.getAttribute("data-dg-scope") || "global";
   var statusRequestInFlight = false;
+  var agendaRequestInFlight = false;
+  var agendaRequestPending = false;
+  var agendaRequestTimer = null;
   var activeStatusMenu = null;
   var activeStatusTrigger = null;
+  var activeAgendaOverlay = null;
+  var activeAgendaTrigger = null;
+  var activeAgendaRowId = "";
+  var activeAgendaDates = [];
+  var activeAgendaMonth = null;
   var STATUS_OPTIONS = [
     { value: "EXECUTANDO", label: "Executando" },
     { value: "PENDENTE", label: "Pendente" },
     { value: "FINALIZADA", label: "Finalizada" },
   ];
+  var WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
 
   function setupDescriptionMarquees(scopeEl) {
     if (!scopeEl) {
@@ -101,6 +110,8 @@
       horas_trabalho: payload.horas_trabalho || "",
       inicio_execucao_display: payload.inicio_execucao_display || "",
       finalizada_display: payload.finalizada_display || "",
+      agenda_dias: Array.isArray(payload.agenda_dias) ? payload.agenda_dias : [],
+      agenda_total_dias: Number(payload.agenda_total_dias || 0),
     };
   }
 
@@ -112,6 +123,350 @@
       return true;
     }
     return state.sortCol === "ordem" && state.sortDir === "asc";
+  }
+
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function isoFromDate(dateObj) {
+    return [
+      dateObj.getFullYear(),
+      pad2(dateObj.getMonth() + 1),
+      pad2(dateObj.getDate()),
+    ].join("-");
+  }
+
+  function parseIsoDate(isoText) {
+    var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoText || "").trim());
+    if (!match) {
+      return null;
+    }
+    var year = Number(match[1]);
+    var month = Number(match[2]);
+    var day = Number(match[3]);
+    var parsed = new Date(year, month - 1, day);
+    if (
+      parsed.getFullYear() !== year ||
+      parsed.getMonth() + 1 !== month ||
+      parsed.getDate() !== day
+    ) {
+      return null;
+    }
+    return parsed;
+  }
+
+  function monthStart(dateObj) {
+    return new Date(dateObj.getFullYear(), dateObj.getMonth(), 1);
+  }
+
+  function monthLabel(dateObj) {
+    var label = dateObj.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return label ? label.charAt(0).toUpperCase() + label.slice(1) : "";
+  }
+
+  function getRowAgendaDates(row) {
+    if (!row || !Array.isArray(row.agenda_dias)) {
+      return [];
+    }
+    var cleaned = [];
+    var seen = {};
+    row.agenda_dias.forEach(function (item) {
+      var iso = String(item || "").trim();
+      if (!parseIsoDate(iso) || seen[iso]) {
+        return;
+      }
+      seen[iso] = true;
+      cleaned.push(iso);
+    });
+    cleaned.sort();
+    return cleaned;
+  }
+
+  function closeAgendaOverlay() {
+    if (agendaRequestTimer) {
+      window.clearTimeout(agendaRequestTimer);
+      agendaRequestTimer = null;
+    }
+    if (activeAgendaTrigger) {
+      activeAgendaTrigger.setAttribute("aria-expanded", "false");
+    }
+    if (activeAgendaOverlay && activeAgendaOverlay.parentNode) {
+      activeAgendaOverlay.parentNode.removeChild(activeAgendaOverlay);
+    }
+    activeAgendaOverlay = null;
+    activeAgendaTrigger = null;
+    activeAgendaRowId = "";
+    activeAgendaDates = [];
+    activeAgendaMonth = null;
+    agendaRequestPending = false;
+  }
+
+  function positionAgendaOverlay(overlayEl, triggerEl) {
+    if (!overlayEl || !triggerEl) {
+      return;
+    }
+    var triggerRect = triggerEl.getBoundingClientRect();
+    var overlayRect = overlayEl.getBoundingClientRect();
+    var top = triggerRect.bottom + 8;
+    var left = triggerRect.left - Math.max(0, overlayRect.width - triggerRect.width);
+    if (left + overlayRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - overlayRect.width - 8;
+    }
+    if (left < 8) {
+      left = 8;
+    }
+    if (top + overlayRect.height > window.innerHeight - 8) {
+      top = triggerRect.top - overlayRect.height - 8;
+    }
+    if (top < 8) {
+      top = 8;
+    }
+    overlayEl.style.left = left + "px";
+    overlayEl.style.top = top + "px";
+  }
+
+  function renderAgendaOverlay() {
+    if (!activeAgendaOverlay || !activeAgendaMonth) {
+      return;
+    }
+    var monthLabelEl = activeAgendaOverlay.querySelector("[data-agenda-month]");
+    if (monthLabelEl) {
+      monthLabelEl.textContent = monthLabel(activeAgendaMonth);
+    }
+
+    var summaryEl = activeAgendaOverlay.querySelector("[data-agenda-summary]");
+    if (summaryEl) {
+      summaryEl.textContent = activeAgendaDates.length + " dia(s) selecionado(s)";
+    }
+
+    var gridEl = activeAgendaOverlay.querySelector("[data-agenda-grid]");
+    if (!gridEl) {
+      return;
+    }
+
+    var selectedMap = {};
+    activeAgendaDates.forEach(function (iso) {
+      selectedMap[iso] = true;
+    });
+
+    var month = activeAgendaMonth.getMonth();
+    var year = activeAgendaMonth.getFullYear();
+    var firstDay = new Date(year, month, 1);
+    var lastDay = new Date(year, month + 1, 0);
+    var dayCount = lastDay.getDate();
+    var firstWeekday = (firstDay.getDay() + 6) % 7;
+    var todayIso = isoFromDate(new Date());
+    var html = "";
+
+    WEEKDAY_LABELS.forEach(function (weekday) {
+      html += '<div class="radar-agenda-weekday">' + utils.escHtml(weekday) + "</div>";
+    });
+
+    for (var pad = 0; pad < firstWeekday; pad += 1) {
+      html += '<div class="radar-agenda-day is-blank" aria-hidden="true"></div>';
+    }
+
+    for (var day = 1; day <= dayCount; day += 1) {
+      var dateObj = new Date(year, month, day);
+      var iso = isoFromDate(dateObj);
+      var classes = "radar-agenda-day";
+      if (selectedMap[iso]) {
+        classes += " is-selected";
+      }
+      if (iso === todayIso) {
+        classes += " is-today";
+      }
+      html +=
+        '<button type="button" class="' +
+        classes +
+        '" data-agenda-day="' +
+        iso +
+        '" aria-pressed="' +
+        (selectedMap[iso] ? "true" : "false") +
+        '">' +
+        day +
+        "</button>";
+    }
+
+    gridEl.innerHTML = html;
+  }
+
+  function queueAgendaSync() {
+    if (agendaRequestTimer) {
+      window.clearTimeout(agendaRequestTimer);
+    }
+    agendaRequestTimer = window.setTimeout(function () {
+      agendaRequestTimer = null;
+      submitAgendaSync();
+    }, 120);
+  }
+
+  function submitAgendaSync() {
+    if (!activeAgendaRowId) {
+      return;
+    }
+    if (agendaRequestInFlight) {
+      agendaRequestPending = true;
+      return;
+    }
+    agendaRequestInFlight = true;
+    agendaRequestPending = false;
+    var data = new FormData();
+    data.set("action", "set_agenda_atividade");
+    data.set("atividade_id", activeAgendaRowId);
+    data.set("dias_execucao", JSON.stringify(activeAgendaDates.slice().sort()));
+    postFormData(data)
+      .then(function (payload) {
+        if (!payload || !payload.ok) {
+          throw payload || {};
+        }
+        var patch = payloadToRowPatch(payload);
+        grid.updateRow(payload.id || activeAgendaRowId, patch);
+        activeAgendaDates = Array.isArray(patch.agenda_dias) ? patch.agenda_dias.slice() : [];
+        if (activeAgendaOverlay) {
+          renderAgendaOverlay();
+          if (activeAgendaTrigger) {
+            positionAgendaOverlay(activeAgendaOverlay, activeAgendaTrigger);
+          }
+        }
+      })
+      .catch(function (err) {
+        setPageMessage((err && err.message) || "Nao foi possivel atualizar a agenda.", "error");
+      })
+      .finally(function () {
+        agendaRequestInFlight = false;
+        if (agendaRequestPending) {
+          agendaRequestPending = false;
+          submitAgendaSync();
+        }
+      });
+  }
+
+  function toggleAgendaDate(isoDate) {
+    if (!isoDate || !parseIsoDate(isoDate)) {
+      return;
+    }
+    var current = {};
+    activeAgendaDates.forEach(function (iso) {
+      current[iso] = true;
+    });
+    if (current[isoDate]) {
+      activeAgendaDates = activeAgendaDates.filter(function (iso) {
+        return iso !== isoDate;
+      });
+    } else {
+      activeAgendaDates.push(isoDate);
+    }
+    activeAgendaDates.sort();
+    renderAgendaOverlay();
+    queueAgendaSync();
+  }
+
+  function openAgendaOverlay(triggerEl) {
+    if (!triggerEl || !canManage) {
+      return;
+    }
+    var rowId = triggerEl.getAttribute("data-row-id") || "";
+    if (!rowId) {
+      return;
+    }
+    if (activeAgendaOverlay && activeAgendaTrigger === triggerEl) {
+      closeAgendaOverlay();
+      return;
+    }
+
+    closeAgendaOverlay();
+    closeStatusMenu();
+
+    var row = grid.getRowById(rowId);
+    if (!row) {
+      setPageMessage("Atividade nao encontrada.", "warning");
+      return;
+    }
+
+    activeAgendaTrigger = triggerEl;
+    activeAgendaTrigger.setAttribute("aria-expanded", "true");
+    activeAgendaRowId = rowId;
+    activeAgendaDates = getRowAgendaDates(row);
+
+    if (activeAgendaDates.length) {
+      activeAgendaMonth = monthStart(parseIsoDate(activeAgendaDates[0]) || new Date());
+    } else {
+      activeAgendaMonth = monthStart(new Date());
+    }
+
+    var overlayEl = document.createElement("div");
+    overlayEl.className = "radar-agenda-overlay";
+    overlayEl.setAttribute("role", "dialog");
+    overlayEl.setAttribute("aria-label", "Agenda da atividade");
+    overlayEl.innerHTML =
+      '<div class="radar-agenda-head">' +
+      '<button type="button" class="radar-agenda-nav" data-agenda-prev aria-label="Mes anterior">&lt;</button>' +
+      '<strong data-agenda-month></strong>' +
+      '<button type="button" class="radar-agenda-nav" data-agenda-next aria-label="Proximo mes">&gt;</button>' +
+      "</div>" +
+      '<div class="radar-agenda-grid" data-agenda-grid></div>' +
+      '<div class="radar-agenda-foot">' +
+      '<span data-agenda-summary>0 dia(s) selecionado(s)</span>' +
+      '<button type="button" class="radar-agenda-clear" data-agenda-clear>Limpar</button>' +
+      "</div>";
+
+    overlayEl.addEventListener("click", function (event) {
+      var prevBtn = event.target.closest("[data-agenda-prev]");
+      if (prevBtn) {
+        event.preventDefault();
+        activeAgendaMonth = monthStart(new Date(activeAgendaMonth.getFullYear(), activeAgendaMonth.getMonth() - 1, 1));
+        renderAgendaOverlay();
+        positionAgendaOverlay(activeAgendaOverlay, activeAgendaTrigger);
+        return;
+      }
+      var nextBtn = event.target.closest("[data-agenda-next]");
+      if (nextBtn) {
+        event.preventDefault();
+        activeAgendaMonth = monthStart(new Date(activeAgendaMonth.getFullYear(), activeAgendaMonth.getMonth() + 1, 1));
+        renderAgendaOverlay();
+        positionAgendaOverlay(activeAgendaOverlay, activeAgendaTrigger);
+        return;
+      }
+      var clearBtn = event.target.closest("[data-agenda-clear]");
+      if (clearBtn) {
+        event.preventDefault();
+        if (activeAgendaDates.length) {
+          activeAgendaDates = [];
+          renderAgendaOverlay();
+          queueAgendaSync();
+        }
+        return;
+      }
+      var dayBtn = event.target.closest("[data-agenda-day]");
+      if (dayBtn) {
+        event.preventDefault();
+        toggleAgendaDate(dayBtn.getAttribute("data-agenda-day"));
+      }
+    });
+
+    document.body.appendChild(overlayEl);
+    activeAgendaOverlay = overlayEl;
+    renderAgendaOverlay();
+    positionAgendaOverlay(overlayEl, triggerEl);
+  }
+
+  function refreshAgendaAnchor() {
+    if (!activeAgendaOverlay || !activeAgendaRowId) {
+      return;
+    }
+    var nextTrigger = root.querySelector('.js-agenda-inline-trigger[data-row-id="' + activeAgendaRowId + '"]');
+    if (!nextTrigger) {
+      closeAgendaOverlay();
+      return;
+    }
+    if (activeAgendaTrigger && activeAgendaTrigger !== nextTrigger) {
+      activeAgendaTrigger.setAttribute("aria-expanded", "false");
+    }
+    activeAgendaTrigger = nextTrigger;
+    activeAgendaTrigger.setAttribute("aria-expanded", "true");
+    positionAgendaOverlay(activeAgendaOverlay, activeAgendaTrigger);
   }
 
   function closeStatusMenu() {
@@ -236,6 +591,29 @@
     );
   }
 
+  function renderAgendaCell(row, ctx) {
+    var total = Number(row.agenda_total_dias || 0);
+    if (!canManage) {
+      return total ? ctx.slotBadge(total, "dias") : "-";
+    }
+    var buttonClass = "radar-agenda-trigger js-agenda-inline-trigger";
+    if (total > 0) {
+      buttonClass += " is-active";
+    }
+    return (
+      '<button class="' +
+      buttonClass +
+      '" type="button" data-row-id="' +
+      ctx.esc(row.id) +
+      '" aria-haspopup="dialog" aria-expanded="false" aria-label="Editar agenda">' +
+      '<span class="radar-agenda-icon" aria-hidden="true">&#128197;</span>' +
+      '<span class="radar-agenda-count">' +
+      ctx.esc(total) +
+      "</span>" +
+      "</button>"
+    );
+  }
+
   var columns = [
     {
       key: "nome",
@@ -293,6 +671,16 @@
         ],
       },
       render: renderStatusCell,
+    },
+    {
+      key: "agenda_total_dias",
+      label: "Agenda",
+      visible: true,
+      width: 110,
+      minWidth: 100,
+      compareType: "number",
+      filter: { type: "number", min: 0, step: 1, placeholder: "0" },
+      render: renderAgendaCell,
     },
     {
       key: "horas_trabalho",
@@ -406,10 +794,12 @@
       : { enabled: false },
     onAfterRender: function (api) {
       closeStatusMenu();
+      refreshAgendaAnchor();
       setupDescriptionMarquees(api.root);
     },
     onResize: function (api) {
       closeStatusMenu();
+      refreshAgendaAnchor();
       setupDescriptionMarquees(api.root);
     },
   });
@@ -486,6 +876,13 @@
       openStatusMenu(statusTrigger);
       return;
     }
+    var agendaTrigger = event.target.closest(".js-agenda-inline-trigger");
+    if (agendaTrigger && root.contains(agendaTrigger)) {
+      event.preventDefault();
+      event.stopPropagation();
+      openAgendaOverlay(agendaTrigger);
+      return;
+    }
     var editButton = event.target.closest(".js-editar-atividade");
     if (editButton) {
       event.preventDefault();
@@ -495,26 +892,41 @@
 
   if (canManage) {
     document.addEventListener("mousedown", function (event) {
-      if (!activeStatusMenu) {
-        return;
+      if (activeStatusMenu) {
+        if (activeStatusMenu.contains(event.target)) {
+          return;
+        }
+        if (activeStatusTrigger && activeStatusTrigger.contains(event.target)) {
+          return;
+        }
+        closeStatusMenu();
       }
-      if (activeStatusMenu.contains(event.target)) {
-        return;
+      if (activeAgendaOverlay) {
+        if (activeAgendaOverlay.contains(event.target)) {
+          return;
+        }
+        if (activeAgendaTrigger && activeAgendaTrigger.contains(event.target)) {
+          return;
+        }
+        closeAgendaOverlay();
       }
-      if (activeStatusTrigger && activeStatusTrigger.contains(event.target)) {
-        return;
-      }
-      closeStatusMenu();
     });
 
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
         closeStatusMenu();
+        closeAgendaOverlay();
       }
     });
 
-    window.addEventListener("resize", closeStatusMenu);
-    window.addEventListener("scroll", closeStatusMenu, true);
+    window.addEventListener("resize", function () {
+      closeStatusMenu();
+      closeAgendaOverlay();
+    });
+    window.addEventListener("scroll", function () {
+      closeStatusMenu();
+      closeAgendaOverlay();
+    }, true);
   }
 
   if (cancelButton) {

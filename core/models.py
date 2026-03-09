@@ -489,6 +489,24 @@ class RadarTrabalho(models.Model):
         return self.nome
 
 
+class RadarTrabalhoColaborador(models.Model):
+    trabalho = models.ForeignKey(RadarTrabalho, on_delete=models.CASCADE, related_name="colaboradores")
+    nome = models.CharField(max_length=120)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["trabalho", "nome"],
+                name="unique_radar_trabalho_colaborador",
+            )
+        ]
+
+    def __str__(self):
+        return self.nome
+
+
 class RadarAtividade(models.Model):
     class Status(models.TextChoices):
         PENDENTE = "PENDENTE", "Pendente"
@@ -521,6 +539,24 @@ class RadarAtividade(models.Model):
             )
             self.ordem = max_ordem + 1
         super().save(*args, **kwargs)
+
+
+class RadarAtividadeDiaExecucao(models.Model):
+    atividade = models.ForeignKey(RadarAtividade, on_delete=models.CASCADE, related_name="dias_execucao")
+    data_execucao = models.DateField()
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["data_execucao", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["atividade", "data_execucao"],
+                name="unique_radar_atividade_dia_execucao",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.atividade_id} - {self.data_execucao.isoformat()}"
 
 
 class Inventario(models.Model):
