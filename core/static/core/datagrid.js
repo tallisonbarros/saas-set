@@ -139,6 +139,7 @@
     var nextButton = root.querySelector("[data-dg-next-page]");
     var pageIndicatorEl = root.querySelector("[data-dg-page-indicator]");
     var pickerBody = root.querySelector("[data-dg-column-picker-body]");
+    var createHost = root.querySelector("[data-dg-create]");
 
     if (
       !tableEl ||
@@ -175,6 +176,7 @@
       page: 1,
       pageSize: initialPageSize,
     };
+    var rowReorder = config.rowReorder && config.rowReorder.enabled ? config.rowReorder : null;
 
     var storageKey = buildStorageKey(root, config);
     var visibleColumns = loadVisibleColumns(storageKey, columns);
@@ -184,6 +186,16 @@
       rows.forEach(function (row, index) {
         row._index = index;
       });
+    }
+
+    function addRowInternal(row) {
+      if (!row || typeof row !== "object") {
+        return null;
+      }
+      var clone = Object.assign({}, row);
+      clone._index = rows.length;
+      rows.push(clone);
+      return clone;
     }
 
     function ensureMandatoryColumns() {
@@ -208,7 +220,20 @@
       var count = columns.filter(function (column) {
         return isColumnVisible(column.key);
       }).length;
+      if (rowReorder) {
+        count += 1;
+      }
       return count > 0 ? count : 1;
+    }
+
+    function isRowReorderActive() {
+      if (!rowReorder) {
+        return false;
+      }
+      if (typeof rowReorder.isEnabled === "function") {
+        return !!rowReorder.isEnabled(state, rows.slice());
+      }
+      return true;
     }
 
     function columnStyle(column) {
@@ -400,6 +425,7 @@
         applyColumnVisibility();
         return;
       }
+      var canReorder = isRowReorderActive();
       bodyEl.innerHTML = pageRows
         .map(function (row) {
           var rowId = escHtml(row.id || "");
@@ -428,6 +454,21 @@
               );
             })
             .join("");
+          if (rowReorder) {
+            var disabledAttr = canReorder ? "" : " disabled";
+            var titleText = canReorder ? "Arrastar para mover" : "Reordenacao desativada para a ordenacao atual";
+            var handleCell =
+              '<td class="datagrid-reorder-col">' +
+              '<button class="datagrid-row-handle js-dg-row-handle" type="button" draggable="true" data-row-id="' +
+              rowId +
+              '" aria-label="Mover linha" title="' +
+              escHtml(titleText) +
+              '"' +
+              disabledAttr +
+              ">≡</button>" +
+              "</td>";
+            cols = handleCell + cols;
+          }
           return '<tr data-row-id="' + rowId + '"' + classToken + attrToken + ">" + cols + "</tr>";
         })
         .join("");
@@ -533,8 +574,8 @@
     }
 
     function renderHeader() {
-      var headHtml =
-        "<tr>" +
+      var headerCells =
+        (rowReorder ? '<th class="datagrid-reorder-head" aria-label="Mover linhas"></th>' : "") +
         columns
           .map(function (column) {
             var col = escHtml(column.key);
@@ -575,8 +616,8 @@
               "</div></th>"
             );
           })
-          .join("") +
-        "</tr>";
+          .join("");
+      var headHtml = "<tr>" + headerCells + "</tr>";
       headEl.innerHTML = headHtml;
     }
 
@@ -765,6 +806,327 @@
       });
     }
 
+    function getRowsByIndex() {
+      return rows.slice().sort(function (a, b) {
+        return a._index - b._index;
+      });
+    }
+
+    function moveRowBeforeInternal(sourceId, targetId) {
+      var sourceText = safeText(sourceId);
+      var targetText = safeText(targetId);
+      if (!sourceText || !targetText || sourceText === targetText) {
+        return false;
+      }
+      var ordered = getRowsByIndex();
+      var sourceIndex = -1;
+      var targetIndex = -1;
+      for (var i = 0; i < ordered.length; i += 1) {
+        var currentId = safeText(ordered[i].id);
+        if (currentId === sourceText) {
+          sourceIndex = i;
+        }
+        if (currentId === targetText) {
+          targetIndex = i;
+        }
+      }
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return false;
+      }
+      var moved = ordered.splice(sourceIndex, 1)[0];
+      if (sourceIndex < targetIndex) {
+        targetIndex -= 1;
+      }
+      ordered.splice(targetIndex, 0, moved);
+      ordered.forEach(function (row, index) {
+        row._index = index;
+        if (row.ordem !== undefined) {
+          row.ordem = index + 1;
+        }
+      });
+      return true;
+    }
+
+    function bindRowReorderActions() {
+      if (!rowReorder) {
+        return;
+      }
+      var dragSourceId = "";
+      var pending = false;
+
+      function clearDragStyles() {
+        var dragged = root.querySelectorAll(".is-row-dragging");
+        dragged.forEach(function (el) {
+          el.classList.remove("is-row-dragging");
+        });
+        var over = root.querySelectorAll(".is-row-drop-target");
+        over.forEach(function (el) {
+          el.classList.remove("is-row-drop-target");
+        });
+      }
+
+      root.addEventListener("dragstart", function (event) {
+        var handle = event.target.closest(".js-dg-row-handle");
+        if (!handle || !isRowReorderActive() || pending || handle.disabled) {
+          event.preventDefault();
+          return;
+        }
+        dragSourceId = safeText(handle.dataset.rowId);
+        if (!dragSourceId) {
+          event.preventDefault();
+          return;
+        }
+        var row = handle.closest("tr[data-row-id]");
+        if (row) {
+          row.classList.add("is-row-dragging");
+        }
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", dragSourceId);
+        }
+      });
+
+      root.addEventListener("dragend", function () {
+        dragSourceId = "";
+        clearDragStyles();
+      });
+
+      root.addEventListener("dragover", function (event) {
+        if (!dragSourceId || !isRowReorderActive() || pending) {
+          return;
+        }
+        var row = event.target.closest("tr[data-row-id]");
+        if (!row) {
+          return;
+        }
+        var rowId = safeText(row.getAttribute("data-row-id"));
+        if (!rowId || rowId === dragSourceId) {
+          return;
+        }
+        event.preventDefault();
+        clearDragStyles();
+        row.classList.add("is-row-drop-target");
+      });
+
+      root.addEventListener("drop", function (event) {
+        if (!dragSourceId || !isRowReorderActive() || pending) {
+          return;
+        }
+        var row = event.target.closest("tr[data-row-id]");
+        if (!row) {
+          return;
+        }
+        var targetId = safeText(row.getAttribute("data-row-id"));
+        if (!targetId || targetId === dragSourceId) {
+          clearDragStyles();
+          return;
+        }
+        event.preventDefault();
+        pending = true;
+        root.classList.add("is-reordering");
+        clearDragStyles();
+
+        var result = null;
+        if (typeof rowReorder.onMove === "function") {
+          result = rowReorder.onMove({
+            sourceId: dragSourceId,
+            targetId: targetId,
+            api: api,
+            state: JSON.parse(JSON.stringify(state)),
+          });
+        }
+
+        Promise.resolve(result)
+          .then(function (payload) {
+            if (payload === false) {
+              return;
+            }
+            if (moveRowBeforeInternal(dragSourceId, targetId)) {
+              renderTable();
+            }
+          })
+          .finally(function () {
+            pending = false;
+            dragSourceId = "";
+            root.classList.remove("is-reordering");
+            clearDragStyles();
+        });
+      });
+    }
+
+    function renderCreateField(field) {
+      var name = escHtml(field.name || "");
+      if (!name) {
+        return "";
+      }
+      var label = escHtml(field.label || field.name || "");
+      var type = field.type || "text";
+      var required = field.required ? " required" : "";
+      var placeholder = field.placeholder ? ' placeholder="' + escHtml(field.placeholder) + '"' : "";
+      var value = field.value !== undefined && field.value !== null ? safeText(field.value) : "";
+      var className = "field datagrid-create-field";
+      if (field.wide) {
+        className += " is-wide";
+      }
+
+      if (type === "hidden") {
+        return '<input type="hidden" name="' + name + '" value="' + escHtml(value) + '">';
+      }
+
+      var inputHtml = "";
+      if (type === "select") {
+        var options = Array.isArray(field.options) ? field.options : [];
+        inputHtml =
+          '<select name="' +
+          name +
+          '"' +
+          required +
+          ">" +
+          options
+            .map(function (option) {
+              var optionValue = safeText(option.value);
+              var selected = optionValue === value ? " selected" : "";
+              return '<option value="' + escHtml(optionValue) + '"' + selected + ">" + escHtml(option.label || optionValue) + "</option>";
+            })
+            .join("") +
+          "</select>";
+      } else if (type === "textarea") {
+        inputHtml = '<textarea name="' + name + '"' + required + placeholder + ">" + escHtml(value) + "</textarea>";
+      } else {
+        var min = field.min !== undefined ? ' min="' + escHtml(field.min) + '"' : "";
+        var step = field.step !== undefined ? ' step="' + escHtml(field.step) + '"' : "";
+        inputHtml =
+          '<input type="' +
+          escHtml(type) +
+          '" name="' +
+          name +
+          '" value="' +
+          escHtml(value) +
+          '"' +
+          required +
+          placeholder +
+          min +
+          step +
+          ">";
+      }
+
+      return '<label class="' + className + '"><span>' + label + "</span>" + inputHtml + "</label>";
+    }
+
+    function bindCreateActions() {
+      var createConfig = config.create;
+      if (!createHost || !createConfig || !createConfig.enabled) {
+        return;
+      }
+      var fields = Array.isArray(createConfig.fields) ? createConfig.fields : [];
+      if (!fields.length) {
+        return;
+      }
+
+      createHost.style.display = "";
+
+      var createFormHtml =
+        '<form class="datagrid-create-form" data-dg-create-form>' +
+        '<div class="datagrid-create-fields">' +
+        fields.map(renderCreateField).join("") +
+        "</div>" +
+        '<div class="datagrid-create-actions">' +
+        '<button class="btn btn-primary btn-compact" type="submit" data-dg-create-submit>' +
+        escHtml(createConfig.submitLabel || "Salvar rapido") +
+        "</button>" +
+        "</div>" +
+        '<div class="datagrid-create-message" data-dg-create-message style="display:none;"></div>' +
+        "</form>";
+      createHost.innerHTML = createFormHtml;
+
+      var createForm = createHost.querySelector("[data-dg-create-form]");
+      var createSubmit = createHost.querySelector("[data-dg-create-submit]");
+      var createMessage = createHost.querySelector("[data-dg-create-message]");
+
+      if (!createForm || !createSubmit) {
+        return;
+      }
+
+      function setCreateMessage(message, level) {
+        if (!createMessage) {
+          return;
+        }
+        if (!message) {
+          createMessage.style.display = "none";
+          createMessage.textContent = "";
+          createMessage.className = "datagrid-create-message";
+          return;
+        }
+        createMessage.style.display = "block";
+        createMessage.textContent = message;
+        createMessage.className = "datagrid-create-message notice notice-" + (level || "info");
+      }
+
+      var pendingCreate = false;
+      createForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (pendingCreate) {
+          return;
+        }
+        pendingCreate = true;
+        createSubmit.disabled = true;
+
+        var formData = new FormData(createForm);
+        var result = null;
+        if (typeof createConfig.onSubmit === "function") {
+          result = createConfig.onSubmit({
+            formData: formData,
+            api: api,
+            state: JSON.parse(JSON.stringify(state)),
+          });
+        }
+
+        Promise.resolve(result)
+          .then(function (payload) {
+            if (!payload || payload.ok === false) {
+              var failMessage = (payload && payload.message) || "Nao foi possivel salvar agora.";
+              setCreateMessage(failMessage, (payload && payload.level) || "error");
+              return;
+            }
+            if (payload.message) {
+              setCreateMessage(payload.message, payload.level || "success");
+            } else {
+              setCreateMessage("", "");
+            }
+            if (payload.row && typeof payload.row === "object") {
+              addRowInternal(payload.row);
+              renderTable();
+            } else if (payload.refresh) {
+              renderTable();
+            }
+            if (payload.reload) {
+              window.location.reload();
+              return;
+            }
+            if (payload.reset !== false) {
+              createForm.reset();
+              fields.forEach(function (field) {
+                if (field.value === undefined || field.value === null) {
+                  return;
+                }
+                var input = createForm.elements[field.name];
+                if (input) {
+                  input.value = safeText(field.value);
+                }
+              });
+            }
+          })
+          .catch(function (err) {
+            var message = (err && err.message) || "Nao foi possivel salvar agora.";
+            setCreateMessage(message, "error");
+          })
+          .finally(function () {
+            pendingCreate = false;
+            createSubmit.disabled = false;
+          });
+      });
+    }
+
     function ensurePageSizeOptions() {
       var options = Array.isArray(config.pageSizeOptions) && config.pageSizeOptions.length
         ? config.pageSizeOptions
@@ -837,6 +1199,14 @@
         state.page = 1;
         renderTable();
       },
+      addRow: function (row) {
+        var added = addRowInternal(row);
+        if (!added) {
+          return null;
+        }
+        renderTable();
+        return added;
+      },
       updateRow: function (id, patch) {
         var row = getRowById(id);
         if (!row) {
@@ -870,6 +1240,14 @@
         }
         renderTable();
       },
+      moveRowBefore: function (sourceId, targetId) {
+        if (moveRowBeforeInternal(sourceId, targetId)) {
+          renderTable();
+        }
+      },
+      canReorderRows: function () {
+        return isRowReorderActive();
+      },
       closeFilters: closeHeaderFilters,
       openFilter: openHeaderFilter,
     };
@@ -881,6 +1259,8 @@
     bindHeaderActions();
     bindFilterActions();
     bindPaginationActions();
+    bindCreateActions();
+    bindRowReorderActions();
     applyColumnVisibility();
     renderTable();
 

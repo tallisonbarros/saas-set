@@ -8,6 +8,42 @@
   if (!root) {
     return;
   }
+  var tableConfig = window.RadarTrabalhosTableConfig || {};
+  var canManage = !!tableConfig.canManage;
+  var defaultDate = tableConfig.defaultDate || "";
+
+  function parseJsonResponse(resp) {
+    return resp.text().then(function (text) {
+      var payload = {};
+      if (text) {
+        try {
+          payload = JSON.parse(text);
+        } catch (e) {
+          payload = {};
+        }
+      }
+      if (!resp.ok) {
+        throw payload;
+      }
+      return payload;
+    });
+  }
+
+  function postFormData(data) {
+    var getCookie = window.RadarShared && window.RadarShared.getCookie
+      ? window.RadarShared.getCookie
+      : function () {
+          return "";
+        };
+    return fetch(window.location.pathname + window.location.search, {
+      method: "POST",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      body: data,
+    }).then(parseJsonResponse);
+  }
 
   function setupDescriptionMarquees(scopeEl) {
     if (!scopeEl) {
@@ -49,6 +85,38 @@
     summaryFormatter: function (total) {
       return total + " trabalho(s) encontrado(s)";
     },
+    create: canManage
+      ? {
+          enabled: true,
+          submitLabel: "Salvar rapido",
+          fields: [
+            { name: "action", type: "hidden", value: "create_trabalho" },
+            { name: "nome", label: "Novo trabalho", type: "text", placeholder: "Nome do trabalho", required: true },
+            { name: "data_registro", label: "Data", type: "date", value: defaultDate },
+          ],
+          onSubmit: function (ctx) {
+            return postFormData(ctx.formData)
+              .then(function (payload) {
+                if (!payload || !payload.ok || !payload.row) {
+                  return { ok: false, message: "Nao foi possivel criar o trabalho." };
+                }
+                return {
+                  ok: true,
+                  row: payload.row,
+                  message: payload.message || "Trabalho criado.",
+                  level: payload.level || "success",
+                };
+              })
+              .catch(function (err) {
+                return {
+                  ok: false,
+                  message: (err && err.message) || "Nao foi possivel criar o trabalho.",
+                  level: "error",
+                };
+              });
+          },
+        }
+      : { enabled: false },
     columns: [
       {
         key: "nome",

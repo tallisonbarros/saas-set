@@ -4,6 +4,8 @@
   data-dg-storage-key="{{ storage_key|default:grid_id }}"
   {% if scope %}data-dg-scope="{{ scope }}"{% endif %}
 >
+  <div class="datagrid-create" data-dg-create style="display: none;"></div>
+
   <div class="datagrid-toolbar">
     <div class="datagrid-summary">
       <span data-dg-summary>{{ loading_text|default:"Carregando..." }}</span>

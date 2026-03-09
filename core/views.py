@@ -2042,6 +2042,7 @@ def _atividade_response_payload(atividade):
         "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
         "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
         "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
+        "ordem": atividade.ordem or 0,
     }
 
 
@@ -3450,6 +3451,8 @@ def radar_detail(request, pk):
                 except ValueError:
                     data_registro = None
             if not nome:
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse({"ok": False, "message": "Informe um nome para o trabalho.", "level": "error"}, status=400)
                 message = "Informe um nome para o trabalho."
                 message_level = "error"
             else:
@@ -3459,7 +3462,7 @@ def radar_detail(request, pk):
                 classificacao = None
                 if classificacao_id:
                     classificacao = RadarClassificacao.objects.filter(pk=classificacao_id).first()
-                RadarTrabalho.objects.create(
+                novo_trabalho = RadarTrabalho.objects.create(
                     radar=radar,
                     nome=nome,
                     descricao=descricao,
@@ -3471,6 +3474,30 @@ def radar_detail(request, pk):
                     classificacao=classificacao,
                     criado_por=request.user,
                 )
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse(
+                        {
+                            "ok": True,
+                            "message": "Trabalho criado.",
+                            "level": "success",
+                            "row": {
+                                "id": novo_trabalho.id,
+                                "nome": novo_trabalho.nome or "",
+                                "descricao": novo_trabalho.descricao or "",
+                                "status": novo_trabalho.status,
+                                "status_label": novo_trabalho.get_status_display(),
+                                "classificacao": novo_trabalho.classificacao.nome if novo_trabalho.classificacao else "",
+                                "contrato": novo_trabalho.contrato.nome if novo_trabalho.contrato else "",
+                                "data_registro": novo_trabalho.data_registro.isoformat() if novo_trabalho.data_registro else "",
+                                "data_registro_label": novo_trabalho.data_registro.strftime("%d/%m/%Y") if novo_trabalho.data_registro else "",
+                                "setor": novo_trabalho.setor or "",
+                                "solicitante": novo_trabalho.solicitante or "",
+                                "responsavel": novo_trabalho.responsavel or "",
+                                "total_atividades": 0,
+                                "detalhe_url": reverse("radar_trabalho_detail", args=[radar.pk, novo_trabalho.pk]),
+                            },
+                        }
+                    )
                 return redirect("radar_detail", pk=radar.pk)
         if action == "update_radar":
             nome = request.POST.get("nome", "").strip()
@@ -3622,6 +3649,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "quick_status_atividade",
             "delete_atividade",
             "move_atividade",
+            "move_atividade_to",
             "create_contrato",
             "create_classificacao",
         }:
@@ -3785,13 +3813,15 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 except InvalidOperation:
                     horas = None
             if not nome:
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse({"ok": False, "message": "Informe um nome para a atividade.", "level": "error"}, status=400)
                 message = "Informe um nome para a atividade."
                 message_level = "error"
             else:
                 proxima_ordem = (
                     RadarAtividade.objects.filter(trabalho=trabalho).aggregate(max_ordem=Max("ordem"))["max_ordem"] or 0
                 ) + 1
-                RadarAtividade.objects.create(
+                nova_atividade = RadarAtividade.objects.create(
                     trabalho=trabalho,
                     nome=nome,
                     descricao=descricao,
@@ -3802,6 +3832,17 @@ def radar_trabalho_detail(request, radar_pk, pk):
                     ordem=proxima_ordem,
                 )
                 _sync_trabalho_status(trabalho)
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    row = _atividade_response_payload(nova_atividade)
+                    row.pop("ok", None)
+                    return JsonResponse(
+                        {
+                            "ok": True,
+                            "message": "Atividade criada.",
+                            "level": "success",
+                            "row": row,
+                        }
+                    )
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "update_atividade":
             atividade_id = request.POST.get("atividade_id")
@@ -3905,6 +3946,52 @@ def radar_trabalho_detail(request, radar_pk, pk):
                         "direcao": direcao,
                         "moved": moved,
                         "swap_with_id": swap_with_id,
+                    }
+                )
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "move_atividade_to":
+            atividade_id = request.POST.get("atividade_id")
+            target_id = request.POST.get("target_atividade_id")
+            atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
+            target = get_object_or_404(RadarAtividade, pk=target_id, trabalho=trabalho)
+
+            moved = False
+            if atividade.id != target.id:
+                with transaction.atomic():
+                    _normalizar_ordem_atividades(trabalho)
+                    atividades_status = list(
+                        RadarAtividade.objects.select_for_update()
+                        .filter(trabalho=trabalho)
+                        .order_by("ordem", "criado_em", "id")
+                    )
+                    ids = [item.id for item in atividades_status]
+                    try:
+                        idx_from = ids.index(atividade.id)
+                        idx_to = ids.index(target.id)
+                    except ValueError:
+                        idx_from = -1
+                        idx_to = -1
+                    if 0 <= idx_from < len(atividades_status) and 0 <= idx_to < len(atividades_status):
+                        item = atividades_status.pop(idx_from)
+                        if idx_from < idx_to:
+                            idx_to -= 1
+                        atividades_status.insert(idx_to, item)
+                        changed = []
+                        for idx, atividade_item in enumerate(atividades_status, start=1):
+                            if atividade_item.ordem != idx:
+                                atividade_item.ordem = idx
+                                changed.append(atividade_item)
+                        if changed:
+                            RadarAtividade.objects.bulk_update(changed, ["ordem"])
+                        moved = True
+
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "id": atividade.id,
+                        "target_id": target.id,
+                        "moved": moved,
                     }
                 )
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)

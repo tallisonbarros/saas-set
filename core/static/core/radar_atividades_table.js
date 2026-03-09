@@ -96,48 +96,14 @@
     };
   }
 
-  function actionButtons(row, ctx) {
-    if (!canManage) {
-      return "-";
+  function canReorderForState(state) {
+    if (!state) {
+      return false;
     }
-    var buttons = [];
-    if (row.status !== "EXECUTANDO") {
-      buttons.push(
-        '<button class="btn btn-ghost btn-compact js-atividade-status" type="button" data-atividade-id="' +
-          ctx.esc(row.id) +
-          '" data-status="EXECUTANDO">Iniciar</button>'
-      );
+    if (!state.sortCol) {
+      return true;
     }
-    if (row.status !== "FINALIZADA") {
-      buttons.push(
-        '<button class="btn btn-ghost btn-compact js-atividade-status" type="button" data-atividade-id="' +
-          ctx.esc(row.id) +
-          '" data-status="FINALIZADA">Concluir</button>'
-      );
-    }
-    if (row.status !== "PENDENTE") {
-      buttons.push(
-        '<button class="btn btn-ghost btn-compact js-atividade-status" type="button" data-atividade-id="' +
-          ctx.esc(row.id) +
-          '" data-status="PENDENTE">Reabrir</button>'
-      );
-    }
-    buttons.push(
-      '<button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="' +
-        ctx.esc(row.id) +
-        '" data-direcao="up" title="Mover para cima">Subir</button>'
-    );
-    buttons.push(
-      '<button class="btn btn-ghost btn-compact js-move-atividade" type="button" data-atividade-id="' +
-        ctx.esc(row.id) +
-        '" data-direcao="down" title="Mover para baixo">Descer</button>'
-    );
-    buttons.push(
-      '<button class="btn btn-ghost btn-compact js-editar-atividade" type="button" data-atividade-id="' +
-        ctx.esc(row.id) +
-        '">Editar</button>'
-    );
-    return '<div class="atividade-actions">' + buttons.join("") + "</div>";
+    return state.sortCol === "ordem" && state.sortDir === "asc";
   }
 
   var columns = [
@@ -203,7 +169,7 @@
     {
       key: "horas_trabalho",
       label: "Horas",
-      visible: true,
+      visible: false,
       width: 120,
       minWidth: 120,
       compareType: "number",
@@ -240,22 +206,9 @@
     },
   ];
 
-  if (canManage) {
-    columns.push({
-      key: "acoes",
-      label: "Acoes",
-      visible: true,
-      width: 410,
-      minWidth: 320,
-      sortable: false,
-      filter: false,
-      render: actionButtons,
-    });
-  }
-
   var grid = window.SAASDataGrid.create({
     rootId: "radar-atividades-grid",
-    storageKey: "radar-atividades:" + trabalhoId,
+    storageKey: "radar-atividades:v2:" + trabalhoId,
     rows: rows,
     pageSize: 20,
     pageSizeOptions: [10, 20, 50, 100],
@@ -264,7 +217,69 @@
     summaryFormatter: function (total) {
       return total + " atividade(s) encontrada(s)";
     },
+    create: canManage
+      ? {
+          enabled: true,
+          submitLabel: "Salvar rapido",
+          fields: [
+            { name: "action", type: "hidden", value: "create_atividade" },
+            { name: "nome", label: "Nova atividade", type: "text", placeholder: "Nome da atividade", required: true },
+            { name: "descricao", label: "Descricao", type: "text", placeholder: "Descricao resumida" },
+            { name: "status", label: "Status", type: "select", value: "PENDENTE", options: [
+              { value: "PENDENTE", label: "Pendente" },
+              { value: "EXECUTANDO", label: "Executando" },
+              { value: "FINALIZADA", label: "Finalizada" }
+            ] },
+            { name: "horas_trabalho", label: "Horas", type: "number", min: "0", step: "0.1", placeholder: "0" },
+          ],
+          onSubmit: function (ctx) {
+            return postFormData(ctx.formData)
+              .then(function (payload) {
+                if (!payload || !payload.ok || !payload.row) {
+                  return { ok: false, message: "Nao foi possivel criar a atividade." };
+                }
+                return {
+                  ok: true,
+                  row: payload.row,
+                  message: payload.message || "Atividade criada.",
+                  level: payload.level || "success",
+                };
+              })
+              .catch(function (err) {
+                return {
+                  ok: false,
+                  message: (err && err.message) || "Nao foi possivel criar a atividade.",
+                  level: "error",
+                };
+              });
+          },
+        }
+      : { enabled: false },
     columns: columns,
+    rowReorder: canManage
+      ? {
+          enabled: true,
+          isEnabled: function (state) {
+            return canReorderForState(state);
+          },
+          onMove: function (ctx) {
+            var data = new FormData();
+            data.set("action", "move_atividade_to");
+            data.set("atividade_id", ctx.sourceId);
+            data.set("target_atividade_id", ctx.targetId);
+            return postFormData(data).then(function (payload) {
+              if (!payload || !payload.ok || !payload.moved) {
+                setPageMessage("Nao foi possivel mover a atividade.", "warning");
+                return false;
+              }
+              return true;
+            }).catch(function () {
+              setPageMessage("Nao foi possivel mover a atividade.", "error");
+              return false;
+            });
+          },
+        }
+      : { enabled: false },
     onAfterRender: function (api) {
       setupDescriptionMarquees(api.root);
     },
@@ -342,70 +357,6 @@
     if (editButton) {
       event.preventDefault();
       openEditorById(editButton.dataset.atividadeId);
-      return;
-    }
-
-    var statusButton = event.target.closest(".js-atividade-status");
-    if (statusButton) {
-      event.preventDefault();
-      if (statusButton.disabled) {
-        return;
-      }
-      var atividadeId = statusButton.dataset.atividadeId;
-      var status = statusButton.dataset.status;
-      if (!atividadeId || !status) {
-        return;
-      }
-      var dataStatus = new FormData();
-      dataStatus.set("action", "quick_status_atividade");
-      dataStatus.set("atividade_id", atividadeId);
-      dataStatus.set("status", status);
-      statusButton.disabled = true;
-      postFormData(dataStatus)
-        .then(function (payload) {
-          if (payload && payload.ok) {
-            grid.updateRow(payload.id, payloadToRowPatch(payload));
-          }
-        })
-        .catch(function () {
-          setPageMessage("Nao foi possivel atualizar o status.", "error");
-        })
-        .finally(function () {
-          statusButton.disabled = false;
-        });
-      return;
-    }
-
-    var moveButton = event.target.closest(".js-move-atividade");
-    if (moveButton) {
-      event.preventDefault();
-      if (moveButton.disabled) {
-        return;
-      }
-      var moveId = moveButton.dataset.atividadeId;
-      var direcao = moveButton.dataset.direcao;
-      if (!moveId || !direcao) {
-        return;
-      }
-      var dataMove = new FormData();
-      dataMove.set("action", "move_atividade");
-      dataMove.set("atividade_id", moveId);
-      dataMove.set("direcao", direcao);
-      moveButton.disabled = true;
-      postFormData(dataMove)
-        .then(function (payload) {
-          if (payload && payload.ok && payload.moved && payload.swap_with_id) {
-            grid.swapRows(payload.id, payload.swap_with_id);
-          } else {
-            setPageMessage("Nao foi possivel mover a atividade.", "warning");
-          }
-        })
-        .catch(function () {
-          setPageMessage("Nao foi possivel mover a atividade.", "error");
-        })
-        .finally(function () {
-          moveButton.disabled = false;
-        });
     }
   });
 

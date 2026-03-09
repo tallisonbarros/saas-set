@@ -4279,6 +4279,54 @@ select {
   width: 100%;
 }
 
+.datagrid-create {
+  margin: 2px 0 12px;
+}
+
+.datagrid-create-form {
+  display: grid;
+  gap: 10px;
+}
+
+.datagrid-create-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.datagrid-create-field {
+  min-width: 0;
+}
+
+.datagrid-create-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.datagrid-create-field span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.datagrid-create-field input,
+.datagrid-create-field select,
+.datagrid-create-field textarea {
+  width: 100%;
+}
+
+.datagrid-create-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.datagrid-create-message {
+  margin-top: 2px;
+}
+
 .datagrid-toolbar {
   display: flex;
   justify-content: space-between;
@@ -4321,6 +4369,61 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.datagrid-reorder-head,
+.datagrid-reorder-col {
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
+  text-align: center;
+}
+
+.datagrid-reorder-col {
+  vertical-align: middle;
+}
+
+.datagrid-row-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #8da0b2;
+  cursor: grab;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.datagrid-row-handle:hover {
+  border-color: rgba(141, 160, 178, 0.42);
+}
+
+.datagrid-row-handle:active {
+  cursor: grabbing;
+}
+
+.datagrid-row-handle:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.datagrid-table tr.is-row-dragging {
+  opacity: 0.5;
+}
+
+.datagrid-table tr.is-row-drop-target {
+  outline: 1px dashed rgba(255, 122, 26, 0.65);
+  outline-offset: -2px;
+}
+
+.datagrid.is-reordering {
+  pointer-events: none;
 }
 
 .datagrid-table th.is-hidden,
@@ -4519,6 +4622,11 @@ select {
 }
 
 @media (max-width: 980px) {
+  .datagrid-create-fields {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
   .datagrid-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
