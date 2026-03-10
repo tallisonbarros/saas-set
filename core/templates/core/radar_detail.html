@@ -22,6 +22,7 @@
           <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
         <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'radar_agenda' radar.id %}">Agenda</a>
           <a class="hud-menu-pill" href="{% url 'radar_list' %}">Voltar para radares</a>
         </div>
       </div>

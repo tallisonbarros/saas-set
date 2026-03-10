@@ -86,6 +86,7 @@
     rows: rows,
     pageSize: 20,
     pageSizeOptions: [10, 20, 50, 100],
+    defaultSort: { col: "ultimo_status_evento_em", dir: "desc" },
     noRowsText: "Nenhum trabalho encontrado com os filtros atuais.",
     summaryFormatter: function (total) {
       return total + " trabalho(s) encontrado(s)";
@@ -204,6 +205,12 @@
         render: function (row, ctx) {
           return ctx.esc(row.data_registro_label || "-");
         },
+      },
+      {
+        key: "ultimo_status_evento_em",
+        label: "Ultimo status em",
+        visible: false,
+        compareType: "date",
       },
       {
         key: "total_horas",

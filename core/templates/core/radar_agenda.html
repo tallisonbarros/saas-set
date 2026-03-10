@@ -1,0 +1,162 @@
+{% extends "core/base.html" %}
+
+{% block title %}Agenda - {{ radar.nome }}{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'radar_list' %}">Radar de atividades</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'radar_detail' radar.id %}">{{ radar.nome }}</a>
+    <span class="crumb-sep">/</span>
+    <span>Agenda</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <div class="radar-mode {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
+    <div class="page-hud">
+      <div class="hud-top">
+        <h1 class="page-title">Agenda de atividades</h1>
+        {% if is_radar_creator %}
+          <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
+        {% endif %}
+        <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar para o radar</a>
+        </div>
+      </div>
+    </div>
+
+    <section class="io-card">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Calendario</h2>
+          <p class="muted">Dia selecionado: {{ selected_day_display }}</p>
+        </div>
+      </div>
+      <div class="radar-agenda-nav-row">
+        <a class="btn btn-ghost btn-compact" href="?dia={{ prev_day_iso }}">Dia anterior</a>
+        <a class="btn btn-ghost btn-compact" href="?dia={{ today_iso }}">Hoje</a>
+        <a class="btn btn-ghost btn-compact" href="?dia={{ next_day_iso }}">Proximo dia</a>
+      </div>
+      <div class="radar-agenda-nav-row">
+        <a class="btn btn-ghost btn-compact" href="?dia={{ prev_month_iso }}">Mes anterior</a>
+        <strong>{{ month_label }}</strong>
+        <a class="btn btn-ghost btn-compact" href="?dia={{ next_month_iso }}">Proximo mes</a>
+      </div>
+      <div class="radar-agenda-calendar-grid">
+        {% for weekday in weekday_labels %}
+          <div class="radar-agenda-calendar-weekday">{{ weekday }}</div>
+        {% endfor %}
+        {% for week in calendar_weeks %}
+          {% for cell in week %}
+            <a
+              class="radar-agenda-calendar-day{% if not cell.is_current_month %} is-outside{% endif %}{% if cell.activity_count %} has-activity{% endif %}{% if cell.is_selected %} is-selected{% endif %}{% if cell.is_today %} is-today{% endif %}"
+              href="?dia={{ cell.iso }}"
+            >
+              <span class="radar-agenda-calendar-day-num">{{ cell.day }}</span>
+              {% if cell.is_current_month and cell.activity_count %}
+                <span class="radar-agenda-calendar-day-count">{{ cell.activity_count }} ativ.</span>
+              {% endif %}
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="io-card radar-agenda-section">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Atividades sendo executadas no dia</h2>
+          <p class="muted">
+            {{ daily_total_trabalhos }} trabalho(s),
+            {{ daily_total_atividades }} atividade(s),
+            {{ daily_total_horas|floatformat:2 }} h no dia.
+          </p>
+        </div>
+      </div>
+      {% if daily_groups %}
+        <div class="radar-agenda-work-list">
+          {% for group in daily_groups %}
+            <article class="radar-agenda-work-item">
+              <div class="radar-agenda-work-head">
+                <div>
+                  <h3 class="radar-agenda-work-title">
+                    <a href="{{ group.trabalho_url }}">{{ group.trabalho_nome }}</a>
+                  </h3>
+                  <div class="muted">
+                    Status: {{ group.trabalho_status_label }} |
+                    Equipe: {{ group.total_colaboradores|default:0 }} |
+                    Atividades no dia: {{ group.total_atividades }}
+                  </div>
+                </div>
+                <div class="slot-badge">{{ group.total_horas_dia|floatformat:2 }} h</div>
+              </div>
+              <table class="radar-agenda-mini-table">
+                <thead>
+                  <tr>
+                    <th>Atividade</th>
+                    <th>Status</th>
+                    <th>Horas no dia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for atividade in group.atividades %}
+                    <tr>
+                      <td>{{ atividade.nome }}</td>
+                      <td>{{ atividade.status_label }}</td>
+                      <td>{{ atividade.horas_dia|floatformat:2 }} h</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted">Nenhuma atividade programada para este dia.</div>
+      {% endif %}
+    </section>
+
+    <section class="io-card radar-agenda-section">
+      <div class="io-card-head">
+        <div>
+          <h2 class="io-title">Resumo mensal por trabalho</h2>
+          <p class="muted">
+            {{ month_total_trabalhos }} trabalho(s) no mes,
+            {{ month_total_horas|floatformat:2 }} h acumuladas.
+          </p>
+        </div>
+      </div>
+      {% if month_summary %}
+        <div class="table-scroll">
+          <table class="radar-agenda-summary-table">
+            <thead>
+              <tr>
+                <th>Inicio</th>
+                <th>Fim</th>
+                <th>Trabalho</th>
+                <th>Horas totais</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in month_summary %}
+                <tr>
+                  <td>{{ row.inicio_display }}</td>
+                  <td>{{ row.fim_display }}</td>
+                  <td><a href="{{ row.trabalho_url }}">{{ row.trabalho_nome }}</a></td>
+                  <td>{{ row.total_horas|floatformat:2 }} h</td>
+                  <td>{{ row.status_label }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="muted">Sem dados no mes selecionado.</div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

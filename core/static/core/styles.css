@@ -4879,6 +4879,164 @@ select {
   text-decoration: underline;
 }
 
+.radar-agenda-section {
+  margin-top: 18px;
+}
+
+.radar-agenda-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.radar-agenda-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.radar-agenda-calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca8b4;
+}
+
+.radar-agenda-calendar-day {
+  border: 1px solid rgba(141, 160, 178, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  min-height: 62px;
+  padding: 7px 8px;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.radar-agenda-calendar-day:hover {
+  border-color: rgba(255, 157, 86, 0.48);
+  background: rgba(255, 157, 86, 0.1);
+}
+
+.radar-agenda-calendar-day.is-outside {
+  opacity: 0.45;
+}
+
+.radar-agenda-calendar-day.has-activity {
+  border-color: rgba(116, 224, 194, 0.45);
+}
+
+.radar-agenda-calendar-day.is-selected {
+  border-color: rgba(116, 224, 194, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(116, 224, 194, 0.45);
+}
+
+.radar-agenda-calendar-day.is-today .radar-agenda-calendar-day-num {
+  color: #f8ad73;
+}
+
+.radar-agenda-calendar-day-num {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.radar-agenda-calendar-day-count {
+  font-size: 11px;
+  color: #c4cbd3;
+}
+
+.radar-agenda-work-list {
+  display: grid;
+  gap: 12px;
+}
+
+.radar-agenda-work-item {
+  border: 1px solid rgba(141, 160, 178, 0.35);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.radar-agenda-work-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.radar-agenda-work-title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.radar-agenda-work-title a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.radar-agenda-work-title a:hover {
+  text-decoration: underline;
+}
+
+.radar-agenda-mini-table,
+.radar-agenda-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.radar-agenda-mini-table th,
+.radar-agenda-mini-table td,
+.radar-agenda-summary-table th,
+.radar-agenda-summary-table td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(141, 160, 178, 0.24);
+  text-align: left;
+}
+
+.radar-agenda-mini-table th,
+.radar-agenda-summary-table th {
+  color: #c4cbd3;
+  font-weight: 600;
+}
+
+.radar-agenda-summary-table a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.radar-agenda-summary-table a:hover {
+  text-decoration: underline;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+@media (max-width: 760px) {
+  .radar-agenda-calendar-day {
+    min-height: 58px;
+    padding: 6px;
+  }
+
+  .radar-agenda-calendar-day-count {
+    font-size: 10px;
+  }
+
+  .radar-agenda-work-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 #radar-trabalhos-grid .datagrid-create-field span,
 #radar-atividades-grid .datagrid-create-field span {
   display: none;

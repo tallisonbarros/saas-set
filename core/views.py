@@ -27,7 +27,7 @@ from django.utils import timezone
 
 from django.contrib.auth.models import User
 from django.db import DatabaseError, connections, transaction
-from django.db.models import Case, Count, DecimalField, F, IntegerField, Max, OuterRef, Q, Subquery, Sum, TextField, Value, When
+from django.db.models import Case, Count, DecimalField, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum, TextField, Value, When
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.functions import Cast, Coalesce
 
@@ -3703,6 +3703,7 @@ def radar_detail(request, pk):
                     data_registro=data_registro or timezone.localdate(),
                     classificacao=classificacao,
                     horas_dia=horas_dia,
+                    ultimo_status_evento_em=timezone.now(),
                     criado_por=request.user,
                 )
                 _sync_trabalho_colaboradores(novo_trabalho, colaboradores_nomes)
@@ -3722,6 +3723,11 @@ def radar_detail(request, pk):
                                 "contrato": novo_trabalho.contrato.nome if novo_trabalho.contrato else "",
                                 "data_registro": novo_trabalho.data_registro.isoformat() if novo_trabalho.data_registro else "",
                                 "data_registro_label": novo_trabalho.data_registro.strftime("%d/%m/%Y") if novo_trabalho.data_registro else "",
+                                "ultimo_status_evento_em": (
+                                    novo_trabalho.ultimo_status_evento_em.isoformat()
+                                    if novo_trabalho.ultimo_status_evento_em
+                                    else ""
+                                ),
                                 "setor": novo_trabalho.setor or "",
                                 "solicitante": novo_trabalho.solicitante or "",
                                 "responsavel": novo_trabalho.responsavel or "",
@@ -3813,6 +3819,11 @@ def radar_detail(request, pk):
                 "contrato": trabalho.contrato.nome if trabalho.contrato else "",
                 "data_registro": trabalho.data_registro.isoformat() if trabalho.data_registro else "",
                 "data_registro_label": trabalho.data_registro.strftime("%d/%m/%Y") if trabalho.data_registro else "",
+                "ultimo_status_evento_em": (
+                    trabalho.ultimo_status_evento_em.isoformat()
+                    if trabalho.ultimo_status_evento_em
+                    else ""
+                ),
                 "setor": trabalho.setor or "",
                 "solicitante": trabalho.solicitante or "",
                 "responsavel": trabalho.responsavel or "",
@@ -3840,6 +3851,261 @@ def radar_detail(request, pk):
             "message": message,
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
+        },
+    )
+
+
+@login_required
+def radar_agenda(request, pk):
+    cliente = _get_cliente(request.user)
+    if not cliente and not request.user.is_staff:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    if request.user.is_staff and not cliente:
+        radar = get_object_or_404(Radar, pk=pk)
+        is_creator = False
+        has_id_radar_access = False
+        can_manage = False
+    else:
+        radar = get_object_or_404(
+            Radar,
+            Q(pk=pk),
+            Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
+        )
+        is_creator = _is_radar_creator_user(request.user, radar)
+        has_id_radar_access = bool(cliente) and (
+            radar.id_radar_id and cliente.radares.filter(pk=radar.id_radar_id).exists()
+        )
+        can_manage = is_creator
+
+    today = timezone.localdate()
+    dia_raw = request.GET.get("dia", "").strip()
+    if dia_raw:
+        try:
+            selected_day = datetime.strptime(dia_raw, "%Y-%m-%d").date()
+        except ValueError:
+            selected_day = today
+    else:
+        selected_day = today
+
+    month_start = selected_day.replace(day=1)
+    month_end = date(
+        selected_day.year,
+        selected_day.month,
+        calendar.monthrange(selected_day.year, selected_day.month)[1],
+    )
+
+    month_day_rows = list(
+        RadarAtividadeDiaExecucao.objects.filter(
+            atividade__trabalho__radar=radar,
+            data_execucao__gte=month_start,
+            data_execucao__lte=month_end,
+        )
+        .values("data_execucao")
+        .annotate(total_atividades=Count("id"))
+        .order_by("data_execucao")
+    )
+    month_day_counts = {
+        row["data_execucao"]: row["total_atividades"]
+        for row in month_day_rows
+    }
+
+    month_summary_rows_raw = list(
+        RadarAtividadeDiaExecucao.objects.filter(
+            atividade__trabalho__radar=radar,
+            data_execucao__gte=month_start,
+            data_execucao__lte=month_end,
+        )
+        .values(
+            "atividade__trabalho_id",
+            "atividade__trabalho__nome",
+            "atividade__trabalho__status",
+            "atividade__trabalho__horas_dia",
+        )
+        .annotate(
+            primeiro_dia=Min("data_execucao"),
+            ultimo_dia=Max("data_execucao"),
+            total_slots=Count("id"),
+        )
+        .order_by(
+            "primeiro_dia",
+            "ultimo_dia",
+            "atividade__trabalho__nome",
+        )
+    )
+
+    daily_rows = list(
+        RadarAtividadeDiaExecucao.objects.filter(
+            atividade__trabalho__radar=radar,
+            data_execucao=selected_day,
+        )
+        .select_related("atividade", "atividade__trabalho")
+        .order_by(
+            "atividade__trabalho__nome",
+            "atividade__ordem",
+            "atividade__nome",
+            "id",
+        )
+    )
+
+    trabalhos_ids = {
+        row["atividade__trabalho_id"]
+        for row in month_summary_rows_raw
+        if row.get("atividade__trabalho_id")
+    }
+    trabalhos_ids.update(
+        item.atividade.trabalho_id
+        for item in daily_rows
+        if item.atividade and item.atividade.trabalho_id
+    )
+
+    colaboradores_por_trabalho = {}
+    if trabalhos_ids:
+        colaboradores_por_trabalho = {
+            row["trabalho_id"]: row["total_colaboradores"]
+            for row in (
+                RadarTrabalhoColaborador.objects.filter(trabalho_id__in=trabalhos_ids)
+                .values("trabalho_id")
+                .annotate(total_colaboradores=Count("id"))
+            )
+        }
+
+    daily_groups = []
+    daily_groups_map = {}
+    daily_total_atividades = 0
+    daily_total_horas = Decimal("0.00")
+    for row in daily_rows:
+        atividade = row.atividade
+        trabalho = atividade.trabalho
+        total_colaboradores = colaboradores_por_trabalho.get(trabalho.id, 0)
+        multiplier = Decimal(total_colaboradores if total_colaboradores > 0 else 1)
+        horas_dia = trabalho.horas_dia if trabalho.horas_dia is not None else Decimal("8.00")
+        horas_atividade_dia = (horas_dia * multiplier).quantize(Decimal("0.01"))
+
+        group = daily_groups_map.get(trabalho.id)
+        if group is None:
+            group = {
+                "trabalho_id": trabalho.id,
+                "trabalho_nome": trabalho.nome or "-",
+                "trabalho_status": trabalho.status,
+                "trabalho_status_label": trabalho.get_status_display(),
+                "trabalho_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.id]),
+                "total_colaboradores": total_colaboradores,
+                "total_atividades": 0,
+                "total_horas_dia": Decimal("0.00"),
+                "atividades": [],
+            }
+            daily_groups_map[trabalho.id] = group
+            daily_groups.append(group)
+
+        group["atividades"].append(
+            {
+                "id": atividade.id,
+                "nome": atividade.nome or "-",
+                "status": atividade.status,
+                "status_label": atividade.get_status_display(),
+                "horas_dia": horas_atividade_dia,
+            }
+        )
+        group["total_atividades"] += 1
+        group["total_horas_dia"] += horas_atividade_dia
+        daily_total_atividades += 1
+        daily_total_horas += horas_atividade_dia
+
+    for group in daily_groups:
+        group["total_horas_dia"] = group["total_horas_dia"].quantize(Decimal("0.01"))
+
+    status_map = dict(RadarTrabalho.Status.choices)
+    month_summary = []
+    month_total_horas = Decimal("0.00")
+    for row in month_summary_rows_raw:
+        trabalho_id = row["atividade__trabalho_id"]
+        total_colaboradores = colaboradores_por_trabalho.get(trabalho_id, 0)
+        multiplier = Decimal(total_colaboradores if total_colaboradores > 0 else 1)
+        horas_dia = row["atividade__trabalho__horas_dia"] or Decimal("8.00")
+        total_slots = row["total_slots"] or 0
+        total_horas = (horas_dia * multiplier * Decimal(total_slots)).quantize(Decimal("0.01"))
+        month_total_horas += total_horas
+        status_value = row["atividade__trabalho__status"] or ""
+        month_summary.append(
+            {
+                "trabalho_id": trabalho_id,
+                "trabalho_nome": row["atividade__trabalho__nome"] or "-",
+                "trabalho_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho_id]),
+                "inicio": row["primeiro_dia"],
+                "inicio_display": row["primeiro_dia"].strftime("%d/%m/%Y") if row["primeiro_dia"] else "-",
+                "fim": row["ultimo_dia"],
+                "fim_display": row["ultimo_dia"].strftime("%d/%m/%Y") if row["ultimo_dia"] else "-",
+                "status": status_value,
+                "status_label": status_map.get(status_value, status_value),
+                "total_horas": total_horas,
+            }
+        )
+
+    month_total_horas = month_total_horas.quantize(Decimal("0.01"))
+    daily_total_horas = daily_total_horas.quantize(Decimal("0.01"))
+
+    calendar_weeks = []
+    month_calendar = calendar.Calendar(firstweekday=0).monthdatescalendar(selected_day.year, selected_day.month)
+    for week in month_calendar:
+        week_cells = []
+        for cell_day in week:
+            is_current_month = cell_day.month == selected_day.month
+            activity_count = month_day_counts.get(cell_day, 0) if is_current_month else 0
+            week_cells.append(
+                {
+                    "iso": cell_day.isoformat(),
+                    "day": cell_day.day,
+                    "is_current_month": is_current_month,
+                    "is_selected": cell_day == selected_day,
+                    "is_today": cell_day == today,
+                    "activity_count": activity_count,
+                }
+            )
+        calendar_weeks.append(week_cells)
+
+    month_names = [
+        "Janeiro",
+        "Fevereiro",
+        "Marco",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+    ]
+    month_label = f"{month_names[selected_day.month - 1]} de {selected_day.year}"
+
+    return render(
+        request,
+        "core/radar_agenda.html",
+        {
+            "radar": radar,
+            "can_manage": can_manage or request.user.is_staff,
+            "is_radar_creator": is_creator,
+            "has_id_radar_access": has_id_radar_access,
+            "selected_day": selected_day,
+            "selected_day_iso": selected_day.isoformat(),
+            "selected_day_display": selected_day.strftime("%d/%m/%Y"),
+            "today_iso": today.isoformat(),
+            "prev_day_iso": (selected_day - timedelta(days=1)).isoformat(),
+            "next_day_iso": (selected_day + timedelta(days=1)).isoformat(),
+            "prev_month_iso": _add_months(selected_day, -1).isoformat(),
+            "next_month_iso": _add_months(selected_day, 1).isoformat(),
+            "month_label": month_label,
+            "weekday_labels": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"],
+            "calendar_weeks": calendar_weeks,
+            "daily_groups": daily_groups,
+            "daily_total_trabalhos": len(daily_groups),
+            "daily_total_atividades": daily_total_atividades,
+            "daily_total_horas": daily_total_horas,
+            "month_summary": month_summary,
+            "month_total_trabalhos": len(month_summary),
+            "month_total_horas": month_total_horas,
         },
     )
 
@@ -4034,6 +4300,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 solicitante=trabalho.solicitante,
                 responsavel=trabalho.responsavel,
                 horas_dia=trabalho.horas_dia,
+                ultimo_status_evento_em=timezone.now(),
                 criado_por=request.user,
             )
             colaboradores_origem = _trabalho_colaboradores_nomes(trabalho)
