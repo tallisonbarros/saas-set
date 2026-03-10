@@ -3876,22 +3876,16 @@ select {
   box-shadow: 0 0 0 1px rgba(255, 122, 26, 0.1) inset;
 }
 
-.radar-mode-viewer .page-hud,
-.radar-mode-viewer .io-card,
-.radar-mode-viewer .io-discrete {
+.radar-mode-viewer .page-hud {
   border-color: rgba(82, 140, 255, 0.42);
   background: linear-gradient(165deg, rgba(15, 22, 34, 0.96) 0%, rgba(23, 34, 52, 0.96) 100%);
   box-shadow: 0 0 0 1px rgba(82, 140, 255, 0.18) inset;
 }
 
-.radar-mode-viewer .io-discrete-summary,
-.radar-mode-viewer .hud-pill {
-  border-color: rgba(82, 140, 255, 0.45);
-  color: #b8d2ff;
-}
-
-.radar-mode-viewer .muted {
-  color: #98a8bf;
+.radar-mode-viewer .io-card,
+.radar-mode-viewer .io-discrete {
+  border-color: rgba(255, 122, 26, 0.26);
+  box-shadow: 0 0 0 1px rgba(255, 122, 26, 0.1) inset;
 }
 
 .rack-highlight {
