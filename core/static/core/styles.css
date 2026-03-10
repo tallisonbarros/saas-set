@@ -4879,8 +4879,13 @@ select {
   text-decoration: underline;
 }
 
+.radar-agenda-page {
+  display: grid;
+  gap: 18px;
+}
+
 .radar-agenda-section {
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 .radar-agenda-nav-row {
@@ -4961,12 +4966,27 @@ select {
 }
 
 .radar-agenda-calendar-day.is-selected {
-  border-color: rgba(116, 224, 194, 0.75);
-  box-shadow: inset 0 0 0 1px rgba(116, 224, 194, 0.45);
+  border-color: rgba(116, 224, 194, 0.95);
+  background: linear-gradient(180deg, rgba(116, 224, 194, 0.22), rgba(116, 224, 194, 0.1));
+  box-shadow:
+    inset 0 0 0 1px rgba(116, 224, 194, 0.75),
+    0 0 0 1px rgba(116, 224, 194, 0.35),
+    0 10px 22px rgba(7, 22, 25, 0.45);
+  transform: translateY(-1px);
 }
 
 .radar-agenda-calendar-day.is-today .radar-agenda-calendar-day-num {
   color: #f8ad73;
+}
+
+.radar-agenda-calendar-day.is-selected .radar-agenda-calendar-day-num {
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.radar-agenda-calendar-day.is-selected .radar-agenda-calendar-day-count {
+  color: #dcf7ef;
+  font-weight: 700;
 }
 
 .radar-agenda-calendar-day-num {

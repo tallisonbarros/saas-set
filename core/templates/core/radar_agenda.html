@@ -15,7 +15,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="radar-mode {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
+  <div class="radar-mode radar-agenda-page {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
     <div class="page-hud">
       <div class="hud-top">
         <h1 class="page-title">Agenda de atividades</h1>
@@ -29,36 +29,6 @@
     </div>
 
     <section class="io-card">
-      <div class="radar-agenda-month-switch">
-        <a class="radar-agenda-month-arrow" href="?dia={{ prev_month_iso }}" aria-label="Mes anterior">&lt;</a>
-        <strong>{{ month_label }}</strong>
-        <a class="radar-agenda-month-arrow" href="?dia={{ next_month_iso }}" aria-label="Proximo mes">&gt;</a>
-      </div>
-      <div class="radar-agenda-calendar-grid">
-        {% for weekday in weekday_labels %}
-          <div class="radar-agenda-calendar-weekday">{{ weekday }}</div>
-        {% endfor %}
-        {% for week in calendar_weeks %}
-          {% for cell in week %}
-            <a
-              class="radar-agenda-calendar-day{% if not cell.is_current_month %} is-outside{% endif %}{% if cell.activity_count %} has-activity{% endif %}{% if cell.is_selected %} is-selected{% endif %}{% if cell.is_today %} is-today{% endif %}"
-              href="?dia={{ cell.iso }}"
-            >
-              <span class="radar-agenda-calendar-day-num">{{ cell.day }}</span>
-              {% if cell.is_current_month and cell.activity_count %}
-                <span class="radar-agenda-calendar-day-count">{{ cell.activity_count }} ativ.</span>
-              {% endif %}
-            </a>
-          {% endfor %}
-        {% endfor %}
-      </div>
-    </section>
-
-    <div id="radar-agenda-daily-container">
-      {% include "core/partials/radar_agenda_daily_section.html" %}
-    </div>
-
-    <section class="io-card radar-agenda-section">
       <div class="io-card-head">
         <div>
           <h2 class="io-title">Resumo mensal</h2>
@@ -97,6 +67,36 @@
         <div class="muted">Sem dados no mes selecionado.</div>
       {% endif %}
     </section>
+
+    <section class="io-card radar-agenda-section">
+      <div class="radar-agenda-month-switch">
+        <a class="radar-agenda-month-arrow" href="?dia={{ prev_month_iso }}" aria-label="Mes anterior">&lt;</a>
+        <strong>{{ month_label }}</strong>
+        <a class="radar-agenda-month-arrow" href="?dia={{ next_month_iso }}" aria-label="Proximo mes">&gt;</a>
+      </div>
+      <div class="radar-agenda-calendar-grid">
+        {% for weekday in weekday_labels %}
+          <div class="radar-agenda-calendar-weekday">{{ weekday }}</div>
+        {% endfor %}
+        {% for week in calendar_weeks %}
+          {% for cell in week %}
+            <a
+              class="radar-agenda-calendar-day{% if not cell.is_current_month %} is-outside{% endif %}{% if cell.activity_count %} has-activity{% endif %}{% if cell.is_selected %} is-selected{% endif %}{% if cell.is_today %} is-today{% endif %}"
+              href="?dia={{ cell.iso }}"
+            >
+              <span class="radar-agenda-calendar-day-num">{{ cell.day }}</span>
+              {% if cell.is_current_month and cell.activity_count %}
+                <span class="radar-agenda-calendar-day-count">{{ cell.activity_count }} ativ.</span>
+              {% endif %}
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </section>
+
+    <div id="radar-agenda-daily-container">
+      {% include "core/partials/radar_agenda_daily_section.html" %}
+    </div>
   </div>
 {% endblock %}
 
@@ -110,7 +110,7 @@
     }
 
     function buildPartialUrl(rawHref) {
-      var url = new URL(rawHref, window.location.origin);
+      var url = new URL(rawHref, window.location.href);
       url.searchParams.set("partial", "1");
       url.searchParams.set("section", "daily");
       return url.toString();
@@ -154,7 +154,7 @@
         .then(function (html) {
           dailyContainer.innerHTML = html;
           updateSelectedDay(dayLink);
-          var nextUrl = new URL(href, window.location.origin);
+          var nextUrl = new URL(href, window.location.href);
           window.history.replaceState({}, "", nextUrl.pathname + nextUrl.search);
         })
         .catch(function () {
