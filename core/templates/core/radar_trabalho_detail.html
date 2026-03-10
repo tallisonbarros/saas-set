@@ -24,6 +24,7 @@
           <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
         <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
+          <a class="hud-menu-pill" href="{% url 'radar_agenda' radar.id %}">Agenda</a>
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar para o radar</a>
         </div>
       </div>
@@ -99,44 +100,6 @@
       </section>
     {% endif %}
   </div>
-
-  <details class="io-card io-discrete" id="nova-atividade" style="margin-top: 18px;">
-    <summary class="io-discrete-summary">
-      <span class="io-title">Nova atividade</span>
-      <span class="muted">Registre uma nova atividade no trabalho.</span>
-    </summary>
-    <div class="io-discrete-body">
-      {% if can_manage %}
-        <form class="io-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_atividade">
-          <div class="io-form-grid">
-            <label class="field">
-              <span>Nome</span>
-              <input type="text" name="nome" placeholder="Atividade principal" required>
-            </label>
-            <label class="field">
-              <span>Descricao</span>
-              <input type="text" name="descricao" placeholder="Descricao resumida">
-            </label>
-            <label class="field">
-              <span>Status</span>
-              <select name="status">
-                {% for value, label in status_choices %}
-                  <option value="{{ value }}">{{ label }}</option>
-                {% endfor %}
-              </select>
-            </label>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Salvar atividade</button>
-          </div>
-        </form>
-      {% else %}
-        <div class="muted">Criacao de atividade desabilitada para acesso de leitura.</div>
-      {% endif %}
-    </div>
-  </details>
 
   <details class="io-card io-discrete" style="margin-top: 18px;">
     <summary class="io-discrete-summary">

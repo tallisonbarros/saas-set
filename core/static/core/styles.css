@@ -4573,6 +4573,11 @@ select {
   right: 0;
   top: calc(100% + 6px);
   z-index: 14;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #20252b;
+  box-shadow: var(--shadow);
 }
 
 .datagrid-head-cell.is-filter-open .datagrid-head-filter {
@@ -4584,11 +4589,26 @@ select {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface-soft);
   color: var(--text);
   padding: 6px 8px;
   font: inherit;
   font-size: 12px;
+}
+
+.datagrid-filter-input::placeholder {
+  color: #8e959d;
+}
+
+select.datagrid-filter-input {
+  color-scheme: dark;
+  background-color: var(--surface-soft);
+}
+
+select.datagrid-filter-input option,
+select.datagrid-filter-input optgroup {
+  background-color: #1f252b;
+  color: var(--text);
 }
 
 .datagrid-filter-input:focus {
@@ -4935,8 +4955,8 @@ select {
 
 .radar-agenda-calendar-grid {
   display: grid;
-  /* Espaço extra entre sexta e sabado */
-  grid-template-columns: repeat(6, minmax(0, 1fr)) 0 minmax(0, 1fr);
+  /* Espacamento extra entre domingo/segunda e sexta/sabado */
+  grid-template-columns: minmax(0, 1fr) 0 repeat(5, minmax(0, 1fr)) 0 minmax(0, 1fr);
   column-gap: 6px;
   row-gap: 6px;
 }
@@ -4946,27 +4966,27 @@ select {
 }
 
 .radar-agenda-calendar-grid > *:nth-child(7n + 2) {
-  grid-column: 2;
-}
-
-.radar-agenda-calendar-grid > *:nth-child(7n + 3) {
   grid-column: 3;
 }
 
-.radar-agenda-calendar-grid > *:nth-child(7n + 4) {
+.radar-agenda-calendar-grid > *:nth-child(7n + 3) {
   grid-column: 4;
 }
 
-.radar-agenda-calendar-grid > *:nth-child(7n + 5) {
+.radar-agenda-calendar-grid > *:nth-child(7n + 4) {
   grid-column: 5;
 }
 
-.radar-agenda-calendar-grid > *:nth-child(7n + 6) {
+.radar-agenda-calendar-grid > *:nth-child(7n + 5) {
   grid-column: 6;
 }
 
+.radar-agenda-calendar-grid > *:nth-child(7n + 6) {
+  grid-column: 7;
+}
+
 .radar-agenda-calendar-grid > *:nth-child(7n) {
-  grid-column: 8;
+  grid-column: 9;
 }
 
 .radar-agenda-calendar-weekday {
@@ -4974,6 +4994,11 @@ select {
   font-size: 12px;
   font-weight: 600;
   color: #9ca8b4;
+}
+
+.radar-agenda-calendar-grid > .radar-agenda-calendar-weekday:nth-child(7n + 1),
+.radar-agenda-calendar-grid > .radar-agenda-calendar-weekday:nth-child(7n) {
+  color: #8e98a3;
 }
 
 .radar-agenda-calendar-day {
@@ -4990,9 +5015,21 @@ select {
   gap: 4px;
 }
 
+.radar-agenda-calendar-grid > .radar-agenda-calendar-day:nth-child(7n + 1),
+.radar-agenda-calendar-grid > .radar-agenda-calendar-day:nth-child(7n) {
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(148, 163, 184, 0.08);
+}
+
 .radar-agenda-calendar-day:hover {
   border-color: rgba(255, 157, 86, 0.48);
   background: rgba(255, 157, 86, 0.1);
+}
+
+.radar-agenda-calendar-grid > .radar-agenda-calendar-day:nth-child(7n + 1):hover,
+.radar-agenda-calendar-grid > .radar-agenda-calendar-day:nth-child(7n):hover {
+  border-color: rgba(148, 163, 184, 0.62);
+  background: rgba(148, 163, 184, 0.14);
 }
 
 .radar-agenda-calendar-day.is-outside {
@@ -5135,6 +5172,14 @@ select {
 #radar-trabalhos-grid .datagrid-create-field span,
 #radar-atividades-grid .datagrid-create-field span {
   display: none;
+}
+
+#radar-trabalhos-grid .datagrid-create-field.is-advanced-hidden {
+  display: none;
+}
+
+#radar-trabalhos-grid .radar-create-advanced-toggle {
+  white-space: nowrap;
 }
 
 .atividade-actions {
@@ -6157,3 +6202,4 @@ select:focus {
 .milhao-readings .table tbody tr:nth-child(odd) {
   background: rgba(255, 255, 255, 0.015);
 }
+

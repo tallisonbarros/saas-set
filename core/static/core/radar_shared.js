@@ -24,9 +24,9 @@
     }
     var formCadastro = document.getElementById(options.formId);
     var input = document.querySelector(options.inputSelector);
-    var select = document.getElementById(options.selectId);
+    var select = options.selectId ? document.getElementById(options.selectId) : null;
     var details = document.getElementById(options.detailsId);
-    if (!formCadastro || !input || !select || !details) {
+    if (!formCadastro || !input || !details) {
       return;
     }
 
@@ -76,7 +76,7 @@
             });
         })
         .then(function (payload) {
-          if (payload && payload.id && payload.nome) {
+          if (select && payload && payload.id && payload.nome) {
             var exists = Array.from(select.options).some(function (opt) {
               return opt.value === String(payload.id);
             });

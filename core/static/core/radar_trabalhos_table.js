@@ -101,6 +101,7 @@
             { name: "action", type: "hidden", value: "create_trabalho" },
             { name: "nome", label: "Nome", type: "text", placeholder: "Novo trabalho", required: true },
             { name: "data_registro", label: "Data", type: "date", value: defaultDate },
+            { name: "descricao", label: "Descricao", type: "text", placeholder: "Descricao resumida" },
           ],
           onSubmit: function (ctx) {
             return postFormData(ctx.formData)
@@ -283,10 +284,82 @@
       },
     ],
     onAfterRender: function (api) {
+      setupQuickCreateAdvanced(api.root);
       setupDescriptionMarquees(api.root);
     },
     onResize: function (api) {
+      setupQuickCreateAdvanced(api.root);
       setupDescriptionMarquees(api.root);
     },
   });
+
+  function setupQuickCreateAdvanced(scopeEl) {
+    if (!canManage || !scopeEl) {
+      return;
+    }
+    var createForm = scopeEl.querySelector(".datagrid-create-form");
+    if (!createForm) {
+      return;
+    }
+
+    var descricaoInput = createForm.querySelector("[name='descricao']");
+    if (!descricaoInput) {
+      return;
+    }
+    var descricaoField = descricaoInput.closest(".datagrid-create-field");
+    if (!descricaoField) {
+      return;
+    }
+    if (!descricaoField.id) {
+      descricaoField.id = "radar-trabalho-quick-descricao";
+    }
+
+    var actions = createForm.querySelector(".datagrid-create-actions");
+    if (!actions) {
+      return;
+    }
+
+    var toggle = createForm.querySelector("[data-radar-create-advanced-toggle]");
+    if (!toggle) {
+      toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "btn btn-ghost btn-compact radar-create-advanced-toggle";
+      toggle.setAttribute("data-radar-create-advanced-toggle", "1");
+      toggle.setAttribute("aria-controls", descricaoField.id);
+      actions.insertBefore(toggle, actions.firstChild || null);
+    }
+
+    var isOpen = descricaoField.classList.contains("is-advanced-open");
+    if (!isOpen && !descricaoInput.value) {
+      descricaoField.classList.add("is-advanced-hidden");
+      descricaoField.classList.remove("is-advanced-open");
+      toggle.textContent = "Avancado";
+      toggle.setAttribute("aria-expanded", "false");
+    } else {
+      descricaoField.classList.remove("is-advanced-hidden");
+      descricaoField.classList.add("is-advanced-open");
+      toggle.textContent = "Ocultar avancado";
+      toggle.setAttribute("aria-expanded", "true");
+    }
+
+    if (toggle.dataset.bound === "1") {
+      return;
+    }
+    toggle.dataset.bound = "1";
+    toggle.addEventListener("click", function () {
+      var currentlyHidden = descricaoField.classList.contains("is-advanced-hidden");
+      if (currentlyHidden) {
+        descricaoField.classList.remove("is-advanced-hidden");
+        descricaoField.classList.add("is-advanced-open");
+        toggle.textContent = "Ocultar avancado";
+        toggle.setAttribute("aria-expanded", "true");
+        descricaoInput.focus();
+        return;
+      }
+      descricaoField.classList.add("is-advanced-hidden");
+      descricaoField.classList.remove("is-advanced-open");
+      toggle.textContent = "Avancado";
+      toggle.setAttribute("aria-expanded", "false");
+    });
+  }
 })();

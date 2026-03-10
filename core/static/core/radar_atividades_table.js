@@ -29,7 +29,7 @@
     { value: "PENDENTE", label: "Pendente" },
     { value: "FINALIZADA", label: "Finalizada" },
   ];
-  var WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
+  var WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 
   function setupDescriptionMarquees(scopeEl) {
     if (!scopeEl) {
@@ -255,7 +255,7 @@
     var firstDay = new Date(year, month, 1);
     var lastDay = new Date(year, month + 1, 0);
     var dayCount = lastDay.getDate();
-    var firstWeekday = (firstDay.getDay() + 6) % 7;
+    var firstWeekday = firstDay.getDay();
     var todayIso = isoFromDate(new Date());
     var html = "";
 

@@ -38,87 +38,6 @@
   </section>
 
   {% if can_manage %}
-    <details class="io-card io-discrete" id="novo-trabalho" style="margin-top: 18px;">
-      <summary class="io-discrete-summary">
-        <span class="io-title">Novo trabalho</span>
-        <span class="muted">Cadastre um trabalho para operar o radar.</span>
-      </summary>
-      <div class="io-discrete-body">
-        <form class="io-form" method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_trabalho">
-          <div class="io-form-grid">
-            <label class="field">
-              <span>Nome</span>
-              <input type="text" name="nome" placeholder="Trabalho eletrico" required>
-            </label>
-            <label class="field">
-              <span>Descricao</span>
-              <input type="text" name="descricao" placeholder="Revisao preventiva">
-            </label>
-            <label class="field">
-              <span>Data de registro</span>
-              <input type="date" name="data_registro" value="{% now 'Y-m-d' %}">
-            </label>
-          </div>
-          <div class="form-actions" style="margin-top: 10px;">
-            <button
-              class="btn btn-ghost btn-compact"
-              type="button"
-              id="novo-trabalho-avancado-toggle"
-              aria-expanded="false"
-              aria-controls="novo-trabalho-avancado-campos"
-            >
-              Avancado
-            </button>
-          </div>
-          <div class="io-form-grid" id="novo-trabalho-avancado-campos" style="display: none; margin-top: 12px;">
-            <label class="field">
-              <span>Setor</span>
-              <input type="text" name="setor" placeholder="Utilidades">
-            </label>
-            <label class="field">
-              <span>Solicitante</span>
-              <input type="text" name="solicitante" placeholder="Supervisor">
-            </label>
-            <label class="field">
-              <span>Responsavel</span>
-              <input type="text" name="responsavel" placeholder="Equipe tecnica">
-            </label>
-            <label class="field">
-              <span>Horas/dia</span>
-              <input type="number" name="horas_dia" min="0.25" step="0.25" value="8.00">
-            </label>
-            <label class="field" style="grid-column: 1 / -1;">
-              <span>Colaboradores</span>
-              <input type="text" name="colaboradores" placeholder="Ana, Bruno, Carla">
-            </label>
-            <label class="field">
-              <span>Contrato</span>
-              <select name="contrato" id="contrato-select">
-                <option value="">Selecione</option>
-                {% for contrato in contratos %}
-                  <option value="{{ contrato.id }}">{{ contrato.nome }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label class="field">
-              <span>Classificacao</span>
-              <select name="classificacao" id="classificacao-select">
-                <option value="">Selecione</option>
-                {% for classificacao in classificacoes %}
-                  <option value="{{ classificacao.id }}">{{ classificacao.nome }}</option>
-                {% endfor %}
-              </select>
-            </label>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Salvar trabalho</button>
-          </div>
-        </form>
-      </div>
-    </details>
-
     <details class="io-card io-discrete" style="margin-top: 18px;" {% if open_cadastro == 'classificacao' or open_cadastro == 'contrato' %}open{% endif %}>
       <summary class="io-discrete-summary">
         <span class="io-title">Configuracoes do radar</span>
@@ -226,31 +145,18 @@
   <script src="{% static 'core/radar_trabalhos_table.js' %}"></script>
   <script>
     (function () {
-      var advancedToggle = document.getElementById("novo-trabalho-avancado-toggle");
-      var advancedPanel = document.getElementById("novo-trabalho-avancado-campos");
-      if (advancedToggle && advancedPanel) {
-        advancedToggle.addEventListener("click", function () {
-          var isOpen = advancedPanel.style.display !== "none";
-          advancedPanel.style.display = isOpen ? "none" : "";
-          advancedToggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
-          advancedToggle.textContent = isOpen ? "Avancado" : "Ocultar avancado";
-        });
-      }
-
       if (!window.RadarShared) {
         return;
       }
       window.RadarShared.bindCadastro({
         formId: "create-contrato-form",
         inputSelector: "input[name='contrato_nome'][form='create-contrato-form']",
-        selectId: "contrato-select",
         detailsId: "contrato-pop",
         messageId: "cadastro-message",
       });
       window.RadarShared.bindCadastro({
         formId: "create-classificacao-form",
         inputSelector: "input[name='classificacao_nome'][form='create-classificacao-form']",
-        selectId: "classificacao-select",
         detailsId: "classificacao-pop",
         messageId: "cadastro-message",
       });

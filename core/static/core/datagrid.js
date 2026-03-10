@@ -912,12 +912,13 @@
         if (!dragSourceId || !isRowReorderActive() || pending) {
           return;
         }
+        var sourceId = dragSourceId;
         var row = event.target.closest("tr[data-row-id]");
         if (!row) {
           return;
         }
         var targetId = safeText(row.getAttribute("data-row-id"));
-        if (!targetId || targetId === dragSourceId) {
+        if (!targetId || targetId === sourceId) {
           clearDragStyles();
           return;
         }
@@ -929,7 +930,7 @@
         var result = null;
         if (typeof rowReorder.onMove === "function") {
           result = rowReorder.onMove({
-            sourceId: dragSourceId,
+            sourceId: sourceId,
             targetId: targetId,
             api: api,
             state: JSON.parse(JSON.stringify(state)),
@@ -941,7 +942,7 @@
             if (payload === false) {
               return;
             }
-            if (moveRowBeforeInternal(dragSourceId, targetId)) {
+            if (moveRowBeforeInternal(sourceId, targetId)) {
               renderTable();
             }
           })
