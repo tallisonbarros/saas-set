@@ -724,7 +724,7 @@
 
   var grid = window.SAASDataGrid.create({
     rootId: "radar-atividades-grid",
-    storageKey: "radar-atividades:v2:" + trabalhoId,
+    storageKey: "radar-atividades:v3:" + trabalhoId,
     rows: rows,
     pageSize: 20,
     pageSizeOptions: [10, 20, 50, 100],

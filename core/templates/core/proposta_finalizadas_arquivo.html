@@ -55,7 +55,7 @@
                 {% endif %}
               </td>
               <td>{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</td>
-              <td>{{ proposta.finalizada_em|date:"d/m/Y H:i" }}</td>
+              <td>{{ proposta.finalizada_em|date:"d/m/Y" }}</td>
               <td><a class="btn btn-ghost btn-compact" href="{% url 'proposta_detail' proposta.pk %}">Abrir</a></td>
             </tr>
           {% empty %}

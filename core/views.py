@@ -567,6 +567,12 @@ def _sync_lista_ip_items(lista, ip_values):
 
 
 def _sync_trabalho_status(trabalho):
+    def _is_status_valido(status):
+        return status in {
+            RadarTrabalho.Status.EXECUTANDO,
+            RadarTrabalho.Status.FINALIZADA,
+        }
+
     statuses = list(trabalho.atividades.values_list("status", flat=True))
     if not statuses:
         novo_status = RadarTrabalho.Status.PENDENTE
@@ -578,7 +584,11 @@ def _sync_trabalho_status(trabalho):
         novo_status = RadarTrabalho.Status.PENDENTE
     if trabalho.status != novo_status:
         trabalho.status = novo_status
-        trabalho.save(update_fields=["status"])
+        update_fields = ["status"]
+        if _is_status_valido(novo_status):
+            trabalho.ultimo_status_evento_em = timezone.now()
+            update_fields.append("ultimo_status_evento_em")
+        trabalho.save(update_fields=update_fields)
 
 
 def _parse_colaboradores_input(raw_value, max_items=40):
@@ -2163,6 +2173,12 @@ def _format_ptbr_datetime(value):
     return timezone.localtime(value).strftime("%d/%m/%Y %H:%M")
 
 
+def _format_ptbr_date(value):
+    if not value:
+        return ""
+    return timezone.localtime(value).strftime("%d/%m/%Y")
+
+
 def _atividade_response_payload(atividade):
     agenda_dias = _atividade_agenda_dias_iso(atividade)
     return {
@@ -2173,8 +2189,8 @@ def _atividade_response_payload(atividade):
         "status": atividade.status,
         "status_label": atividade.get_status_display(),
         "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
-        "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
-        "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
+        "inicio_execucao_display": _format_ptbr_date(atividade.inicio_execucao_em),
+        "finalizada_display": _format_ptbr_date(atividade.finalizada_em),
         "agenda_dias": agenda_dias,
         "agenda_total_dias": len(agenda_dias),
         "ordem": atividade.ordem or 0,
@@ -2460,11 +2476,11 @@ def _build_proposta_pdf_context(
     _append_pdf_row(identificacao_esquerda, "Codigo", proposta.codigo or f"ID {proposta.id}", mono=True)
     _append_pdf_row(identificacao_esquerda, "Proposta", proposta.nome)
     _append_pdf_row(identificacao_esquerda, "Prioridade", proposta.prioridade)
-    _append_pdf_row(identificacao_esquerda, "Criada em", _format_ptbr_datetime(proposta.criado_em))
+    _append_pdf_row(identificacao_esquerda, "Criada em", _format_ptbr_date(proposta.criado_em))
     if proposta.decidido_em:
-        _append_pdf_row(identificacao_esquerda, "Decidida em", _format_ptbr_datetime(proposta.decidido_em))
+        _append_pdf_row(identificacao_esquerda, "Decidida em", _format_ptbr_date(proposta.decidido_em))
     if proposta.finalizada_em:
-        _append_pdf_row(identificacao_esquerda, "Finalizada em", _format_ptbr_datetime(proposta.finalizada_em))
+        _append_pdf_row(identificacao_esquerda, "Finalizada em", _format_ptbr_date(proposta.finalizada_em))
 
     identificacao_direita = []
     if proposta.cliente and proposta.cliente.nome:
@@ -2489,7 +2505,7 @@ def _build_proposta_pdf_context(
         "status_badge_class": _status_badge_class(status_label),
         "codigo": proposta.codigo or f"ID {proposta.id}",
         "valor_display": _format_brl_currency(proposta.valor),
-        "criada_em_display": _format_ptbr_datetime(proposta.criado_em),
+        "criada_em_display": _format_ptbr_date(proposta.criado_em),
         "de_display": proposta.criada_por.username if proposta.criada_por else "Sistema",
         "para_nome": proposta.cliente.nome if proposta.cliente else "-",
         "para_email": proposta.cliente.email if proposta.cliente else "-",
@@ -2504,7 +2520,7 @@ def _build_proposta_pdf_context(
         "has_observacao": bool((proposta.observacao_cliente or "").strip()),
         "observacao": (proposta.observacao_cliente or "").strip(),
         "condicoes_comerciais": _proposta_condicoes_comerciais(proposta),
-        "gerado_em_display": _format_ptbr_datetime(timezone.now()),
+        "gerado_em_display": _format_ptbr_date(timezone.now()),
         "logo_uri": logo_uri,
     }
 
@@ -3658,7 +3674,11 @@ def radar_detail(request, pk):
                 )
             if trabalho.status != status_raw:
                 trabalho.status = status_raw
-                trabalho.save(update_fields=["status"])
+                update_fields = ["status"]
+                if status_raw in {RadarTrabalho.Status.EXECUTANDO, RadarTrabalho.Status.FINALIZADA}:
+                    trabalho.ultimo_status_evento_em = timezone.now()
+                    update_fields.append("ultimo_status_evento_em")
+                trabalho.save(update_fields=update_fields)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(
                     {
@@ -3706,15 +3726,11 @@ def radar_detail(request, pk):
     total_trabalhos = trabalhos_base.count()
     trabalhos_tabela = trabalhos_base
 
-    trabalhos_tabela = trabalhos_tabela.annotate(
-        status_ordem=Case(
-            When(status=RadarTrabalho.Status.EXECUTANDO, then=Value(0)),
-            When(status=RadarTrabalho.Status.PENDENTE, then=Value(1)),
-            When(status=RadarTrabalho.Status.FINALIZADA, then=Value(2)),
-            default=Value(9),
-            output_field=IntegerField(),
-        )
-    ).order_by("status_ordem", "-data_registro", "nome")
+    trabalhos_tabela = trabalhos_tabela.order_by(
+        F("ultimo_status_evento_em").desc(nulls_last=True),
+        "-data_registro",
+        "nome",
+    )
 
     trabalhos_table_data = []
     for trabalho in trabalhos_tabela:
@@ -4201,8 +4217,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 "status": atividade.status,
                 "status_label": atividade.get_status_display(),
                 "horas_trabalho": horas_label,
-                "inicio_execucao_display": _format_ptbr_datetime(atividade.inicio_execucao_em),
-                "finalizada_display": _format_ptbr_datetime(atividade.finalizada_em),
+                "inicio_execucao_display": _format_ptbr_date(atividade.inicio_execucao_em),
+                "finalizada_display": _format_ptbr_date(atividade.finalizada_em),
                 "agenda_dias": agenda_dias,
                 "agenda_total_dias": len(agenda_dias),
                 "ordem": atividade.ordem or 0,

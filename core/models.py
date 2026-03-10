@@ -473,6 +473,7 @@ class RadarTrabalho(models.Model):
     responsavel = models.CharField(max_length=120, blank=True)
     data_registro = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    ultimo_status_evento_em = models.DateTimeField(null=True, blank=True)
     criado_por = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

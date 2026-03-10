@@ -140,12 +140,12 @@
             {% if proposta.criada_por %}
               <div><strong>De:</strong> {{ proposta.criada_por.username }}</div>
             {% endif %}
-            <div><strong>Criada em:</strong> {{ proposta.criado_em|date:"d/m/Y H:i" }}</div>
+            <div><strong>Criada em:</strong> {{ proposta.criado_em|date:"d/m/Y" }}</div>
             {% if proposta.finalizada_em %}
-              <div><strong>Finalizada em:</strong> {{ proposta.finalizada_em|date:"d/m/Y H:i" }}</div>
+              <div><strong>Finalizada em:</strong> {{ proposta.finalizada_em|date:"d/m/Y" }}</div>
             {% endif %}
             {% if proposta.decidido_em %}
-              <div><strong>Decidida em:</strong> {{ proposta.decidido_em|date:"d/m/Y H:i" }}</div>
+              <div><strong>Decidida em:</strong> {{ proposta.decidido_em|date:"d/m/Y" }}</div>
             {% endif %}
             {% if proposta.aprovado_por %}
               <div><strong>Decidida por:</strong> {{ proposta.aprovado_por.username }}</div>
@@ -175,7 +175,7 @@
                 <div class="user-row">
                   <div>
                     <div class="panel-title">{{ anexo.get_tipo_display }}</div>
-                    <div class="muted">{{ anexo.criado_em|date:"d/m/Y H:i" }}</div>
+                    <div class="muted">{{ anexo.criado_em|date:"d/m/Y" }}</div>
                   </div>
                   <div class="form-actions">
                     <a class="btn btn-outline btn-compact" href="{{ anexo.arquivo.url }}" target="_blank" rel="noreferrer">Abrir</a>
