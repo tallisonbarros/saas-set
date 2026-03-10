@@ -47,7 +47,13 @@
       <div class="proposal-grid">
         {% for radar in radars %}
           <article class="proposal-card io-proposal-card">
-            <a class="proposal-link" href="{% url 'radar_agenda' radar.id %}" aria-label="Abrir agenda do radar"></a>
+            <a class="proposal-link" href="{% url 'radar_detail' radar.id %}" aria-label="Abrir detalhes do radar"></a>
+            <a class="radar-card-agenda-corner" href="{% url 'radar_agenda' radar.id %}" aria-label="Abrir agenda do radar" title="Abrir agenda">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="3.5" y="4.5" width="17" height="16" rx="3"></rect>
+                <path d="M8 2.75v3.5M16 2.75v3.5M3.5 9.5h17"></path>
+              </svg>
+            </a>
             <div class="proposal-head">
               <div>
                 <div class="proposal-title">{{ radar.nome }}</div>

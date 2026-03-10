@@ -726,13 +726,25 @@ body {
 }
 
 .hud-menu-primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: transparent !important;
 }
 
 .hud-menu-primary:hover {
-  background: #e65c00;
+  background: #e65c00 !important;
+  border-color: #e65c00 !important;
+}
+
+.page-hud .hud-menu .hud-menu-pill.hud-menu-primary {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.page-hud .hud-menu .hud-menu-pill.hud-menu-primary:hover {
+  background: #e65c00 !important;
+  border-color: #e65c00 !important;
 }
 
 .proposal-card {
@@ -845,6 +857,41 @@ body {
 .proposal-pdf-corner:hover img {
   transform: scale(1.05);
   filter: saturate(1.08);
+}
+
+.radar-card-agenda-corner {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(122, 107, 96, 0.35);
+  background: rgba(255, 255, 255, 0.74);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #a8571a;
+  text-decoration: none;
+  z-index: 3;
+  transition: transform .16s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.radar-card-agenda-corner svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.radar-card-agenda-corner:hover {
+  transform: translateY(-1px) scale(1.03);
+  border-color: rgba(255, 102, 0, 0.55);
+  box-shadow: 0 7px 16px rgba(255, 102, 0, 0.24);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .proposal-hud-pdf-corner {
@@ -1520,6 +1567,20 @@ a.proposal-link-badge:hover {
 .hud-menu-pill:hover {
   background: #fff1e7;
   border-color: var(--border);
+}
+
+.hud-menu-pill-icon {
+  gap: 6px;
+}
+
+.hud-menu-pill-icon svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .hud-title {
