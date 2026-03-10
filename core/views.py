@@ -4268,6 +4268,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 )
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
 
+    # Garante consistencia em horas historicas antes de montar a tabela.
+    _recalcular_horas_atividades_trabalho(trabalho)
+
     contratos = RadarContrato.objects.order_by("nome")
     atividades_base = trabalho.atividades.prefetch_related("dias_execucao").all()
     _normalizar_ordem_atividades(trabalho)

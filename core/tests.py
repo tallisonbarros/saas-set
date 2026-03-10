@@ -483,3 +483,22 @@ class RadarCreatorPermissionTests(TestCase):
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["status"], RadarTrabalho.Status.PENDENTE)
         self.assertIn("automatico", payload["message"].lower())
+
+    def test_radar_trabalho_detail_recalcula_horas_stale_ao_carregar(self):
+        self.client_http.force_login(self.owner_user)
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Ana")
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Bruno")
+        atividade = RadarAtividade.objects.create(
+            trabalho=self.trabalho,
+            nome="Ativ stale",
+            horas_trabalho=Decimal("0.00"),
+        )
+        RadarAtividadeDiaExecucao.objects.create(atividade=atividade, data_execucao="2026-03-01")
+        RadarAtividadeDiaExecucao.objects.create(atividade=atividade, data_execucao="2026-03-02")
+
+        response = self.client_http.get(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/"
+        )
+        self.assertEqual(response.status_code, 200)
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("32.00"))

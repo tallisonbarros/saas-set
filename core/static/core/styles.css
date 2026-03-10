@@ -3285,6 +3285,11 @@ select {
   display: grid;
   gap: 16px;
   margin-top: 16px;
+  min-width: 0;
+}
+
+.io-layout > * {
+  min-width: 0;
 }
 
 .io-card {
@@ -3954,6 +3959,9 @@ select {
 
 .radar-table-card {
   margin-top: 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .radar-table-controls {
@@ -4283,6 +4291,7 @@ select {
 
 .datagrid {
   width: 100%;
+  min-width: 0;
 }
 
 .datagrid-create {
@@ -4391,6 +4400,8 @@ select {
 .datagrid-wrap {
   margin-top: 0;
   max-width: 100%;
+  width: 100%;
+  min-width: 0;
   overflow-x: hidden;
 }
 
