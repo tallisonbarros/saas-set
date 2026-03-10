@@ -242,9 +242,29 @@ class RadarCreatorPermissionTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["row"]["total_colaboradores"], 2)
+        self.assertEqual(payload["row"]["total_horas"], "0.00")
         trabalho = RadarTrabalho.objects.get(radar=self.radar, nome="Trabalho Equipe")
         nomes = list(trabalho.colaboradores.order_by("nome").values_list("nome", flat=True))
         self.assertEqual(nomes, ["Ana", "Bruno"])
+
+    def test_radar_detail_exibe_total_horas_por_trabalho(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Horas Lista")
+        self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": json.dumps(["2026-03-01", "2026-03-02"]),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        response = self.client_http.get(f"/radar-atividades/{self.radar.id}/")
+        self.assertEqual(response.status_code, 200)
+        rows = response.context["trabalhos_table_data"]
+        row = next(item for item in rows if item["id"] == self.trabalho.id)
+        self.assertEqual(row["total_horas"], "16.00")
 
     def test_update_trabalho_sincroniza_colaboradores(self):
         self.client_http.force_login(self.owner_user)
@@ -357,6 +377,28 @@ class RadarCreatorPermissionTests(TestCase):
         atividade.refresh_from_db()
         self.assertEqual(atividade.horas_trabalho, Decimal("24.00"))
 
+    def test_horas_trabalho_multiplica_quantidade_colaboradores(self):
+        self.client_http.force_login(self.owner_user)
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Ana")
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Bruno")
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Equipe")
+
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": json.dumps(["2026-03-01", "2026-03-02", "2026-03-03"]),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["horas_trabalho"], "48.00")
+
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("48.00"))
+
     def test_atualizar_horas_dia_recalcula_horas_de_todas_atividades(self):
         self.client_http.force_login(self.owner_user)
         atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Recalc")
@@ -390,3 +432,54 @@ class RadarCreatorPermissionTests(TestCase):
         self.assertEqual(update_resp.status_code, 302)
         atividade.refresh_from_db()
         self.assertEqual(atividade.horas_trabalho, Decimal("12.00"))
+
+    def test_atualizar_colaboradores_recalcula_horas_de_todas_atividades(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Recalc Equipe")
+
+        agenda_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": json.dumps(["2026-03-01", "2026-03-02"]),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(agenda_resp.status_code, 200)
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("16.00"))
+
+        update_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_trabalho",
+                "nome": self.trabalho.nome,
+                "descricao": self.trabalho.descricao or "",
+                "setor": self.trabalho.setor or "",
+                "solicitante": self.trabalho.solicitante or "",
+                "responsavel": self.trabalho.responsavel or "",
+                "horas_dia": "8",
+                "colaboradores": "Ana, Bruno",
+            },
+        )
+        self.assertEqual(update_resp.status_code, 302)
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("32.00"))
+
+    def test_status_trabalho_nao_aceita_update_manual(self):
+        self.client_http.force_login(self.owner_user)
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/",
+            {
+                "action": "quick_status_trabalho",
+                "trabalho_id": str(self.trabalho.id),
+                "status": "FINALIZADA",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["status"], RadarTrabalho.Status.PENDENTE)
+        self.assertIn("automatico", payload["message"].lower())

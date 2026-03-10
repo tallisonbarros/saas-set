@@ -29,7 +29,7 @@ from django.contrib.auth.models import User
 from django.db import DatabaseError, connections, transaction
 from django.db.models import Case, Count, DecimalField, F, IntegerField, Max, OuterRef, Q, Subquery, Sum, TextField, Value, When
 from django.db.models.expressions import ExpressionWrapper
-from django.db.models.functions import Cast
+from django.db.models.functions import Cast, Coalesce
 
 from .forms import RegisterForm, TipoPerfilCreateForm, UserCreateForm
 from .models import (
@@ -742,10 +742,32 @@ def _atividade_agenda_dias_iso(atividade):
     return [item.isoformat() for item in _atividade_agenda_datas(atividade)]
 
 
-def _atividade_horas_from_agenda(atividade, agenda_datas=None):
+def _trabalho_colaboradores_multiplier(trabalho):
+    if not trabalho:
+        return Decimal("1")
+    prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
+    if "colaboradores" in prefetched:
+        total_colaboradores = len(prefetched["colaboradores"])
+    else:
+        total_colaboradores = trabalho.colaboradores.count()
+    if total_colaboradores <= 0:
+        total_colaboradores = 1
+    return Decimal(total_colaboradores)
+
+
+def _atividade_horas_from_agenda(atividade, agenda_datas=None, colaboradores_multiplier=None):
     datas = agenda_datas if agenda_datas is not None else _atividade_agenda_datas(atividade)
-    horas_dia = atividade.trabalho.horas_dia if atividade.trabalho and atividade.trabalho.horas_dia is not None else Decimal("8.00")
-    return horas_dia * Decimal(len(datas))
+    horas_dia = (
+        atividade.trabalho.horas_dia
+        if atividade.trabalho and atividade.trabalho.horas_dia is not None
+        else Decimal("8.00")
+    )
+    multiplier = (
+        colaboradores_multiplier
+        if colaboradores_multiplier is not None
+        else _trabalho_colaboradores_multiplier(atividade.trabalho)
+    )
+    return horas_dia * Decimal(len(datas)) * multiplier
 
 
 def _sync_atividade_execucao_metrics_from_agenda(atividade, agenda_datas=None):
@@ -772,9 +794,10 @@ def _recalcular_horas_atividades_trabalho(trabalho):
     atividades = list(
         RadarAtividade.objects.filter(trabalho=trabalho).select_related("trabalho").prefetch_related("dias_execucao")
     )
+    colaboradores_multiplier = _trabalho_colaboradores_multiplier(trabalho)
     changed = []
     for atividade in atividades:
-        horas = _atividade_horas_from_agenda(atividade)
+        horas = _atividade_horas_from_agenda(atividade, colaboradores_multiplier=colaboradores_multiplier)
         if atividade.horas_trabalho != horas:
             atividade.horas_trabalho = horas
             changed.append(atividade)
@@ -3574,7 +3597,6 @@ def radar_detail(request, pk):
         action = request.POST.get("action")
         if action in {
             "create_trabalho",
-            "quick_status_trabalho",
             "update_radar",
             "delete_radar",
             "create_classificacao",
@@ -3707,6 +3729,7 @@ def radar_detail(request, pk):
                                 "colaboradores": ", ".join(colaboradores_nomes),
                                 "total_colaboradores": len(colaboradores_nomes),
                                 "total_atividades": 0,
+                                "total_horas": "0.00",
                                 "detalhe_url": reverse("radar_trabalho_detail", args=[radar.pk, novo_trabalho.pk]),
                             },
                         }
@@ -3715,33 +3738,18 @@ def radar_detail(request, pk):
         if action == "quick_status_trabalho":
             trabalho_id = request.POST.get("trabalho_id")
             trabalho = get_object_or_404(RadarTrabalho, pk=trabalho_id, radar=radar)
-            status_raw = request.POST.get("status", "").strip()
-            if status_raw not in dict(RadarTrabalho.Status.choices):
-                return JsonResponse(
-                    {
-                        "ok": False,
-                        "message": "Status invalido.",
-                        "level": "error",
-                    },
-                    status=400,
-                )
-            if trabalho.status != status_raw:
-                trabalho.status = status_raw
-                update_fields = ["status"]
-                if status_raw in {RadarTrabalho.Status.EXECUTANDO, RadarTrabalho.Status.FINALIZADA}:
-                    trabalho.ultimo_status_evento_em = timezone.now()
-                    update_fields.append("ultimo_status_evento_em")
-                trabalho.save(update_fields=update_fields)
+            _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(
                     {
-                        "ok": True,
+                        "ok": False,
                         "id": trabalho.id,
                         "status": trabalho.status,
                         "status_label": trabalho.get_status_display(),
-                        "message": "Status atualizado.",
-                        "level": "success",
-                    }
+                        "message": "Status do trabalho e automatico com base nas atividades.",
+                        "level": "warning",
+                    },
+                    status=400,
                 )
             return redirect("radar_detail", pk=radar.pk)
         if action == "update_radar":
@@ -3767,7 +3775,13 @@ def radar_detail(request, pk):
             return redirect("radar_list")
 
     trabalhos_base = (
-        radar.trabalhos.annotate(total_atividades=Count("atividades"))
+        radar.trabalhos.annotate(
+            total_atividades=Count("atividades"),
+            total_horas=Coalesce(
+                Sum("atividades__horas_trabalho"),
+                Value(Decimal("0.00")),
+            ),
+        )
         .select_related(
             "classificacao",
             "contrato",
@@ -3806,6 +3820,7 @@ def radar_detail(request, pk):
                 "colaboradores": ", ".join(colaboradores_nomes),
                 "total_colaboradores": len(colaboradores_nomes),
                 "total_atividades": trabalho.total_atividades or 0,
+                "total_horas": str((trabalho.total_horas or Decimal("0.00")).quantize(Decimal("0.01"))),
                 "detalhe_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.pk]),
             }
         )
@@ -3957,6 +3972,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             else:
                 with transaction.atomic():
                     horas_dia_alterado = trabalho.horas_dia != horas_dia
+                    total_colaboradores_antes = trabalho.colaboradores.count()
                     if data_raw:
                         try:
                             trabalho.data_registro = datetime.strptime(data_raw, "%Y-%m-%d").date()
@@ -3993,7 +4009,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
                         ]
                     )
                     _sync_trabalho_colaboradores(trabalho, colaboradores_nomes)
-                    if horas_dia_alterado:
+                    total_colaboradores_depois = trabalho.colaboradores.count()
+                    if horas_dia_alterado or total_colaboradores_antes != total_colaboradores_depois:
                         _recalcular_horas_atividades_trabalho(trabalho)
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)

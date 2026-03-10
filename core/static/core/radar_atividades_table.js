@@ -685,7 +685,7 @@
     {
       key: "horas_trabalho",
       label: "Horas",
-      visible: false,
+      visible: true,
       width: 120,
       minWidth: 120,
       compareType: "number",
