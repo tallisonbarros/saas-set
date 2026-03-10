@@ -284,6 +284,12 @@
         iso +
         '" aria-pressed="' +
         (selectedMap[iso] ? "true" : "false") +
+        '"' +
+        (canManage ? "" : ' disabled aria-disabled="true"') +
+        ' aria-label="' +
+        (canManage ? "Selecionar dia" : "Dia da agenda") +
+        " " +
+        day +
         '">' +
         day +
         "</button>";
@@ -364,7 +370,7 @@
   }
 
   function openAgendaOverlay(triggerEl) {
-    if (!triggerEl || !canManage) {
+    if (!triggerEl) {
       return;
     }
     var rowId = triggerEl.getAttribute("data-row-id") || "";
@@ -397,7 +403,7 @@
     }
 
     var overlayEl = document.createElement("div");
-    overlayEl.className = "radar-agenda-overlay";
+    overlayEl.className = "radar-agenda-overlay" + (canManage ? "" : " is-readonly");
     overlayEl.setAttribute("role", "dialog");
     overlayEl.setAttribute("aria-label", "Agenda da atividade");
     overlayEl.innerHTML =
@@ -409,7 +415,9 @@
       '<div class="radar-agenda-grid" data-agenda-grid></div>' +
       '<div class="radar-agenda-foot">' +
       '<span data-agenda-summary>0 dia(s) selecionado(s)</span>' +
-      '<button type="button" class="radar-agenda-clear" data-agenda-clear>Limpar</button>' +
+      (canManage
+        ? '<button type="button" class="radar-agenda-clear" data-agenda-clear>Limpar</button>'
+        : '<span class="radar-agenda-readonly">Somente leitura</span>') +
       "</div>";
 
     overlayEl.addEventListener("click", function (event) {
@@ -432,6 +440,9 @@
       var clearBtn = event.target.closest("[data-agenda-clear]");
       if (clearBtn) {
         event.preventDefault();
+        if (!canManage) {
+          return;
+        }
         if (activeAgendaDates.length) {
           activeAgendaDates = [];
           renderAgendaOverlay();
@@ -442,6 +453,9 @@
       var dayBtn = event.target.closest("[data-agenda-day]");
       if (dayBtn) {
         event.preventDefault();
+        if (!canManage) {
+          return;
+        }
         toggleAgendaDate(dayBtn.getAttribute("data-agenda-day"));
       }
     });
@@ -593,19 +607,21 @@
 
   function renderAgendaCell(row, ctx) {
     var total = Number(row.agenda_total_dias || 0);
-    if (!canManage) {
-      return total ? ctx.slotBadge(total, "dias") : "-";
-    }
     var buttonClass = "radar-agenda-trigger js-agenda-inline-trigger";
     if (total > 0) {
       buttonClass += " is-active";
+    }
+    if (!canManage) {
+      buttonClass += " is-readonly";
     }
     return (
       '<button class="' +
       buttonClass +
       '" type="button" data-row-id="' +
       ctx.esc(row.id) +
-      '" aria-haspopup="dialog" aria-expanded="false" aria-label="Editar agenda">' +
+      '" aria-haspopup="dialog" aria-expanded="false" aria-label="' +
+      (canManage ? "Editar agenda" : "Visualizar agenda") +
+      '">' +
       '<span class="radar-agenda-icon" aria-hidden="true">&#128197;</span>' +
       '<span class="radar-agenda-count">' +
       ctx.esc(total) +
@@ -889,44 +905,46 @@
     }
   });
 
-  if (canManage) {
-    document.addEventListener("mousedown", function (event) {
-      if (activeStatusMenu) {
-        if (activeStatusMenu.contains(event.target)) {
-          return;
-        }
-        if (activeStatusTrigger && activeStatusTrigger.contains(event.target)) {
-          return;
-        }
-        closeStatusMenu();
+  document.addEventListener("mousedown", function (event) {
+    if (activeStatusMenu) {
+      if (activeStatusMenu.contains(event.target)) {
+        return;
       }
-      if (activeAgendaOverlay) {
-        if (activeAgendaOverlay.contains(event.target)) {
-          return;
-        }
-        if (activeAgendaTrigger && activeAgendaTrigger.contains(event.target)) {
-          return;
-        }
-        closeAgendaOverlay();
+      if (activeStatusTrigger && activeStatusTrigger.contains(event.target)) {
+        return;
       }
-    });
+      closeStatusMenu();
+    }
+    if (activeAgendaOverlay) {
+      if (activeAgendaOverlay.contains(event.target)) {
+        return;
+      }
+      if (activeAgendaTrigger && activeAgendaTrigger.contains(event.target)) {
+        return;
+      }
+      closeAgendaOverlay();
+    }
+  });
 
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") {
-        closeStatusMenu();
-        closeAgendaOverlay();
-      }
-    });
-
-    window.addEventListener("resize", function () {
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
       closeStatusMenu();
       closeAgendaOverlay();
-    });
-    window.addEventListener("scroll", function () {
+    }
+  });
+
+  window.addEventListener("resize", function () {
+    closeStatusMenu();
+    closeAgendaOverlay();
+  });
+  window.addEventListener(
+    "scroll",
+    function () {
       closeStatusMenu();
       closeAgendaOverlay();
-    }, true);
-  }
+    },
+    true
+  );
 
   if (cancelButton) {
     cancelButton.addEventListener("click", function () {

@@ -1735,6 +1735,16 @@ a.proposal-link-badge:hover {
   color: var(--muted);
 }
 
+.hud-title-block {
+  display: grid;
+  gap: 4px;
+  min-width: min(320px, 100%);
+}
+
+.hud-title-block .page-subtitle {
+  margin: 0;
+}
+
 .page-actions {
   display: flex;
   gap: 8px;
@@ -4834,6 +4844,10 @@ select.datagrid-filter-input optgroup {
   background: rgba(116, 224, 194, 0.16);
 }
 
+.radar-agenda-trigger.is-readonly {
+  cursor: pointer;
+}
+
 .radar-agenda-trigger:focus-visible {
   outline: 2px solid rgba(255, 157, 86, 0.9);
   outline-offset: 2px;
@@ -4923,7 +4937,26 @@ select.datagrid-filter-input optgroup {
   background: rgba(255, 157, 86, 0.1);
 }
 
+.radar-agenda-overlay.is-readonly .radar-agenda-day {
+  cursor: default;
+}
+
+.radar-agenda-overlay.is-readonly .radar-agenda-day[disabled] {
+  opacity: 1;
+  color: var(--text);
+}
+
+.radar-agenda-overlay.is-readonly .radar-agenda-day:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
 .radar-agenda-day.is-selected {
+  border-color: rgba(116, 224, 194, 0.55);
+  background: rgba(116, 224, 194, 0.18);
+}
+
+.radar-agenda-overlay.is-readonly .radar-agenda-day.is-selected {
   border-color: rgba(116, 224, 194, 0.55);
   background: rgba(116, 224, 194, 0.18);
 }
@@ -4960,6 +4993,10 @@ select.datagrid-filter-input optgroup {
 
 .radar-agenda-clear:hover {
   text-decoration: underline;
+}
+
+.radar-agenda-readonly {
+  color: #9ca8b4;
 }
 
 .radar-agenda-page {
