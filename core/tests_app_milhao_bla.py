@@ -124,8 +124,38 @@ class AppMilhaoBlaIngestConfigTests(TestCase):
             ["Resumo", "Totais por balanca", "Leituras por hora", "Totais por dia"],
         )
         resumo = workbook["Resumo"]
-        self.assertEqual(resumo["A2"].value, "Arquivo: milhao_bla_20260301_a_20260302.xlsx")
+        self.assertEqual(resumo["A3"].value, "Arquivo: milhao_bla_20260301_a_20260302.xlsx")
+        merged_ranges = {str(rng) for rng in resumo.merged_cells.ranges}
+        self.assertIn("A1:B1", merged_ranges)
+        self.assertIn("A8:B8", merged_ranges)
         self.assertNotIn("Cliente", {str(resumo[f"A{line}"].value) for line in range(1, 9)})
+
+        totals_balance = workbook["Totais por balanca"]
+        self.assertEqual(totals_balance["A1"].value, "Balanca")
+        self.assertEqual(totals_balance["B1"].value, "Total_kg")
+        self.assertEqual(totals_balance["C1"].value, "% do total (sem LIMBL01)")
+        self.assertIsNone(totals_balance["D1"].value)
+
+        hourly = workbook["Leituras por hora"]
+        self.assertEqual(hourly["A1"].value, "Data")
+        self.assertEqual(hourly["B1"].value, "Hora")
+        self.assertEqual(hourly["C1"].value, "Balanca")
+        self.assertEqual(hourly["D1"].value, "Valor_kg")
+        self.assertIsNone(hourly["E1"].value)
+
+        daily = workbook["Totais por dia"]
+        self.assertEqual(daily["A1"].value, "Data")
+        self.assertEqual(daily["B1"].value, "LIMBL01_kg")
+        self.assertEqual(daily["C1"].value, "CLABL01_kg")
+        self.assertEqual(daily["D1"].value, "CLABL02_kg")
+        self.assertEqual(daily["E1"].value, "SECBL01_kg")
+        self.assertEqual(daily["F1"].value, "SECBL02_kg")
+        self.assertEqual(daily["G1"].value, "TOTAL_sem_milho_kg")
+        self.assertEqual(daily["H1"].value, "CLABL01_%")
+        self.assertEqual(daily["I1"].value, "CLABL02_%")
+        self.assertEqual(daily["J1"].value, "SECBL01_%")
+        self.assertEqual(daily["K1"].value, "SECBL02_%")
+        self.assertEqual(daily["L1"].value, "Componente_predominante")
 
         for sheet_name in workbook.sheetnames:
             ws = workbook[sheet_name]
