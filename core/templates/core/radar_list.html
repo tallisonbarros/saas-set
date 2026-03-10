@@ -47,7 +47,7 @@
       <div class="proposal-grid">
         {% for radar in radars %}
           <article class="proposal-card io-proposal-card">
-            <a class="proposal-link" href="{% url 'radar_detail' radar.id %}" aria-label="Abrir radar"></a>
+            <a class="proposal-link" href="{% url 'radar_agenda' radar.id %}" aria-label="Abrir agenda do radar"></a>
             <div class="proposal-head">
               <div>
                 <div class="proposal-title">{{ radar.nome }}</div>

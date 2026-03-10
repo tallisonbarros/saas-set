@@ -23,7 +23,7 @@
           <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
         <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar para o radar</a>
+          <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Lista de Trabalhos</a>
         </div>
       </div>
     </div>
@@ -97,6 +97,13 @@
     <div id="radar-agenda-daily-container">
       {% include "core/partials/radar_agenda_daily_section.html" %}
     </div>
+
+    <section class="io-card radar-agenda-section radar-agenda-cta">
+      <p>
+        Quer ajustar os trabalhos e atividades?
+        <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Lista de Trabalhos</a>
+      </p>
+    </section>
   </div>
 {% endblock %}
 
