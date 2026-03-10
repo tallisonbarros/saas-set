@@ -4302,6 +4302,14 @@ select {
   display: none;
 }
 
+.datagrid-inline-title {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin: 2px 0 8px;
+}
+
 .datagrid-create-form {
   display: grid;
   gap: 8px;

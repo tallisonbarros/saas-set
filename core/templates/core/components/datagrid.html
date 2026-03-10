@@ -5,6 +5,9 @@
   {% if scope %}data-dg-scope="{{ scope }}"{% endif %}
 >
   <div class="datagrid-create" data-dg-create hidden></div>
+  {% if grid_title %}
+    <div class="datagrid-inline-title">{{ grid_title }}</div>
+  {% endif %}
 
   <div class="datagrid-toolbar">
     <div class="datagrid-summary">

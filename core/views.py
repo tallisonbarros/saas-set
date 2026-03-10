@@ -3845,7 +3845,7 @@ def radar_detail(request, pk):
             "classificacoes": classificacoes,
             "contratos": RadarContrato.objects.order_by("nome"),
             "classificacao_filter": classificacao_filter,
-            "can_manage": can_manage or request.user.is_staff,
+            "can_manage": can_manage,
             "is_radar_creator": is_creator,
             "has_id_radar_access": has_id_radar_access,
             "message": message,

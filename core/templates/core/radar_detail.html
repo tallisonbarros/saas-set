@@ -34,21 +34,16 @@
   {% endif %}
 
   <section class="io-card radar-table-card">
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Trabalhos</h2>
-      </div>
-    </div>
-    {% include "core/components/datagrid.html" with grid_id="radar-trabalhos-grid" table_class="radar-work-table" scope=radar.id %}
+    {% include "core/components/datagrid.html" with grid_id="radar-trabalhos-grid" table_class="radar-work-table" scope=radar.id grid_title="Trabalhos" %}
   </section>
 
-  <details class="io-card io-discrete" id="novo-trabalho" style="margin-top: 18px;">
-    <summary class="io-discrete-summary">
-      <span class="io-title">Novo trabalho</span>
-      <span class="muted">Cadastre um trabalho para operar o radar.</span>
-    </summary>
-    <div class="io-discrete-body">
-      {% if can_manage %}
+  {% if can_manage %}
+    <details class="io-card io-discrete" id="novo-trabalho" style="margin-top: 18px;">
+      <summary class="io-discrete-summary">
+        <span class="io-title">Novo trabalho</span>
+        <span class="muted">Cadastre um trabalho para operar o radar.</span>
+      </summary>
+      <div class="io-discrete-body">
         <form class="io-form" method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="create_trabalho">
@@ -121,19 +116,15 @@
             <button class="btn btn-primary" type="submit">Salvar trabalho</button>
           </div>
         </form>
-      {% else %}
-        <div class="muted">Criacao desabilitada para acesso de leitura.</div>
-      {% endif %}
-    </div>
-  </details>
+      </div>
+    </details>
 
-  <details class="io-card io-discrete" style="margin-top: 18px;" {% if open_cadastro == 'classificacao' or open_cadastro == 'contrato' %}open{% endif %}>
-    <summary class="io-discrete-summary">
-      <span class="io-title">Configuracoes do radar</span>
-      <span class="muted">Centralize cadastros auxiliares e ajustes gerais.</span>
-    </summary>
-    <div class="io-discrete-body">
-      {% if can_manage %}
+    <details class="io-card io-discrete" style="margin-top: 18px;" {% if open_cadastro == 'classificacao' or open_cadastro == 'contrato' %}open{% endif %}>
+      <summary class="io-discrete-summary">
+        <span class="io-title">Configuracoes do radar</span>
+        <span class="muted">Centralize cadastros auxiliares e ajustes gerais.</span>
+      </summary>
+      <div class="io-discrete-body">
         <details class="io-discrete" id="cadastro-auxiliar" style="margin-bottom: 14px;" {% if open_cadastro == 'classificacao' or open_cadastro == 'contrato' %}open{% endif %}>
           <summary class="io-discrete-summary compact">
             <span class="io-title">Cadastros auxiliares</span>
@@ -219,11 +210,9 @@
             </form>
           </div>
         </details>
-      {% else %}
-        <div class="muted">Configuracoes indisponiveis para acesso de leitura.</div>
-      {% endif %}
-    </div>
-  </details>
+      </div>
+    </details>
+  {% endif %}
   </div>
   {{ trabalhos_table_data|json_script:"radar-trabalhos-data" }}
   <script>
