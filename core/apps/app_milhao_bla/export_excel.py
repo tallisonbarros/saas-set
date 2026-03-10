@@ -165,7 +165,7 @@ def _build_summary_sheet(wb, *, filename, start_date, end_date, export_dt, logo_
         row_idx=1,
         start_col=1,
         end_col=2,
-        height=42,
+        height=50,
     )
 
     ws["A3"] = f"Arquivo: {filename}"
@@ -186,7 +186,7 @@ def _build_summary_sheet(wb, *, filename, start_date, end_date, export_dt, logo_
         row_idx=set_logo_row,
         start_col=1,
         end_col=2,
-        height=38,
+        height=19,
     )
 
     _append_footer(ws, footer_text, spacer_rows=1)
@@ -261,21 +261,20 @@ def _build_daily_totals_sheet(wb, *, entries, footer_text):
             "Data",
             "LIMBL01_kg",
             "CLABL01_kg",
-            "CLABL02_kg",
-            "SECBL01_kg",
-            "SECBL02_kg",
-            "TOTAL_sem_milho_kg",
             "CLABL01_%",
+            "CLABL02_kg",
             "CLABL02_%",
+            "SECBL01_kg",
             "SECBL01_%",
+            "SECBL02_kg",
             "SECBL02_%",
-            "Componente_predominante",
+            "TOTAL_sem_milho_kg",
         ]
     )
     _style_header(ws, 1)
 
     if not entries:
-        ws.append(["Sem dados no periodo selecionado.", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "-"])
+        ws.append(["Sem dados no periodo selecionado.", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         _autosize_columns(ws)
         _append_footer(ws, footer_text)
         return
@@ -299,35 +298,31 @@ def _build_daily_totals_sheet(wb, *, entries, footer_text):
         if total_without_milho > 0:
             for balance in composition_balances:
                 composition_percent[balance] = (day_values.get(balance, 0.0) / total_without_milho) * 100.0
-            predominant_balance = max(composition_balances, key=lambda b: composition_percent[b])
-            predominant_label = BALANCE_LABELS.get(predominant_balance, predominant_balance)
         else:
             for balance in composition_balances:
                 composition_percent[balance] = 0.0
-            predominant_label = "-"
 
         ws.append(
             [
                 day.strftime("%d/%m/%Y"),
                 round(day_values.get("LIMBL01", 0.0), 2),
                 round(day_values.get("CLABL01", 0.0), 2),
-                round(day_values.get("CLABL02", 0.0), 2),
-                round(day_values.get("SECBL01", 0.0), 2),
-                round(day_values.get("SECBL02", 0.0), 2),
-                round(total_without_milho, 2),
                 round(composition_percent["CLABL01"], 2),
+                round(day_values.get("CLABL02", 0.0), 2),
                 round(composition_percent["CLABL02"], 2),
+                round(day_values.get("SECBL01", 0.0), 2),
                 round(composition_percent["SECBL01"], 2),
+                round(day_values.get("SECBL02", 0.0), 2),
                 round(composition_percent["SECBL02"], 2),
-                predominant_label,
+                round(total_without_milho, 2),
             ]
         )
 
-    ws.auto_filter.ref = f"A1:L{ws.max_row}"
+    ws.auto_filter.ref = f"A1:K{ws.max_row}"
     for row_idx in range(2, ws.max_row + 1):
-        for column_idx in range(2, 8):
+        for column_idx in (2, 3, 5, 7, 9, 11):
             ws.cell(row=row_idx, column=column_idx).number_format = "#,##0.00"
-        for column_idx in range(8, 12):
+        for column_idx in (4, 6, 8, 10):
             ws.cell(row=row_idx, column=column_idx).number_format = "0.00\\%"
     _autosize_columns(ws)
     _append_footer(ws, footer_text)
