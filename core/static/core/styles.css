@@ -5235,6 +5235,13 @@ select.datagrid-filter-input optgroup {
   grid-column: 1 / -1;
 }
 
+#radar-trabalhos-grid .radar-create-advanced-panel textarea[name="descricao"] {
+  min-height: 40px;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
 .atividade-actions {
   display: flex;
   flex-wrap: wrap;

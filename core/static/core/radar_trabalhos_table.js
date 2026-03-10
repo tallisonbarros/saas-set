@@ -103,7 +103,7 @@
             { name: "action", type: "hidden", value: "create_trabalho" },
             { name: "nome", label: "Nome", type: "text", placeholder: "Novo trabalho", required: true },
             { name: "data_registro", label: "Data", type: "date", value: defaultDate },
-            { name: "descricao", label: "Descricao", type: "text", placeholder: "Descricao resumida" },
+            { name: "descricao", label: "Descricao", type: "textarea", placeholder: "Descricao resumida", wide: true },
             { name: "setor", label: "Setor", type: "text", placeholder: "Utilidades" },
             { name: "solicitante", label: "Solicitante", type: "text", placeholder: "Supervisor" },
             { name: "responsavel", label: "Responsavel", type: "text", placeholder: "Equipe tecnica" },
@@ -113,13 +113,13 @@
               name: "contrato",
               label: "Contrato",
               type: "select",
-              options: [{ value: "", label: "Selecione" }].concat(contratosOptions),
+              options: [{ value: "", label: "Contrato" }].concat(contratosOptions),
             },
             {
               name: "classificacao",
               label: "Classificacao",
               type: "select",
-              options: [{ value: "", label: "Selecione" }].concat(classificacoesOptions),
+              options: [{ value: "", label: "Classificacao" }].concat(classificacoesOptions),
             },
           ],
           onSubmit: function (ctx) {
@@ -413,6 +413,22 @@
       }
     });
 
+    var descricaoTextarea = createForm.querySelector("textarea[name='descricao']");
+    function syncDescricaoHeight() {
+      if (!descricaoTextarea) {
+        return;
+      }
+      descricaoTextarea.style.height = "auto";
+      descricaoTextarea.style.height = Math.max(40, descricaoTextarea.scrollHeight) + "px";
+    }
+    if (descricaoTextarea) {
+      syncDescricaoHeight();
+      if (descricaoTextarea.dataset.autogrowBound !== "1") {
+        descricaoTextarea.dataset.autogrowBound = "1";
+        descricaoTextarea.addEventListener("input", syncDescricaoHeight);
+      }
+    }
+
     var toggle = toggleRow.querySelector("[data-radar-create-advanced-toggle]");
     if (!toggle) {
       toggle = document.createElement("button");
@@ -439,6 +455,23 @@
       advancedPanel.classList.toggle("is-open", isOpen);
       toggle.textContent = isOpen ? "Ocultar ajustes" : "Ajustes avancados";
       toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      if (isOpen) {
+        syncDescricaoHeight();
+      }
+    }
+
+    function submitQuickSaveAndCollapse() {
+      createForm.dataset.collapseAdvancedOnReset = "1";
+      var submitButton = createForm.querySelector("[data-dg-create-submit]");
+      if (typeof createForm.requestSubmit === "function") {
+        if (submitButton) {
+          createForm.requestSubmit(submitButton);
+        } else {
+          createForm.requestSubmit();
+        }
+        return;
+      }
+      createForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     }
 
     var shouldOpen = toggle.getAttribute("aria-expanded") === "true";
@@ -470,7 +503,6 @@
     advancedPanel.addEventListener("keydown", function (event) {
       if (
         event.key !== "Enter" ||
-        event.shiftKey ||
         event.altKey ||
         event.ctrlKey ||
         event.metaKey ||
@@ -479,24 +511,28 @@
         return;
       }
       var target = event.target;
-      if (!target || target.tagName === "TEXTAREA") {
+      if (!target) {
+        return;
+      }
+      var isDescricaoTextarea = target.tagName === "TEXTAREA" && target.name === "descricao";
+      if (isDescricaoTextarea && event.shiftKey) {
+        window.setTimeout(syncDescricaoHeight, 0);
+        return;
+      }
+      if (isDescricaoTextarea) {
+        event.preventDefault();
+        submitQuickSaveAndCollapse();
+        return;
+      }
+      if (target.tagName === "TEXTAREA" || event.shiftKey) {
         return;
       }
       event.preventDefault();
-      createForm.dataset.collapseAdvancedOnReset = "1";
-      var submitButton = createForm.querySelector("[data-dg-create-submit]");
-      if (typeof createForm.requestSubmit === "function") {
-        if (submitButton) {
-          createForm.requestSubmit(submitButton);
-        } else {
-          createForm.requestSubmit();
-        }
-        return;
-      }
-      createForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      submitQuickSaveAndCollapse();
     });
 
     createForm.addEventListener("reset", function () {
+      syncDescricaoHeight();
       if (createForm.dataset.collapseAdvancedOnReset !== "1") {
         return;
       }
