@@ -66,10 +66,6 @@
                 <input type="text" name="descricao" value="{{ edit_atividade.descricao|default:'' }}">
               </label>
               <label class="field">
-                <span>Horas de trabalho</span>
-                <input type="text" name="horas_trabalho" value="{{ edit_atividade.horas_trabalho|default:'' }}">
-              </label>
-              <label class="field">
                 <span>Status</span>
                 <select name="status">
                   {% for value, label in status_choices %}
@@ -124,10 +120,6 @@
               <input type="text" name="descricao" placeholder="Descricao resumida">
             </label>
             <label class="field">
-              <span>Horas de trabalho</span>
-              <input type="text" name="horas_trabalho" placeholder="2.5">
-            </label>
-            <label class="field">
               <span>Status</span>
               <select name="status">
                 {% for value, label in status_choices %}
@@ -176,6 +168,10 @@
             <label class="field">
               <span>Responsavel</span>
               <input type="text" name="responsavel" value="{{ trabalho.responsavel|default:'' }}">
+            </label>
+            <label class="field">
+              <span>Horas/dia</span>
+              <input type="number" name="horas_dia" min="0.25" step="0.25" value="{{ trabalho.horas_dia|default:'8.00' }}">
             </label>
             <label class="field" style="grid-column: 1 / -1;">
               <span>Colaboradores</span>

@@ -612,6 +612,22 @@ def _parse_colaboradores_input(raw_value, max_items=40):
     return colaboradores
 
 
+def _parse_horas_dia_input(raw_value, default=Decimal("8.00")):
+    raw = (raw_value or "").replace(",", ".").strip()
+    if not raw:
+        return default.quantize(Decimal("0.01")), None
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        return None, "Informe um valor valido para horas/dia."
+    if value <= 0:
+        return None, "Horas/dia deve ser maior que zero."
+    value = value.quantize(Decimal("0.01"))
+    if value > Decimal("999.99"):
+        return None, "Horas/dia excede o maximo permitido (999.99)."
+    return value, None
+
+
 def _trabalho_colaboradores_nomes(trabalho):
     prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
     if "colaboradores" in prefetched:
@@ -726,7 +742,13 @@ def _atividade_agenda_dias_iso(atividade):
     return [item.isoformat() for item in _atividade_agenda_datas(atividade)]
 
 
-def _sync_atividade_execucao_dates_from_agenda(atividade, agenda_datas=None):
+def _atividade_horas_from_agenda(atividade, agenda_datas=None):
+    datas = agenda_datas if agenda_datas is not None else _atividade_agenda_datas(atividade)
+    horas_dia = atividade.trabalho.horas_dia if atividade.trabalho and atividade.trabalho.horas_dia is not None else Decimal("8.00")
+    return horas_dia * Decimal(len(datas))
+
+
+def _sync_atividade_execucao_metrics_from_agenda(atividade, agenda_datas=None):
     datas = agenda_datas if agenda_datas is not None else _atividade_agenda_datas(atividade)
     inicio = None
     fim = None
@@ -734,10 +756,30 @@ def _sync_atividade_execucao_dates_from_agenda(atividade, agenda_datas=None):
         tz = timezone.get_current_timezone()
         inicio = timezone.make_aware(datetime.combine(datas[0], datetime.min.time()), tz)
         fim = timezone.make_aware(datetime.combine(datas[-1], datetime.min.time()), tz)
-    mudou = atividade.inicio_execucao_em != inicio or atividade.finalizada_em != fim
+    horas = _atividade_horas_from_agenda(atividade, agenda_datas=datas)
+    mudou = (
+        atividade.inicio_execucao_em != inicio
+        or atividade.finalizada_em != fim
+        or atividade.horas_trabalho != horas
+    )
     atividade.inicio_execucao_em = inicio
     atividade.finalizada_em = fim
+    atividade.horas_trabalho = horas
     return mudou
+
+
+def _recalcular_horas_atividades_trabalho(trabalho):
+    atividades = list(
+        RadarAtividade.objects.filter(trabalho=trabalho).select_related("trabalho").prefetch_related("dias_execucao")
+    )
+    changed = []
+    for atividade in atividades:
+        horas = _atividade_horas_from_agenda(atividade)
+        if atividade.horas_trabalho != horas:
+            atividade.horas_trabalho = horas
+            changed.append(atividade)
+    if changed:
+        RadarAtividade.objects.bulk_update(changed, ["horas_trabalho"])
 
 
 def _normalizar_ordem_atividades(trabalho, status=None):
@@ -2181,6 +2223,9 @@ def _format_ptbr_date(value):
 
 def _atividade_response_payload(atividade):
     agenda_dias = _atividade_agenda_dias_iso(atividade)
+    horas_label = ""
+    if atividade.horas_trabalho is not None:
+        horas_label = str(atividade.horas_trabalho)
     return {
         "ok": True,
         "id": atividade.id,
@@ -2188,7 +2233,7 @@ def _atividade_response_payload(atividade):
         "descricao": atividade.descricao,
         "status": atividade.status,
         "status_label": atividade.get_status_display(),
-        "horas_trabalho": str(atividade.horas_trabalho) if atividade.horas_trabalho else "",
+        "horas_trabalho": horas_label,
         "inicio_execucao_display": _format_ptbr_date(atividade.inicio_execucao_em),
         "finalizada_display": _format_ptbr_date(atividade.finalizada_em),
         "agenda_dias": agenda_dias,
@@ -3598,6 +3643,7 @@ def radar_detail(request, pk):
             solicitante = request.POST.get("solicitante", "").strip()
             responsavel = request.POST.get("responsavel", "").strip()
             colaboradores_nomes = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
+            horas_dia, horas_dia_error = _parse_horas_dia_input(request.POST.get("horas_dia", ""))
             contrato_id = request.POST.get("contrato")
             data_raw = request.POST.get("data_registro", "").strip()
             classificacao_id = request.POST.get("classificacao")
@@ -3611,6 +3657,11 @@ def radar_detail(request, pk):
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
                     return JsonResponse({"ok": False, "message": "Informe um nome para o trabalho.", "level": "error"}, status=400)
                 message = "Informe um nome para o trabalho."
+                message_level = "error"
+            elif horas_dia_error:
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse({"ok": False, "message": horas_dia_error, "level": "error"}, status=400)
+                message = horas_dia_error
                 message_level = "error"
             else:
                 contrato = None
@@ -3629,6 +3680,7 @@ def radar_detail(request, pk):
                     contrato=contrato,
                     data_registro=data_registro or timezone.localdate(),
                     classificacao=classificacao,
+                    horas_dia=horas_dia,
                     criado_por=request.user,
                 )
                 _sync_trabalho_colaboradores(novo_trabalho, colaboradores_nomes)
@@ -3651,6 +3703,7 @@ def radar_detail(request, pk):
                                 "setor": novo_trabalho.setor or "",
                                 "solicitante": novo_trabalho.solicitante or "",
                                 "responsavel": novo_trabalho.responsavel or "",
+                                "horas_dia": str(novo_trabalho.horas_dia) if novo_trabalho.horas_dia is not None else "",
                                 "colaboradores": ", ".join(colaboradores_nomes),
                                 "total_colaboradores": len(colaboradores_nomes),
                                 "total_atividades": 0,
@@ -3749,6 +3802,7 @@ def radar_detail(request, pk):
                 "setor": trabalho.setor or "",
                 "solicitante": trabalho.solicitante or "",
                 "responsavel": trabalho.responsavel or "",
+                "horas_dia": str(trabalho.horas_dia) if trabalho.horas_dia is not None else "",
                 "colaboradores": ", ".join(colaboradores_nomes),
                 "total_colaboradores": len(colaboradores_nomes),
                 "total_atividades": trabalho.total_atividades or 0,
@@ -3887,14 +3941,22 @@ def radar_trabalho_detail(request, radar_pk, pk):
             solicitante = request.POST.get("solicitante", "").strip()
             responsavel = request.POST.get("responsavel", "").strip()
             colaboradores_nomes = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
+            horas_dia, horas_dia_error = _parse_horas_dia_input(
+                request.POST.get("horas_dia", ""),
+                default=trabalho.horas_dia if trabalho.horas_dia is not None else Decimal("8.00"),
+            )
             data_raw = request.POST.get("data_registro", "").strip()
             classificacao_id = request.POST.get("classificacao")
             contrato_id = request.POST.get("contrato")
             if not nome:
                 message = "Informe um nome para o trabalho."
                 message_level = "error"
+            elif horas_dia_error:
+                message = horas_dia_error
+                message_level = "error"
             else:
                 with transaction.atomic():
+                    horas_dia_alterado = trabalho.horas_dia != horas_dia
                     if data_raw:
                         try:
                             trabalho.data_registro = datetime.strptime(data_raw, "%Y-%m-%d").date()
@@ -3915,6 +3977,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                     trabalho.setor = setor
                     trabalho.solicitante = solicitante
                     trabalho.responsavel = responsavel
+                    trabalho.horas_dia = horas_dia
                     trabalho.save(
                         update_fields=[
                             "criado_por",
@@ -3926,9 +3989,12 @@ def radar_trabalho_detail(request, radar_pk, pk):
                             "setor",
                             "solicitante",
                             "responsavel",
+                            "horas_dia",
                         ]
                     )
                     _sync_trabalho_colaboradores(trabalho, colaboradores_nomes)
+                    if horas_dia_alterado:
+                        _recalcular_horas_atividades_trabalho(trabalho)
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "delete_trabalho":
@@ -3950,6 +4016,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 setor=trabalho.setor,
                 solicitante=trabalho.solicitante,
                 responsavel=trabalho.responsavel,
+                horas_dia=trabalho.horas_dia,
                 criado_por=request.user,
             )
             colaboradores_origem = _trabalho_colaboradores_nomes(trabalho)
@@ -3963,7 +4030,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                             trabalho=novo_trabalho,
                             nome=atividade.nome,
                             descricao=atividade.descricao,
-                            horas_trabalho=atividade.horas_trabalho,
+                            horas_trabalho=Decimal("0.00"),
                             status=atividade.status,
                             inicio_execucao_em=atividade.inicio_execucao_em,
                             finalizada_em=atividade.finalizada_em,
@@ -3977,16 +4044,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
         if action == "create_atividade":
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
-            horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
             status_raw = request.POST.get("status", "").strip()
             if status_raw not in dict(RadarAtividade.Status.choices):
                 status_raw = RadarAtividade.Status.PENDENTE
-            horas = None
-            if horas_raw:
-                try:
-                    horas = Decimal(horas_raw)
-                except InvalidOperation:
-                    horas = None
             if not nome:
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
                     return JsonResponse({"ok": False, "message": "Informe um nome para a atividade.", "level": "error"}, status=400)
@@ -4000,7 +4060,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                     trabalho=trabalho,
                     nome=nome,
                     descricao=descricao,
-                    horas_trabalho=horas,
+                    horas_trabalho=Decimal("0.00"),
                     status=status_raw,
                     inicio_execucao_em=None,
                     finalizada_em=None,
@@ -4029,15 +4089,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
             atividade.nome = nome_atividade
             atividade.descricao = request.POST.get("descricao", "").strip()
-            horas_raw = request.POST.get("horas_trabalho", "").replace(",", ".").strip()
-            if horas_raw:
-                try:
-                    horas = Decimal(horas_raw)
-                    atividade.horas_trabalho = horas if horas >= 0 else None
-                except InvalidOperation:
-                    atividade.horas_trabalho = None
-            else:
-                atividade.horas_trabalho = None
             status_raw = request.POST.get("status", "").strip()
             if status_raw in dict(RadarAtividade.Status.choices):
                 atividade.status = status_raw
@@ -4045,7 +4096,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 update_fields=[
                     "nome",
                     "descricao",
-                    "horas_trabalho",
                     "status",
                 ]
             )
@@ -4094,9 +4144,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
                         ],
                         ignore_conflicts=True,
                     )
-                mudou_datas = _sync_atividade_execucao_dates_from_agenda(atividade, agenda_datas=sorted(novos))
+                mudou_datas = _sync_atividade_execucao_metrics_from_agenda(atividade, agenda_datas=sorted(novos))
                 if mudou_datas:
-                    atividade.save(update_fields=["inicio_execucao_em", "finalizada_em"])
+                    atividade.save(update_fields=["inicio_execucao_em", "finalizada_em", "horas_trabalho"])
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 atividade.refresh_from_db()
                 return JsonResponse(_atividade_response_payload(atividade))

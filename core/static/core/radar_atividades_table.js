@@ -854,7 +854,6 @@
     setField(updateForm, "atividade_id", row.id);
     setField(updateForm, "nome", row.nome);
     setField(updateForm, "descricao", row.descricao);
-    setField(updateForm, "horas_trabalho", row.horas_trabalho);
     setField(updateForm, "status", row.status);
     setField(updateForm, "inicio_execucao_display", row.inicio_execucao_display);
     setField(updateForm, "finalizada_display", row.finalizada_display);

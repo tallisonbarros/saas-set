@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.utils import timezone
+from decimal import Decimal
 
 class PerfilUsuario(models.Model):
     nome = models.CharField(max_length=120)
@@ -472,6 +473,7 @@ class RadarTrabalho(models.Model):
     solicitante = models.CharField(max_length=120, blank=True)
     responsavel = models.CharField(max_length=120, blank=True)
     data_registro = models.DateField(default=timezone.localdate)
+    horas_dia = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("8.00"))
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
     ultimo_status_evento_em = models.DateTimeField(null=True, blank=True)
     criado_por = models.ForeignKey(

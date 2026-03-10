@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.test import Client, SimpleTestCase, TestCase
@@ -335,3 +336,57 @@ class RadarCreatorPermissionTests(TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.json()
         self.assertFalse(payload["ok"])
+
+    def test_horas_trabalho_e_calculada_por_agenda_x_horas_dia(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Horas")
+
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": json.dumps(["2026-03-01", "2026-03-02", "2026-03-03"]),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["horas_trabalho"], "24.00")
+
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("24.00"))
+
+    def test_atualizar_horas_dia_recalcula_horas_de_todas_atividades(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Recalc")
+
+        agenda_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": json.dumps(["2026-03-01", "2026-03-02"]),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(agenda_resp.status_code, 200)
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("16.00"))
+
+        update_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_trabalho",
+                "nome": self.trabalho.nome,
+                "descricao": self.trabalho.descricao or "",
+                "setor": self.trabalho.setor or "",
+                "solicitante": self.trabalho.solicitante or "",
+                "responsavel": self.trabalho.responsavel or "",
+                "horas_dia": "6",
+                "colaboradores": "",
+            },
+        )
+        self.assertEqual(update_resp.status_code, 302)
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("12.00"))
