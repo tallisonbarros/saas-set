@@ -4935,8 +4935,38 @@ select {
 
 .radar-agenda-calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
+  /* Espaço extra entre sexta e sabado */
+  grid-template-columns: repeat(6, minmax(0, 1fr)) 0 minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 6px;
+}
+
+.radar-agenda-calendar-grid > *:nth-child(7n + 1) {
+  grid-column: 1;
+}
+
+.radar-agenda-calendar-grid > *:nth-child(7n + 2) {
+  grid-column: 2;
+}
+
+.radar-agenda-calendar-grid > *:nth-child(7n + 3) {
+  grid-column: 3;
+}
+
+.radar-agenda-calendar-grid > *:nth-child(7n + 4) {
+  grid-column: 4;
+}
+
+.radar-agenda-calendar-grid > *:nth-child(7n + 5) {
+  grid-column: 5;
+}
+
+.radar-agenda-calendar-grid > *:nth-child(7n + 6) {
+  grid-column: 6;
+}
+
+.radar-agenda-calendar-grid > *:nth-child(7n) {
+  grid-column: 8;
 }
 
 .radar-agenda-calendar-weekday {

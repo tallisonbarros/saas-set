@@ -4046,7 +4046,8 @@ def radar_agenda(request, pk):
     daily_total_horas = daily_total_horas.quantize(Decimal("0.01"))
 
     calendar_weeks = []
-    month_calendar = calendar.Calendar(firstweekday=0).monthdatescalendar(selected_day.year, selected_day.month)
+    # Semana visual da agenda: domingo a sabado.
+    month_calendar = calendar.Calendar(firstweekday=6).monthdatescalendar(selected_day.year, selected_day.month)
     for week in month_calendar:
         week_cells = []
         for cell_day in week:
@@ -4094,7 +4095,7 @@ def radar_agenda(request, pk):
         "prev_month_iso": _add_months(selected_day, -1).isoformat(),
         "next_month_iso": _add_months(selected_day, 1).isoformat(),
         "month_label": month_label,
-        "weekday_labels": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"],
+        "weekday_labels": ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"],
         "calendar_weeks": calendar_weeks,
         "daily_groups": daily_groups,
         "daily_total_trabalhos": len(daily_groups),
