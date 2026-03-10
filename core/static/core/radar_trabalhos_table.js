@@ -11,6 +11,8 @@
   var tableConfig = window.RadarTrabalhosTableConfig || {};
   var canManage = !!tableConfig.canManage;
   var defaultDate = tableConfig.defaultDate || "";
+  var contratosOptions = Array.isArray(tableConfig.contratos) ? tableConfig.contratos : [];
+  var classificacoesOptions = Array.isArray(tableConfig.classificacoes) ? tableConfig.classificacoes : [];
   var grid = null;
 
   function parseJsonResponse(resp) {
@@ -102,6 +104,23 @@
             { name: "nome", label: "Nome", type: "text", placeholder: "Novo trabalho", required: true },
             { name: "data_registro", label: "Data", type: "date", value: defaultDate },
             { name: "descricao", label: "Descricao", type: "text", placeholder: "Descricao resumida" },
+            { name: "setor", label: "Setor", type: "text", placeholder: "Utilidades" },
+            { name: "solicitante", label: "Solicitante", type: "text", placeholder: "Supervisor" },
+            { name: "responsavel", label: "Responsavel", type: "text", placeholder: "Equipe tecnica" },
+            { name: "horas_dia", label: "Horas/dia", type: "number", min: 0.25, step: 0.25, placeholder: "8.00" },
+            { name: "colaboradores", label: "Colaboradores", type: "text", placeholder: "Ana, Bruno, Carla", wide: true },
+            {
+              name: "contrato",
+              label: "Contrato",
+              type: "select",
+              options: [{ value: "", label: "Selecione" }].concat(contratosOptions),
+            },
+            {
+              name: "classificacao",
+              label: "Classificacao",
+              type: "select",
+              options: [{ value: "", label: "Selecione" }].concat(classificacoesOptions),
+            },
           ],
           onSubmit: function (ctx) {
             return postFormData(ctx.formData)
@@ -301,65 +320,200 @@
     if (!createForm) {
       return;
     }
-
-    var descricaoInput = createForm.querySelector("[name='descricao']");
-    if (!descricaoInput) {
+    var fieldsHost = createForm.querySelector(".datagrid-create-fields");
+    if (!fieldsHost) {
       return;
     }
-    var descricaoField = descricaoInput.closest(".datagrid-create-field");
-    if (!descricaoField) {
-      return;
-    }
-    if (!descricaoField.id) {
-      descricaoField.id = "radar-trabalho-quick-descricao";
-    }
-
     var actions = createForm.querySelector(".datagrid-create-actions");
     if (!actions) {
       return;
     }
 
-    var toggle = createForm.querySelector("[data-radar-create-advanced-toggle]");
+    var contratoSelect = createForm.querySelector("[name='contrato']");
+    if (contratoSelect && !contratoSelect.id) {
+      contratoSelect.id = "quick-contrato-select";
+    }
+    var classificacaoSelect = createForm.querySelector("[name='classificacao']");
+    if (classificacaoSelect && !classificacaoSelect.id) {
+      classificacaoSelect.id = "quick-classificacao-select";
+    }
+
+    var advancedFieldNames = [
+      "descricao",
+      "setor",
+      "solicitante",
+      "responsavel",
+      "horas_dia",
+      "colaboradores",
+      "contrato",
+      "classificacao",
+    ];
+    var advancedFields = [];
+    advancedFieldNames.forEach(function (fieldName) {
+      var fieldInput = createForm.querySelector("[name='" + fieldName + "']");
+      if (!fieldInput) {
+        return;
+      }
+      var fieldEl = fieldInput.closest(".datagrid-create-field");
+      if (!fieldEl) {
+        return;
+      }
+      fieldEl.classList.add("radar-create-advanced-field");
+      if (!fieldEl.id) {
+        fieldEl.id = "radar-trabalho-quick-advanced-" + fieldName;
+      }
+      advancedFields.push(fieldEl);
+    });
+    if (!advancedFields.length) {
+      return;
+    }
+
+    var basicFieldNames = ["nome", "data_registro"];
+    basicFieldNames.forEach(function (fieldName) {
+      var fieldInput = createForm.querySelector("[name='" + fieldName + "']");
+      if (!fieldInput) {
+        return;
+      }
+      var fieldEl = fieldInput.closest(".datagrid-create-field");
+      if (!fieldEl) {
+        return;
+      }
+      fieldEl.classList.add("radar-create-basic-field");
+      fieldEl.style.order = "10";
+    });
+    actions.classList.add("radar-create-main-actions");
+    actions.style.order = "10";
+
+    var toggleRow = fieldsHost.querySelector("[data-radar-create-advanced-row]");
+    if (!toggleRow) {
+      toggleRow = document.createElement("div");
+      toggleRow.className = "radar-create-advanced-row";
+      toggleRow.setAttribute("data-radar-create-advanced-row", "1");
+      fieldsHost.appendChild(toggleRow);
+    }
+    toggleRow.style.order = "20";
+
+    var advancedPanel = fieldsHost.querySelector("[data-radar-create-advanced-panel]");
+    if (!advancedPanel) {
+      advancedPanel = document.createElement("div");
+      advancedPanel.className = "radar-create-advanced-panel";
+      advancedPanel.setAttribute("data-radar-create-advanced-panel", "1");
+      fieldsHost.appendChild(advancedPanel);
+    }
+    advancedPanel.style.order = "30";
+    if (!advancedPanel.id) {
+      advancedPanel.id = "radar-trabalho-quick-advanced-panel";
+    }
+    advancedFields.forEach(function (fieldEl) {
+      fieldEl.style.removeProperty("order");
+      fieldEl.classList.remove("is-advanced-hidden");
+      fieldEl.classList.remove("is-advanced-open");
+      if (fieldEl.parentNode !== advancedPanel) {
+        advancedPanel.appendChild(fieldEl);
+      }
+    });
+
+    var toggle = toggleRow.querySelector("[data-radar-create-advanced-toggle]");
     if (!toggle) {
       toggle = document.createElement("button");
       toggle.type = "button";
-      toggle.className = "btn btn-ghost btn-compact radar-create-advanced-toggle";
+      toggle.className = "radar-create-advanced-toggle";
       toggle.setAttribute("data-radar-create-advanced-toggle", "1");
-      toggle.setAttribute("aria-controls", descricaoField.id);
-      actions.insertBefore(toggle, actions.firstChild || null);
+      toggleRow.appendChild(toggle);
+    }
+    toggle.setAttribute("aria-controls", advancedPanel.id);
+
+    function hasAdvancedValue() {
+      return advancedFieldNames.some(function (fieldName) {
+        var input = createForm.querySelector("[name='" + fieldName + "']");
+        if (!input) {
+          return false;
+        }
+        var value = input.value;
+        return value !== null && value !== undefined && String(value).trim() !== "";
+      });
     }
 
-    var isOpen = descricaoField.classList.contains("is-advanced-open");
-    if (!isOpen && !descricaoInput.value) {
-      descricaoField.classList.add("is-advanced-hidden");
-      descricaoField.classList.remove("is-advanced-open");
-      toggle.textContent = "Avancado";
-      toggle.setAttribute("aria-expanded", "false");
-    } else {
-      descricaoField.classList.remove("is-advanced-hidden");
-      descricaoField.classList.add("is-advanced-open");
-      toggle.textContent = "Ocultar avancado";
-      toggle.setAttribute("aria-expanded", "true");
+    function setAdvancedOpen(isOpen) {
+      advancedPanel.classList.toggle("is-collapsed", !isOpen);
+      advancedPanel.classList.toggle("is-open", isOpen);
+      toggle.textContent = isOpen ? "Ocultar ajustes" : "Ajustes avancados";
+      toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
     }
+
+    var shouldOpen = toggle.getAttribute("aria-expanded") === "true";
+    if (toggle.dataset.initialized !== "1") {
+      shouldOpen = shouldOpen || hasAdvancedValue();
+      toggle.dataset.initialized = "1";
+    }
+    setAdvancedOpen(shouldOpen);
 
     if (toggle.dataset.bound === "1") {
       return;
     }
     toggle.dataset.bound = "1";
     toggle.addEventListener("click", function () {
-      var currentlyHidden = descricaoField.classList.contains("is-advanced-hidden");
-      if (currentlyHidden) {
-        descricaoField.classList.remove("is-advanced-hidden");
-        descricaoField.classList.add("is-advanced-open");
-        toggle.textContent = "Ocultar avancado";
-        toggle.setAttribute("aria-expanded", "true");
-        descricaoInput.focus();
+      var isCurrentlyOpen = toggle.getAttribute("aria-expanded") === "true";
+      setAdvancedOpen(!isCurrentlyOpen);
+      if (!isCurrentlyOpen) {
+        var firstAdvancedInput = advancedPanel.querySelector("input, select, textarea");
+        if (firstAdvancedInput) {
+          firstAdvancedInput.focus();
+        }
+      }
+    });
+
+    if (createForm.dataset.advancedEnterBound === "1") {
+      return;
+    }
+    createForm.dataset.advancedEnterBound = "1";
+    advancedPanel.addEventListener("keydown", function (event) {
+      if (
+        event.key !== "Enter" ||
+        event.shiftKey ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.isComposing
+      ) {
         return;
       }
-      descricaoField.classList.add("is-advanced-hidden");
-      descricaoField.classList.remove("is-advanced-open");
-      toggle.textContent = "Avancado";
-      toggle.setAttribute("aria-expanded", "false");
+      var target = event.target;
+      if (!target || target.tagName === "TEXTAREA") {
+        return;
+      }
+      event.preventDefault();
+      createForm.dataset.collapseAdvancedOnReset = "1";
+      var submitButton = createForm.querySelector("[data-dg-create-submit]");
+      if (typeof createForm.requestSubmit === "function") {
+        if (submitButton) {
+          createForm.requestSubmit(submitButton);
+        } else {
+          createForm.requestSubmit();
+        }
+        return;
+      }
+      createForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    createForm.addEventListener("reset", function () {
+      if (createForm.dataset.collapseAdvancedOnReset !== "1") {
+        return;
+      }
+      createForm.dataset.collapseAdvancedOnReset = "";
+      window.setTimeout(function () {
+        setAdvancedOpen(false);
+      }, 0);
+    });
+    createForm.addEventListener("submit", function () {
+      if (createForm.dataset.collapseAdvancedOnReset !== "1") {
+        return;
+      }
+      window.setTimeout(function () {
+        if (createForm.dataset.collapseAdvancedOnReset === "1") {
+          createForm.dataset.collapseAdvancedOnReset = "";
+        }
+      }, 5000);
     });
   }
 })();

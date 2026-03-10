@@ -5174,12 +5174,65 @@ select.datagrid-filter-input optgroup {
   display: none;
 }
 
-#radar-trabalhos-grid .datagrid-create-field.is-advanced-hidden {
-  display: none;
+#radar-trabalhos-grid .radar-create-main-actions {
+  margin-left: auto;
+}
+
+#radar-trabalhos-grid .radar-create-advanced-row {
+  flex: 1 1 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid rgba(141, 160, 178, 0.22);
 }
 
 #radar-trabalhos-grid .radar-create-advanced-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #aeb5bd;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  padding: 0;
   white-space: nowrap;
+}
+
+#radar-trabalhos-grid .radar-create-advanced-toggle:hover {
+  color: #f8ad73;
+}
+
+#radar-trabalhos-grid .radar-create-advanced-toggle:focus-visible {
+  outline: 2px solid rgba(255, 157, 86, 0.6);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+#radar-trabalhos-grid .radar-create-advanced-panel {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(141, 160, 178, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+#radar-trabalhos-grid .radar-create-advanced-panel.is-collapsed {
+  display: none;
+}
+
+#radar-trabalhos-grid .radar-create-advanced-panel .datagrid-create-field {
+  margin-bottom: 0;
+}
+
+#radar-trabalhos-grid .radar-create-advanced-panel .datagrid-create-field.is-wide {
+  grid-column: 1 / -1;
 }
 
 .atividade-actions {
@@ -5203,6 +5256,10 @@ select.datagrid-filter-input optgroup {
     width: 100%;
     justify-content: flex-start;
     align-self: stretch;
+  }
+
+  #radar-trabalhos-grid .radar-create-advanced-panel {
+    grid-template-columns: 1fr;
   }
 
   .datagrid-submit-icon {

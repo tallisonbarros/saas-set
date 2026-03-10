@@ -137,7 +137,17 @@
   <script>
     window.RadarTrabalhosTableConfig = {
       canManage: {{ can_manage|yesno:"true,false" }},
-      defaultDate: "{% now 'Y-m-d' %}"
+      defaultDate: "{% now 'Y-m-d' %}",
+      contratos: [
+        {% for contrato in contratos %}
+          { value: "{{ contrato.id }}", label: "{{ contrato.nome|escapejs }}" }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ],
+      classificacoes: [
+        {% for classificacao in classificacoes %}
+          { value: "{{ classificacao.id }}", label: "{{ classificacao.nome|escapejs }}" }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ]
     };
   </script>
   <script src="{% static 'core/datagrid.js' %}"></script>
@@ -151,12 +161,14 @@
       window.RadarShared.bindCadastro({
         formId: "create-contrato-form",
         inputSelector: "input[name='contrato_nome'][form='create-contrato-form']",
+        selectId: "quick-contrato-select",
         detailsId: "contrato-pop",
         messageId: "cadastro-message",
       });
       window.RadarShared.bindCadastro({
         formId: "create-classificacao-form",
         inputSelector: "input[name='classificacao_nome'][form='create-classificacao-form']",
+        selectId: "quick-classificacao-select",
         detailsId: "classificacao-pop",
         messageId: "cadastro-message",
       });
