@@ -4080,33 +4080,38 @@ def radar_agenda(request, pk):
     ]
     month_label = f"{month_names[selected_day.month - 1]} de {selected_day.year}"
 
+    context = {
+        "radar": radar,
+        "can_manage": can_manage or request.user.is_staff,
+        "is_radar_creator": is_creator,
+        "has_id_radar_access": has_id_radar_access,
+        "selected_day": selected_day,
+        "selected_day_iso": selected_day.isoformat(),
+        "selected_day_display": selected_day.strftime("%d/%m/%Y"),
+        "today_iso": today.isoformat(),
+        "prev_day_iso": (selected_day - timedelta(days=1)).isoformat(),
+        "next_day_iso": (selected_day + timedelta(days=1)).isoformat(),
+        "prev_month_iso": _add_months(selected_day, -1).isoformat(),
+        "next_month_iso": _add_months(selected_day, 1).isoformat(),
+        "month_label": month_label,
+        "weekday_labels": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"],
+        "calendar_weeks": calendar_weeks,
+        "daily_groups": daily_groups,
+        "daily_total_trabalhos": len(daily_groups),
+        "daily_total_atividades": daily_total_atividades,
+        "daily_total_horas": daily_total_horas,
+        "month_summary": month_summary,
+        "month_total_trabalhos": len(month_summary),
+        "month_total_horas": month_total_horas,
+    }
+
+    if _is_partial_request(request) and request.GET.get("section") == "daily":
+        return render(request, "core/partials/radar_agenda_daily_section.html", context)
+
     return render(
         request,
         "core/radar_agenda.html",
-        {
-            "radar": radar,
-            "can_manage": can_manage or request.user.is_staff,
-            "is_radar_creator": is_creator,
-            "has_id_radar_access": has_id_radar_access,
-            "selected_day": selected_day,
-            "selected_day_iso": selected_day.isoformat(),
-            "selected_day_display": selected_day.strftime("%d/%m/%Y"),
-            "today_iso": today.isoformat(),
-            "prev_day_iso": (selected_day - timedelta(days=1)).isoformat(),
-            "next_day_iso": (selected_day + timedelta(days=1)).isoformat(),
-            "prev_month_iso": _add_months(selected_day, -1).isoformat(),
-            "next_month_iso": _add_months(selected_day, 1).isoformat(),
-            "month_label": month_label,
-            "weekday_labels": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"],
-            "calendar_weeks": calendar_weeks,
-            "daily_groups": daily_groups,
-            "daily_total_trabalhos": len(daily_groups),
-            "daily_total_atividades": daily_total_atividades,
-            "daily_total_horas": daily_total_horas,
-            "month_summary": month_summary,
-            "month_total_trabalhos": len(month_summary),
-            "month_total_horas": month_total_horas,
-        },
+        context,
     )
 
 

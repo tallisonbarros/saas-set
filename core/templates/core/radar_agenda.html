@@ -29,21 +29,10 @@
     </div>
 
     <section class="io-card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Calendario</h2>
-          <p class="muted">Dia selecionado: {{ selected_day_display }}</p>
-        </div>
-      </div>
-      <div class="radar-agenda-nav-row">
-        <a class="btn btn-ghost btn-compact" href="?dia={{ prev_day_iso }}">Dia anterior</a>
-        <a class="btn btn-ghost btn-compact" href="?dia={{ today_iso }}">Hoje</a>
-        <a class="btn btn-ghost btn-compact" href="?dia={{ next_day_iso }}">Proximo dia</a>
-      </div>
-      <div class="radar-agenda-nav-row">
-        <a class="btn btn-ghost btn-compact" href="?dia={{ prev_month_iso }}">Mes anterior</a>
+      <div class="radar-agenda-month-switch">
+        <a class="radar-agenda-month-arrow" href="?dia={{ prev_month_iso }}" aria-label="Mes anterior">&lt;</a>
         <strong>{{ month_label }}</strong>
-        <a class="btn btn-ghost btn-compact" href="?dia={{ next_month_iso }}">Proximo mes</a>
+        <a class="radar-agenda-month-arrow" href="?dia={{ next_month_iso }}" aria-label="Proximo mes">&gt;</a>
       </div>
       <div class="radar-agenda-calendar-grid">
         {% for weekday in weekday_labels %}
@@ -65,64 +54,14 @@
       </div>
     </section>
 
-    <section class="io-card radar-agenda-section">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Atividades sendo executadas no dia</h2>
-          <p class="muted">
-            {{ daily_total_trabalhos }} trabalho(s),
-            {{ daily_total_atividades }} atividade(s),
-            {{ daily_total_horas|floatformat:2 }} h no dia.
-          </p>
-        </div>
-      </div>
-      {% if daily_groups %}
-        <div class="radar-agenda-work-list">
-          {% for group in daily_groups %}
-            <article class="radar-agenda-work-item">
-              <div class="radar-agenda-work-head">
-                <div>
-                  <h3 class="radar-agenda-work-title">
-                    <a href="{{ group.trabalho_url }}">{{ group.trabalho_nome }}</a>
-                  </h3>
-                  <div class="muted">
-                    Status: {{ group.trabalho_status_label }} |
-                    Equipe: {{ group.total_colaboradores|default:0 }} |
-                    Atividades no dia: {{ group.total_atividades }}
-                  </div>
-                </div>
-                <div class="slot-badge">{{ group.total_horas_dia|floatformat:2 }} h</div>
-              </div>
-              <table class="radar-agenda-mini-table">
-                <thead>
-                  <tr>
-                    <th>Atividade</th>
-                    <th>Status</th>
-                    <th>Horas no dia</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for atividade in group.atividades %}
-                    <tr>
-                      <td>{{ atividade.nome }}</td>
-                      <td>{{ atividade.status_label }}</td>
-                      <td>{{ atividade.horas_dia|floatformat:2 }} h</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </article>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="muted">Nenhuma atividade programada para este dia.</div>
-      {% endif %}
-    </section>
+    <div id="radar-agenda-daily-container">
+      {% include "core/partials/radar_agenda_daily_section.html" %}
+    </div>
 
     <section class="io-card radar-agenda-section">
       <div class="io-card-head">
         <div>
-          <h2 class="io-title">Resumo mensal por trabalho</h2>
+          <h2 class="io-title">Resumo mensal</h2>
           <p class="muted">
             {{ month_total_trabalhos }} trabalho(s) no mes,
             {{ month_total_horas|floatformat:2 }} h acumuladas.
@@ -159,4 +98,69 @@
       {% endif %}
     </section>
   </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var dailyContainer = document.getElementById("radar-agenda-daily-container");
+    var calendarGrid = document.querySelector(".radar-agenda-calendar-grid");
+    if (!dailyContainer || !calendarGrid) {
+      return;
+    }
+
+    function buildPartialUrl(rawHref) {
+      var url = new URL(rawHref, window.location.origin);
+      url.searchParams.set("partial", "1");
+      url.searchParams.set("section", "daily");
+      return url.toString();
+    }
+
+    function updateSelectedDay(activeLink) {
+      var selected = calendarGrid.querySelectorAll(".radar-agenda-calendar-day.is-selected");
+      selected.forEach(function (node) {
+        node.classList.remove("is-selected");
+      });
+      if (activeLink) {
+        activeLink.classList.add("is-selected");
+      }
+    }
+
+    calendarGrid.addEventListener("click", function (event) {
+      var dayLink = event.target.closest(".radar-agenda-calendar-day");
+      if (!dayLink || !calendarGrid.contains(dayLink)) {
+        return;
+      }
+      if (dayLink.classList.contains("is-outside")) {
+        return;
+      }
+      var href = dayLink.getAttribute("href");
+      if (!href) {
+        return;
+      }
+      event.preventDefault();
+
+      fetch(buildPartialUrl(href), {
+        headers: {
+          "X-Requested-With": "XMLHttpRequest"
+        }
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("request_failed");
+          }
+          return response.text();
+        })
+        .then(function (html) {
+          dailyContainer.innerHTML = html;
+          updateSelectedDay(dayLink);
+          var nextUrl = new URL(href, window.location.origin);
+          window.history.replaceState({}, "", nextUrl.pathname + nextUrl.search);
+        })
+        .catch(function () {
+          window.location.href = href;
+        });
+    });
+  })();
+</script>
 {% endblock %}

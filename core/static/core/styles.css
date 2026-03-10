@@ -4892,6 +4892,34 @@ select {
   margin-bottom: 10px;
 }
 
+.radar-agenda-month-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.radar-agenda-month-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(141, 160, 178, 0.4);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.radar-agenda-month-arrow:hover {
+  border-color: rgba(255, 157, 86, 0.48);
+  background: rgba(255, 157, 86, 0.1);
+}
+
 .radar-agenda-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

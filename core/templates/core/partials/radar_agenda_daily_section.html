@@ -1,0 +1,53 @@
+<section class="io-card radar-agenda-section">
+  <div class="io-card-head">
+    <div>
+      <h2 class="io-title">Atividades sendo executadas no dia</h2>
+      <p class="muted">
+        {{ daily_total_trabalhos }} trabalho(s),
+        {{ daily_total_atividades }} atividade(s),
+        {{ daily_total_horas|floatformat:2 }} h no dia.
+      </p>
+    </div>
+  </div>
+  {% if daily_groups %}
+    <div class="radar-agenda-work-list">
+      {% for group in daily_groups %}
+        <article class="radar-agenda-work-item">
+          <div class="radar-agenda-work-head">
+            <div>
+              <h3 class="radar-agenda-work-title">
+                <a href="{{ group.trabalho_url }}">{{ group.trabalho_nome }}</a>
+              </h3>
+              <div class="muted">
+                Status: {{ group.trabalho_status_label }} |
+                Equipe: {{ group.total_colaboradores|default:0 }} |
+                Atividades no dia: {{ group.total_atividades }}
+              </div>
+            </div>
+            <div class="slot-badge">{{ group.total_horas_dia|floatformat:2 }} h</div>
+          </div>
+          <table class="radar-agenda-mini-table">
+            <thead>
+              <tr>
+                <th>Atividade</th>
+                <th>Status</th>
+                <th>Horas no dia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for atividade in group.atividades %}
+                <tr>
+                  <td>{{ atividade.nome }}</td>
+                  <td>{{ atividade.status_label }}</td>
+                  <td>{{ atividade.horas_dia|floatformat:2 }} h</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="muted">Nenhuma atividade programada para este dia.</div>
+  {% endif %}
+</section>
