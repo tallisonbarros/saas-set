@@ -1,7 +1,10 @@
+from io import BytesIO
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from openpyxl import load_workbook
 
 from core.models import App, IngestRecord, PerfilUsuario
 
@@ -76,3 +79,81 @@ class AppMilhaoBlaIngestConfigTests(TestCase):
         total_card = next(item for item in payload["totals_by_balance"] if item["balance"] == "TOTAL")
         self.assertEqual(total_card["total_display"], "5")
         self.assertGreaterEqual(len(payload["composition"]), 1)
+
+    def test_export_excel_endpoint_returns_workbook_with_expected_structure(self):
+        IngestRecord.objects.create(
+            source_id="bla-export-1",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="balanca_acumulado_hora",
+            payload={"TagName": "LIMBL01", "Hora": "2026-03-01T08:00:00", "ProducaoHora": "10"},
+        )
+        IngestRecord.objects.create(
+            source_id="bla-export-2",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="balanca_acumulado_hora",
+            payload={"TagName": "SECBL01", "Hora": "2026-03-01T09:00:00", "ProducaoHora": "5"},
+        )
+        IngestRecord.objects.create(
+            source_id="bla-export-3",
+            client_id="UBS3-UN1",
+            agent_id="VMSCADA",
+            source="balanca_acumulado_hora",
+            payload={"TagName": "CLABL01", "Hora": "2026-03-02T10:00:00", "ProducaoHora": "7"},
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_milhao_bla_export_excel"),
+            {"start_date": "2026-03-01", "end_date": "2026-03-02"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response["Content-Type"],
+        )
+        self.assertIn(
+            "milhao_bla_20260301_a_20260302.xlsx",
+            response["Content-Disposition"],
+        )
+
+        workbook = load_workbook(filename=BytesIO(response.content))
+        self.assertListEqual(
+            workbook.sheetnames,
+            ["Resumo", "Totais por balanca", "Leituras por hora", "Totais por dia"],
+        )
+        resumo = workbook["Resumo"]
+        self.assertEqual(resumo["A2"].value, "Arquivo: milhao_bla_20260301_a_20260302.xlsx")
+        self.assertNotIn("Cliente", {str(resumo[f"A{line}"].value) for line in range(1, 9)})
+
+        for sheet_name in workbook.sheetnames:
+            ws = workbook[sheet_name]
+            footer_text = str(ws.cell(row=ws.max_row, column=1).value or "").lower()
+            self.assertIn("setbrasil.club", footer_text)
+
+    def test_export_excel_rejects_interval_over_limit(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_milhao_bla_export_excel"),
+            {"start_date": "2026-01-01", "end_date": "2026-05-01"},
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertIn("Intervalo maximo", payload["error"])
+
+    def test_export_excel_requires_app_permission(self):
+        outsider = User.objects.create_user(username="outsider", password="123456", email="out@example.com")
+        PerfilUsuario.objects.create(
+            nome="Out",
+            email="out@example.com",
+            usuario=outsider,
+            ativo=True,
+        )
+        self.client.force_login(outsider)
+        response = self.client.post(
+            reverse("app_milhao_bla_export_excel"),
+            {"start_date": "2026-03-01", "end_date": "2026-03-02"},
+        )
+        self.assertEqual(response.status_code, 403)

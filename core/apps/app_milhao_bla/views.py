@@ -1,17 +1,29 @@
 from datetime import datetime
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from core.models import App, IngestRecord
 from core.views import _get_cliente
+from .export_excel import build_milhao_excel_export
 
 
 DEFAULT_CLIENT_ID = "clienteA"
 DEFAULT_AGENT_ID = "agente01"
 DEFAULT_SOURCES = ("balanca_acumulado_hora", "balanca_acumulado")
+MAX_EXPORT_RANGE_DAYS = 93
+BALANCE_LABELS = {
+    "LIMBL01": "MILHO",
+    "SECBL01": "GERMEN",
+    "SECBL02": "RESIDUO",
+    "CLABL01": "MIUDO",
+    "CLABL02": "GRAUDO",
+}
 
 
 def _normalize_sources(raw_source):
@@ -46,6 +58,15 @@ def _extract_balance_name(tag_name):
     return None
 
 
+def _parse_yyyy_mm_dd(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(str(value).strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
 def _format_kg(value):
     if value is None:
         return None
@@ -54,6 +75,72 @@ def _format_kg(value):
     except (TypeError, ValueError):
         return None
     return f"{rounded:,.0f}".replace(",", ".")
+
+
+def _resolve_ingest_config(app):
+    ingest_client_id = (app.ingest_client_id or "").strip() or DEFAULT_CLIENT_ID
+    ingest_agent_id = (app.ingest_agent_id or "").strip() or DEFAULT_AGENT_ID
+    ingest_sources = _normalize_sources(app.ingest_source)
+    return ingest_client_id, ingest_agent_id, ingest_sources
+
+
+def _load_entries_for_app(app, *, limit=2000, start_date=None, end_date=None):
+    ingest_client_id, ingest_agent_id, ingest_sources = _resolve_ingest_config(app)
+    records_qs = IngestRecord.objects.filter(
+        client_id=ingest_client_id,
+        agent_id=ingest_agent_id,
+        source__in=ingest_sources,
+    ).order_by("-created_at")
+    if limit is not None:
+        records_iter = records_qs[:limit]
+    else:
+        records_iter = records_qs.iterator(chunk_size=2000)
+
+    entries = []
+    for record in records_iter:
+        payload = record.payload if isinstance(record.payload, dict) else {}
+        tag_name = payload.get("TagName") or payload.get("tagname")
+        balance_name = _extract_balance_name(tag_name)
+        if not balance_name:
+            continue
+        hora = payload.get("Hora") or payload.get("DataHoraBase") or payload.get("datahora")
+        dt = _parse_iso_datetime(hora)
+        if not dt:
+            continue
+
+        item_date = dt.date()
+        if start_date and item_date < start_date:
+            continue
+        if end_date and item_date > end_date:
+            continue
+
+        value = payload.get("ProducaoHora")
+        if value is None:
+            value = payload.get("Delta")
+        try:
+            value = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            value = None
+
+        ingest_dt = record.updated_at or record.created_at
+        if ingest_dt and timezone.is_aware(ingest_dt):
+            ingest_dt = timezone.localtime(ingest_dt)
+        entries.append(
+            {
+                "balance": balance_name,
+                "label": BALANCE_LABELS.get(balance_name, balance_name),
+                "datetime": dt,
+                "date": item_date,
+                "hour": dt.strftime("%H:%M"),
+                "ingest_datetime": ingest_dt,
+                "ingest_time": ingest_dt.strftime("%H:%M") if ingest_dt else None,
+                "value": value,
+                "value_display": _format_kg(value),
+            }
+        )
+
+    entries.sort(key=lambda item: (item["date"], item["hour"], item["balance"]))
+    return entries, ingest_client_id, ingest_agent_id, ingest_sources
 
 
 def _get_app_if_allowed(request):
@@ -67,68 +154,11 @@ def _get_app_if_allowed(request):
 
 
 def _build_dashboard_context(request, app):
-    balance_labels = {
-        "LIMBL01": "MILHO",
-        "SECBL01": "GERMEN",
-        "SECBL02": "RESIDUO",
-        "CLABL01": "MIUDO",
-        "CLABL02": "GRAUDO",
-    }
-
-    ingest_client_id = (app.ingest_client_id or "").strip() or DEFAULT_CLIENT_ID
-    ingest_agent_id = (app.ingest_agent_id or "").strip() or DEFAULT_AGENT_ID
-    ingest_sources = _normalize_sources(app.ingest_source)
-    records = IngestRecord.objects.filter(
-        client_id=ingest_client_id,
-        agent_id=ingest_agent_id,
-        source__in=ingest_sources,
-    ).order_by("-created_at")[:2000]
-    entries = []
-    for record in records:
-        payload = record.payload if isinstance(record.payload, dict) else {}
-        tag_name = payload.get("TagName") or payload.get("tagname")
-        balance_name = _extract_balance_name(tag_name)
-        if not balance_name:
-            continue
-        hora = payload.get("Hora") or payload.get("DataHoraBase") or payload.get("datahora")
-        dt = _parse_iso_datetime(hora)
-        if not dt:
-            continue
-        value = payload.get("ProducaoHora")
-        if value is None:
-            value = payload.get("Delta")
-        try:
-            value = float(value) if value is not None else None
-        except (TypeError, ValueError):
-            value = None
-        ingest_dt = record.updated_at or record.created_at
-        if ingest_dt and timezone.is_aware(ingest_dt):
-            ingest_dt = timezone.localtime(ingest_dt)
-        entries.append(
-            {
-                "balance": balance_name,
-                "label": balance_labels.get(balance_name, balance_name),
-                "datetime": dt,
-                "date": dt.date(),
-                "hour": dt.strftime("%H:%M"),
-                "ingest_datetime": ingest_dt,
-                "ingest_time": ingest_dt.strftime("%H:%M") if ingest_dt else None,
-                "value": value,
-                "value_display": _format_kg(value),
-            }
-        )
-
-    entries.sort(key=lambda item: (item["date"], item["hour"]))
+    entries, ingest_client_id, ingest_agent_id, ingest_sources = _load_entries_for_app(app, limit=2000)
     dates = sorted({item["date"] for item in entries})
     balances = sorted({item["balance"] for item in entries})
 
-    selected_date_raw = request.GET.get("date", "")
-    selected_date = None
-    if selected_date_raw:
-        try:
-            selected_date = datetime.strptime(selected_date_raw, "%Y-%m-%d").date()
-        except ValueError:
-            selected_date = None
+    selected_date = _parse_yyyy_mm_dd(request.GET.get("date", ""))
     if not selected_date and dates:
         selected_date = dates[-1]
 
@@ -151,7 +181,7 @@ def _build_dashboard_context(request, app):
     last_ingests = [
         {
             "balance": balance,
-            "label": balance_labels.get(balance, balance),
+            "label": BALANCE_LABELS.get(balance, balance),
             "time": last_by_balance[balance].strftime("%H:%M"),
         }
         for balance in sorted(last_by_balance.keys())
@@ -180,7 +210,7 @@ def _build_dashboard_context(request, app):
     totals_by_balance_items = [
         {
             "balance": balance,
-            "label": balance_labels.get(balance, balance),
+            "label": BALANCE_LABELS.get(balance, balance),
             "total": totals_by_balance[balance],
             "total_display": _format_kg(totals_by_balance[balance]),
         }
@@ -211,7 +241,7 @@ def _build_dashboard_context(request, app):
     composition_items = [
         {
             "balance": balance,
-            "label": balance_labels.get(balance, balance),
+            "label": BALANCE_LABELS.get(balance, balance),
             "total": composition_totals[balance],
         }
         for balance in sorted(composition_totals.keys())
@@ -267,6 +297,7 @@ def dashboard(request):
             "app": app,
             "theme_color": app.theme_color,
             "icon": app.icon,
+            "export_max_days": MAX_EXPORT_RANGE_DAYS,
         }
     )
     return render(request, "core/apps/app_milhao_bla/dashboard.html", context)
@@ -309,3 +340,61 @@ def dashboard_cards_data(request):
             ],
         }
     )
+
+
+@login_required
+@require_POST
+def export_excel(request):
+    app = _get_app_if_allowed(request)
+    if not app:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    start_date = _parse_yyyy_mm_dd(request.POST.get("start_date"))
+    end_date = _parse_yyyy_mm_dd(request.POST.get("end_date"))
+    if not start_date or not end_date:
+        return JsonResponse({"ok": False, "error": "Intervalo invalido."}, status=400)
+    if start_date > end_date:
+        return JsonResponse({"ok": False, "error": "Data inicial maior que data final."}, status=400)
+
+    selected_days = (end_date - start_date).days + 1
+    if selected_days > MAX_EXPORT_RANGE_DAYS:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": f"Intervalo maximo: {MAX_EXPORT_RANGE_DAYS} dias.",
+            },
+            status=400,
+        )
+
+    entries, _, _, _ = _load_entries_for_app(
+        app,
+        limit=None,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    filename = f"milhao_bla_{start_date.strftime('%Y%m%d')}_a_{end_date.strftime('%Y%m%d')}.xlsx"
+    export_dt = timezone.localtime(timezone.now())
+
+    base_dir = Path(settings.BASE_DIR)
+    logo_set_path = base_dir / "core" / "static" / "core" / "logoset.png"
+    logo_milhao_path = base_dir / "core" / "apps" / "app_milhao_bla" / "static" / "app_milhao_bla" / "milhao_logo.png"
+    try:
+        file_content = build_milhao_excel_export(
+            filename=filename,
+            start_date=start_date,
+            end_date=end_date,
+            export_dt=export_dt,
+            entries=entries,
+            logo_set_path=logo_set_path,
+            logo_milhao_path=logo_milhao_path,
+        )
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Falha ao gerar arquivo Excel."}, status=500)
+
+    response = HttpResponse(
+        file_content,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Cache-Control"] = "no-store"
+    return response
