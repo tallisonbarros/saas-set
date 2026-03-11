@@ -58,6 +58,7 @@ from .models import (
     Radar,
     RadarAtividade,
     RadarAtividadeDiaExecucao,
+    RadarColaborador,
     RadarClassificacao,
     RadarContrato,
     RadarID,
@@ -389,6 +390,17 @@ def _is_admin_user(user):
     return _cliente_has_admin_privileges(cliente)
 
 
+def _is_dev_user(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    cliente = _get_cliente(user)
+    if not cliente:
+        return False
+    return cliente.tipos.filter(nome__iexact="DEV").exists()
+
+
 def _user_role(user):
     if _is_admin_user(user):
         return "ADMIN"
@@ -630,6 +642,30 @@ def _parse_colaboradores_input(raw_value, max_items=40):
     return colaboradores
 
 
+def _parse_colaborador_ids_input(raw_values, max_items=40):
+    if not raw_values:
+        return []
+    ids = []
+    seen = set()
+    for item in raw_values:
+        if item is None:
+            continue
+        for raw_part in re.split(r"[,;\s]+", str(item).strip()):
+            if not raw_part:
+                continue
+            try:
+                colaborador_id = int(raw_part)
+            except (TypeError, ValueError):
+                continue
+            if colaborador_id <= 0 or colaborador_id in seen:
+                continue
+            seen.add(colaborador_id)
+            ids.append(colaborador_id)
+            if len(ids) >= max_items:
+                return ids
+    return ids
+
+
 def _parse_horas_dia_input(raw_value, default=Decimal("8.00")):
     raw = (raw_value or "").replace(",", ".").strip()
     if not raw:
@@ -646,71 +682,174 @@ def _parse_horas_dia_input(raw_value, default=Decimal("8.00")):
     return value, None
 
 
+def _radar_colaborador_nome(row):
+    if getattr(row, "colaborador", None) and row.colaborador.nome:
+        return row.colaborador.nome
+    return row.nome or ""
+
+
 def _trabalho_colaboradores_nomes(trabalho):
     prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
     if "colaboradores" in prefetched:
         return [
-            colaborador.nome
+            _radar_colaborador_nome(colaborador)
             for colaborador in sorted(
                 prefetched["colaboradores"],
-                key=lambda item: ((item.nome or "").casefold(), item.id),
+                key=lambda item: ((_radar_colaborador_nome(item) or "").casefold(), item.id),
             )
         ]
-    return list(trabalho.colaboradores.order_by("nome", "id").values_list("nome", flat=True))
+    rows = list(trabalho.colaboradores.select_related("colaborador").all())
+    rows.sort(key=lambda item: ((_radar_colaborador_nome(item) or "").casefold(), item.id))
+    return [_radar_colaborador_nome(row) for row in rows]
 
 
-def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes):
-    incoming_by_key = {}
-    ordered_incoming = []
-    for nome in colaboradores_nomes or []:
-        normalized = " ".join((nome or "").strip().split())
-        if not normalized:
+def _trabalho_colaboradores_ids(trabalho):
+    prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
+    rows = prefetched.get("colaboradores")
+    if rows is None:
+        rows = trabalho.colaboradores.all()
+    ids = []
+    seen = set()
+    for row in rows:
+        colab_id = getattr(row, "colaborador_id", None)
+        if not colab_id or colab_id in seen:
             continue
-        normalized = normalized[:120]
-        key = normalized.casefold()
-        if key in incoming_by_key:
-            continue
-        incoming_by_key[key] = normalized
-        ordered_incoming.append(normalized)
+        seen.add(colab_id)
+        ids.append(colab_id)
+    return ids
 
-    existing_rows = list(trabalho.colaboradores.all())
+
+def _radar_colaboradores_catalogo(radar):
+    if not radar or not radar.cliente_id:
+        return RadarColaborador.objects.none()
+    return RadarColaborador.objects.filter(perfil=radar.cliente).order_by("nome", "id")
+
+
+def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes=None, colaboradores_ids=None):
+    incoming = []
+    incoming_keys = set()
+    cliente_dono = getattr(getattr(trabalho, "radar", None), "cliente", None)
+
+    colaboradores_by_id = {}
+    if cliente_dono and colaboradores_ids:
+        queryset = RadarColaborador.objects.filter(
+            perfil=cliente_dono,
+            id__in=[int(colab_id) for colab_id in colaboradores_ids if str(colab_id).isdigit()],
+        )
+        colaboradores_by_id = {item.id: item for item in queryset}
+
+    for colaborador_id in colaboradores_ids or []:
+        colaborador = colaboradores_by_id.get(colaborador_id)
+        if not colaborador:
+            continue
+        nome = " ".join((colaborador.nome or "").strip().split())[:120]
+        if not nome:
+            continue
+        key = f"id:{colaborador.id}"
+        if key in incoming_keys:
+            continue
+        incoming_keys.add(key)
+        incoming.append(
+            {
+                "key": key,
+                "nome": nome,
+                "colaborador_id": colaborador.id,
+            }
+        )
+
+    nomes_sem_id = _parse_colaboradores_input(
+        ",".join(colaboradores_nomes or []),
+        max_items=40,
+    )
+    for nome in nomes_sem_id:
+        key_nome = f"nome:{nome.casefold()}"
+        if key_nome in incoming_keys:
+            continue
+        colaborador_id = None
+        if cliente_dono:
+            mapped = RadarColaborador.objects.filter(perfil=cliente_dono, nome__iexact=nome).first()
+            if mapped:
+                colaborador_id = mapped.id
+                mapped_key = f"id:{mapped.id}"
+                if mapped_key in incoming_keys:
+                    continue
+                incoming_keys.add(mapped_key)
+                incoming.append(
+                    {
+                        "key": mapped_key,
+                        "nome": mapped.nome[:120],
+                        "colaborador_id": mapped.id,
+                    }
+                )
+                continue
+        incoming_keys.add(key_nome)
+        incoming.append(
+            {
+                "key": key_nome,
+                "nome": nome,
+                "colaborador_id": colaborador_id,
+            }
+        )
+
+    existing_rows = list(trabalho.colaboradores.select_related("colaborador").all())
     existing_by_key = {}
-    duplicate_rows = []
+    duplicate_ids = []
     for row in existing_rows:
-        key = (row.nome or "").strip().casefold()
+        if row.colaborador_id:
+            key = f"id:{row.colaborador_id}"
+        else:
+            nome_key = (row.nome or "").strip().casefold()
+            key = f"nome:{nome_key}" if nome_key else ""
         if not key:
-            duplicate_rows.append(row)
+            if row.id:
+                duplicate_ids.append(row.id)
             continue
         if key in existing_by_key:
-            duplicate_rows.append(row)
+            if row.id:
+                duplicate_ids.append(row.id)
             continue
         existing_by_key[key] = row
 
-    to_delete_ids = [row.id for row in duplicate_rows if row.id]
+    used_existing_ids = set()
     to_update = []
     to_create = []
+    ordered_nomes = []
 
-    for key, row in existing_by_key.items():
-        if key not in incoming_by_key and row.id:
-            to_delete_ids.append(row.id)
+    for item in incoming:
+        key = item["key"]
+        nome = item["nome"]
+        colaborador_id = item["colaborador_id"]
+        row = existing_by_key.get(key)
+        if not row and key.startswith("id:"):
+            row = existing_by_key.get(f"nome:{nome.casefold()}")
+        if row:
+            used_existing_ids.add(row.id)
+            if row.nome != nome or row.colaborador_id != colaborador_id:
+                row.nome = nome
+                row.colaborador_id = colaborador_id
+                to_update.append(row)
+        else:
+            to_create.append(
+                RadarTrabalhoColaborador(
+                    trabalho=trabalho,
+                    nome=nome,
+                    colaborador_id=colaborador_id,
+                )
+            )
+        ordered_nomes.append(nome)
 
-    for key, incoming_nome in incoming_by_key.items():
-        existing = existing_by_key.get(key)
-        if existing:
-            if existing.nome != incoming_nome:
-                existing.nome = incoming_nome
-                to_update.append(existing)
-            continue
-        to_create.append(RadarTrabalhoColaborador(trabalho=trabalho, nome=incoming_nome))
-
+    to_delete_ids = duplicate_ids + [
+        row.id
+        for row in existing_rows
+        if row.id and row.id not in used_existing_ids
+    ]
     if to_delete_ids:
         RadarTrabalhoColaborador.objects.filter(pk__in=to_delete_ids).delete()
     if to_update:
-        RadarTrabalhoColaborador.objects.bulk_update(to_update, ["nome"])
+        RadarTrabalhoColaborador.objects.bulk_update(to_update, ["nome", "colaborador"])
     if to_create:
         RadarTrabalhoColaborador.objects.bulk_create(to_create, ignore_conflicts=True)
-
-    return ordered_incoming
+    return ordered_nomes
 
 
 def _parse_agenda_execucao_input(raw_value, max_days=730):
@@ -1002,6 +1141,7 @@ def painel(request):
     else:
         apps = App.objects.none()
     module_signal_badges = _build_module_signal_badges(request.user, cliente)
+    is_dev_user = _is_dev_user(request.user)
     return render(
         request,
         "core/painel.html",
@@ -1013,6 +1153,7 @@ def painel(request):
             "is_vendedor": True,
             "apps": apps,
             "module_signal_badges": module_signal_badges,
+            "is_dev_user": is_dev_user,
         },
     )
 
@@ -1517,6 +1658,97 @@ def apps_gerenciar(request):
         "core/apps_gerenciar.html",
         {
             "apps": apps,
+            "message": message,
+            "message_level": message_level,
+        },
+    )
+
+
+@login_required
+def colaboradores_gerenciar(request):
+    if not _is_dev_user(request.user):
+        return HttpResponseForbidden("Sem permissao.")
+    cliente = _get_cliente(request.user)
+    if not cliente:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    message = request.GET.get("msg", "").strip() or None
+    message_level = request.GET.get("level", "").strip() or "info"
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "create_colaborador":
+            nome = " ".join((request.POST.get("nome", "") or "").strip().split())[:120]
+            cargo = " ".join((request.POST.get("cargo", "") or "").strip().split())[:120]
+            if not nome:
+                message = "Informe o nome do colaborador."
+                message_level = "error"
+            elif RadarColaborador.objects.filter(perfil=cliente, nome__iexact=nome).exists():
+                message = "Colaborador ja cadastrado para este perfil."
+                message_level = "warning"
+            else:
+                RadarColaborador.objects.create(
+                    perfil=cliente,
+                    nome=nome,
+                    cargo=cargo,
+                    ativo=True,
+                )
+                return redirect(
+                    f"{reverse('colaboradores_gerenciar')}?{urlencode({'msg': 'Colaborador cadastrado.', 'level': 'success'})}"
+                )
+        if action == "update_colaborador":
+            colaborador_id = request.POST.get("colaborador_id")
+            colaborador = RadarColaborador.objects.filter(pk=colaborador_id, perfil=cliente).first()
+            if not colaborador:
+                message = "Colaborador nao encontrado."
+                message_level = "error"
+            else:
+                nome = " ".join((request.POST.get("nome", "") or "").strip().split())[:120]
+                cargo = " ".join((request.POST.get("cargo", "") or "").strip().split())[:120]
+                if not nome:
+                    message = "Informe o nome do colaborador."
+                    message_level = "error"
+                else:
+                    duplicate_qs = RadarColaborador.objects.filter(perfil=cliente, nome__iexact=nome).exclude(pk=colaborador.pk)
+                    if duplicate_qs.exists():
+                        message = "Ja existe colaborador com esse nome."
+                        message_level = "warning"
+                    else:
+                        colaborador.nome = nome
+                        colaborador.cargo = cargo
+                        colaborador.save(update_fields=["nome", "cargo", "atualizado_em"])
+                        return redirect(
+                            f"{reverse('colaboradores_gerenciar')}?{urlencode({'msg': 'Colaborador atualizado.', 'level': 'success'})}"
+                        )
+        if action == "toggle_colaborador":
+            colaborador_id = request.POST.get("colaborador_id")
+            colaborador = RadarColaborador.objects.filter(pk=colaborador_id, perfil=cliente).first()
+            if colaborador:
+                colaborador.ativo = not colaborador.ativo
+                colaborador.save(update_fields=["ativo", "atualizado_em"])
+                status_msg = "ativado" if colaborador.ativo else "desativado"
+                return redirect(
+                    f"{reverse('colaboradores_gerenciar')}?{urlencode({'msg': f'Colaborador {status_msg}.', 'level': 'success'})}"
+                )
+            message = "Colaborador nao encontrado."
+            message_level = "error"
+        if action == "delete_colaborador":
+            colaborador_id = request.POST.get("colaborador_id")
+            colaborador = RadarColaborador.objects.filter(pk=colaborador_id, perfil=cliente).first()
+            if colaborador:
+                colaborador.delete()
+                return redirect(
+                    f"{reverse('colaboradores_gerenciar')}?{urlencode({'msg': 'Colaborador removido.', 'level': 'success'})}"
+                )
+            message = "Colaborador nao encontrado."
+            message_level = "error"
+
+    colaboradores = RadarColaborador.objects.filter(perfil=cliente).order_by("nome", "id")
+    return render(
+        request,
+        "core/colaboradores_gerenciar.html",
+        {
+            "colaboradores": colaboradores,
             "message": message,
             "message_level": message_level,
         },
@@ -3682,7 +3914,8 @@ def radar_detail(request, pk):
             setor = request.POST.get("setor", "").strip()
             solicitante = request.POST.get("solicitante", "").strip()
             responsavel = request.POST.get("responsavel", "").strip()
-            colaboradores_nomes = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
+            colaboradores_ids = _parse_colaborador_ids_input(request.POST.getlist("colaborador_ids"))
+            colaboradores_nomes_legacy = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
             horas_dia, horas_dia_error = _parse_horas_dia_input(request.POST.get("horas_dia", ""))
             contrato_id = request.POST.get("contrato")
             data_raw = request.POST.get("data_registro", "").strip()
@@ -3724,7 +3957,11 @@ def radar_detail(request, pk):
                     ultimo_status_evento_em=timezone.now(),
                     criado_por=request.user,
                 )
-                _sync_trabalho_colaboradores(novo_trabalho, colaboradores_nomes)
+                colaboradores_nomes = _sync_trabalho_colaboradores(
+                    novo_trabalho,
+                    colaboradores_nomes=colaboradores_nomes_legacy,
+                    colaboradores_ids=colaboradores_ids,
+                )
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
                     return JsonResponse(
                         {
@@ -3863,6 +4100,7 @@ def radar_detail(request, pk):
             "classificacoes": classificacoes,
             "contratos": RadarContrato.objects.order_by("nome"),
             "classificacao_filter": classificacao_filter,
+            "colaboradores_catalogo": list(_radar_colaboradores_catalogo(radar)),
             "can_manage": can_manage,
             "is_radar_creator": is_creator,
             "has_id_radar_access": has_id_radar_access,
@@ -4565,7 +4803,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             setor = request.POST.get("setor", "").strip()
             solicitante = request.POST.get("solicitante", "").strip()
             responsavel = request.POST.get("responsavel", "").strip()
-            colaboradores_nomes = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
+            colaboradores_ids = _parse_colaborador_ids_input(request.POST.getlist("colaborador_ids"))
+            colaboradores_nomes_legacy = _parse_colaboradores_input(request.POST.get("colaboradores", ""))
             horas_dia, horas_dia_error = _parse_horas_dia_input(
                 request.POST.get("horas_dia", ""),
                 default=trabalho.horas_dia if trabalho.horas_dia is not None else Decimal("8.00"),
@@ -4618,7 +4857,11 @@ def radar_trabalho_detail(request, radar_pk, pk):
                             "horas_dia",
                         ]
                     )
-                    _sync_trabalho_colaboradores(trabalho, colaboradores_nomes)
+                    _sync_trabalho_colaboradores(
+                        trabalho,
+                        colaboradores_nomes=colaboradores_nomes_legacy,
+                        colaboradores_ids=colaboradores_ids,
+                    )
                     total_colaboradores_depois = trabalho.colaboradores.count()
                     if horas_dia_alterado or total_colaboradores_antes != total_colaboradores_depois:
                         _recalcular_horas_atividades_trabalho(trabalho)
@@ -4649,7 +4892,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
             )
             colaboradores_origem = _trabalho_colaboradores_nomes(trabalho)
             if colaboradores_origem:
-                _sync_trabalho_colaboradores(novo_trabalho, colaboradores_origem)
+                _sync_trabalho_colaboradores(novo_trabalho, colaboradores_nomes=colaboradores_origem)
             atividades = list(trabalho.atividades.all())
             if atividades:
                 RadarAtividade.objects.bulk_create(
@@ -4988,6 +5231,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "can_duplicate_trabalho": can_duplicate_trabalho,
             "can_edit_trabalho_by_creator": can_edit_trabalho_by_creator,
             "trabalho_colaboradores": ", ".join(_trabalho_colaboradores_nomes(trabalho)),
+            "trabalho_colaborador_ids": _trabalho_colaboradores_ids(trabalho),
+            "colaboradores_catalogo": list(_radar_colaboradores_catalogo(radar)),
             "observacoes_trabalho": observacoes_trabalho,
             "observacao_data_default": timezone.localdate().isoformat(),
         },

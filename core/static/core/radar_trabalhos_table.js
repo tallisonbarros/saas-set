@@ -13,6 +13,7 @@
   var defaultDate = tableConfig.defaultDate || "";
   var contratosOptions = Array.isArray(tableConfig.contratos) ? tableConfig.contratos : [];
   var classificacoesOptions = Array.isArray(tableConfig.classificacoes) ? tableConfig.classificacoes : [];
+  var colaboradoresOptions = Array.isArray(tableConfig.colaboradores) ? tableConfig.colaboradores : [];
   var grid = null;
 
   function parseJsonResponse(resp) {
@@ -108,7 +109,15 @@
             { name: "solicitante", label: "Solicitante", type: "text", placeholder: "Supervisor" },
             { name: "responsavel", label: "Responsavel", type: "text", placeholder: "Equipe tecnica" },
             { name: "horas_dia", label: "Horas/dia", type: "number", min: 0.25, step: 0.25, placeholder: "8.00" },
-            { name: "colaboradores", label: "Colaboradores", type: "text", placeholder: "Ana, Bruno, Carla", wide: true },
+            {
+              name: "colaborador_ids",
+              label: "Colaboradores",
+              type: "select",
+              options: colaboradoresOptions,
+              multiple: true,
+              size: 5,
+              wide: true,
+            },
             {
               name: "contrato",
               label: "Contrato",
@@ -344,7 +353,7 @@
       "solicitante",
       "responsavel",
       "horas_dia",
-      "colaboradores",
+      "colaborador_ids",
       "contrato",
       "classificacao",
     ];

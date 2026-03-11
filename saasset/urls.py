@@ -37,6 +37,7 @@ urlpatterns = [
     path('ingest-sources/', views.ingest_sources, name="ingest_sources"),
     path('planta-conectada/', views.planta_conectada_redirect, name="planta_conectada"),
     path('apps/gerenciar/', views.apps_gerenciar, name="apps_gerenciar"),
+    path('colaboradores/', views.colaboradores_gerenciar, name="colaboradores_gerenciar"),
     path('apps/appmilhaobla/', include('core.apps.app_milhao_bla.urls')),
     path('apps/approtas/', include('core.apps.app_rotas.urls')),
     path('apps/<slug:slug>/', views.app_home, name="app_home"),

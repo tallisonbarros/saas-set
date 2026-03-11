@@ -4037,6 +4037,29 @@ select {
   margin-top: 2px;
 }
 
+.radar-observacao-inline {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.radar-observacao-inline .field {
+  margin: 0;
+}
+
+.radar-observacao-inline .field > span {
+  display: none;
+}
+
+.radar-observacao-inline .field input {
+  width: 100%;
+}
+
+.radar-observacao-inline .btn {
+  white-space: nowrap;
+}
+
 .radar-table-controls {
   display: flex;
   align-items: center;

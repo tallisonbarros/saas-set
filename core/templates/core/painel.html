@@ -243,6 +243,22 @@
             </div>
             <div class="muted">Cadastro e acesso aos apps dedicados.</div>
           </a>
+          {% if is_dev_user %}
+            <a class="panel-card" href="{% url 'colaboradores_gerenciar' %}" style="--delay: 0.27s;">
+              <div class="panel-card-top">
+                <div class="panel-title">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="8" cy="9" r="3" fill="currentColor"></circle>
+                    <circle cx="16" cy="10" r="2.5" fill="currentColor"></circle>
+                    <path d="M4 19c0-2.2 1.8-4 4-4s4 1.8 4 4" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                    <path d="M12 19c.3-1.6 1.7-2.8 3.4-2.8 1.8 0 3.3 1.2 3.6 2.8" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                  </svg>
+                  Colaboradores
+                </div>
+              </div>
+              <div class="muted">Catalogo tecnico para selecao em trabalhos do radar.</div>
+            </a>
+          {% endif %}
           <a class="panel-card" href="{% url 'admin_logs' %}" style="--delay: 0.3s;">
             <div class="panel-card-top">
               <div class="panel-title">

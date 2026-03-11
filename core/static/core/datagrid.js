@@ -1024,10 +1024,23 @@
       var inputHtml = "";
       if (type === "select") {
         var options = Array.isArray(field.options) ? field.options : [];
+        var isMultiple = !!field.multiple;
+        var size = Number(field.size || 0);
+        var multipleAttr = isMultiple ? " multiple" : "";
+        var sizeAttr = isMultiple && size > 0 ? ' size="' + escHtml(size) + '"' : "";
+        var selectedMap = {};
+        if (isMultiple) {
+          var values = Array.isArray(field.value) ? field.value : [];
+          values.forEach(function (item) {
+            selectedMap[safeText(item)] = true;
+          });
+        }
         inputHtml =
           '<select name="' +
           name +
           '"' +
+          multipleAttr +
+          sizeAttr +
           required +
           ">" +
           options
@@ -1039,7 +1052,9 @@
                 };
               }
               var optionValue = safeText(option.value);
-              var selected = optionValue === value ? " selected" : "";
+              var selected = isMultiple
+                ? (selectedMap[optionValue] ? " selected" : "")
+                : (optionValue === value ? " selected" : "");
               return '<option value="' + escHtml(optionValue) + '"' + selected + ">" + escHtml(option.label || optionValue) + "</option>";
             })
             .join("") +
@@ -1204,6 +1219,13 @@
                 }
                 var input = createForm.elements[field.name];
                 if (input) {
+                  if (field.type === "select" && field.multiple && input.options) {
+                    var defaults = Array.isArray(field.value) ? field.value.map(safeText) : [];
+                    Array.prototype.forEach.call(input.options, function (option) {
+                      option.selected = defaults.indexOf(option.value) >= 0;
+                    });
+                    return;
+                  }
                   input.value = safeText(field.value);
                 }
               });

@@ -184,6 +184,11 @@
         {% for classificacao in classificacoes %}
           { value: "{{ classificacao.id }}", label: "{{ classificacao.nome|escapejs }}" }{% if not forloop.last %},{% endif %}
         {% endfor %}
+      ],
+      colaboradores: [
+        {% for colaborador in colaboradores_catalogo %}
+          { value: "{{ colaborador.id }}", label: "{{ colaborador.nome|escapejs }}{% if colaborador.cargo %} - {{ colaborador.cargo|escapejs }}{% endif %}" }{% if not forloop.last %},{% endif %}
+        {% endfor %}
       ]
     };
   </script>

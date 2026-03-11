@@ -142,7 +142,16 @@
               </label>
               <label class="field" style="grid-column: 1 / -1;">
                 <span>Colaboradores</span>
-                <input type="text" name="colaboradores" value="{{ trabalho_colaboradores|default:'' }}" placeholder="Ana, Bruno, Carla">
+                <select name="colaborador_ids" multiple size="6">
+                  {% for colaborador in colaboradores_catalogo %}
+                    <option value="{{ colaborador.id }}" {% if colaborador.id in trabalho_colaborador_ids %}selected{% endif %}>
+                      {{ colaborador.nome }}{% if colaborador.cargo %} - {{ colaborador.cargo }}{% endif %}
+                    </option>
+                  {% endfor %}
+                </select>
+                {% if not colaboradores_catalogo %}
+                  <small class="muted">Nenhum colaborador cadastrado. Use o modulo Colaboradores no painel.</small>
+                {% endif %}
               </label>
               <label class="field">
                 <div class="field-row">
@@ -215,29 +224,23 @@
     </details>
   {% endif %}
 
-  <section class="io-card" style="margin-top: 18px;">
-    <div class="io-card-head">
-      <div>
-        <h2 class="io-title">Observacoes do trabalho</h2>
-        <p class="muted">Lista historica de observacoes vinculadas ao trabalho.</p>
-      </div>
-    </div>
+  <details class="io-card io-discrete" style="margin-top: 18px;">
+    <summary class="io-discrete-summary">
+      <span class="io-title">Observacoes do trabalho</span>
+      <span class="muted">Lista historica de observacoes vinculadas ao trabalho.</span>
+    </summary>
     <div class="io-discrete-body">
       {% if can_edit_trabalho_by_creator %}
-        <form class="io-form" method="post" style="margin-bottom: 14px;">
+        <form class="io-form radar-observacao-inline-form" method="post" style="margin-bottom: 14px;">
           {% csrf_token %}
           <input type="hidden" name="action" value="create_observacao">
-          <div class="io-form-grid">
-            <label class="field">
-              <span>Data</span>
-              <input type="date" name="observacao_data" value="{{ observacao_data_default }}" required>
+          <div class="radar-observacao-inline">
+            <label class="field radar-observacao-data">
+              <input type="date" name="observacao_data" value="{{ observacao_data_default }}" aria-label="Data da observacao" required>
             </label>
-            <label class="field" style="grid-column: 1 / -1;">
-              <span>Observacao</span>
-              <textarea name="observacao_texto" rows="3" placeholder="Registre uma observacao do trabalho." required></textarea>
+            <label class="field radar-observacao-texto">
+              <input type="text" name="observacao_texto" placeholder="Registre uma observacao do trabalho." aria-label="Texto da observacao" required>
             </label>
-          </div>
-          <div class="form-actions">
             <button class="btn btn-primary" type="submit">Salvar observacao</button>
           </div>
         </form>
@@ -248,21 +251,17 @@
           {% for observacao in observacoes_trabalho %}
             <div class="user-row">
               {% if can_edit_trabalho_by_creator %}
-                <form class="io-form" method="post" style="width: 100%;">
+                <form class="io-form radar-observacao-inline-form" method="post" style="width: 100%;">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="update_observacao">
                   <input type="hidden" name="observacao_id" value="{{ observacao.id }}">
-                  <div class="io-form-grid">
-                    <label class="field">
-                      <span>Data</span>
-                      <input type="date" name="observacao_data" value="{{ observacao.data_observacao|date:'Y-m-d' }}" required>
+                  <div class="radar-observacao-inline">
+                    <label class="field radar-observacao-data">
+                      <input type="date" name="observacao_data" value="{{ observacao.data_observacao|date:'Y-m-d' }}" aria-label="Data da observacao" required>
                     </label>
-                    <label class="field" style="grid-column: 1 / -1;">
-                      <span>Observacao</span>
-                      <textarea name="observacao_texto" rows="3" required>{{ observacao.texto }}</textarea>
+                    <label class="field radar-observacao-texto">
+                      <input type="text" name="observacao_texto" value="{{ observacao.texto }}" aria-label="Texto da observacao" required>
                     </label>
-                  </div>
-                  <div class="form-actions">
                     <button class="btn btn-ghost" type="submit">Atualizar</button>
                   </div>
                 </form>
@@ -285,7 +284,7 @@
         <div class="muted">Nenhuma observacao registrada.</div>
       {% endif %}
     </div>
-  </section>
+  </details>
 
   {{ atividades_table_data|json_script:"radar-atividades-data" }}
   <script>

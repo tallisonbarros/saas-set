@@ -492,8 +492,41 @@ class RadarTrabalho(models.Model):
         return self.nome
 
 
+class RadarColaborador(models.Model):
+    perfil = models.ForeignKey(
+        "PerfilUsuario",
+        on_delete=models.CASCADE,
+        related_name="radar_colaboradores",
+    )
+    nome = models.CharField(max_length=120)
+    cargo = models.CharField(max_length=120, blank=True)
+    atributos = models.JSONField(default=dict, blank=True)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["perfil", "nome"],
+                name="unique_radar_colaborador_por_perfil_nome",
+            ),
+        ]
+
+    def __str__(self):
+        return self.nome
+
+
 class RadarTrabalhoColaborador(models.Model):
     trabalho = models.ForeignKey(RadarTrabalho, on_delete=models.CASCADE, related_name="colaboradores")
+    colaborador = models.ForeignKey(
+        RadarColaborador,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trabalhos_vinculados",
+    )
     nome = models.CharField(max_length=120)
     criado_em = models.DateTimeField(auto_now_add=True)
 
