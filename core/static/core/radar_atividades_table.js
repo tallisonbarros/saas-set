@@ -757,7 +757,7 @@
           submitPosition: "end",
           fields: [
             { name: "action", type: "hidden", value: "create_atividade" },
-            { name: "nome", label: "Nome", type: "text", placeholder: "Nome da atividade", required: true },
+            { name: "nome", label: "Nome", type: "text", placeholder: "Nova Atividade", required: true },
             { name: "descricao", label: "Descricao", type: "text", placeholder: "Descricao resumida" },
           ],
           onSubmit: function (ctx) {

@@ -21,9 +21,6 @@
 
   var modalEl = null;
   var modalBodyEl = null;
-  var modalTitleEl = null;
-  var modalSubtitleEl = null;
-  var modalOpenLinkEl = null;
   var modalGrid = null;
   var rowObserver = null;
 
@@ -31,6 +28,8 @@
     isOpen: false,
     trabalhoId: "",
     detalheUrl: "",
+    trabalhoNome: "",
+    trabalhoDescricao: "",
   };
 
   var statusRequestInFlight = false;
@@ -179,6 +178,30 @@
     );
   }
 
+  function renderGridHeader() {
+    var title = utils.escHtml(modalState.trabalhoNome || "Atividades do trabalho");
+    var description = utils.escHtml(modalState.trabalhoDescricao || "Sessao de atividades do trabalho.");
+    var detailUrl = utils.escHtml(modalState.detalheUrl || "#");
+    return (
+      '<div class="io-card-head radar-modal-grid-head">' +
+      '<div class="radar-modal-grid-head-main">' +
+      '<h2 class="io-title">' +
+      title +
+      "</h2>" +
+      '<p class="muted">' +
+      description +
+      "</p>" +
+      "</div>" +
+      '<div class="radar-modal-grid-head-actions">' +
+      '<a class="btn btn-ghost btn-compact" href="' +
+      detailUrl +
+      '" target="_self">Abrir trabalho</a>' +
+      '<button type="button" class="btn btn-outline btn-compact" data-radar-work-modal-close>Fechar</button>' +
+      "</div>" +
+      "</div>"
+    );
+  }
+
   function closeStatusMenu() {
     if (activeStatusTrigger) {
       activeStatusTrigger.setAttribute("aria-expanded", "false");
@@ -214,9 +237,12 @@
       return;
     }
     modalBodyEl.innerHTML =
+      '<section class="io-card radar-table-card">' +
+      renderGridHeader() +
       '<div class="radar-work-modal-state' + (isError ? ' is-error' : '') + '">' +
       utils.escHtml(message) +
-      '</div>';
+      "</div>" +
+      "</section>";
   }
 
   function ensureModal() {
@@ -228,16 +254,12 @@
     modalEl.setAttribute("hidden", "hidden");
     modalEl.innerHTML =
       '<div class="radar-work-modal-backdrop" data-radar-work-modal-close></div>' +
-      '<section class="radar-work-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="radar-work-modal-title">' +
-      '<header class="radar-work-modal-head"><div class="radar-work-modal-heading"><h2 id="radar-work-modal-title">Atividades do trabalho</h2><p class="muted" data-radar-work-modal-subtitle></p></div><div class="radar-work-modal-actions"><a class="btn btn-ghost btn-compact" href="#" target="_self" data-radar-work-modal-open-detail>Abrir trabalho</a><button type="button" class="btn btn-outline btn-compact" data-radar-work-modal-close>Fechar</button></div></header>' +
+      '<section class="radar-work-modal-dialog" role="dialog" aria-modal="true" aria-label="Atividades do trabalho">' +
       '<div class="radar-work-modal-body" data-radar-work-modal-body></div>' +
       '</section>';
     document.body.appendChild(modalEl);
 
     modalBodyEl = modalEl.querySelector("[data-radar-work-modal-body]");
-    modalTitleEl = modalEl.querySelector("#radar-work-modal-title");
-    modalSubtitleEl = modalEl.querySelector("[data-radar-work-modal-subtitle]");
-    modalOpenLinkEl = modalEl.querySelector("[data-radar-work-modal-open-detail]");
   }
 
   function canReorderForState(state) {
@@ -334,7 +356,7 @@
             submitPosition: "end",
             fields: [
               { name: "action", type: "hidden", value: "create_atividade" },
-              { name: "nome", label: "Nome", type: "text", placeholder: "Nome da atividade", required: true },
+              { name: "nome", label: "Nome", type: "text", placeholder: "Nova Atividade", required: true },
               { name: "descricao", label: "Descricao", type: "text", placeholder: "Descricao resumida" },
             ],
             onSubmit: function (ctx) {
@@ -423,7 +445,7 @@
     if (!modalBodyEl) {
       return;
     }
-    modalBodyEl.innerHTML = '<section class="io-card radar-table-card">' + buildGridShell() + '</section>';
+    modalBodyEl.innerHTML = '<section class="io-card radar-table-card">' + renderGridHeader() + buildGridShell() + '</section>';
     initializeGrid(rows);
     if (!modalGrid) {
       setModalState("Nao foi possivel montar a grade de atividades.", true);
@@ -470,11 +492,9 @@
     modalState.isOpen = true;
     modalState.trabalhoId = String(data.id || "");
     modalState.detalheUrl = String(data.detalheUrl || "");
+    modalState.trabalhoNome = String(data.nome || "");
+    modalState.trabalhoDescricao = String(data.descricao || "");
     modalState.requestToken = (modalState.requestToken || 0) + 1;
-
-    modalTitleEl.textContent = data.nome || "Atividades do trabalho";
-    modalSubtitleEl.textContent = data.descricao || "Sessao de atividades do trabalho.";
-    modalOpenLinkEl.href = modalState.detalheUrl;
 
     modalEl.hidden = false;
     modalEl.classList.add("is-open");
@@ -490,6 +510,8 @@
     modalState.isOpen = false;
     modalState.trabalhoId = "";
     modalState.detalheUrl = "";
+    modalState.trabalhoNome = "";
+    modalState.trabalhoDescricao = "";
     modalState.requestToken = (modalState.requestToken || 0) + 1;
     modalGrid = null;
     closeStatusMenu();

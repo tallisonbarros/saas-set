@@ -4236,18 +4236,23 @@ select {
   z-index: 1;
   width: min(980px, calc(100vw - 28px));
   max-height: calc(100vh - 28px);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: #1a2028;
-  box-shadow: var(--shadow);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 
-.radar-work-modal-head {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+.radar-work-modal-body {
+  padding: 0;
+  overflow: auto;
+}
+
+.radar-work-modal .radar-table-card {
+  margin-top: 0;
+}
+
+.radar-modal-grid-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -4255,28 +4260,26 @@ select {
   flex-wrap: wrap;
 }
 
-.radar-work-modal-heading h2 {
+.radar-modal-grid-head-main .io-title {
   margin: 0;
-  font-size: 18px;
 }
 
-.radar-work-modal-heading .muted {
+.radar-modal-grid-head-main .muted {
   margin: 4px 0 0;
   max-width: 640px;
 }
 
-.radar-work-modal-actions {
+.radar-modal-grid-head-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.radar-work-modal-body {
-  padding: 12px 14px 14px;
-  overflow: auto;
+.radar-work-modal .datagrid-modal-atividades .datagrid-toolbar {
+  display: none;
 }
 
-.radar-work-modal .datagrid-modal-atividades .datagrid-toolbar {
+.radar-work-modal .datagrid-modal-atividades [data-dg-head] {
   display: none;
 }
 
@@ -5577,15 +5580,11 @@ select.datagrid-filter-input optgroup {
     max-height: calc(100vh - 16px);
   }
 
-  .radar-work-modal-head {
-    padding: 10px;
-  }
-
   .radar-work-modal-body {
-    padding: 10px;
+    padding: 0;
   }
 
-  .radar-work-modal-actions .btn {
+  .radar-modal-grid-head-actions .btn {
     width: 100%;
   }
 
