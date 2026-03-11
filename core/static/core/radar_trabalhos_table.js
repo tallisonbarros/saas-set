@@ -346,6 +346,18 @@
     if (classificacaoSelect && !classificacaoSelect.id) {
       classificacaoSelect.id = "quick-classificacao-select";
     }
+    var colaboradoresSelect = createForm.querySelector("[name='colaborador_ids']");
+    if (colaboradoresSelect) {
+      colaboradoresSelect.setAttribute("data-colab-picker", "1");
+      colaboradoresSelect.setAttribute("data-colab-picker-placeholder", "Adicionar colaborador...");
+      colaboradoresSelect.setAttribute("data-colab-picker-empty", "Sem colaboradores selecionados");
+      if (window.RadarColaboradoresPicker && typeof window.RadarColaboradoresPicker.mountFromSelect === "function") {
+        window.RadarColaboradoresPicker.mountFromSelect(colaboradoresSelect, {
+          placeholder: "Adicionar colaborador...",
+          emptyText: "Sem colaboradores selecionados",
+        });
+      }
+    }
 
     var advancedFieldNames = [
       "descricao",

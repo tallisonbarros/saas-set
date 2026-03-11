@@ -142,7 +142,14 @@
               </label>
               <label class="field" style="grid-column: 1 / -1;">
                 <span>Colaboradores</span>
-                <select name="colaborador_ids" multiple size="6">
+                <select
+                  name="colaborador_ids"
+                  multiple
+                  size="6"
+                  data-colab-picker
+                  data-colab-picker-placeholder="Adicionar colaborador..."
+                  data-colab-picker-empty="Sem colaboradores selecionados"
+                >
                   {% for colaborador in colaboradores_catalogo %}
                     <option value="{{ colaborador.id }}" {% if colaborador.id in trabalho_colaborador_ids %}selected{% endif %}>
                       {{ colaborador.nome }}{% if colaborador.cargo %} - {{ colaborador.cargo }}{% endif %}
@@ -293,8 +300,17 @@
     };
   </script>
   <script src="{% static 'core/datagrid.js' %}"></script>
+  <script src="{% static 'core/colaboradores_picker.js' %}"></script>
   <script src="{% static 'core/radar_shared.js' %}"></script>
   <script src="{% static 'core/radar_atividades_table.js' %}"></script>
+  <script>
+    (function () {
+      if (!window.RadarColaboradoresPicker) {
+        return;
+      }
+      window.RadarColaboradoresPicker.mountAll("select[data-colab-picker]");
+    })();
+  </script>
   <script>
     (function () {
       if (!window.RadarShared) {
