@@ -29,6 +29,9 @@
             </svg>
             <span>Agenda</span>
           </a>
+          {% if can_manage %}
+            <button class="hud-menu-pill" type="button" id="radar-export-open">Exportar relatorio</button>
+          {% endif %}
           <a class="hud-menu-pill" href="{% url 'radar_list' %}">Voltar para radares</a>
         </div>
       </div>
@@ -37,6 +40,34 @@
   <div id="cadastro-message" class="notice" style="display: none;"></div>
   {% if message %}
     <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
+  {% endif %}
+
+  {% if can_manage %}
+    <div
+      class="radar-export-modal"
+      id="radar-export-modal"
+      hidden
+      data-export-url="{{ radar_export_pdf_url }}"
+    >
+      <div class="radar-export-modal-backdrop" data-radar-export-close></div>
+      <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="radar-export-title">
+        <header class="radar-export-modal-head">
+          <h2 id="radar-export-title">Exportar relatorio</h2>
+          <button class="btn btn-outline btn-compact" type="button" data-radar-export-close>Fechar</button>
+        </header>
+        <div class="radar-export-modal-body">
+          <label class="field">
+            <span>Mes</span>
+            <input type="month" id="radar-export-month" value="{{ export_month_default }}" required>
+          </label>
+          <p class="muted">Serao incluidos apenas trabalhos com atividade agendada no mes selecionado.</p>
+          <div class="notice notice-error" id="radar-export-error" style="display: none;"></div>
+        </div>
+        <footer class="radar-export-modal-foot">
+          <button class="btn btn-primary" type="button" id="radar-export-submit">Gerar relatorio</button>
+        </footer>
+      </section>
+    </div>
   {% endif %}
 
   <section class="io-card radar-table-card">
@@ -160,6 +191,7 @@
   <script src="{% static 'core/radar_shared.js' %}"></script>
   <script src="{% static 'core/radar_trabalhos_table.js' %}"></script>
   <script src="{% static 'core/radar_trabalhos_modal.js' %}"></script>
+  <script src="{% static 'core/radar_export_modal.js' %}"></script>
   <script>
     (function () {
       if (!window.RadarShared) {

@@ -3868,6 +3868,8 @@ def radar_detail(request, pk):
             "message": message,
             "message_level": message_level,
             "open_cadastro": request.GET.get("cadastro", "").strip(),
+            "export_month_default": timezone.localdate().strftime("%Y-%m"),
+            "radar_export_pdf_url": reverse("radar_export_pdf", args=[radar.pk]),
         },
     )
 
@@ -4131,6 +4133,304 @@ def radar_agenda(request, pk):
         "core/radar_agenda.html",
         context,
     )
+
+
+def _radar_month_summary_snapshot(radar, month_start, month_end):
+    month_summary_rows_raw = list(
+        RadarAtividadeDiaExecucao.objects.filter(
+            atividade__trabalho__radar=radar,
+            data_execucao__gte=month_start,
+            data_execucao__lte=month_end,
+        )
+        .values(
+            "atividade__trabalho_id",
+            "atividade__trabalho__nome",
+            "atividade__trabalho__status",
+            "atividade__trabalho__horas_dia",
+        )
+        .annotate(
+            primeiro_dia=Min("data_execucao"),
+            ultimo_dia=Max("data_execucao"),
+            total_slots=Count("id"),
+        )
+        .order_by(
+            "primeiro_dia",
+            "ultimo_dia",
+            "atividade__trabalho__nome",
+        )
+    )
+    trabalhos_ids = {
+        row["atividade__trabalho_id"]
+        for row in month_summary_rows_raw
+        if row.get("atividade__trabalho_id")
+    }
+    colaboradores_por_trabalho = {}
+    if trabalhos_ids:
+        colaboradores_por_trabalho = {
+            row["trabalho_id"]: row["total_colaboradores"]
+            for row in (
+                RadarTrabalhoColaborador.objects.filter(trabalho_id__in=trabalhos_ids)
+                .values("trabalho_id")
+                .annotate(total_colaboradores=Count("id"))
+            )
+        }
+
+    status_map = dict(RadarTrabalho.Status.choices)
+    month_summary = []
+    month_total_horas = Decimal("0.00")
+    for row in month_summary_rows_raw:
+        trabalho_id = row["atividade__trabalho_id"]
+        total_colaboradores = colaboradores_por_trabalho.get(trabalho_id, 0)
+        multiplier = Decimal(total_colaboradores if total_colaboradores > 0 else 1)
+        horas_dia = row["atividade__trabalho__horas_dia"] or Decimal("8.00")
+        total_slots = row["total_slots"] or 0
+        total_horas = (horas_dia * multiplier * Decimal(total_slots)).quantize(Decimal("0.01"))
+        month_total_horas += total_horas
+        status_value = row["atividade__trabalho__status"] or ""
+        month_summary.append(
+            {
+                "trabalho_id": trabalho_id,
+                "trabalho_nome": row["atividade__trabalho__nome"] or "-",
+                "inicio": row["primeiro_dia"],
+                "inicio_display": row["primeiro_dia"].strftime("%d/%m/%Y") if row["primeiro_dia"] else "-",
+                "fim": row["ultimo_dia"],
+                "fim_display": row["ultimo_dia"].strftime("%d/%m/%Y") if row["ultimo_dia"] else "-",
+                "status": status_value,
+                "status_label": status_map.get(status_value, status_value),
+                "total_slots": total_slots,
+                "total_horas": total_horas,
+            }
+        )
+    month_total_horas = month_total_horas.quantize(Decimal("0.01"))
+    return {
+        "month_summary": month_summary,
+        "month_total_horas": month_total_horas,
+        "trabalhos_ids": trabalhos_ids,
+    }
+
+
+def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
+    month_snapshot = _radar_month_summary_snapshot(radar, month_start, month_end)
+    month_summary = month_snapshot["month_summary"]
+    trabalhos_ids = month_snapshot["trabalhos_ids"]
+    month_total_horas = month_snapshot["month_total_horas"]
+    if not month_summary:
+        return {
+            "radar": radar,
+            "month_summary": [],
+        }
+
+    trabalhos_qs = (
+        RadarTrabalho.objects.filter(pk__in=trabalhos_ids)
+        .select_related("classificacao", "contrato")
+        .prefetch_related("atividades")
+    )
+    trabalhos_map = {trabalho.id: trabalho for trabalho in trabalhos_qs}
+
+    colaboradores_por_trabalho = {}
+    for row in RadarTrabalhoColaborador.objects.filter(trabalho_id__in=trabalhos_ids).order_by("nome", "id"):
+        colaboradores_por_trabalho.setdefault(row.trabalho_id, []).append(row.nome)
+
+    exec_rows = list(
+        RadarAtividadeDiaExecucao.objects.filter(
+            atividade__trabalho__radar=radar,
+            data_execucao__gte=month_start,
+            data_execucao__lte=month_end,
+        )
+        .select_related(
+            "atividade",
+            "atividade__trabalho",
+        )
+        .order_by(
+            "atividade__trabalho_id",
+            "data_execucao",
+            "atividade__ordem",
+            "atividade__nome",
+            "id",
+        )
+    )
+    exec_por_trabalho = {}
+    for exec_row in exec_rows:
+        trabalho_id = exec_row.atividade.trabalho_id if exec_row.atividade else None
+        if not trabalho_id:
+            continue
+        exec_por_trabalho.setdefault(trabalho_id, []).append(exec_row)
+
+    trabalho_pages = []
+    for summary_row in month_summary:
+        trabalho_id = summary_row.get("trabalho_id")
+        trabalho = trabalhos_map.get(trabalho_id)
+        if not trabalho:
+            continue
+
+        horas_dia = trabalho.horas_dia if trabalho.horas_dia is not None else Decimal("8.00")
+        horas_dia = horas_dia.quantize(Decimal("0.01"))
+        execucoes = exec_por_trabalho.get(trabalho_id, [])
+        atividade_dia_rows = []
+        for execucao in execucoes:
+            atividade_nome = "-"
+            if execucao.atividade and execucao.atividade.nome:
+                atividade_nome = execucao.atividade.nome
+            atividade_dia_rows.append(
+                {
+                    "data_display": execucao.data_execucao.strftime("%d/%m/%Y"),
+                    "atividade_nome": atividade_nome,
+                    "hxh": horas_dia,
+                }
+            )
+
+        colaboradores = colaboradores_por_trabalho.get(trabalho_id, [])
+        colaboradores_display = colaboradores or ["Nao informado"]
+        colaborador_tables = []
+        for nome_colaborador in colaboradores_display:
+            total_colaborador_horas = (horas_dia * Decimal(len(atividade_dia_rows))).quantize(Decimal("0.01"))
+            colaborador_tables.append(
+                {
+                    "nome": nome_colaborador,
+                    "rows": atividade_dia_rows,
+                    "total_horas": total_colaborador_horas,
+                }
+            )
+
+        total_execucoes = len(atividade_dia_rows)
+        multiplier = Decimal(len(colaboradores) if len(colaboradores) > 0 else 1)
+        total_horas_trabalho = (horas_dia * Decimal(total_execucoes) * multiplier).quantize(Decimal("0.01"))
+        prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
+        atividades_base = prefetched.get("atividades")
+        if atividades_base is None:
+            atividades_base = list(trabalho.atividades.all())
+        atividades_ordenadas = sorted(
+            atividades_base,
+            key=lambda item: (item.ordem or 0, item.criado_em, item.id),
+        )
+        atividades_resumo = [
+            {
+                "nome": atividade.nome or "-",
+                "descricao": atividade.descricao or "",
+                "ordem": atividade.ordem or 0,
+            }
+            for atividade in atividades_ordenadas
+        ]
+
+        trabalho_pages.append(
+            {
+                "id": trabalho.id,
+                "nome": trabalho.nome or "-",
+                "descricao": trabalho.descricao or "Sem descricao.",
+                "setor": trabalho.setor or "-",
+                "solicitante": trabalho.solicitante or "-",
+                "responsavel": trabalho.responsavel or "-",
+                "classificacao": trabalho.classificacao.nome if trabalho.classificacao else "-",
+                "contrato": trabalho.contrato.nome if trabalho.contrato else "-",
+                "status_label": trabalho.get_status_display(),
+                "data_registro_display": trabalho.data_registro.strftime("%d/%m/%Y") if trabalho.data_registro else "-",
+                "inicio_display": summary_row["inicio_display"],
+                "fim_display": summary_row["fim_display"],
+                "horas_dia": horas_dia,
+                "total_execucoes": total_execucoes,
+                "total_colaboradores": len(colaboradores),
+                "total_horas": total_horas_trabalho,
+                "atividades_resumo": atividades_resumo,
+                "colaborador_tables": colaborador_tables,
+            }
+        )
+
+    month_names = [
+        "Janeiro",
+        "Fevereiro",
+        "Marco",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+    ]
+    month_label = f"{month_names[month_start.month - 1]} de {month_start.year}"
+    logo_path = finders.find("core/logoset.png") or finders.find("core/FAVICON_PRETO.png")
+    logo_uri = Path(logo_path).as_uri() if logo_path else ""
+    return {
+        "radar": radar,
+        "month_label": month_label,
+        "month_iso": month_start.strftime("%Y-%m"),
+        "month_summary": month_summary,
+        "month_total_trabalhos": len(month_summary),
+        "month_total_horas": month_total_horas,
+        "trabalho_pages": trabalho_pages,
+        "gerado_em_display": timezone.localdate().strftime("%d/%m/%Y"),
+        "logo_uri": logo_uri,
+    }
+
+
+def _render_radar_relatorio_pdf(context):
+    try:
+        from weasyprint import CSS, HTML
+    except ImportError:
+        return None
+    html = render_to_string("core/radar_relatorio_pdf.html", context)
+    css_path = finders.find("css/radar_relatorio_pdf.css")
+    stylesheets = [CSS(filename=css_path)] if css_path else None
+    pdf_content = HTML(string=html, base_url=str(settings.BASE_DIR)).write_pdf(stylesheets=stylesheets)
+    return BytesIO(pdf_content)
+
+
+def _radar_export_error_response(request, message, status=400):
+    if _is_partial_request(request):
+        return JsonResponse({"ok": False, "message": message}, status=status)
+    return HttpResponse(message, status=status)
+
+
+@login_required
+def radar_export_pdf(request, pk):
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    cliente = _get_cliente(request.user)
+    if not cliente:
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+    radar = get_object_or_404(
+        Radar,
+        Q(pk=pk),
+        Q(cliente=cliente) | Q(id_radar__in=cliente.radares.all()),
+    )
+    if not _is_radar_creator_user(request.user, radar):
+        return _radar_export_error_response(request, "Somente quem criou o radar pode exportar.", status=403)
+
+    mes_raw = request.GET.get("mes", "").strip()
+    if not re.match(r"^\d{4}-\d{2}$", mes_raw):
+        return _radar_export_error_response(request, "Informe um mes valido no formato YYYY-MM.", status=400)
+    try:
+        month_start = datetime.strptime(f"{mes_raw}-01", "%Y-%m-%d").date()
+    except ValueError:
+        return _radar_export_error_response(request, "Mes invalido.", status=400)
+    month_end = date(
+        month_start.year,
+        month_start.month,
+        calendar.monthrange(month_start.year, month_start.month)[1],
+    )
+
+    context = _build_radar_relatorio_pdf_context(radar, month_start, month_end)
+    if not context.get("month_summary"):
+        return _radar_export_error_response(
+            request,
+            "Sem atividades executadas no mes selecionado. Relatorio bloqueado.",
+            status=400,
+        )
+
+    pdf_buffer = _render_radar_relatorio_pdf(context)
+    if not pdf_buffer:
+        return _radar_export_error_response(request, "Biblioteca de PDF indisponivel (WeasyPrint).", status=500)
+
+    radar_nome = re.sub(r"[^A-Za-z0-9_-]+", "_", str(radar.nome or f"radar_{radar.id}")).strip("_")
+    if not radar_nome:
+        radar_nome = f"radar_{radar.id}"
+    filename = f"relatorio_{radar_nome}_{month_start.strftime('%Y-%m')}.pdf"
+    response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 @login_required

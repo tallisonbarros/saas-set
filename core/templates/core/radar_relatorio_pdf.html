@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relatorio Radar - {{ radar.nome }}</title>
+</head>
+<body>
+  <div class="footer-left">
+    <span>Gerado em {{ gerado_em_display }}</span>
+    <span class="footer-sep">|</span>
+    <span>SETBRASIL.COM</span>
+  </div>
+
+  <main class="report-doc">
+    <header class="report-cover avoid-break">
+      <div class="brand-strip">
+        <div class="brand-strip-pattern"></div>
+        {% if logo_uri %}
+          <img class="brand-logo" src="{{ logo_uri }}" alt="SET">
+        {% else %}
+          <div class="brand-fallback">SET</div>
+        {% endif %}
+      </div>
+      <div class="cover-head">
+        <h1>Relatorio de atividades</h1>
+        <p class="cover-subtitle">Radar: {{ radar.nome }}</p>
+        <p class="cover-period">Mes de referencia: {{ month_label }}</p>
+      </div>
+      <div class="cover-kpis">
+        <div class="kpi-card">
+          <div class="kpi-label">Trabalhos com execucao</div>
+          <div class="kpi-value">{{ month_total_trabalhos }}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total HxH no mes</div>
+          <div class="kpi-value">{{ month_total_horas|floatformat:2 }}</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="content-card section">
+      <h2 class="section-title">Resumo mensal</h2>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Inicio</th>
+            <th>Fim</th>
+            <th>Trabalho</th>
+            <th>Horas totais</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in month_summary %}
+            <tr>
+              <td>{{ row.inicio_display }}</td>
+              <td>{{ row.fim_display }}</td>
+              <td>{{ row.trabalho_nome }}</td>
+              <td>{{ row.total_horas|floatformat:2 }} h</td>
+              <td>{{ row.status_label }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% for trabalho in trabalho_pages %}
+      <section class="work-page page-break-before">
+        <div class="content-card section avoid-break">
+          <h2 class="section-title">Trabalho: {{ trabalho.nome }}</h2>
+          <table class="meta-table">
+            <tbody>
+              <tr>
+                <th>Status</th>
+                <td>{{ trabalho.status_label }}</td>
+                <th>Data de registro</th>
+                <td>{{ trabalho.data_registro_display }}</td>
+              </tr>
+              <tr>
+                <th>Periodo no mes</th>
+                <td>{{ trabalho.inicio_display }} ate {{ trabalho.fim_display }}</td>
+                <th>Horas/dia</th>
+                <td>{{ trabalho.horas_dia|floatformat:2 }} h</td>
+              </tr>
+              <tr>
+                <th>Setor</th>
+                <td>{{ trabalho.setor }}</td>
+                <th>Solicitante</th>
+                <td>{{ trabalho.solicitante }}</td>
+              </tr>
+              <tr>
+                <th>Responsavel</th>
+                <td>{{ trabalho.responsavel }}</td>
+                <th>Classificacao</th>
+                <td>{{ trabalho.classificacao }}</td>
+              </tr>
+              <tr>
+                <th>Contrato</th>
+                <td>{{ trabalho.contrato }}</td>
+                <th>Total HxH no mes</th>
+                <td>{{ trabalho.total_horas|floatformat:2 }} h</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="content-card section avoid-break">
+          <h3 class="section-subtitle">Descricao do trabalho</h3>
+          <p class="description">{{ trabalho.descricao }}</p>
+          <h3 class="section-subtitle">Detalhes sobre o trabalho</h3>
+          {% if trabalho.atividades_resumo %}
+            <ol class="atividades-list">
+              {% for atividade in trabalho.atividades_resumo %}
+                <li>
+                  <strong>{{ atividade.ordem }}. {{ atividade.nome }}</strong>
+                  {% if atividade.descricao %}
+                    <span class="atividade-desc"> - {{ atividade.descricao }}</span>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ol>
+          {% else %}
+            <p class="muted">Sem atividades cadastradas.</p>
+          {% endif %}
+        </div>
+
+        {% for colaborador in trabalho.colaborador_tables %}
+          <div class="content-card section avoid-break">
+            <div class="colaborador-head">
+              <h3 class="section-subtitle">Colaborador: {{ colaborador.nome }}</h3>
+              <div class="slot-badge">HxH: {{ colaborador.total_horas|floatformat:2 }}</div>
+            </div>
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Atividade</th>
+                  <th>HxH</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in colaborador.rows %}
+                  <tr>
+                    <td>{{ row.data_display }}</td>
+                    <td>{{ row.atividade_nome }}</td>
+                    <td>{{ row.hxh|floatformat:2 }}</td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="3">Sem execucoes para este colaborador no mes.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endfor %}
+      </section>
+    {% endfor %}
+  </main>
+</body>
+</html>

@@ -1,4 +1,6 @@
 import json
+from io import BytesIO
+from unittest.mock import patch
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -547,3 +549,37 @@ class RadarCreatorPermissionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         atividade.refresh_from_db()
         self.assertEqual(atividade.horas_trabalho, Decimal("32.00"))
+
+    def test_export_relatorio_pdf_permite_apenas_criador(self):
+        self.client_http.force_login(self.viewer_user)
+        response = self.client_http.get(
+            f"/radar-atividades/{self.radar.id}/relatorio/pdf/?mes=2026-03",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_export_relatorio_pdf_bloqueia_sem_dados_no_mes(self):
+        self.client_http.force_login(self.owner_user)
+        response = self.client_http.get(
+            f"/radar-atividades/{self.radar.id}/relatorio/pdf/?mes=2026-03",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertIn("Sem atividades executadas", payload["message"])
+
+    def test_export_relatorio_pdf_gera_arquivo_com_nome_padrao(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Export")
+        RadarAtividadeDiaExecucao.objects.create(atividade=atividade, data_execucao="2026-03-10")
+
+        with patch("core.views._render_radar_relatorio_pdf", return_value=BytesIO(b"%PDF-1.4\nfake")):
+            response = self.client_http.get(
+                f"/radar-atividades/{self.radar.id}/relatorio/pdf/?mes=2026-03",
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn('attachment; filename="relatorio_Radar_Permissao_2026-03.pdf"', response["Content-Disposition"])

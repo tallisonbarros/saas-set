@@ -83,6 +83,7 @@ urlpatterns = [
     path('radar-atividades/', views.radar_list, name="radar_list"),
     path('radar-atividades/<int:pk>/', views.radar_detail, name="radar_detail"),
     path('radar-atividades/<int:pk>/agenda/', views.radar_agenda, name="radar_agenda"),
+    path('radar-atividades/<int:pk>/relatorio/pdf/', views.radar_export_pdf, name="radar_export_pdf"),
     path(
         'radar-atividades/<int:radar_pk>/trabalhos/<int:pk>/',
         views.radar_trabalho_detail,

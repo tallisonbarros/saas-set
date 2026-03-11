@@ -4211,6 +4211,10 @@ select {
   overflow: hidden;
 }
 
+.radar-export-modal-open {
+  overflow: hidden;
+}
+
 .radar-work-modal {
   position: fixed;
   inset: 0;
@@ -4367,6 +4371,63 @@ select {
   font-size: 12px;
   line-height: 1.35;
   white-space: normal;
+}
+
+.radar-export-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1860;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.radar-export-modal.is-open {
+  display: flex;
+}
+
+.radar-export-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 10, 14, 0.72);
+}
+
+.radar-export-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(460px, calc(100vw - 28px));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #1a2028;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.radar-export-modal-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.radar-export-modal-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.radar-export-modal-body {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.radar-export-modal-foot {
+  padding: 0 14px 14px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .radar-col-nome {
@@ -5582,6 +5643,14 @@ select.datagrid-filter-input optgroup {
 
   .radar-work-modal-body {
     padding: 0;
+  }
+
+  .radar-export-modal {
+    padding: 8px;
+  }
+
+  .radar-export-modal-dialog {
+    width: calc(100vw - 16px);
   }
 
   .radar-modal-grid-head-actions .btn {
