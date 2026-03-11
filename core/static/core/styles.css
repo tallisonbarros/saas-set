@@ -4316,18 +4316,9 @@ select {
   width: 120px;
 }
 
-.radar-work-modal-table th:nth-child(4) {
-  width: 110px;
-}
-
 .radar-work-modal-col-status,
-.radar-work-modal-col-agenda,
-.radar-work-modal-col-horas {
+.radar-work-modal-col-agenda {
   white-space: nowrap;
-}
-
-.radar-work-modal-col-horas {
-  text-align: right;
 }
 
 .radar-work-modal-atividade-nome {
@@ -5567,7 +5558,7 @@ select.datagrid-filter-input optgroup {
   }
 
   .radar-work-modal-table {
-    min-width: 560px;
+    min-width: 460px;
   }
 
   .datagrid-column-picker-body {

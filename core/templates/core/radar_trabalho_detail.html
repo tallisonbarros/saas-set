@@ -44,11 +44,7 @@
           <h2 class="io-title">Atividades</h2>
         </div>
       </div>
-      {% if total_atividades > 0 %}
-        {% include "core/components/datagrid.html" with grid_id="radar-atividades-grid" table_class="radar-work-table radar-atividades-table" scope=trabalho.id %}
-      {% else %}
-        <div class="muted">sem atividade cadastrada para esse trabalho</div>
-      {% endif %}
+      {% include "core/components/datagrid.html" with grid_id="radar-atividades-grid" table_class="radar-work-table radar-atividades-table" scope=trabalho.id %}
     </section>
 
     {% if can_manage %}
