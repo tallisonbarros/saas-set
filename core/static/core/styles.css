@@ -4203,6 +4203,146 @@ select {
   text-decoration: underline;
 }
 
+.radar-trabalho-clickable-row td[data-dg-col] {
+  cursor: pointer;
+}
+
+.radar-work-modal-open {
+  overflow: hidden;
+}
+
+.radar-work-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1850;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.radar-work-modal.is-open {
+  display: flex;
+}
+
+.radar-work-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 10, 14, 0.72);
+}
+
+.radar-work-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(980px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #1a2028;
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.radar-work-modal-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.radar-work-modal-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.radar-work-modal-heading .muted {
+  margin: 4px 0 0;
+  max-width: 640px;
+}
+
+.radar-work-modal-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.radar-work-modal-body {
+  padding: 12px 14px 14px;
+  overflow: auto;
+}
+
+.radar-work-modal-state {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  color: #c4cbd3;
+  font-size: 14px;
+}
+
+.radar-work-modal-state.is-error {
+  border-color: rgba(235, 112, 112, 0.45);
+  color: #ffd7d7;
+}
+
+.radar-work-modal-table-wrap {
+  margin-top: 0;
+}
+
+.radar-work-modal-table {
+  margin-top: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.radar-work-modal-table th,
+.radar-work-modal-table td {
+  vertical-align: top;
+}
+
+.radar-work-modal-table th:nth-child(1) {
+  width: auto;
+}
+
+.radar-work-modal-table th:nth-child(2) {
+  width: 160px;
+}
+
+.radar-work-modal-table th:nth-child(3) {
+  width: 120px;
+}
+
+.radar-work-modal-table th:nth-child(4) {
+  width: 110px;
+}
+
+.radar-work-modal-col-status,
+.radar-work-modal-col-agenda,
+.radar-work-modal-col-horas {
+  white-space: nowrap;
+}
+
+.radar-work-modal-col-horas {
+  text-align: right;
+}
+
+.radar-work-modal-atividade-nome {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.radar-work-modal-atividade-desc {
+  margin-top: 2px;
+  color: #aeb5bd;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
 .radar-col-nome {
   white-space: normal;
 }
@@ -5403,6 +5543,31 @@ select.datagrid-filter-input optgroup {
   #radar-atividades-grid .datagrid-table .radar-desc-marquee.is-running .radar-desc-marquee-text {
     animation: none;
     transform: translateX(0);
+  }
+
+  .radar-work-modal {
+    padding: 8px;
+  }
+
+  .radar-work-modal-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  .radar-work-modal-head {
+    padding: 10px;
+  }
+
+  .radar-work-modal-body {
+    padding: 10px;
+  }
+
+  .radar-work-modal-actions .btn {
+    width: 100%;
+  }
+
+  .radar-work-modal-table {
+    min-width: 560px;
   }
 
   .datagrid-column-picker-body {

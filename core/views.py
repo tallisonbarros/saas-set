@@ -77,6 +77,7 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
 
 
 def _build_module_signal_badges(user, cliente):
@@ -90,7 +91,7 @@ def _build_module_signal_badges(user, cliente):
     """
     propostas_aprovar_count = _pendencias_total(user, cliente)
 
-    if user.is_staff and not cliente:
+    if _is_admin_user(user) and not cliente:
         ios_count = RackIO.objects.count()
         listas_ip_count = ListaIP.objects.count()
         radar_count = Radar.objects.count()
@@ -371,8 +372,24 @@ def _get_cliente(user):
         return PerfilUsuario.objects.filter(email__iexact=email).first()
 
 
-def _user_role(user):
+def _cliente_has_admin_privileges(cliente):
+    if not cliente:
+        return False
+    nomes = ((nome or "").strip().upper() for nome in cliente.tipos.values_list("nome", flat=True))
+    return any(nome in ADMIN_PRIVILEGED_TIPOS for nome in nomes)
+
+
+def _is_admin_user(user):
+    if not user or not user.is_authenticated:
+        return False
     if user.is_superuser or user.is_staff:
+        return True
+    cliente = _get_cliente(user)
+    return _cliente_has_admin_privileges(cliente)
+
+
+def _user_role(user):
+    if _is_admin_user(user):
         return "ADMIN"
     cliente = _get_cliente(user)
     if not cliente:
@@ -830,7 +847,7 @@ def _get_radar_trabalho_acessivel(user, trabalho_pk):
         "classificacao",
         "contrato",
     ).prefetch_related("atividades", "colaboradores")
-    if user.is_staff and not cliente:
+    if _is_admin_user(user) and not cliente:
         return trabalhos.filter(pk=trabalho_pk).first()
     if not cliente:
         return None
@@ -977,7 +994,7 @@ def painel(request):
     else:
         display_name = request.user.first_name or request.user.username
     role = _user_role(request.user)
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         apps = App.objects.filter(ativo=True).order_by("nome")
     elif cliente:
         apps = cliente.apps.filter(ativo=True).order_by("nome")
@@ -1001,7 +1018,7 @@ def painel(request):
 
 @login_required
 def planta_conectada(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     if request.method == "POST":
         action = request.POST.get("action")
@@ -1109,7 +1126,7 @@ def planta_conectada(request):
 
 @login_required
 def ingest_limpar(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
 
     message = None
@@ -1174,7 +1191,7 @@ def ingest_limpar(request):
 
 @login_required
 def ingest_error_logs(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     logs_qs = IngestErrorLog.objects.all()
     source = request.GET.get("source", "").strip()
@@ -1236,7 +1253,7 @@ def ingest_error_logs(request):
 
 @login_required
 def ingest_sources(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     if request.method == "POST":
         action = request.POST.get("action")
@@ -1308,7 +1325,7 @@ def ingest_sources(request):
 
 @login_required
 def ingest_error_detail(request, pk):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     log = get_object_or_404(IngestErrorLog, pk=pk)
     pending_count = IngestErrorLog.objects.filter(resolved=False).count()
@@ -1346,7 +1363,7 @@ def ingest_error_detail(request, pk):
 
 @login_required
 def ingest_detail(request, pk):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     registro = get_object_or_404(IngestRecord, pk=pk)
     payload = registro.payload if isinstance(registro.payload, dict) else {}
@@ -1369,7 +1386,7 @@ def planta_conectada_redirect(request):
 def app_home(request, slug):
     cliente = _get_cliente(request.user)
     app = get_object_or_404(App, slug=slug, ativo=True)
-    if request.user.is_staff:
+    if _is_admin_user(request.user):
         allowed = True
     else:
         allowed = bool(cliente) and cliente.apps.filter(pk=app.pk).exists()
@@ -1384,7 +1401,7 @@ def app_home(request, slug):
 
 @login_required
 def apps_gerenciar(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     message = None
     message_level = "info"
@@ -1543,10 +1560,10 @@ def register(request):
 @login_required
 def ios_list(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         inventarios_qs = Inventario.objects.all()
     else:
         inventarios_qs = Inventario.objects.filter(
@@ -1641,7 +1658,7 @@ def ios_list(request):
                 TipoCanalIO.objects.get_or_create(nome=nome, defaults={"ativo": True})
             return redirect("ios_list")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         racks = RackIO.objects.all()
     else:
         racks = RackIO.objects.filter(Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()))
@@ -1778,9 +1795,9 @@ def ios_list(request):
 @login_required
 def ios_rack_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         inventarios_qs = Inventario.objects.all()
     else:
         inventarios_qs = Inventario.objects.filter(
@@ -1800,7 +1817,7 @@ def ios_rack_detail(request, pk):
     else:
         rack = get_object_or_404(RackIO, pk=pk)
     can_manage = bool(
-        request.user.is_staff
+        _is_admin_user(request.user)
         or (
             cliente
             and (
@@ -2622,7 +2639,7 @@ def _render_proposta_pdf(
 @login_required
 def ios_rack_io_list(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if cliente:
         rack = get_object_or_404(
@@ -2660,7 +2677,7 @@ def ios_rack_io_list(request, pk):
 @login_required
 def ios_modulos(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if request.method == "POST":
         action = request.POST.get("action")
@@ -2709,11 +2726,11 @@ def ios_modulos(request):
 @login_required
 def ios_modulo_modelo_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     module_qs = ModuloIO.objects.select_related("tipo_base")
     module = get_object_or_404(module_qs, pk=pk, cliente=cliente) if cliente else get_object_or_404(module_qs, pk=pk)
-    if module.is_default and not request.user.is_staff:
+    if module.is_default and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     if request.method == "POST":
         action = request.POST.get("action")
@@ -2757,7 +2774,7 @@ def ios_modulo_modelo_detail(request, pk):
 @login_required
 def inventarios_list(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if request.method == "POST":
         action = request.POST.get("action")
@@ -2792,7 +2809,7 @@ def inventarios_list(request):
                 )
             return redirect("inventarios_list")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         inventarios = Inventario.objects.all()
     else:
         inventarios = Inventario.objects.filter(
@@ -2813,7 +2830,7 @@ def inventarios_list(request):
 @login_required
 def inventario_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if cliente:
         inventario = get_object_or_404(
@@ -2922,7 +2939,7 @@ def inventario_detail(request, pk):
             ativo.save(update_fields=["em_manutencao", "manutencao_em", "manutencao_por"])
             return redirect("inventario_detail", pk=inventario.pk)
         if action == "update_inventario":
-            if not cliente and not request.user.is_staff:
+            if not cliente and not _is_admin_user(request.user):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
@@ -2960,7 +2977,7 @@ def inventario_detail(request, pk):
             )
             return redirect("inventario_detail", pk=inventario.pk)
         if action == "delete_inventario":
-            if not cliente and not request.user.is_staff:
+            if not cliente and not _is_admin_user(request.user):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             inventario.delete()
             return redirect("inventarios_list")
@@ -2989,7 +3006,7 @@ def inventario_detail(request, pk):
 @login_required
 def inventario_tagset_preview(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if cliente:
         inventario = get_object_or_404(
@@ -3033,7 +3050,7 @@ def inventario_tagset_preview(request, pk):
 @login_required
 def inventario_ativo_detail(request, inventario_pk, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if cliente:
         inventario = get_object_or_404(
@@ -3146,7 +3163,7 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             _sync_ativo_status(ativo)
             return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
         if action == "update_ativo":
-            if not cliente and not request.user.is_staff:
+            if not cliente and not _is_admin_user(request.user):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             nome = request.POST.get("nome", "").strip()
             setor = request.POST.get("setor", "").strip()
@@ -3170,7 +3187,7 @@ def inventario_ativo_detail(request, inventario_pk, pk):
             )
             return redirect("inventario_ativo_detail", inventario_pk=inventario.pk, pk=ativo.pk)
         if action == "delete_ativo":
-            if not cliente and not request.user.is_staff:
+            if not cliente and not _is_admin_user(request.user):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             ativo.delete()
             return redirect("inventario_detail", pk=inventario.pk)
@@ -3195,7 +3212,7 @@ def inventario_ativo_detail(request, inventario_pk, pk):
 @login_required
 def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if cliente:
         inventario = get_object_or_404(
@@ -3211,7 +3228,7 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_item":
-            if not cliente and not request.user.is_staff:
+            if not cliente and not _is_admin_user(request.user):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             nome = request.POST.get("nome", "").strip()
             tipo_id = request.POST.get("tipo", "").strip()
@@ -3262,7 +3279,7 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
                 pk=item.pk,
             )
         if action == "delete_item":
-            if not cliente and not request.user.is_staff:
+            if not cliente and not _is_admin_user(request.user):
                 return HttpResponseForbidden("Sem cadastro de cliente.")
             item.delete()
             _sync_ativo_status(ativo)
@@ -3282,7 +3299,7 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
 @login_required
 def listas_ip_list(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
     message = None
@@ -3322,7 +3339,7 @@ def listas_ip_list(request):
                     _sync_lista_ip_items(lista, ip_values)
                     return redirect("listas_ip_list")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         listas = ListaIP.objects.all()
         can_manage = True
     else:
@@ -3345,10 +3362,10 @@ def listas_ip_list(request):
 @login_required
 def lista_ip_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         lista = get_object_or_404(ListaIP, pk=pk)
         can_manage = True
     else:
@@ -3365,7 +3382,7 @@ def lista_ip_detail(request, pk):
     if request.method == "POST":
         action = request.POST.get("action")
         if action in {"update_lista", "regenerate_range", "delete_lista", "update_item", "apply_default_protocol"}:
-            if not can_manage and not request.user.is_staff:
+            if not can_manage and not _is_admin_user(request.user):
                 return HttpResponseForbidden("Sem permissao.")
         if action == "update_lista":
             nome = request.POST.get("nome", "").strip()
@@ -3512,7 +3529,7 @@ def lista_ip_detail(request, pk):
 @login_required
 def radar_list(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
     message = None
@@ -3543,7 +3560,7 @@ def radar_list(request):
                 )
                 return redirect("radar_list")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         radars = Radar.objects.all()
         can_manage = True
     else:
@@ -3569,10 +3586,10 @@ def radar_list(request):
 @login_required
 def radar_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         radar = get_object_or_404(Radar, pk=pk)
         is_creator = False
         has_id_radar_access = False
@@ -3858,10 +3875,10 @@ def radar_detail(request, pk):
 @login_required
 def radar_agenda(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         radar = get_object_or_404(Radar, pk=pk)
         is_creator = False
         has_id_radar_access = False
@@ -4083,7 +4100,7 @@ def radar_agenda(request, pk):
 
     context = {
         "radar": radar,
-        "can_manage": can_manage or request.user.is_staff,
+        "can_manage": can_manage or _is_admin_user(request.user),
         "is_radar_creator": is_creator,
         "has_id_radar_access": has_id_radar_access,
         "selected_day": selected_day,
@@ -4119,10 +4136,10 @@ def radar_agenda(request, pk):
 @login_required
 def radar_trabalho_detail(request, radar_pk, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
-    if request.user.is_staff and not cliente:
+    if _is_admin_user(request.user) and not cliente:
         radar = get_object_or_404(Radar, pk=radar_pk)
         trabalho = get_object_or_404(RadarTrabalho, pk=pk, radar=radar)
         is_creator = False
@@ -4604,7 +4621,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
 @login_required
 def ios_rack_modulo_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     module_qs = ModuloRackIO.objects.select_related("modulo_modelo", "rack")
     if cliente:
@@ -4616,7 +4633,7 @@ def ios_rack_modulo_detail(request, pk):
     else:
         module = get_object_or_404(module_qs, pk=pk)
     can_manage = bool(
-        request.user.is_staff
+        _is_admin_user(request.user)
         or (
             cliente
             and (
@@ -5444,7 +5461,7 @@ def salvar_observacao(request, pk):
 
 @login_required
 def user_management(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     message = None
     form = UserCreateForm()
@@ -5513,7 +5530,7 @@ def user_management(request):
 
 @login_required
 def usuarios_gerenciar_usuario(request, pk):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     user = get_object_or_404(User, pk=pk)
     perfil = _get_cliente(user)
@@ -5734,7 +5751,7 @@ def meu_perfil(request):
 @login_required
 def financeiro_overview(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     if cliente:
         cadernos = Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()))
@@ -5796,7 +5813,7 @@ def financeiro_overview(request):
 @login_required
 def financeiro_nova(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
     from_compra_id = request.GET.get("from_compra")
@@ -5979,7 +5996,7 @@ def financeiro_nova(request):
     }
     if from_compra_id:
         compra_qs = Compra.objects.filter(pk=from_compra_id)
-        if not request.user.is_staff:
+        if not _is_admin_user(request.user):
             compra_qs = compra_qs.filter(
                 Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())
             )
@@ -6019,7 +6036,7 @@ def financeiro_nova(request):
 @login_required
 def financeiro_cadernos(request):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
     message = request.GET.get("msg", "").strip()
@@ -6134,7 +6151,7 @@ def financeiro_cadernos(request):
 @login_required
 def financeiro_caderno_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     caderno = get_object_or_404(
         Caderno,
@@ -6308,7 +6325,7 @@ def financeiro_caderno_detail(request, pk):
 @login_required
 def financeiro_compra_detail(request, pk):
     cliente = _get_cliente(request.user)
-    if not cliente and not request.user.is_staff:
+    if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     compra = get_object_or_404(
         Compra,
@@ -6618,7 +6635,7 @@ def financeiro_compra_detail(request, pk):
 
 @login_required
 def admin_explorar(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     cliente_id = request.GET.get("cliente_id")
     cliente_q = request.GET.get("cliente_q", "").strip()
@@ -6672,7 +6689,7 @@ def admin_explorar(request):
 
 @login_required
 def admin_logs(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     user_q = request.GET.get("user", "").strip()
     module_q = request.GET.get("module", "").strip()
@@ -6695,7 +6712,7 @@ def admin_logs(request):
 
 @login_required
 def admin_db_monitor(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
 
     started_at = timezone.localtime(timezone.now())
@@ -6839,7 +6856,7 @@ def _admin_db_ingest_payload_keys(table_name, max_keys=80):
 
 @login_required
 def admin_db_table(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
 
     tables = _admin_db_public_tables(ingest_only=True)
@@ -6861,7 +6878,7 @@ def admin_db_table(request):
 
 @login_required
 def admin_db_table_data(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
 
     table_name = request.GET.get("table", "").strip()
@@ -7064,7 +7081,7 @@ def admin_db_table_data(request):
 
 @login_required
 def admin_db_table_values(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
 
     table_name = request.GET.get("table", "").strip()
@@ -7169,7 +7186,7 @@ def admin_db_table_values(request):
 
 @login_required
 def ajustes_sistema(request):
-    if not request.user.is_staff:
+    if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     message = None
     if request.method == "POST":
@@ -7203,3 +7220,4 @@ def ajustes_sistema(request):
             "tipos_ativos": tipos_ativos,
         },
     )
+

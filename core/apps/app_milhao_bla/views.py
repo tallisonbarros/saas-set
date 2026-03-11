@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.models import App, IngestRecord
-from core.views import _get_cliente
+from core.views import _get_cliente, _is_admin_user
 from .export_excel import build_milhao_excel_export
 
 
@@ -146,7 +146,7 @@ def _load_entries_for_app(app, *, limit=2000, start_date=None, end_date=None):
 def _get_app_if_allowed(request):
     app = get_object_or_404(App, slug="appmilhaobla", ativo=True)
     cliente = _get_cliente(request.user)
-    if request.user.is_staff:
+    if _is_admin_user(request.user):
         return app
     if not cliente or not cliente.apps.filter(pk=app.pk).exists():
         return None

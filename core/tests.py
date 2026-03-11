@@ -18,8 +18,53 @@ from core.models import (
     RadarID,
     RadarTrabalho,
     RadarTrabalhoColaborador,
+    TipoPerfil,
 )
-from core.views import _build_proposta_pdf_context, _sanitize_proposta_descricao
+from core.views import _build_proposta_pdf_context, _sanitize_proposta_descricao, _user_role
+
+
+class DevAdminPrivilegesTests(TestCase):
+    def setUp(self):
+        self.client_http = Client()
+        self.tipo_dev, _ = TipoPerfil.objects.get_or_create(nome="Dev")
+        self.tipo_cliente, _ = TipoPerfil.objects.get_or_create(nome="Cliente")
+
+        self.dev_user = User.objects.create_user(username="dev@set.local", email="dev@set.local", password="123456")
+        self.dev_perfil = PerfilUsuario.objects.create(
+            nome="Dev User",
+            email="dev@set.local",
+            usuario=self.dev_user,
+        )
+        self.dev_perfil.tipos.add(self.tipo_dev)
+
+        self.user = User.objects.create_user(username="user@set.local", email="user@set.local", password="123456")
+        self.perfil = PerfilUsuario.objects.create(
+            nome="Regular User",
+            email="user@set.local",
+            usuario=self.user,
+        )
+        self.perfil.tipos.add(self.tipo_cliente)
+
+    def test_dev_role_is_admin(self):
+        self.assertEqual(_user_role(self.dev_user), "ADMIN")
+
+    def test_dev_can_access_admin_logs(self):
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/admin-logs/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_dev_is_promoted_to_staff_by_middleware(self):
+        self.assertFalse(User.objects.get(pk=self.dev_user.pk).is_staff)
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/painel/")
+        self.assertEqual(response.status_code, 200)
+        self.dev_user.refresh_from_db()
+        self.assertTrue(self.dev_user.is_staff)
+
+    def test_non_dev_cannot_access_admin_logs(self):
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/admin-logs/")
+        self.assertEqual(response.status_code, 403)
 
 
 class RouteTimelineStateTests(SimpleTestCase):

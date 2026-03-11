@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from core.models import App, AppRotaConfig, AppRotasMap, IngestRecord
-from core.views import _get_cliente
+from core.views import _get_cliente, _is_admin_user
 
 TAG_KEYS = ("Name", "TagName", "tagname", "tag", "nome_tag")
 VALUE_KEYS = ("Value", "value", "valor", "status")
@@ -55,7 +55,7 @@ def _get_rotas_app():
 
 
 def _has_access(user, app):
-    if user.is_staff:
+    if _is_admin_user(user):
         return True
     cliente = _get_cliente(user)
     return bool(cliente) and cliente.apps.filter(pk=app.pk).exists()

@@ -1,8 +1,12 @@
 from datetime import timedelta
 
+from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .models import AdminAccessLog
+from .models import AdminAccessLog, PerfilUsuario
+
+
+ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
 
 
 class AdminAccessLogMiddleware:
@@ -10,6 +14,7 @@ class AdminAccessLogMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        self._ensure_staff_from_profile(request)
         response = self.get_response(request)
 
         try:
@@ -33,6 +38,28 @@ class AdminAccessLogMiddleware:
             pass
 
         return response
+
+    def _ensure_staff_from_profile(self, request):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated or user.is_superuser or user.is_staff:
+            return
+        perfil = self._resolve_perfil(user)
+        if not perfil:
+            return
+        tipo_nomes = ((nome or "").strip().upper() for nome in perfil.tipos.values_list("nome", flat=True))
+        if not any(nome in ADMIN_PRIVILEGED_TIPOS for nome in tipo_nomes):
+            return
+        User.objects.filter(pk=user.pk, is_staff=False).update(is_staff=True)
+        user.is_staff = True
+
+    def _resolve_perfil(self, user):
+        try:
+            return user.perfilusuario
+        except PerfilUsuario.DoesNotExist:
+            email = (user.email or user.username or "").strip().lower()
+            if not email:
+                return None
+            return PerfilUsuario.objects.filter(email__iexact=email).first()
 
     def _module_from_path(self, path):
         stripped = path.strip("/")
