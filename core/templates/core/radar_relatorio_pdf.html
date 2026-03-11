@@ -125,6 +125,22 @@
           {% endif %}
         </div>
 
+        <div class="content-card section avoid-break">
+          <h3 class="section-subtitle">Observacoes do trabalho</h3>
+          {% if trabalho.observacoes_resumo %}
+            <ul class="observacoes-list">
+              {% for observacao in trabalho.observacoes_resumo %}
+                <li>
+                  <strong>{{ observacao.data_display }}:</strong>
+                  <span>{{ observacao.texto }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="muted">Sem observacoes registradas.</p>
+          {% endif %}
+        </div>
+
         {% for colaborador in trabalho.colaborador_tables %}
           <div class="content-card section avoid-break">
             <div class="colaborador-head">

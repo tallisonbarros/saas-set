@@ -16,18 +16,18 @@
 {% endblock %}
 
 {% block content %}
-  <div class="radar-mode {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
+  <div class="radar-mode radar-trabalho-page {% if can_manage %}radar-mode-creator{% else %}radar-mode-viewer{% endif %}">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title-block">
           <h1 class="page-title">{{ trabalho.nome }}</h1>
           <p class="page-subtitle">{{ trabalho.descricao|default:"Sem descricao." }}</p>
+          <p class="muted">Colaboradores: {{ trabalho_colaboradores|default:"Sem colaboradores cadastrados." }}</p>
         </div>
         {% if is_radar_creator %}
           <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
         <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'radar_agenda' radar.id %}">Agenda</a>
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar para o radar</a>
         </div>
       </div>
@@ -214,6 +214,78 @@
       </div>
     </details>
   {% endif %}
+
+  <section class="io-card" style="margin-top: 18px;">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Observacoes do trabalho</h2>
+        <p class="muted">Lista historica de observacoes vinculadas ao trabalho.</p>
+      </div>
+    </div>
+    <div class="io-discrete-body">
+      {% if can_edit_trabalho_by_creator %}
+        <form class="io-form" method="post" style="margin-bottom: 14px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_observacao">
+          <div class="io-form-grid">
+            <label class="field">
+              <span>Data</span>
+              <input type="date" name="observacao_data" value="{{ observacao_data_default }}" required>
+            </label>
+            <label class="field" style="grid-column: 1 / -1;">
+              <span>Observacao</span>
+              <textarea name="observacao_texto" rows="3" placeholder="Registre uma observacao do trabalho." required></textarea>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Salvar observacao</button>
+          </div>
+        </form>
+      {% endif %}
+
+      {% if observacoes_trabalho %}
+        <div class="user-list">
+          {% for observacao in observacoes_trabalho %}
+            <div class="user-row">
+              {% if can_edit_trabalho_by_creator %}
+                <form class="io-form" method="post" style="width: 100%;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="update_observacao">
+                  <input type="hidden" name="observacao_id" value="{{ observacao.id }}">
+                  <div class="io-form-grid">
+                    <label class="field">
+                      <span>Data</span>
+                      <input type="date" name="observacao_data" value="{{ observacao.data_observacao|date:'Y-m-d' }}" required>
+                    </label>
+                    <label class="field" style="grid-column: 1 / -1;">
+                      <span>Observacao</span>
+                      <textarea name="observacao_texto" rows="3" required>{{ observacao.texto }}</textarea>
+                    </label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="btn btn-ghost" type="submit">Atualizar</button>
+                  </div>
+                </form>
+                <form method="post" onsubmit="return confirm('Excluir observacao?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_observacao">
+                  <input type="hidden" name="observacao_id" value="{{ observacao.id }}">
+                  <button class="btn btn-outline btn-compact" type="submit">Excluir</button>
+                </form>
+              {% else %}
+                <div style="width: 100%;">
+                  <div class="muted">Data: {{ observacao.data_observacao|date:"d/m/Y" }}</div>
+                  <div>{{ observacao.texto|linebreaksbr }}</div>
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted">Nenhuma observacao registrada.</div>
+      {% endif %}
+    </div>
+  </section>
 
   {{ atividades_table_data|json_script:"radar-atividades-data" }}
   <script>

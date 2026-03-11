@@ -63,6 +63,7 @@ from .models import (
     RadarID,
     RadarTrabalho,
     RadarTrabalhoColaborador,
+    RadarTrabalhoObservacao,
     PlantaIO,
     Proposta,
     PropostaAnexo,
@@ -4223,7 +4224,7 @@ def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
     trabalhos_qs = (
         RadarTrabalho.objects.filter(pk__in=trabalhos_ids)
         .select_related("classificacao", "contrato")
-        .prefetch_related("atividades")
+        .prefetch_related("atividades", "observacoes")
     )
     trabalhos_map = {trabalho.id: trabalho for trabalho in trabalhos_qs}
 
@@ -4311,6 +4312,22 @@ def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
             }
             for atividade in atividades_ordenadas
         ]
+        observacoes_base = prefetched.get("observacoes")
+        if observacoes_base is None:
+            observacoes_base = list(trabalho.observacoes.all())
+        observacoes_ordenadas = sorted(
+            observacoes_base,
+            key=lambda item: (item.data_observacao, item.id),
+            reverse=True,
+        )
+        observacoes_resumo = [
+            {
+                "data_display": observacao.data_observacao.strftime("%d/%m/%Y"),
+                "texto": observacao.texto or "",
+            }
+            for observacao in observacoes_ordenadas
+            if (observacao.texto or "").strip()
+        ]
 
         trabalho_pages.append(
             {
@@ -4331,6 +4348,7 @@ def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
                 "total_colaboradores": len(colaboradores),
                 "total_horas": total_horas_trabalho,
                 "atividades_resumo": atividades_resumo,
+                "observacoes_resumo": observacoes_resumo,
                 "colaborador_tables": colaborador_tables,
             }
         )
@@ -4479,6 +4497,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "move_atividade_to",
             "create_contrato",
             "create_classificacao",
+            "create_observacao",
+            "update_observacao",
+            "delete_observacao",
         }:
             if not can_manage:
                 return HttpResponseForbidden("Somente quem criou o radar pode alterar.")
@@ -4648,6 +4669,58 @@ def radar_trabalho_detail(request, radar_pk, pk):
                 )
             _sync_trabalho_status(novo_trabalho)
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=novo_trabalho.pk)
+        if action == "create_observacao":
+            texto = request.POST.get("observacao_texto", "").strip()
+            data_raw = request.POST.get("observacao_data", "").strip()
+            data_observacao = timezone.localdate()
+            create_error = False
+            if data_raw:
+                try:
+                    data_observacao = datetime.strptime(data_raw, "%Y-%m-%d").date()
+                except ValueError:
+                    message = "Data invalida para observacao."
+                    message_level = "error"
+                    create_error = True
+            if not texto:
+                message = "Informe o texto da observacao."
+                message_level = "error"
+                create_error = True
+            if not create_error:
+                RadarTrabalhoObservacao.objects.create(
+                    trabalho=trabalho,
+                    texto=texto,
+                    data_observacao=data_observacao,
+                )
+                return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "update_observacao":
+            observacao_id = request.POST.get("observacao_id")
+            observacao = get_object_or_404(RadarTrabalhoObservacao, pk=observacao_id, trabalho=trabalho)
+            texto = request.POST.get("observacao_texto", "").strip()
+            data_raw = request.POST.get("observacao_data", "").strip()
+            update_error = False
+            if not texto:
+                message = "Informe o texto da observacao."
+                message_level = "error"
+                update_error = True
+            else:
+                data_observacao = observacao.data_observacao
+                if data_raw:
+                    try:
+                        data_observacao = datetime.strptime(data_raw, "%Y-%m-%d").date()
+                    except ValueError:
+                        message = "Data invalida para observacao."
+                        message_level = "error"
+                        update_error = True
+                if not update_error:
+                    observacao.texto = texto
+                    observacao.data_observacao = data_observacao
+                    observacao.save(update_fields=["texto", "data_observacao", "atualizado_em"])
+                    return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
+        if action == "delete_observacao":
+            observacao_id = request.POST.get("observacao_id")
+            observacao = get_object_or_404(RadarTrabalhoObservacao, pk=observacao_id, trabalho=trabalho)
+            observacao.delete()
+            return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
         if action == "create_atividade":
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
@@ -4889,6 +4962,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
     if edit_atividade_id:
         edit_atividade = RadarAtividade.objects.filter(pk=edit_atividade_id, trabalho=trabalho).first()
     total_atividades = atividades_base.count()
+    observacoes_trabalho = list(trabalho.observacoes.order_by("-data_observacao", "-id"))
     can_create_proposta_from_trabalho = can_edit_trabalho_by_creator
     can_duplicate_trabalho = can_edit_trabalho_by_creator
     return render(
@@ -4914,6 +4988,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "can_duplicate_trabalho": can_duplicate_trabalho,
             "can_edit_trabalho_by_creator": can_edit_trabalho_by_creator,
             "trabalho_colaboradores": ", ".join(_trabalho_colaboradores_nomes(trabalho)),
+            "observacoes_trabalho": observacoes_trabalho,
+            "observacao_data_default": timezone.localdate().isoformat(),
         },
     )
 

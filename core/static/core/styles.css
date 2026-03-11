@@ -4029,6 +4029,14 @@ select {
   min-width: 0;
 }
 
+.radar-trabalho-page .io-layout {
+  margin-top: 4px;
+}
+
+.radar-trabalho-page .io-layout > .radar-table-card {
+  margin-top: 2px;
+}
+
 .radar-table-controls {
   display: flex;
   align-items: center;
@@ -4277,6 +4285,27 @@ select {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.radar-modal-grid-foot {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.radar-modal-grid-foot-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca8b4;
+}
+
+.radar-modal-grid-foot-value {
+  color: #d4dae0;
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 .radar-work-modal .datagrid-modal-atividades .datagrid-toolbar {

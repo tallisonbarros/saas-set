@@ -510,6 +510,20 @@ class RadarTrabalhoColaborador(models.Model):
         return self.nome
 
 
+class RadarTrabalhoObservacao(models.Model):
+    trabalho = models.ForeignKey(RadarTrabalho, on_delete=models.CASCADE, related_name="observacoes")
+    texto = models.TextField()
+    data_observacao = models.DateField(default=timezone.localdate)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-data_observacao", "-id"]
+
+    def __str__(self):
+        return f"{self.trabalho_id} - {self.data_observacao.isoformat()}"
+
+
 class RadarAtividade(models.Model):
     class Status(models.TextChoices):
         PENDENTE = "PENDENTE", "Pendente"

@@ -20,9 +20,10 @@ from core.models import (
     RadarID,
     RadarTrabalho,
     RadarTrabalhoColaborador,
+    RadarTrabalhoObservacao,
     TipoPerfil,
 )
-from core.views import _build_proposta_pdf_context, _sanitize_proposta_descricao, _user_role
+from core.views import _build_proposta_pdf_context, _build_radar_relatorio_pdf_context, _sanitize_proposta_descricao, _user_role
 
 
 class DevAdminPrivilegesTests(TestCase):
@@ -583,3 +584,85 @@ class RadarCreatorPermissionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn('attachment; filename="relatorio_Radar_Permissao_2026-03.pdf"', response["Content-Disposition"])
+
+    def test_criador_pode_criar_observacao_com_data_padrao(self):
+        self.client_http.force_login(self.owner_user)
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "create_observacao",
+                "observacao_texto": "Primeira observacao",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        observacao = RadarTrabalhoObservacao.objects.get(trabalho=self.trabalho)
+        self.assertEqual(observacao.texto, "Primeira observacao")
+        self.assertEqual(observacao.data_observacao, timezone.localdate())
+
+    def test_viewer_nao_cria_observacao(self):
+        self.client_http.force_login(self.viewer_user)
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "create_observacao",
+                "observacao_texto": "Nao pode",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(RadarTrabalhoObservacao.objects.filter(trabalho=self.trabalho).exists())
+
+    def test_criador_pode_editar_e_excluir_observacao(self):
+        self.client_http.force_login(self.owner_user)
+        observacao = RadarTrabalhoObservacao.objects.create(
+            trabalho=self.trabalho,
+            texto="Obs inicial",
+            data_observacao=datetime(2026, 3, 1).date(),
+        )
+        update_response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_observacao",
+                "observacao_id": str(observacao.id),
+                "observacao_texto": "Obs atualizada",
+                "observacao_data": "2026-03-05",
+            },
+        )
+        self.assertEqual(update_response.status_code, 302)
+        observacao.refresh_from_db()
+        self.assertEqual(observacao.texto, "Obs atualizada")
+        self.assertEqual(observacao.data_observacao.isoformat(), "2026-03-05")
+
+        delete_response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "delete_observacao",
+                "observacao_id": str(observacao.id),
+            },
+        )
+        self.assertEqual(delete_response.status_code, 302)
+        self.assertFalse(RadarTrabalhoObservacao.objects.filter(pk=observacao.id).exists())
+
+    def test_contexto_pdf_do_radar_inclui_todas_observacoes_do_trabalho(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ PDF Obs")
+        RadarAtividadeDiaExecucao.objects.create(atividade=atividade, data_execucao="2026-03-10")
+        RadarTrabalhoObservacao.objects.create(
+            trabalho=self.trabalho,
+            texto="Observacao antiga",
+            data_observacao=datetime(2026, 1, 15).date(),
+        )
+        RadarTrabalhoObservacao.objects.create(
+            trabalho=self.trabalho,
+            texto="Observacao mais recente",
+            data_observacao=datetime(2026, 4, 2).date(),
+        )
+
+        context = _build_radar_relatorio_pdf_context(
+            self.radar,
+            datetime(2026, 3, 1).date(),
+            datetime(2026, 3, 31).date(),
+        )
+        trabalho_ctx = next(item for item in context["trabalho_pages"] if item["id"] == self.trabalho.id)
+        self.assertEqual(len(trabalho_ctx["observacoes_resumo"]), 2)
+        self.assertEqual(trabalho_ctx["observacoes_resumo"][0]["texto"], "Observacao mais recente")
+        self.assertEqual(trabalho_ctx["observacoes_resumo"][1]["texto"], "Observacao antiga")

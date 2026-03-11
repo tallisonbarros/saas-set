@@ -30,6 +30,7 @@
     detalheUrl: "",
     trabalhoNome: "",
     trabalhoDescricao: "",
+    trabalhoColaboradores: "",
   };
 
   var statusRequestInFlight = false;
@@ -202,6 +203,19 @@
     );
   }
 
+  function renderGridFooter() {
+    var colaboradores = String(modalState.trabalhoColaboradores || "").trim();
+    var label = colaboradores ? utils.escHtml(colaboradores) : "Sem colaboradores cadastrados.";
+    return (
+      '<footer class="radar-modal-grid-foot">' +
+      '<span class="radar-modal-grid-foot-label">Colaboradores</span>' +
+      '<span class="radar-modal-grid-foot-value">' +
+      label +
+      "</span>" +
+      "</footer>"
+    );
+  }
+
   function closeStatusMenu() {
     if (activeStatusTrigger) {
       activeStatusTrigger.setAttribute("aria-expanded", "false");
@@ -242,6 +256,7 @@
       '<div class="radar-work-modal-state' + (isError ? ' is-error' : '') + '">' +
       utils.escHtml(message) +
       "</div>" +
+      renderGridFooter() +
       "</section>";
   }
 
@@ -445,7 +460,7 @@
     if (!modalBodyEl) {
       return;
     }
-    modalBodyEl.innerHTML = '<section class="io-card radar-table-card">' + renderGridHeader() + buildGridShell() + '</section>';
+    modalBodyEl.innerHTML = '<section class="io-card radar-table-card">' + renderGridHeader() + buildGridShell() + renderGridFooter() + '</section>';
     initializeGrid(rows);
     if (!modalGrid) {
       setModalState("Nao foi possivel montar a grade de atividades.", true);
@@ -494,6 +509,7 @@
     modalState.detalheUrl = String(data.detalheUrl || "");
     modalState.trabalhoNome = String(data.nome || "");
     modalState.trabalhoDescricao = String(data.descricao || "");
+    modalState.trabalhoColaboradores = String(data.colaboradores || "");
     modalState.requestToken = (modalState.requestToken || 0) + 1;
 
     modalEl.hidden = false;
@@ -512,6 +528,7 @@
     modalState.detalheUrl = "";
     modalState.trabalhoNome = "";
     modalState.trabalhoDescricao = "";
+    modalState.trabalhoColaboradores = "";
     modalState.requestToken = (modalState.requestToken || 0) + 1;
     modalGrid = null;
     closeStatusMenu();
@@ -541,10 +558,13 @@
       return null;
     }
     var descricaoEl = rowEl.querySelector(".radar-desc-marquee-text");
+    var colaboradoresEl = rowEl.querySelector('td[data-dg-col="colaboradores"]');
+    var colaboradores = colaboradoresEl ? (colaboradoresEl.textContent || "").trim() : "";
     return {
       id: rowId,
       nome: (link.textContent || "").trim(),
       descricao: descricaoEl ? (descricaoEl.textContent || "").trim() : "",
+      colaboradores: colaboradores,
       detalheUrl: link.href,
     };
   }

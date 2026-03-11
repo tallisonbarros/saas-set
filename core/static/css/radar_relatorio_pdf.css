@@ -218,6 +218,19 @@ h1 {
   color: #374151;
 }
 
+.observacoes-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.observacoes-list li {
+  margin-bottom: 4px;
+}
+
+.observacoes-list span {
+  white-space: pre-wrap;
+}
+
 .muted {
   color: #4b5563;
   margin: 0;
