@@ -5674,8 +5674,8 @@ select.datagrid-filter-input optgroup {
   }
 }
 
-#radar-trabalhos-grid .datagrid-create-field span,
-#radar-atividades-grid .datagrid-create-field span {
+#radar-trabalhos-grid .datagrid-create-field > span,
+#radar-atividades-grid .datagrid-create-field > span {
   display: none;
 }
 
