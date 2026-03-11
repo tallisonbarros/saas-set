@@ -170,11 +170,11 @@
 
   function buildGridShell() {
     return (
-      '<div class="datagrid" id="' + MODAL_GRID_ID + '">' +
+      '<div class="datagrid datagrid-modal-atividades" id="' + MODAL_GRID_ID + '">' +
       '<div class="datagrid-create" data-dg-create hidden></div>' +
       '<div class="datagrid-toolbar"><div class="datagrid-summary"><span data-dg-summary>Carregando...</span><button class="btn btn-ghost btn-compact" type="button" data-dg-clear-filters>Limpar filtros</button></div><details class="datagrid-column-picker" data-dg-column-picker><summary class="btn btn-ghost btn-compact">Colunas</summary><div class="datagrid-column-picker-body" data-dg-column-picker-body></div></details></div>' +
       '<div class="table-wrap datagrid-wrap"><table class="table datagrid-table radar-work-table radar-atividades-table" data-dg-table><thead data-dg-head></thead><tbody data-dg-body><tr><td class="muted" colspan="1">Carregando dados...</td></tr></tbody></table></div>' +
-      '<div class="datagrid-pagination"><label class="field datagrid-page-size"><span>Linhas por pagina</span><select data-dg-page-size><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label><div class="datagrid-pager-actions"><button class="btn btn-ghost btn-compact" type="button" data-dg-prev-page>Anterior</button><span class="muted" data-dg-page-indicator>Pagina 1 de 1</span><button class="btn btn-ghost btn-compact" type="button" data-dg-next-page>Proxima</button></div></div>' +
+      '<div class="datagrid-pagination datagrid-pagination-modal"><label class="field datagrid-page-size"><span>Linhas por pagina</span><select data-dg-page-size><option value="10" selected>10</option></select></label><div class="datagrid-pager-actions"><button class="btn btn-ghost btn-compact" type="button" data-dg-prev-page>Anterior</button><span class="muted" data-dg-page-indicator>Pagina 1 de 1</span><button class="btn btn-ghost btn-compact" type="button" data-dg-next-page>Proxima</button></div></div>' +
       '</div>'
     );
   }
@@ -319,8 +319,8 @@
       rootId: MODAL_GRID_ID,
       storageKey: "radar-atividades:modal:v3:" + modalState.trabalhoId,
       rows: rows,
-      pageSize: 20,
-      pageSizeOptions: [10, 20, 50, 100],
+      pageSize: 10,
+      pageSizeOptions: [10],
       defaultSort: { col: "ordem", dir: "asc" },
       noRowsText: "Nenhuma atividade cadastrada.",
       summaryFormatter: function (total) {
@@ -376,12 +376,8 @@
             return nome + '<div class="radar-desc-marquee" title="' + descricao + '"><span class="radar-desc-marquee-text">' + descricao + "</span></div>";
           },
         },
-        { key: "descricao", label: "Descricao", visible: false, width: 260, minWidth: 220, cellClass: "radar-cell-wrap", filter: { type: "text", placeholder: "Filtrar" } },
         { key: "status", label: "Status", visible: true, width: 140, minWidth: 140, filter: { type: "select", options: [{ value: "EXECUTANDO", label: "Executando" }, { value: "PENDENTE", label: "Pendente" }, { value: "FINALIZADA", label: "Finalizada" }] }, render: renderStatusCell },
         { key: "agenda_total_dias", label: "Agenda", visible: true, width: 110, minWidth: 100, compareType: "number", filter: { type: "number", min: 0, step: 1, placeholder: "0" }, render: renderAgendaCell },
-        { key: "horas_trabalho", label: "Horas", visible: true, width: 120, minWidth: 120, compareType: "number", filter: { type: "number", min: 0, step: 0.1, placeholder: "0" }, render: function (row, ctx) { var value = row.horas_trabalho || ""; return value ? ctx.slotBadge(value, "h") : "-"; } },
-        { key: "inicio_execucao_display", label: "Inicio", visible: false, width: 170, minWidth: 150, filter: { type: "text", placeholder: "Filtrar" } },
-        { key: "finalizada_display", label: "Finalizacao", visible: false, width: 170, minWidth: 150, filter: { type: "text", placeholder: "Filtrar" } },
         { key: "ordem", label: "Ordem", visible: false, width: 100, minWidth: 90, compareType: "number", filter: { type: "number", min: 0, step: 1, placeholder: "0" } },
       ],
       rowReorder: canManage
@@ -427,7 +423,7 @@
     if (!modalBodyEl) {
       return;
     }
-    modalBodyEl.innerHTML = '<section class="io-card radar-table-card"><div class="io-card-head"><div><h2 class="io-title">Atividades</h2></div></div>' + buildGridShell() + '</section>';
+    modalBodyEl.innerHTML = '<section class="io-card radar-table-card">' + buildGridShell() + '</section>';
     initializeGrid(rows);
     if (!modalGrid) {
       setModalState("Nao foi possivel montar a grade de atividades.", true);

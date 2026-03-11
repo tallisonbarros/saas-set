@@ -4276,6 +4276,38 @@ select {
   overflow: auto;
 }
 
+.radar-work-modal .datagrid-modal-atividades .datagrid-toolbar {
+  display: none;
+}
+
+.radar-work-modal .datagrid-modal-atividades .datagrid-page-size {
+  display: none;
+}
+
+.radar-work-modal .datagrid-modal-atividades .datagrid-create-field > span {
+  display: none;
+}
+
+.radar-work-modal .datagrid-modal-atividades .datagrid-create-fields {
+  align-items: center;
+}
+
+.radar-work-modal .datagrid-modal-atividades .datagrid-pagination {
+  justify-content: flex-end;
+}
+
+.radar-work-modal .datagrid-modal-atividades .datagrid-pager-actions .btn {
+  border-color: rgba(141, 160, 178, 0.24);
+  background: rgba(255, 255, 255, 0.01);
+  color: #b9c2cb;
+  padding: 6px 12px;
+}
+
+.radar-work-modal .datagrid-modal-atividades .datagrid-pager-actions .btn:hover {
+  border-color: rgba(141, 160, 178, 0.35);
+  color: #d4dae0;
+}
+
 .radar-work-modal-state {
   border: 1px dashed var(--border);
   border-radius: 10px;
