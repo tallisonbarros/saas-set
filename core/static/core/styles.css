@@ -5679,6 +5679,16 @@ select.datagrid-filter-input optgroup {
   display: none;
 }
 
+#financeiro-compras-grid .datagrid-table td.financeiro-col-nome {
+  white-space: normal;
+}
+
+#financeiro-compras-grid .datagrid-table td.financeiro-col-nome .muted {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
 #radar-trabalhos-grid .radar-create-main-actions {
   margin-left: auto;
 }

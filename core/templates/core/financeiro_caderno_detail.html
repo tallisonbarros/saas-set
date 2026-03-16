@@ -43,25 +43,13 @@
         aria-label="Selecionar mes"
       >
       <div class="month-nav month-nav-pill">
-        <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ prev_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Mes anterior">&lt;</a>
+        <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ prev_month }}" aria-label="Mes anterior">&lt;</a>
         <label class="month-nav-label month-nav-label-click" for="month-nav-input" aria-live="polite">
           <span class="month-nav-month">{{ mes_referencia|date:"F" }}</span>
           <span class="month-nav-year">{{ mes_referencia|date:"Y" }}</span>
         </label>
-        <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}{% if month_query %}&{{ month_query }}{% endif %}" aria-label="Proximo mes">&gt;</a>
+        <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}" aria-label="Proximo mes">&gt;</a>
       </div>
-      {% if status_filter %}
-        <input type="hidden" name="status" value="{{ status_filter }}">
-      {% endif %}
-      {% if categoria_filter %}
-        <input type="hidden" name="categoria" value="{{ categoria_filter }}">
-      {% endif %}
-      {% if centro_filter %}
-        <input type="hidden" name="centro" value="{{ centro_filter }}">
-      {% endif %}
-      {% if search_query %}
-        <input type="hidden" name="q" value="{{ search_query }}">
-      {% endif %}
     </form>
     <script>
       (function () {
@@ -79,52 +67,6 @@
         });
       })();
     </script>
-
-    <details class="io-card io-discrete hud-filter" {% if status_filter or categoria_filter or centro_filter or search_query %}open{% endif %}>
-      <summary class="io-discrete-summary">
-        <span class="io-title">Filtros</span>
-        <span class="muted">Filtrar.</span>
-      </summary>
-      <div class="io-discrete-body">
-        <form class="finance-filter" method="get">
-          <input type="hidden" name="mes" value="{{ selected_month }}">
-          <div class="field">
-            <label>Busca</label>
-            <input type="search" name="q" value="{{ search_query }}" placeholder="Nome ou descricao">
-          </div>
-          <div class="field">
-            <label>Status</label>
-            <select name="status">
-              <option value="" {% if not status_filter %}selected{% endif %}>Todos</option>
-              <option value="pago" {% if status_filter == "pago" %}selected{% endif %}>Pago</option>
-              <option value="pendente" {% if status_filter == "pendente" %}selected{% endif %}>Pendente</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Categoria</label>
-            <select name="categoria">
-              <option value="" {% if not categoria_filter %}selected{% endif %}>Todas</option>
-              {% for categoria in categorias %}
-                <option value="{{ categoria.id }}" {% if categoria.id|stringformat:"s" == categoria_filter %}selected{% endif %}>{{ categoria.nome }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="field">
-            <label>Centro de custo</label>
-            <select name="centro">
-              <option value="" {% if not centro_filter %}selected{% endif %}>Todos</option>
-              {% for centro in centros %}
-                <option value="{{ centro.id }}" {% if centro.id|stringformat:"s" == centro_filter %}selected{% endif %}>{{ centro.nome }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Aplicar</button>
-            <a class="btn btn-ghost" href="{% url 'financeiro_caderno_detail' caderno.id %}">Limpar</a>
-          </div>
-        </form>
-      </div>
-    </details>
 
     <div class="finance-summary">
       <div class="summary-card hud-card">
@@ -146,32 +88,7 @@
     </div>
 
     <div class="finance-card">
-      <div class="panel-title">Compras do mes</div>
-      {% if compras %}
-        <div class="proposal-grid">
-          {% for compra in compras %}
-            <div class="proposal-card">
-              <a class="proposal-link" href="{% url 'financeiro_compra_detail' compra.pk %}" aria-label="Abrir compra"></a>
-              <div class="proposal-head">
-                <div>
-                  <div class="proposal-title">{{ compra.nome|default:compra.descricao|default:"Compra sem nome" }}</div>
-                  <div class="proposal-meta">
-                    {% if compra.data %}{{ compra.data }}{% else %}Sem data{% endif %} - Itens: {{ compra.itens_count }}
-                  </div>
-                </div>
-                <span class="badge badge-{{ compra.status_label|lower }}">{{ compra.status_label }}</span>
-              </div>
-              <div class="proposal-meta">Total: R$ {{ compra.total_itens|floatformat:2 }} - Pago: R$ {{ compra.total_pago|floatformat:2 }}</div>
-              <div class="proposal-meta">
-                {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}Sem categoria{% endif %} -
-                {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}Sem centro{% endif %}
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="muted">Sem compras para o mes e filtros selecionados.</p>
-      {% endif %}
+      {% include "core/components/datagrid.html" with grid_id="financeiro-compras-grid" table_class="financeiro-compras-table" scope=caderno.id grid_title="Compras do mes" %}
     </div>
 
     <div class="finance-card finance-card-muted">
@@ -197,8 +114,17 @@
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">Nenhuma compra sem data para os filtros atuais.</p>
+        <p class="muted">Nenhuma compra sem data cadastrada.</p>
       {% endif %}
     </div>
+    {{ compras_table_data|json_script:"financeiro-compras-mes-data" }}
+    <script>
+      window.FinanceiroCadernoComprasConfig = {
+        cadernoId: "{{ caderno.id }}",
+        selectedMonth: "{{ selected_month|escapejs }}"
+      };
+    </script>
+    <script src="{% static 'core/datagrid.js' %}"></script>
+    <script src="{% static 'core/financeiro_caderno_table.js' %}"></script>
   </section>
 {% endblock %}

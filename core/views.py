@@ -477,6 +477,26 @@ def _ensure_default_cadernos(cliente):
         Caderno.objects.create(nome="OPEX", ativo=True, criador=cliente)
 
 
+def _financeiro_allowed_cadernos_qs(user, cliente):
+    if _is_admin_user(user) and not cliente:
+        return Caderno.objects.all()
+    if not cliente:
+        return Caderno.objects.none()
+    return Caderno.objects.filter(
+        Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())
+    ).distinct()
+
+
+def _financeiro_allowed_compras_qs(user, cliente):
+    if _is_admin_user(user) and not cliente:
+        return Compra.objects.all()
+    if not cliente:
+        return Compra.objects.none()
+    return Compra.objects.filter(
+        Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())
+    ).distinct()
+
+
 def _compra_status_label(compra):
     itens = list(compra.itens.all())
     if itens and all(item.pago for item in itens):
@@ -6374,10 +6394,7 @@ def financeiro_overview(request):
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    if cliente:
-        cadernos = Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()))
-    else:
-        cadernos = Caderno.objects.none()
+    cadernos = _financeiro_allowed_cadernos_qs(request.user, cliente)
     total_expr = ExpressionWrapper(
         F("compras__itens__valor") * F("compras__itens__quantidade"),
         output_field=DecimalField(max_digits=12, decimal_places=2),
@@ -6398,23 +6415,14 @@ def financeiro_overview(request):
             filter=Q(compras__data__gte=start_date, compras__data__lt=end_date),
         )
     ).order_by("nome")
-    if cliente:
-        compras_qs = Compra.objects.filter(
-            Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())
-        )
-        total_geral = compras_qs.aggregate(total=Sum(item_expr)).get("total")
-        ultimas_compras = compras_qs.prefetch_related("itens").order_by("-data")[:6]
-    else:
-        total_geral = None
-        ultimas_compras = Compra.objects.none()
+    compras_qs = _financeiro_allowed_compras_qs(request.user, cliente)
+    total_geral = compras_qs.aggregate(total=Sum(item_expr)).get("total")
+    ultimas_compras = compras_qs.prefetch_related("itens").order_by("-data")[:6]
 
     caderno_id = request.GET.get("caderno_id")
     compras = Compra.objects.none()
-    if cliente and caderno_id:
-        compras = Compra.objects.filter(
-            Q(caderno_id=caderno_id),
-            Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all()),
-        ).order_by("-data")
+    if caderno_id:
+        compras = _financeiro_allowed_compras_qs(request.user, cliente).filter(caderno_id=caderno_id).order_by("-data")
         compras = compras.prefetch_related("itens")
 
     return render(
@@ -6504,8 +6512,6 @@ def financeiro_nova(request):
                 params["caderno_id"] = next_caderno_id
             return redirect(f"{reverse('financeiro_nova')}?{urlencode(params)}")
         if action == "create_compra":
-            if not cliente:
-                return HttpResponseForbidden("Sem cadastro de cliente.")
             caderno_id = request.POST.get("caderno")
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
@@ -6549,9 +6555,7 @@ def financeiro_nova(request):
                 data = datetime.strptime(data_raw, "%Y-%m-%d").date()
             except ValueError:
                 data = None
-            allowed_cadernos = Caderno.objects.filter(
-                Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())
-            )
+            allowed_cadernos = _financeiro_allowed_cadernos_qs(request.user, cliente)
             has_any = any(
                 [
                     caderno_id,
@@ -6599,10 +6603,7 @@ def financeiro_nova(request):
                 return redirect("financeiro_compra_detail", pk=compra.pk)
             return redirect("financeiro")
 
-    if cliente:
-        cadernos = Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()))
-    else:
-        cadernos = Caderno.objects.none()
+    cadernos = _financeiro_allowed_cadernos_qs(request.user, cliente)
     categorias = CategoriaCompra.objects.order_by("nome")
     centros = CentroCusto.objects.order_by("nome")
     tipos = TipoCompra.objects.order_by("nome")
@@ -6668,7 +6669,7 @@ def financeiro_cadernos(request):
         if action == "create_caderno":
             nome = request.POST.get("nome", "").strip()
             id_financeiro_raw = request.POST.get("id_financeiro", "").strip()
-            if nome and cliente:
+            if nome:
                 financeiro = None
                 if id_financeiro_raw:
                     financeiro, _ = FinanceiroID.objects.get_or_create(codigo=id_financeiro_raw.upper())
@@ -6677,9 +6678,8 @@ def financeiro_cadernos(request):
         if action == "toggle_caderno":
             caderno_id = request.POST.get("caderno_id")
             caderno = get_object_or_404(
-                Caderno,
-                Q(pk=caderno_id),
-                Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()),
+                _financeiro_allowed_cadernos_qs(request.user, cliente),
+                pk=caderno_id,
             )
             caderno.ativo = not caderno.ativo
             caderno.save(update_fields=["ativo"])
@@ -6687,9 +6687,8 @@ def financeiro_cadernos(request):
         if action == "delete_caderno":
             caderno_id = request.POST.get("caderno_id")
             caderno = get_object_or_404(
-                Caderno,
-                Q(pk=caderno_id),
-                Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()),
+                _financeiro_allowed_cadernos_qs(request.user, cliente),
+                pk=caderno_id,
             )
             caderno.delete()
             return redirect("financeiro_cadernos")
@@ -6753,7 +6752,7 @@ def financeiro_cadernos(request):
         output_field=DecimalField(max_digits=12, decimal_places=2),
     )
     cadernos = (
-        Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()))
+        _financeiro_allowed_cadernos_qs(request.user, cliente)
         .annotate(total=Sum(total_expr))
         .order_by("nome")
     )
@@ -6774,11 +6773,7 @@ def financeiro_caderno_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    caderno = get_object_or_404(
-        Caderno,
-        Q(pk=pk),
-        Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all()),
-    )
+    caderno = get_object_or_404(_financeiro_allowed_cadernos_qs(request.user, cliente), pk=pk)
     today = timezone.localdate()
     selected_month = request.GET.get("mes", "").strip()
     if selected_month:
@@ -6807,36 +6802,16 @@ def financeiro_caderno_detail(request, pk):
     else:
         end_date = date(selected_dt.year, selected_dt.month + 1, 1)
 
-    status_filter = request.GET.get("status", "").strip().lower()
-    categoria_filter = request.GET.get("categoria", "").strip()
-    centro_filter = request.GET.get("centro", "").strip()
-    search_query = request.GET.get("q", "").strip()
-    query_params = {}
-    if status_filter:
-        query_params["status"] = status_filter
-    if categoria_filter:
-        query_params["categoria"] = categoria_filter
-    if centro_filter:
-        query_params["centro"] = centro_filter
-    if search_query:
-        query_params["q"] = search_query
-    month_query = urlencode(query_params)
-
     compras_base_qs = (
         Compra.objects.filter(caderno=caderno)
         .select_related("categoria", "centro_custo")
         .prefetch_related("itens")
         .order_by("-data", "-id")
     )
-    if categoria_filter:
-        compras_base_qs = compras_base_qs.filter(categoria_id=categoria_filter)
-    if centro_filter:
-        compras_base_qs = compras_base_qs.filter(centro_custo_id=centro_filter)
-
     compras_qs = compras_base_qs.filter(data__gte=start_date, data__lt=end_date)
     compras_sem_data_qs = compras_base_qs.filter(data__isnull=True)
 
-    compras = []
+    compras_table_data = []
     compras_sem_data = []
     total_mes = Decimal(0)
     total_pago = Decimal(0)
@@ -6848,6 +6823,7 @@ def financeiro_caderno_detail(request, pk):
     for compra in compras_qs:
         itens = list(compra.itens.all())
         compra.status_label = _compra_status_label(compra)
+        status_key = compra.status_label.lower()
         compra.total_itens = sum(
             (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens
         )
@@ -6856,16 +6832,29 @@ def financeiro_caderno_detail(request, pk):
         )
         compra.total_pendente = compra.total_itens - compra.total_pago
         compra.itens_count = len(itens)
-        if status_filter == "pago" and compra.status_label.lower() != "pago":
-            continue
-        if status_filter == "pendente" and compra.status_label.lower() != "pendente":
-            continue
-        compras.append(compra)
+        compras_table_data.append(
+            {
+                "id": compra.id,
+                "nome": (compra.nome or "").strip(),
+                "descricao": (compra.descricao or "").strip(),
+                "status": status_key,
+                "status_label": compra.status_label,
+                "data": compra.data.isoformat() if compra.data else "",
+                "data_label": compra.data.strftime("%d/%m/%Y") if compra.data else "-",
+                "itens_count": compra.itens_count,
+                "total_itens": str(compra.total_itens.quantize(Decimal("0.01"))),
+                "total_pago": str(compra.total_pago.quantize(Decimal("0.01"))),
+                "total_pendente": str(compra.total_pendente.quantize(Decimal("0.01"))),
+                "categoria": compra.categoria.nome if compra.categoria else "",
+                "centro": compra.centro_custo.nome if compra.centro_custo else "",
+                "detalhe_url": reverse("financeiro_compra_detail", args=[compra.pk]),
+            }
+        )
         total_mes += compra.total_itens
         total_pago += compra.total_pago
         total_pendente += compra.total_pendente
         total_compras += 1
-        if compra.status_label.lower() == "pago":
+        if status_key == "pago":
             total_pagas += 1
         else:
             total_pendentes += 1
@@ -6874,10 +6863,6 @@ def financeiro_caderno_detail(request, pk):
     for compra in compras_sem_data_qs:
         itens = list(compra.itens.all())
         compra.status_label = _compra_status_label(compra)
-        if status_filter == "pago" and compra.status_label.lower() != "pago":
-            continue
-        if status_filter == "pendente" and compra.status_label.lower() != "pendente":
-            continue
         compra.total_itens = sum(
             (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens
         )
@@ -6887,49 +6872,18 @@ def financeiro_caderno_detail(request, pk):
         compra.total_pendente = compra.total_itens - compra.total_pago
         compra.itens_count = len(itens)
         compras_sem_data.append(compra)
-
-    categorias = CategoriaCompra.objects.order_by("nome")
-    centros = CentroCusto.objects.order_by("nome")
-    if search_query:
-        compras = [
-            compra
-            for compra in compras
-            if search_query.lower()
-            in (
-                (compra.nome or compra.descricao or "")
-                .strip()
-                .lower()
-            )
-        ]
-        compras_sem_data = [
-            compra
-            for compra in compras_sem_data
-            if search_query.lower()
-            in (
-                (compra.nome or compra.descricao or "")
-                .strip()
-                .lower()
-            )
-        ]
     return render(
         request,
         "core/financeiro_caderno_detail.html",
         {
             "caderno": caderno,
-            "compras": compras,
+            "compras_table_data": compras_table_data,
             "compras_sem_data": compras_sem_data,
             "selected_month": selected_month,
             "mes_referencia": start_date,
             "prev_month": prev_month,
             "next_month": next_month,
             "current_month": current_month,
-            "month_query": month_query,
-            "status_filter": status_filter,
-            "categoria_filter": categoria_filter,
-            "centro_filter": centro_filter,
-            "search_query": search_query,
-            "categorias": categorias,
-            "centros": centros,
             "resumo": {
                 "total_mes": total_mes,
                 "total_pago": total_pago,
@@ -6948,11 +6902,7 @@ def financeiro_compra_detail(request, pk):
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
-    compra = get_object_or_404(
-        Compra,
-        Q(pk=pk),
-        Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all()),
-    )
+    compra = get_object_or_404(_financeiro_allowed_compras_qs(request.user, cliente), pk=pk)
     message = request.GET.get("msg", "").strip()
     message_level = request.GET.get("level", "").strip() or "info"
     open_cadastro = request.GET.get("cadastro", "").strip()
@@ -7025,9 +6975,7 @@ def financeiro_compra_detail(request, pk):
             centro_id = request.POST.get("centro_custo")
             caderno_id = request.POST.get("caderno")
             data_raw = request.POST.get("data", "").strip()
-            allowed_cadernos = Caderno.objects.filter(
-                Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())
-            )
+            allowed_cadernos = _financeiro_allowed_cadernos_qs(request.user, cliente)
             if caderno_id and not allowed_cadernos.filter(id=caderno_id).exists():
                 return redirect("financeiro_compra_detail", pk=compra.pk)
             if data_raw:
@@ -7236,7 +7184,7 @@ def financeiro_compra_detail(request, pk):
     tipos = TipoCompra.objects.order_by("nome")
     categorias = CategoriaCompra.objects.order_by("nome")
     centros = CentroCusto.objects.order_by("nome")
-    cadernos = Caderno.objects.filter(Q(criador=cliente) | Q(id_financeiro__in=cliente.financeiros.all())).order_by("nome")
+    cadernos = _financeiro_allowed_cadernos_qs(request.user, cliente).order_by("nome")
     return render(
         request,
         "core/financeiro_compra_detail.html",
