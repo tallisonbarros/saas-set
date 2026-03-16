@@ -6819,16 +6819,19 @@ def financeiro_caderno_detail(request, pk):
     total_compras = 0
     total_pagas = 0
     total_pendentes = 0
+    zero_money = Decimal("0.00")
 
     for compra in compras_qs:
         itens = list(compra.itens.all())
         compra.status_label = _compra_status_label(compra)
         status_key = compra.status_label.lower()
         compra.total_itens = sum(
-            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens),
+            zero_money,
         )
         compra.total_pago = sum(
-            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens if item.pago
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens if item.pago),
+            zero_money,
         )
         compra.total_pendente = compra.total_itens - compra.total_pago
         compra.itens_count = len(itens)
@@ -6864,10 +6867,12 @@ def financeiro_caderno_detail(request, pk):
         itens = list(compra.itens.all())
         compra.status_label = _compra_status_label(compra)
         compra.total_itens = sum(
-            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens),
+            zero_money,
         )
         compra.total_pago = sum(
-            (item.valor or Decimal(0)) * (item.quantidade or 0) for item in itens if item.pago
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens if item.pago),
+            zero_money,
         )
         compra.total_pendente = compra.total_itens - compra.total_pago
         compra.itens_count = len(itens)
