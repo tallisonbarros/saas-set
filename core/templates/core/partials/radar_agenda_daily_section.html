@@ -4,8 +4,7 @@
       <h2 class="io-title">Atividades do dia {{ selected_day_display }}</h2>
       <p class="muted">
         {{ daily_total_trabalhos }} trabalho(s),
-        {{ daily_total_atividades }} atividade(s),
-        {{ daily_total_horas|floatformat:2 }} h no dia.
+        {{ daily_total_atividades }} atividade(s).
       </p>
     </div>
   </div>
@@ -24,14 +23,12 @@
                 Atividades no dia: {{ group.total_atividades }}
               </div>
             </div>
-            <div class="slot-badge">{{ group.total_horas_dia|floatformat:2 }} h</div>
           </div>
           <table class="radar-agenda-mini-table">
             <thead>
               <tr>
                 <th>Atividade</th>
                 <th>Status</th>
-                <th>Horas no dia</th>
               </tr>
             </thead>
             <tbody>
@@ -39,7 +36,6 @@
                 <tr>
                   <td>{{ atividade.nome }}</td>
                   <td>{{ atividade.status_label }}</td>
-                  <td>{{ atividade.horas_dia|floatformat:2 }} h</td>
                 </tr>
               {% endfor %}
             </tbody>
