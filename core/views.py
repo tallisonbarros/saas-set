@@ -1317,6 +1317,7 @@ def ingest_limpar(request):
     message = None
     message_level = "info"
     removed_count = None
+    preview_limit = 50
     selected = {
         "client_id": (request.POST.get("client_id") if request.method == "POST" else request.GET.get("client_id") or "").strip(),
         "agent_id": (request.POST.get("agent_id") if request.method == "POST" else request.GET.get("agent_id") or "").strip(),
@@ -1360,6 +1361,10 @@ def ingest_limpar(request):
     if created_at_start and created_at_end:
         preview_qs = preview_qs.filter(created_at__gte=created_at_start, created_at__lt=created_at_end)
     preview_count = preview_qs.count() if any(selected.values()) and not date_error else 0
+    preview_requested = request.method == "GET" and request.GET.get("preview") == "1"
+    preview_records = []
+    if preview_requested and preview_count:
+        preview_records = list(preview_qs.order_by("-created_at")[:preview_limit])
 
     client_id_options = list(
         IngestRecord.objects.exclude(client_id="").values_list("client_id", flat=True).distinct().order_by("client_id")[:400]
@@ -1380,6 +1385,9 @@ def ingest_limpar(request):
             "removed_count": removed_count,
             "selected": selected,
             "preview_count": preview_count,
+            "preview_requested": preview_requested,
+            "preview_records": preview_records,
+            "preview_limit": preview_limit,
             "client_id_options": client_id_options,
             "agent_id_options": agent_id_options,
             "source_options": source_options,

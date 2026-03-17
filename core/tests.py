@@ -185,6 +185,41 @@ class IngestCleanupByDateTests(TestCase):
         self.assertFalse(IngestRecord.objects.filter(pk=remove_second.pk).exists())
         self.assertTrue(IngestRecord.objects.filter(pk=keep_other_source.pk).exists())
 
+    def test_preview_can_show_only_records_that_match_selected_filters(self):
+        tz = timezone.get_current_timezone()
+        matching = self._create_ingest_record(
+            "preview-match",
+            timezone.make_aware(datetime(2026, 3, 11, 9, 0, 0), tz),
+        )
+        self._create_ingest_record(
+            "preview-outside-date",
+            timezone.make_aware(datetime(2026, 3, 15, 9, 0, 0), tz),
+        )
+        self._create_ingest_record(
+            "preview-other-source",
+            timezone.make_aware(datetime(2026, 3, 11, 11, 0, 0), tz),
+            source="SOURCE-B",
+        )
+
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get(
+            "/ingest-gerenciar/limpar/",
+            {
+                "client_id": "CLIENTE-A",
+                "agent_id": "AGENTE-A",
+                "source": "SOURCE-A",
+                "data_inicial": "2026-03-11",
+                "data_final": "2026-03-12",
+                "preview": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pre-visualizacao da limpeza")
+        self.assertContains(response, matching.source_id)
+        self.assertNotContains(response, "preview-outside-date")
+        self.assertNotContains(response, "preview-other-source")
+
 
 class PropostaTrabalhoVinculoTests(TestCase):
     def setUp(self):

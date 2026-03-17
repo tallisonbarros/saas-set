@@ -47,9 +47,8 @@
         <p class="page-subtitle">Preencha client_id, agent_id e source. As datas sao opcionais e filtram `created_at`.</p>
       </div>
     </div>
-    <form method="post" class="stack" onsubmit="return confirm('Confirmar exclusao apenas para esse filtro?');">
+    <form method="post" class="stack">
       {% csrf_token %}
-      <input type="hidden" name="action" value="delete_filtered_ingest">
       <div class="user-row" style="gap: 10px; flex-wrap: wrap;">
         <input class="field-input" style="min-width: 180px; max-width: 260px;" type="text" name="client_id" list="client-id-options" placeholder="Client ID" value="{{ selected.client_id }}" required>
         <datalist id="client-id-options">
@@ -74,7 +73,8 @@
       </div>
       <div class="muted">Se informar apenas uma data, o sistema limpa somente aquele dia.</div>
       <div class="page-actions">
-        <button class="btn btn-primary" type="submit">Limpar somente filtro informado</button>
+        <button class="btn btn-outline" type="submit" formmethod="get" name="preview" value="1">Ver o que sera limpo</button>
+        <button class="btn btn-primary" type="submit" name="action" value="delete_filtered_ingest" onclick="return confirm('Confirmar exclusao apenas para esse filtro?');">Limpar somente filtro informado</button>
         <a class="btn btn-ghost" href="{% url 'ingest_limpar' %}">Limpar campos</a>
       </div>
     </form>
@@ -82,4 +82,39 @@
       Registros que seriam afetados com os filtros atuais: <strong>{{ preview_count }}</strong>
     </div>
   </section>
+
+  {% if preview_requested %}
+    <section class="card">
+      <div class="page-hud-head">
+        <div>
+          <h2 class="page-title">Pre-visualizacao da limpeza</h2>
+          <p class="page-subtitle">
+            {% if preview_count > preview_limit %}
+              Exibindo os {{ preview_limit }} registros mais recentes de {{ preview_count }} encontrados.
+            {% else %}
+              Exibindo {{ preview_count }} registro(s) encontrado(s) para o filtro atual.
+            {% endif %}
+          </p>
+        </div>
+      </div>
+      {% if preview_records %}
+        <div class="user-list">
+          {% for registro in preview_records %}
+            <div class="user-row">
+              <div>
+                <div class="panel-title">{{ registro.source_id }}</div>
+                <div class="proposal-meta">Cliente: {{ registro.client_id|default:"-" }} - Agente: {{ registro.agent_id|default:"-" }}</div>
+                <div class="proposal-meta">Origem: {{ registro.source|default:"-" }} - Recebido: {{ registro.created_at|date:"d/m/Y H:i" }}</div>
+              </div>
+              <div class="user-row" style="gap: 8px; justify-content: flex-end;">
+                <a class="btn btn-ghost" href="{% url 'ingest_detail' registro.pk %}">Detalhes</a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Nenhum registro encontrado para o filtro informado.</p>
+      {% endif %}
+    </section>
+  {% endif %}
 {% endblock %}
