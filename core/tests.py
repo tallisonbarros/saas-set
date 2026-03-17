@@ -16,6 +16,7 @@ from core.models import (
     Radar,
     RadarAtividade,
     RadarAtividadeDiaExecucao,
+    RadarColaborador,
     RadarClassificacao,
     RadarContrato,
     RadarID,
@@ -548,6 +549,21 @@ class RadarCreatorPermissionTests(TestCase):
         atividade.refresh_from_db()
         self.assertEqual(atividade.horas_trabalho, Decimal("48.00"))
 
+    def test_create_atividade_herda_colaboradores_do_trabalho(self):
+        self.client_http.force_login(self.owner_user)
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Ana")
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Bruno")
+
+        response = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {"action": "create_atividade", "nome": "Ativ Herdada"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        atividade = RadarAtividade.objects.get(trabalho=self.trabalho, nome="Ativ Herdada")
+        nomes = list(atividade.colaboradores.order_by("nome").values_list("nome", flat=True))
+        self.assertEqual(nomes, ["Ana", "Bruno"])
+
     def test_atualizar_horas_dia_recalcula_horas_de_todas_atividades(self):
         self.client_http.force_login(self.owner_user)
         atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Recalc")
@@ -582,7 +598,7 @@ class RadarCreatorPermissionTests(TestCase):
         atividade.refresh_from_db()
         self.assertEqual(atividade.horas_trabalho, Decimal("12.00"))
 
-    def test_atualizar_colaboradores_recalcula_horas_de_todas_atividades(self):
+    def test_atualizar_colaboradores_do_trabalho_nao_muda_equipe_ja_herdada(self):
         self.client_http.force_login(self.owner_user)
         atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Recalc Equipe")
 
@@ -614,7 +630,86 @@ class RadarCreatorPermissionTests(TestCase):
         )
         self.assertEqual(update_resp.status_code, 302)
         atividade.refresh_from_db()
+        self.assertEqual(atividade.horas_trabalho, Decimal("16.00"))
+
+    def test_update_atividade_recalcula_horas_com_colaboradores_da_atividade(self):
+        self.client_http.force_login(self.owner_user)
+        ana = RadarColaborador.objects.create(perfil=self.owner, nome="Ana")
+        bruno = RadarColaborador.objects.create(perfil=self.owner, nome="Bruno")
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Ana", colaborador=ana)
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Bruno", colaborador=bruno)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Eq Editavel")
+
+        agenda_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "set_agenda_atividade",
+                "atividade_id": str(atividade.id),
+                "dias_execucao": json.dumps(["2026-03-01", "2026-03-02"]),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(agenda_resp.status_code, 200)
+
+        update_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_atividade",
+                "atividade_id": str(atividade.id),
+                "nome": atividade.nome,
+                "descricao": "",
+                "status": "PENDENTE",
+                "colaborador_ids": [str(ana.id), str(bruno.id)],
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(update_resp.status_code, 200)
+        atividade.refresh_from_db()
         self.assertEqual(atividade.horas_trabalho, Decimal("32.00"))
+        self.assertEqual(
+            list(atividade.colaboradores.order_by("nome").values_list("nome", flat=True)),
+            ["Ana", "Bruno"],
+        )
+
+    def test_update_atividade_mantem_colaborador_ja_vinculado_mesmo_apos_remocao_do_trabalho(self):
+        self.client_http.force_login(self.owner_user)
+        ana = RadarColaborador.objects.create(perfil=self.owner, nome="Ana")
+        RadarTrabalhoColaborador.objects.create(trabalho=self.trabalho, nome="Ana", colaborador=ana)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Preserva Equipe")
+
+        remove_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_trabalho",
+                "nome": self.trabalho.nome,
+                "descricao": self.trabalho.descricao or "",
+                "setor": self.trabalho.setor or "",
+                "solicitante": self.trabalho.solicitante or "",
+                "responsavel": self.trabalho.responsavel or "",
+                "horas_dia": "8",
+                "colaborador_ids": [],
+                "colaboradores": "",
+            },
+        )
+        self.assertEqual(remove_resp.status_code, 302)
+
+        update_resp = self.client_http.post(
+            f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/",
+            {
+                "action": "update_atividade",
+                "atividade_id": str(atividade.id),
+                "nome": atividade.nome,
+                "descricao": "",
+                "status": "PENDENTE",
+                "colaborador_ids": [str(ana.id)],
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(update_resp.status_code, 200)
+        self.assertEqual(
+            list(atividade.colaboradores.order_by("nome").values_list("nome", flat=True)),
+            ["Ana"],
+        )
 
     def test_status_trabalho_nao_aceita_update_manual(self):
         self.client_http.force_login(self.owner_user)

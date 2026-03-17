@@ -19,6 +19,7 @@ from .models import (
     ListaIPItem,
     Radar,
     RadarAtividade,
+    RadarAtividadeColaborador,
     RadarClassificacao,
     RadarContrato,
     RadarID,
@@ -273,6 +274,13 @@ class RadarAtividadeAdmin(RadarOwnershipAdminMixin, admin.ModelAdmin):
                 RadarTrabalho.objects.filter(radar__cliente_id=owner_id) if owner_id else RadarTrabalho.objects.none()
             )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(RadarAtividadeColaborador)
+class RadarAtividadeColaboradorAdmin(RadarOwnershipAdminMixin, admin.ModelAdmin):
+    owner_lookup = "atividade__trabalho__radar__cliente_id"
+    list_display = ("nome", "atividade", "colaborador", "criado_em")
+    search_fields = ("nome", "atividade__nome", "atividade__trabalho__nome", "colaborador__nome")
 
 
 @admin.register(Inventario)

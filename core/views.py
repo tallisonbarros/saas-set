@@ -57,6 +57,7 @@ from .models import (
     AdminAccessLog,
     Radar,
     RadarAtividade,
+    RadarAtividadeColaborador,
     RadarAtividadeDiaExecucao,
     RadarColaborador,
     RadarClassificacao,
@@ -739,16 +740,116 @@ def _trabalho_colaboradores_ids(trabalho):
     return ids
 
 
+def _atividade_colaboradores_nomes(atividade):
+    prefetched = getattr(atividade, "_prefetched_objects_cache", {})
+    if "colaboradores" in prefetched:
+        return [
+            _radar_colaborador_nome(colaborador)
+            for colaborador in sorted(
+                prefetched["colaboradores"],
+                key=lambda item: ((_radar_colaborador_nome(item) or "").casefold(), item.id),
+            )
+        ]
+    rows = list(atividade.colaboradores.select_related("colaborador").all())
+    rows.sort(key=lambda item: ((_radar_colaborador_nome(item) or "").casefold(), item.id))
+    return [_radar_colaborador_nome(row) for row in rows]
+
+
+def _atividade_colaboradores_ids(atividade):
+    prefetched = getattr(atividade, "_prefetched_objects_cache", {})
+    rows = prefetched.get("colaboradores")
+    if rows is None:
+        rows = atividade.colaboradores.all()
+    ids = []
+    seen = set()
+    for row in rows:
+        colab_id = getattr(row, "colaborador_id", None)
+        if not colab_id or colab_id in seen:
+            continue
+        seen.add(colab_id)
+        ids.append(colab_id)
+    return ids
+
+
+def _trabalho_colaboradores_catalogo(trabalho):
+    prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
+    rows = prefetched.get("colaboradores")
+    if rows is None:
+        rows = list(trabalho.colaboradores.select_related("colaborador").all())
+    catalogo = []
+    seen = set()
+    ordered_rows = sorted(
+        rows,
+        key=lambda item: ((_radar_colaborador_nome(item) or "").casefold(), item.id),
+    )
+    for row in ordered_rows:
+        colaborador = getattr(row, "colaborador", None)
+        if not colaborador or not row.colaborador_id or row.colaborador_id in seen:
+            continue
+        seen.add(row.colaborador_id)
+        catalogo.append(colaborador)
+    return catalogo
+
+
+def _atividade_editor_colaboradores_catalogo(trabalho):
+    if not trabalho:
+        return []
+    return list(
+        RadarColaborador.objects.filter(
+            Q(trabalhos_vinculados__trabalho=trabalho)
+            | Q(atividades_vinculadas__atividade__trabalho=trabalho)
+        )
+        .distinct()
+        .order_by("nome", "id")
+    )
+
+
+def _atividade_colaboradores_count_map(atividade_ids):
+    atividade_ids = [item for item in atividade_ids if item]
+    if not atividade_ids:
+        return {}
+    return {
+        row["atividade_id"]: row["total_colaboradores"]
+        for row in (
+            RadarAtividadeColaborador.objects.filter(atividade_id__in=atividade_ids)
+            .values("atividade_id")
+            .annotate(total_colaboradores=Count("id"))
+        )
+    }
+
+
+def _atividade_colaboradores_rows_map(atividade_ids):
+    atividade_ids = [item for item in atividade_ids if item]
+    if not atividade_ids:
+        return {}
+    rows_map = {}
+    for row in (
+        RadarAtividadeColaborador.objects.filter(atividade_id__in=atividade_ids)
+        .select_related("colaborador")
+        .order_by("atividade_id", "nome", "id")
+    ):
+        rows_map.setdefault(row.atividade_id, []).append(row)
+    return rows_map
+
+
 def _radar_colaboradores_catalogo(radar):
     if not radar or not radar.cliente_id:
         return RadarColaborador.objects.none()
     return RadarColaborador.objects.filter(perfil=radar.cliente).order_by("nome", "id")
 
 
-def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes=None, colaboradores_ids=None):
+def _sync_colaboradores_rows(
+    existing_rows_qs,
+    relation_model,
+    parent_field_name,
+    parent_instance,
+    owner_cliente,
+    colaboradores_nomes=None,
+    colaboradores_ids=None,
+):
     incoming = []
     incoming_keys = set()
-    cliente_dono = getattr(getattr(trabalho, "radar", None), "cliente", None)
+    cliente_dono = owner_cliente
 
     colaboradores_by_id = {}
     if cliente_dono and colaboradores_ids:
@@ -811,7 +912,7 @@ def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes=None, colaborador
             }
         )
 
-    existing_rows = list(trabalho.colaboradores.select_related("colaborador").all())
+    existing_rows = list(existing_rows_qs.all())
     existing_by_key = {}
     duplicate_ids = []
     for row in existing_rows:
@@ -849,12 +950,13 @@ def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes=None, colaborador
                 row.colaborador_id = colaborador_id
                 to_update.append(row)
         else:
+            create_kwargs = {
+                parent_field_name: parent_instance,
+                "nome": nome,
+                "colaborador_id": colaborador_id,
+            }
             to_create.append(
-                RadarTrabalhoColaborador(
-                    trabalho=trabalho,
-                    nome=nome,
-                    colaborador_id=colaborador_id,
-                )
+                relation_model(**create_kwargs)
             )
         ordered_nomes.append(nome)
 
@@ -864,12 +966,36 @@ def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes=None, colaborador
         if row.id and row.id not in used_existing_ids
     ]
     if to_delete_ids:
-        RadarTrabalhoColaborador.objects.filter(pk__in=to_delete_ids).delete()
+        relation_model.objects.filter(pk__in=to_delete_ids).delete()
     if to_update:
-        RadarTrabalhoColaborador.objects.bulk_update(to_update, ["nome", "colaborador"])
+        relation_model.objects.bulk_update(to_update, ["nome", "colaborador"])
     if to_create:
-        RadarTrabalhoColaborador.objects.bulk_create(to_create, ignore_conflicts=True)
+        relation_model.objects.bulk_create(to_create, ignore_conflicts=True)
     return ordered_nomes
+
+
+def _sync_trabalho_colaboradores(trabalho, colaboradores_nomes=None, colaboradores_ids=None):
+    return _sync_colaboradores_rows(
+        existing_rows_qs=trabalho.colaboradores.select_related("colaborador"),
+        relation_model=RadarTrabalhoColaborador,
+        parent_field_name="trabalho",
+        parent_instance=trabalho,
+        owner_cliente=getattr(getattr(trabalho, "radar", None), "cliente", None),
+        colaboradores_nomes=colaboradores_nomes,
+        colaboradores_ids=colaboradores_ids,
+    )
+
+
+def _sync_atividade_colaboradores(atividade, colaboradores_nomes=None, colaboradores_ids=None):
+    return _sync_colaboradores_rows(
+        existing_rows_qs=atividade.colaboradores.select_related("colaborador"),
+        relation_model=RadarAtividadeColaborador,
+        parent_field_name="atividade",
+        parent_instance=atividade,
+        owner_cliente=getattr(getattr(getattr(atividade, "trabalho", None), "radar", None), "cliente", None),
+        colaboradores_nomes=colaboradores_nomes,
+        colaboradores_ids=colaboradores_ids,
+    )
 
 
 def _parse_agenda_execucao_input(raw_value, max_days=730):
@@ -932,6 +1058,19 @@ def _trabalho_colaboradores_multiplier(trabalho):
     return Decimal(total_colaboradores)
 
 
+def _atividade_colaboradores_multiplier(atividade):
+    if not atividade:
+        return Decimal("1")
+    prefetched = getattr(atividade, "_prefetched_objects_cache", {})
+    if "colaboradores" in prefetched:
+        total_colaboradores = len(prefetched["colaboradores"])
+    else:
+        total_colaboradores = atividade.colaboradores.count()
+    if total_colaboradores <= 0:
+        total_colaboradores = 1
+    return Decimal(total_colaboradores)
+
+
 def _atividade_horas_from_agenda(atividade, agenda_datas=None, colaboradores_multiplier=None):
     datas = agenda_datas if agenda_datas is not None else _atividade_agenda_datas(atividade)
     horas_dia = (
@@ -942,7 +1081,7 @@ def _atividade_horas_from_agenda(atividade, agenda_datas=None, colaboradores_mul
     multiplier = (
         colaboradores_multiplier
         if colaboradores_multiplier is not None
-        else _trabalho_colaboradores_multiplier(atividade.trabalho)
+        else _atividade_colaboradores_multiplier(atividade)
     )
     return horas_dia * Decimal(len(datas)) * multiplier
 
@@ -969,12 +1108,13 @@ def _sync_atividade_execucao_metrics_from_agenda(atividade, agenda_datas=None):
 
 def _recalcular_horas_atividades_trabalho(trabalho):
     atividades = list(
-        RadarAtividade.objects.filter(trabalho=trabalho).select_related("trabalho").prefetch_related("dias_execucao")
+        RadarAtividade.objects.filter(trabalho=trabalho)
+        .select_related("trabalho")
+        .prefetch_related("dias_execucao", "colaboradores")
     )
-    colaboradores_multiplier = _trabalho_colaboradores_multiplier(trabalho)
     changed = []
     for atividade in atividades:
-        horas = _atividade_horas_from_agenda(atividade, colaboradores_multiplier=colaboradores_multiplier)
+        horas = _atividade_horas_from_agenda(atividade)
         if atividade.horas_trabalho != horas:
             atividade.horas_trabalho = horas
             changed.append(atividade)
@@ -2560,6 +2700,7 @@ def _format_ptbr_date(value):
 
 def _atividade_response_payload(atividade):
     agenda_dias = _atividade_agenda_dias_iso(atividade)
+    colaboradores_nomes = _atividade_colaboradores_nomes(atividade)
     horas_label = ""
     if atividade.horas_trabalho is not None:
         horas_label = str(atividade.horas_trabalho)
@@ -2575,6 +2716,10 @@ def _atividade_response_payload(atividade):
         "finalizada_display": _format_ptbr_date(atividade.finalizada_em),
         "agenda_dias": agenda_dias,
         "agenda_total_dias": len(agenda_dias),
+        "colaborador_ids": _atividade_colaboradores_ids(atividade),
+        "colaboradores": colaboradores_nomes,
+        "colaboradores_label": ", ".join(colaboradores_nomes),
+        "total_colaboradores": len(colaboradores_nomes),
         "ordem": atividade.ordem or 0,
     }
 
@@ -4217,80 +4362,79 @@ def radar_agenda(request, pk):
         calendar.monthrange(selected_day.year, selected_day.month)[1],
     )
 
-    month_day_rows = list(
+    month_exec_rows = list(
         RadarAtividadeDiaExecucao.objects.filter(
             atividade__trabalho__radar=radar,
             data_execucao__gte=month_start,
             data_execucao__lte=month_end,
-        )
-        .values("data_execucao")
-        .annotate(total_atividades=Count("id"))
-        .order_by("data_execucao")
-    )
-    month_day_counts = {
-        row["data_execucao"]: row["total_atividades"]
-        for row in month_day_rows
-    }
-
-    month_summary_rows_raw = list(
-        RadarAtividadeDiaExecucao.objects.filter(
-            atividade__trabalho__radar=radar,
-            data_execucao__gte=month_start,
-            data_execucao__lte=month_end,
-        )
-        .values(
-            "atividade__trabalho_id",
-            "atividade__trabalho__nome",
-            "atividade__trabalho__status",
-            "atividade__trabalho__horas_dia",
-        )
-        .annotate(
-            primeiro_dia=Min("data_execucao"),
-            ultimo_dia=Max("data_execucao"),
-            total_slots=Count("id"),
-        )
-        .order_by(
-            "primeiro_dia",
-            "ultimo_dia",
-            "atividade__trabalho__nome",
-        )
-    )
-
-    daily_rows = list(
-        RadarAtividadeDiaExecucao.objects.filter(
-            atividade__trabalho__radar=radar,
-            data_execucao=selected_day,
         )
         .select_related("atividade", "atividade__trabalho")
-        .order_by(
-            "atividade__trabalho__nome",
-            "atividade__ordem",
-            "atividade__nome",
-            "id",
-        )
+        .order_by("data_execucao")
     )
-
-    trabalhos_ids = {
-        row["atividade__trabalho_id"]
-        for row in month_summary_rows_raw
-        if row.get("atividade__trabalho_id")
+    month_day_counts = {}
+    daily_rows = []
+    atividade_ids = {
+        row.atividade_id
+        for row in month_exec_rows
+        if row.atividade_id
     }
-    trabalhos_ids.update(
-        item.atividade.trabalho_id
-        for item in daily_rows
-        if item.atividade and item.atividade.trabalho_id
-    )
+    colaboradores_por_atividade = _atividade_colaboradores_count_map(atividade_ids)
+    month_summary_map = {}
+    status_map = dict(RadarTrabalho.Status.choices)
+    month_total_horas = Decimal("0.00")
 
-    colaboradores_por_trabalho = {}
-    if trabalhos_ids:
-        colaboradores_por_trabalho = {
-            row["trabalho_id"]: row["total_colaboradores"]
-            for row in (
-                RadarTrabalhoColaborador.objects.filter(trabalho_id__in=trabalhos_ids)
-                .values("trabalho_id")
-                .annotate(total_colaboradores=Count("id"))
-            )
-        }
+    for row in month_exec_rows:
+        month_day_counts[row.data_execucao] = month_day_counts.get(row.data_execucao, 0) + 1
+        if row.data_execucao == selected_day:
+            daily_rows.append(row)
+        atividade = row.atividade
+        trabalho = atividade.trabalho if atividade else None
+        if not atividade or not trabalho:
+            continue
+        total_colaboradores = colaboradores_por_atividade.get(atividade.id, 0)
+        multiplier = Decimal(total_colaboradores if total_colaboradores > 0 else 1)
+        horas_dia = trabalho.horas_dia if trabalho.horas_dia is not None else Decimal("8.00")
+        horas_atividade_dia = (horas_dia * multiplier).quantize(Decimal("0.01"))
+        month_total_horas += horas_atividade_dia
+
+        summary = month_summary_map.get(trabalho.id)
+        if summary is None:
+            summary = {
+                "trabalho_id": trabalho.id,
+                "trabalho_nome": trabalho.nome or "-",
+                "trabalho_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.id]),
+                "inicio": row.data_execucao,
+                "fim": row.data_execucao,
+                "status": trabalho.status,
+                "status_label": status_map.get(trabalho.status, trabalho.status),
+                "total_slots": 0,
+                "total_horas": Decimal("0.00"),
+            }
+            month_summary_map[trabalho.id] = summary
+        if row.data_execucao < summary["inicio"]:
+            summary["inicio"] = row.data_execucao
+        if row.data_execucao > summary["fim"]:
+            summary["fim"] = row.data_execucao
+        summary["total_slots"] += 1
+        summary["total_horas"] += horas_atividade_dia
+
+    month_total_horas = month_total_horas.quantize(Decimal("0.01"))
+    month_summary = []
+    for summary in sorted(
+        month_summary_map.values(),
+        key=lambda item: (item["inicio"], item["fim"], (item["trabalho_nome"] or "").casefold()),
+    ):
+        summary["inicio_display"] = summary["inicio"].strftime("%d/%m/%Y") if summary["inicio"] else "-"
+        summary["fim_display"] = summary["fim"].strftime("%d/%m/%Y") if summary["fim"] else "-"
+        summary["total_horas"] = summary["total_horas"].quantize(Decimal("0.01"))
+        month_summary.append(summary)
+
+    daily_activity_ids = {
+        row.atividade_id
+        for row in daily_rows
+        if row.atividade_id
+    }
+    colaboradores_rows_por_atividade = _atividade_colaboradores_rows_map(daily_activity_ids)
 
     daily_groups = []
     daily_groups_map = {}
@@ -4299,7 +4443,7 @@ def radar_agenda(request, pk):
     for row in daily_rows:
         atividade = row.atividade
         trabalho = atividade.trabalho
-        total_colaboradores = colaboradores_por_trabalho.get(trabalho.id, 0)
+        total_colaboradores = colaboradores_por_atividade.get(atividade.id, 0)
         multiplier = Decimal(total_colaboradores if total_colaboradores > 0 else 1)
         horas_dia = trabalho.horas_dia if trabalho.horas_dia is not None else Decimal("8.00")
         horas_atividade_dia = (horas_dia * multiplier).quantize(Decimal("0.01"))
@@ -4312,13 +4456,25 @@ def radar_agenda(request, pk):
                 "trabalho_status": trabalho.status,
                 "trabalho_status_label": trabalho.get_status_display(),
                 "trabalho_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.id]),
-                "total_colaboradores": total_colaboradores,
+                "total_colaboradores": 0,
                 "total_atividades": 0,
                 "total_horas_dia": Decimal("0.00"),
                 "atividades": [],
+                "_colaborador_keys": set(),
             }
             daily_groups_map[trabalho.id] = group
             daily_groups.append(group)
+
+        for colaborador_row in colaboradores_rows_por_atividade.get(atividade.id, []):
+            nome = " ".join((_radar_colaborador_nome(colaborador_row) or "").strip().split())
+            if not nome:
+                continue
+            key = (
+                f"id:{colaborador_row.colaborador_id}"
+                if colaborador_row.colaborador_id
+                else f"nome:{nome.casefold()}"
+            )
+            group["_colaborador_keys"].add(key)
 
         group["atividades"].append(
             {
@@ -4336,35 +4492,7 @@ def radar_agenda(request, pk):
 
     for group in daily_groups:
         group["total_horas_dia"] = group["total_horas_dia"].quantize(Decimal("0.01"))
-
-    status_map = dict(RadarTrabalho.Status.choices)
-    month_summary = []
-    month_total_horas = Decimal("0.00")
-    for row in month_summary_rows_raw:
-        trabalho_id = row["atividade__trabalho_id"]
-        total_colaboradores = colaboradores_por_trabalho.get(trabalho_id, 0)
-        multiplier = Decimal(total_colaboradores if total_colaboradores > 0 else 1)
-        horas_dia = row["atividade__trabalho__horas_dia"] or Decimal("8.00")
-        total_slots = row["total_slots"] or 0
-        total_horas = (horas_dia * multiplier * Decimal(total_slots)).quantize(Decimal("0.01"))
-        month_total_horas += total_horas
-        status_value = row["atividade__trabalho__status"] or ""
-        month_summary.append(
-            {
-                "trabalho_id": trabalho_id,
-                "trabalho_nome": row["atividade__trabalho__nome"] or "-",
-                "trabalho_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho_id]),
-                "inicio": row["primeiro_dia"],
-                "inicio_display": row["primeiro_dia"].strftime("%d/%m/%Y") if row["primeiro_dia"] else "-",
-                "fim": row["ultimo_dia"],
-                "fim_display": row["ultimo_dia"].strftime("%d/%m/%Y") if row["ultimo_dia"] else "-",
-                "status": status_value,
-                "status_label": status_map.get(status_value, status_value),
-                "total_horas": total_horas,
-            }
-        )
-
-    month_total_horas = month_total_horas.quantize(Decimal("0.01"))
+        group["total_colaboradores"] = len(group.pop("_colaborador_keys"))
     daily_total_horas = daily_total_horas.quantize(Decimal("0.01"))
 
     calendar_weeks = []
@@ -4439,76 +4567,76 @@ def radar_agenda(request, pk):
 
 
 def _radar_month_summary_snapshot(radar, month_start, month_end):
-    month_summary_rows_raw = list(
+    month_exec_rows = list(
         RadarAtividadeDiaExecucao.objects.filter(
             atividade__trabalho__radar=radar,
             data_execucao__gte=month_start,
             data_execucao__lte=month_end,
         )
-        .values(
-            "atividade__trabalho_id",
-            "atividade__trabalho__nome",
-            "atividade__trabalho__status",
-            "atividade__trabalho__horas_dia",
-        )
-        .annotate(
-            primeiro_dia=Min("data_execucao"),
-            ultimo_dia=Max("data_execucao"),
-            total_slots=Count("id"),
-        )
+        .select_related("atividade", "atividade__trabalho")
         .order_by(
-            "primeiro_dia",
-            "ultimo_dia",
+            "data_execucao",
             "atividade__trabalho__nome",
+            "atividade__ordem",
+            "atividade__nome",
+            "id",
         )
     )
-    trabalhos_ids = {
-        row["atividade__trabalho_id"]
-        for row in month_summary_rows_raw
-        if row.get("atividade__trabalho_id")
+    atividade_ids = {
+        row.atividade_id
+        for row in month_exec_rows
+        if row.atividade_id
     }
-    colaboradores_por_trabalho = {}
-    if trabalhos_ids:
-        colaboradores_por_trabalho = {
-            row["trabalho_id"]: row["total_colaboradores"]
-            for row in (
-                RadarTrabalhoColaborador.objects.filter(trabalho_id__in=trabalhos_ids)
-                .values("trabalho_id")
-                .annotate(total_colaboradores=Count("id"))
-            )
-        }
-
+    colaboradores_por_atividade = _atividade_colaboradores_count_map(atividade_ids)
     status_map = dict(RadarTrabalho.Status.choices)
-    month_summary = []
+    month_summary_map = {}
     month_total_horas = Decimal("0.00")
-    for row in month_summary_rows_raw:
-        trabalho_id = row["atividade__trabalho_id"]
-        total_colaboradores = colaboradores_por_trabalho.get(trabalho_id, 0)
+    for row in month_exec_rows:
+        atividade = row.atividade
+        trabalho = atividade.trabalho if atividade else None
+        if not atividade or not trabalho:
+            continue
+        trabalho_id = trabalho.id
+        total_colaboradores = colaboradores_por_atividade.get(atividade.id, 0)
         multiplier = Decimal(total_colaboradores if total_colaboradores > 0 else 1)
-        horas_dia = row["atividade__trabalho__horas_dia"] or Decimal("8.00")
-        total_slots = row["total_slots"] or 0
-        total_horas = (horas_dia * multiplier * Decimal(total_slots)).quantize(Decimal("0.01"))
-        month_total_horas += total_horas
-        status_value = row["atividade__trabalho__status"] or ""
-        month_summary.append(
-            {
+        horas_dia = trabalho.horas_dia or Decimal("8.00")
+        horas_atividade_dia = (horas_dia * multiplier).quantize(Decimal("0.01"))
+        month_total_horas += horas_atividade_dia
+        summary = month_summary_map.get(trabalho_id)
+        if summary is None:
+            summary = {
                 "trabalho_id": trabalho_id,
-                "trabalho_nome": row["atividade__trabalho__nome"] or "-",
-                "inicio": row["primeiro_dia"],
-                "inicio_display": row["primeiro_dia"].strftime("%d/%m/%Y") if row["primeiro_dia"] else "-",
-                "fim": row["ultimo_dia"],
-                "fim_display": row["ultimo_dia"].strftime("%d/%m/%Y") if row["ultimo_dia"] else "-",
-                "status": status_value,
-                "status_label": status_map.get(status_value, status_value),
-                "total_slots": total_slots,
-                "total_horas": total_horas,
+                "trabalho_nome": trabalho.nome or "-",
+                "inicio": row.data_execucao,
+                "fim": row.data_execucao,
+                "status": trabalho.status,
+                "status_label": status_map.get(trabalho.status, trabalho.status),
+                "total_slots": 0,
+                "total_horas": Decimal("0.00"),
             }
-        )
+            month_summary_map[trabalho_id] = summary
+        if row.data_execucao < summary["inicio"]:
+            summary["inicio"] = row.data_execucao
+        if row.data_execucao > summary["fim"]:
+            summary["fim"] = row.data_execucao
+        summary["total_slots"] += 1
+        summary["total_horas"] += horas_atividade_dia
+
+    month_summary = []
+    for summary in sorted(
+        month_summary_map.values(),
+        key=lambda item: (item["inicio"], item["fim"], (item["trabalho_nome"] or "").casefold()),
+    ):
+        summary["inicio_display"] = summary["inicio"].strftime("%d/%m/%Y") if summary["inicio"] else "-"
+        summary["fim_display"] = summary["fim"].strftime("%d/%m/%Y") if summary["fim"] else "-"
+        summary["total_horas"] = summary["total_horas"].quantize(Decimal("0.01"))
+        month_summary.append(summary)
+
     month_total_horas = month_total_horas.quantize(Decimal("0.01"))
     return {
         "month_summary": month_summary,
         "month_total_horas": month_total_horas,
-        "trabalhos_ids": trabalhos_ids,
+        "trabalhos_ids": {item["trabalho_id"] for item in month_summary},
     }
 
 
@@ -4530,10 +4658,6 @@ def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
     )
     trabalhos_map = {trabalho.id: trabalho for trabalho in trabalhos_qs}
 
-    colaboradores_por_trabalho = {}
-    for row in RadarTrabalhoColaborador.objects.filter(trabalho_id__in=trabalhos_ids).order_by("nome", "id"):
-        colaboradores_por_trabalho.setdefault(row.trabalho_id, []).append(row.nome)
-
     exec_rows = list(
         RadarAtividadeDiaExecucao.objects.filter(
             atividade__trabalho__radar=radar,
@@ -4552,6 +4676,12 @@ def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
             "id",
         )
     )
+    atividade_ids = {
+        exec_row.atividade_id
+        for exec_row in exec_rows
+        if exec_row.atividade_id
+    }
+    colaboradores_por_atividade = _atividade_colaboradores_rows_map(atividade_ids)
     exec_por_trabalho = {}
     for exec_row in exec_rows:
         trabalho_id = exec_row.atividade.trabalho_id if exec_row.atividade else None
@@ -4569,35 +4699,60 @@ def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
         horas_dia = trabalho.horas_dia if trabalho.horas_dia is not None else Decimal("8.00")
         horas_dia = horas_dia.quantize(Decimal("0.01"))
         execucoes = exec_por_trabalho.get(trabalho_id, [])
-        atividade_dia_rows = []
+        colaborador_tables_map = {}
         for execucao in execucoes:
-            atividade_nome = "-"
-            if execucao.atividade and execucao.atividade.nome:
-                atividade_nome = execucao.atividade.nome
-            atividade_dia_rows.append(
-                {
-                    "data_display": execucao.data_execucao.strftime("%d/%m/%Y"),
-                    "atividade_nome": atividade_nome,
-                    "hxh": horas_dia,
-                }
-            )
+            atividade = execucao.atividade
+            atividade_nome = atividade.nome if atividade and atividade.nome else "-"
+            row_payload = {
+                "data_display": execucao.data_execucao.strftime("%d/%m/%Y"),
+                "atividade_nome": atividade_nome,
+                "hxh": horas_dia,
+            }
+            atividade_colaboradores = colaboradores_por_atividade.get(getattr(atividade, "id", None), [])
+            if not atividade_colaboradores:
+                table = colaborador_tables_map.setdefault(
+                    "sem-colaborador",
+                    {
+                        "nome": "Nao informado",
+                        "rows": [],
+                        "total_horas": Decimal("0.00"),
+                    },
+                )
+                table["rows"].append(row_payload)
+                table["total_horas"] += horas_dia
+                continue
+            seen_keys = set()
+            for colaborador_row in atividade_colaboradores:
+                nome = " ".join((_radar_colaborador_nome(colaborador_row) or "").strip().split()) or "Nao informado"
+                key = (
+                    f"id:{colaborador_row.colaborador_id}"
+                    if colaborador_row.colaborador_id
+                    else f"nome:{nome.casefold()}"
+                )
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                table = colaborador_tables_map.setdefault(
+                    key,
+                    {
+                        "nome": nome,
+                        "rows": [],
+                        "total_horas": Decimal("0.00"),
+                    },
+                )
+                table["rows"].append(row_payload)
+                table["total_horas"] += horas_dia
 
-        colaboradores = colaboradores_por_trabalho.get(trabalho_id, [])
-        colaboradores_display = colaboradores or ["Nao informado"]
         colaborador_tables = []
-        for nome_colaborador in colaboradores_display:
-            total_colaborador_horas = (horas_dia * Decimal(len(atividade_dia_rows))).quantize(Decimal("0.01"))
-            colaborador_tables.append(
-                {
-                    "nome": nome_colaborador,
-                    "rows": atividade_dia_rows,
-                    "total_horas": total_colaborador_horas,
-                }
-            )
+        for item in sorted(
+            colaborador_tables_map.values(),
+            key=lambda current: ((current["nome"] or "").casefold(), current["nome"]),
+        ):
+            item["total_horas"] = item["total_horas"].quantize(Decimal("0.01"))
+            colaborador_tables.append(item)
 
-        total_execucoes = len(atividade_dia_rows)
-        multiplier = Decimal(len(colaboradores) if len(colaboradores) > 0 else 1)
-        total_horas_trabalho = (horas_dia * Decimal(total_execucoes) * multiplier).quantize(Decimal("0.01"))
+        total_execucoes = len(execucoes)
+        total_horas_trabalho = summary_row["total_horas"]
         prefetched = getattr(trabalho, "_prefetched_objects_cache", {})
         atividades_base = prefetched.get("atividades")
         if atividades_base is None:
@@ -4647,7 +4802,9 @@ def _build_radar_relatorio_pdf_context(radar, month_start, month_end):
                 "fim_display": summary_row["fim_display"],
                 "horas_dia": horas_dia,
                 "total_execucoes": total_execucoes,
-                "total_colaboradores": len(colaboradores),
+                "total_colaboradores": len(
+                    [item for key, item in colaborador_tables_map.items() if key != "sem-colaborador"]
+                ),
                 "total_horas": total_horas_trabalho,
                 "atividades_resumo": atividades_resumo,
                 "observacoes_resumo": observacoes_resumo,
@@ -4885,7 +5042,6 @@ def radar_trabalho_detail(request, radar_pk, pk):
             else:
                 with transaction.atomic():
                     horas_dia_alterado = trabalho.horas_dia != horas_dia
-                    total_colaboradores_antes = trabalho.colaboradores.count()
                     if data_raw:
                         try:
                             trabalho.data_registro = datetime.strptime(data_raw, "%Y-%m-%d").date()
@@ -4926,8 +5082,7 @@ def radar_trabalho_detail(request, radar_pk, pk):
                         colaboradores_nomes=colaboradores_nomes_legacy,
                         colaboradores_ids=colaboradores_ids,
                     )
-                    total_colaboradores_depois = trabalho.colaboradores.count()
-                    if horas_dia_alterado or total_colaboradores_antes != total_colaboradores_depois:
+                    if horas_dia_alterado:
                         _recalcular_horas_atividades_trabalho(trabalho)
                 _sync_trabalho_status(trabalho)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
@@ -4957,23 +5112,24 @@ def radar_trabalho_detail(request, radar_pk, pk):
             colaboradores_origem = _trabalho_colaboradores_nomes(trabalho)
             if colaboradores_origem:
                 _sync_trabalho_colaboradores(novo_trabalho, colaboradores_nomes=colaboradores_origem)
-            atividades = list(trabalho.atividades.all())
+            atividades = list(trabalho.atividades.prefetch_related("colaboradores").all())
             if atividades:
-                RadarAtividade.objects.bulk_create(
-                    [
-                        RadarAtividade(
-                            trabalho=novo_trabalho,
-                            nome=atividade.nome,
-                            descricao=atividade.descricao,
-                            horas_trabalho=Decimal("0.00"),
-                            status=atividade.status,
-                            inicio_execucao_em=atividade.inicio_execucao_em,
-                            finalizada_em=atividade.finalizada_em,
-                            ordem=atividade.ordem,
-                        )
-                        for atividade in atividades
-                    ]
-                )
+                for atividade in atividades:
+                    nova_atividade = RadarAtividade.objects.create(
+                        trabalho=novo_trabalho,
+                        nome=atividade.nome,
+                        descricao=atividade.descricao,
+                        horas_trabalho=Decimal("0.00"),
+                        status=atividade.status,
+                        inicio_execucao_em=atividade.inicio_execucao_em,
+                        finalizada_em=atividade.finalizada_em,
+                        ordem=atividade.ordem,
+                    )
+                    _sync_atividade_colaboradores(
+                        nova_atividade,
+                        colaboradores_nomes=_atividade_colaboradores_nomes(atividade),
+                        colaboradores_ids=_atividade_colaboradores_ids(atividade),
+                    )
             _sync_trabalho_status(novo_trabalho)
             return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=novo_trabalho.pk)
         if action == "create_observacao":
@@ -5070,22 +5226,39 @@ def radar_trabalho_detail(request, radar_pk, pk):
             atividade_id = request.POST.get("atividade_id")
             atividade = get_object_or_404(RadarAtividade, pk=atividade_id, trabalho=trabalho)
             nome_atividade = request.POST.get("nome", "").strip()
+            colaboradores_ids = _parse_colaborador_ids_input(request.POST.getlist("colaborador_ids"))
+            colaboradores_ids_permitidos = set(_trabalho_colaboradores_ids(trabalho)) | set(
+                _atividade_colaboradores_ids(atividade)
+            )
+            colaboradores_ids = [
+                colaborador_id
+                for colaborador_id in colaboradores_ids
+                if colaborador_id in colaboradores_ids_permitidos
+            ]
             if not nome_atividade:
                 if request.headers.get("x-requested-with") == "XMLHttpRequest":
                     return JsonResponse({"ok": False, "message": "Informe um nome para a atividade."}, status=400)
                 return redirect("radar_trabalho_detail", radar_pk=radar.pk, pk=trabalho.pk)
-            atividade.nome = nome_atividade
-            atividade.descricao = request.POST.get("descricao", "").strip()
-            status_raw = request.POST.get("status", "").strip()
-            if status_raw in dict(RadarAtividade.Status.choices):
-                atividade.status = status_raw
-            atividade.save(
-                update_fields=[
-                    "nome",
-                    "descricao",
-                    "status",
-                ]
-            )
+            with transaction.atomic():
+                atividade.nome = nome_atividade
+                atividade.descricao = request.POST.get("descricao", "").strip()
+                status_raw = request.POST.get("status", "").strip()
+                if status_raw in dict(RadarAtividade.Status.choices):
+                    atividade.status = status_raw
+                atividade.save(
+                    update_fields=[
+                        "nome",
+                        "descricao",
+                        "status",
+                    ]
+                )
+                _sync_atividade_colaboradores(
+                    atividade,
+                    colaboradores_ids=colaboradores_ids,
+                )
+                mudou_metricas = _sync_atividade_execucao_metrics_from_agenda(atividade)
+                if mudou_metricas:
+                    atividade.save(update_fields=["inicio_execucao_em", "finalizada_em", "horas_trabalho"])
             _sync_trabalho_status(trabalho)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(_atividade_response_payload(atividade))
@@ -5242,32 +5415,18 @@ def radar_trabalho_detail(request, radar_pk, pk):
     _recalcular_horas_atividades_trabalho(trabalho)
 
     contratos = RadarContrato.objects.order_by("nome")
-    atividades_base = trabalho.atividades.prefetch_related("dias_execucao").all()
+    atividades_base = trabalho.atividades.prefetch_related("dias_execucao", "colaboradores").all()
     _normalizar_ordem_atividades(trabalho)
     atividades_ordenadas = atividades_base.order_by("ordem", "criado_em", "id")
     atividades_table_data = []
     for atividade in atividades_ordenadas:
-        horas_label = str(atividade.horas_trabalho) if atividade.horas_trabalho is not None else ""
-        agenda_dias = _atividade_agenda_dias_iso(atividade)
-        atividades_table_data.append(
-            {
-                "id": atividade.id,
-                "nome": atividade.nome or "",
-                "descricao": atividade.descricao or "",
-                "status": atividade.status,
-                "status_label": atividade.get_status_display(),
-                "horas_trabalho": horas_label,
-                "inicio_execucao_display": _format_ptbr_date(atividade.inicio_execucao_em),
-                "finalizada_display": _format_ptbr_date(atividade.finalizada_em),
-                "agenda_dias": agenda_dias,
-                "agenda_total_dias": len(agenda_dias),
-                "ordem": atividade.ordem or 0,
-            }
-        )
+        row = _atividade_response_payload(atividade)
+        row.pop("ok", None)
+        atividades_table_data.append(row)
     edit_atividade = None
     edit_atividade_id = request.GET.get("editar", "").strip()
     if edit_atividade_id:
-        edit_atividade = RadarAtividade.objects.filter(pk=edit_atividade_id, trabalho=trabalho).first()
+        edit_atividade = RadarAtividade.objects.filter(pk=edit_atividade_id, trabalho=trabalho).prefetch_related("colaboradores").first()
     total_atividades = atividades_base.count()
     observacoes_trabalho = list(trabalho.observacoes.order_by("-data_observacao", "-id"))
     can_create_proposta_from_trabalho = can_edit_trabalho_by_creator
@@ -5297,6 +5456,8 @@ def radar_trabalho_detail(request, radar_pk, pk):
             "trabalho_colaboradores": ", ".join(_trabalho_colaboradores_nomes(trabalho)),
             "trabalho_colaborador_ids": _trabalho_colaboradores_ids(trabalho),
             "colaboradores_catalogo": list(_radar_colaboradores_catalogo(radar)),
+            "atividade_colaboradores_catalogo": _atividade_editor_colaboradores_catalogo(trabalho),
+            "edit_atividade_colaborador_ids": _atividade_colaboradores_ids(edit_atividade) if edit_atividade else [],
             "observacoes_trabalho": observacoes_trabalho,
             "observacao_data_default": timezone.localdate().isoformat(),
         },

@@ -580,6 +580,7 @@ class RadarAtividade(models.Model):
         return self.nome
 
     def save(self, *args, **kwargs):
+        is_new = self._state.adding
         if self.ordem <= 0 and self.trabalho_id:
             max_ordem = (
                 RadarAtividade.objects.filter(trabalho_id=self.trabalho_id, status=self.status).aggregate(
@@ -589,6 +590,40 @@ class RadarAtividade(models.Model):
             )
             self.ordem = max_ordem + 1
         super().save(*args, **kwargs)
+        if is_new and self.trabalho_id:
+            self.inherit_colaboradores_from_trabalho()
+
+    def inherit_colaboradores_from_trabalho(self):
+        if not self.trabalho_id:
+            return 0
+        existing_keys = set()
+        for row in self.colaboradores.all():
+            if row.colaborador_id:
+                existing_keys.add(f"id:{row.colaborador_id}")
+                continue
+            nome_key = (row.nome or "").strip().casefold()
+            if nome_key:
+                existing_keys.add(f"nome:{nome_key}")
+
+        to_create = []
+        for row in self.trabalho.colaboradores.select_related("colaborador").all():
+            nome = " ".join((row.nome or "").strip().split())[:120]
+            if not nome:
+                continue
+            key = f"id:{row.colaborador_id}" if row.colaborador_id else f"nome:{nome.casefold()}"
+            if key in existing_keys:
+                continue
+            existing_keys.add(key)
+            to_create.append(
+                RadarAtividadeColaborador(
+                    atividade=self,
+                    colaborador_id=row.colaborador_id,
+                    nome=nome,
+                )
+            )
+        if to_create:
+            RadarAtividadeColaborador.objects.bulk_create(to_create, ignore_conflicts=True)
+        return len(to_create)
 
 
 class RadarAtividadeDiaExecucao(models.Model):
@@ -607,6 +642,31 @@ class RadarAtividadeDiaExecucao(models.Model):
 
     def __str__(self):
         return f"{self.atividade_id} - {self.data_execucao.isoformat()}"
+
+
+class RadarAtividadeColaborador(models.Model):
+    atividade = models.ForeignKey(RadarAtividade, on_delete=models.CASCADE, related_name="colaboradores")
+    colaborador = models.ForeignKey(
+        RadarColaborador,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="atividades_vinculadas",
+    )
+    nome = models.CharField(max_length=120)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["atividade", "nome"],
+                name="unique_radar_atividade_colaborador",
+            )
+        ]
+
+    def __str__(self):
+        return self.nome
 
 
 class Inventario(models.Model):

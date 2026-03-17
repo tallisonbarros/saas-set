@@ -112,6 +112,10 @@
       finalizada_display: payload.finalizada_display || "",
       agenda_dias: Array.isArray(payload.agenda_dias) ? payload.agenda_dias : [],
       agenda_total_dias: Number(payload.agenda_total_dias || 0),
+      colaborador_ids: Array.isArray(payload.colaborador_ids) ? payload.colaborador_ids : [],
+      colaboradores: Array.isArray(payload.colaboradores) ? payload.colaboradores : [],
+      colaboradores_label: payload.colaboradores_label || "",
+      total_colaboradores: Number(payload.total_colaboradores || 0),
     };
   }
 
@@ -839,6 +843,24 @@
     }
   }
 
+  function setMultiSelectValues(form, name, values) {
+    if (!form) {
+      return;
+    }
+    var input = form.querySelector("[name='" + name + "']");
+    if (!input || input.tagName !== "SELECT" || !input.multiple) {
+      return;
+    }
+    var selectedMap = {};
+    (Array.isArray(values) ? values : []).forEach(function (value) {
+      selectedMap[String(value)] = true;
+    });
+    Array.prototype.forEach.call(input.options || [], function (option) {
+      option.selected = !!selectedMap[String(option.value)];
+    });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
   function hideEditor() {
     if (!editor) {
       return;
@@ -873,6 +895,7 @@
     setField(updateForm, "status", row.status);
     setField(updateForm, "inicio_execucao_display", row.inicio_execucao_display);
     setField(updateForm, "finalizada_display", row.finalizada_display);
+    setMultiSelectValues(updateForm, "colaborador_ids", row.colaborador_ids || []);
     if (deleteForm) {
       setField(deleteForm, "atividade_id", row.id);
       var deleteButton = deleteForm.querySelector("button[type='submit']");

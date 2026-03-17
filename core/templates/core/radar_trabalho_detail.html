@@ -85,6 +85,26 @@
                 <span>Data de finalizacao</span>
                 <input type="text" name="finalizada_display" value="{{ edit_atividade.finalizada_em|date:'d/m/Y' }}" readonly>
               </label>
+              <label class="field" style="grid-column: 1 / -1;">
+                <span>Colaboradores da atividade</span>
+                <select
+                  name="colaborador_ids"
+                  multiple
+                  size="6"
+                  data-colab-picker
+                  data-colab-picker-placeholder="Adicionar colaborador da atividade..."
+                  data-colab-picker-empty="Sem colaboradores selecionados"
+                >
+                  {% for colaborador in atividade_colaboradores_catalogo %}
+                    <option value="{{ colaborador.id }}" {% if colaborador.id in edit_atividade_colaborador_ids %}selected{% endif %}>
+                      {{ colaborador.nome }}{% if colaborador.cargo %} - {{ colaborador.cargo }}{% endif %}
+                    </option>
+                  {% endfor %}
+                </select>
+                {% if not atividade_colaboradores_catalogo %}
+                  <small class="muted">Nenhum colaborador do trabalho disponivel para vincular nesta atividade.</small>
+                {% endif %}
+              </label>
             </div>
             <div class="form-actions">
               <button class="btn btn-primary" type="submit">Salvar atividade</button>
