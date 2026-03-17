@@ -11,6 +11,7 @@ from django.utils import timezone
 from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_visual_flags
 from core.models import (
     PerfilUsuario,
+    IngestRecord,
     Proposta,
     Radar,
     RadarAtividade,
@@ -118,6 +119,71 @@ class RouteTimelineStateTests(SimpleTestCase):
             seed_states=seed_states,
         )
         self.assertEqual(flags, [True, False, False])
+
+
+class IngestCleanupByDateTests(TestCase):
+    def setUp(self):
+        self.client_http = Client()
+        self.tipo_dev, _ = TipoPerfil.objects.get_or_create(nome="Dev")
+        self.dev_user = User.objects.create_user(username="ingest-dev@set.local", email="ingest-dev@set.local", password="123456")
+        self.dev_perfil = PerfilUsuario.objects.create(
+            nome="Ingest Dev",
+            email="ingest-dev@set.local",
+            usuario=self.dev_user,
+        )
+        self.dev_perfil.tipos.add(self.tipo_dev)
+
+    def _create_ingest_record(self, source_id, created_at, client_id="CLIENTE-A", agent_id="AGENTE-A", source="SOURCE-A"):
+        record = IngestRecord.objects.create(
+            source_id=source_id,
+            client_id=client_id,
+            agent_id=agent_id,
+            source=source,
+            payload={"source_id": source_id},
+        )
+        IngestRecord.objects.filter(pk=record.pk).update(created_at=created_at, updated_at=created_at)
+        record.refresh_from_db()
+        return record
+
+    def test_admin_can_delete_only_records_within_selected_created_at_range(self):
+        tz = timezone.get_current_timezone()
+        keep_before = self._create_ingest_record(
+            "before-range",
+            timezone.make_aware(datetime(2026, 3, 10, 9, 0, 0), tz),
+        )
+        remove_first = self._create_ingest_record(
+            "inside-range-1",
+            timezone.make_aware(datetime(2026, 3, 11, 10, 0, 0), tz),
+        )
+        remove_second = self._create_ingest_record(
+            "inside-range-2",
+            timezone.make_aware(datetime(2026, 3, 12, 11, 0, 0), tz),
+        )
+        keep_other_source = self._create_ingest_record(
+            "other-source",
+            timezone.make_aware(datetime(2026, 3, 11, 12, 0, 0), tz),
+            source="SOURCE-B",
+        )
+
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.post(
+            "/ingest-gerenciar/limpar/",
+            {
+                "action": "delete_filtered_ingest",
+                "client_id": "CLIENTE-A",
+                "agent_id": "AGENTE-A",
+                "source": "SOURCE-A",
+                "data_inicial": "2026-03-11",
+                "data_final": "2026-03-12",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "2 registro(s) removido(s)")
+        self.assertTrue(IngestRecord.objects.filter(pk=keep_before.pk).exists())
+        self.assertFalse(IngestRecord.objects.filter(pk=remove_first.pk).exists())
+        self.assertFalse(IngestRecord.objects.filter(pk=remove_second.pk).exists())
+        self.assertTrue(IngestRecord.objects.filter(pk=keep_other_source.pk).exists())
 
 
 class PropostaTrabalhoVinculoTests(TestCase):

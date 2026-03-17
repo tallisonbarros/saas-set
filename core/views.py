@@ -1286,6 +1286,29 @@ def planta_conectada(request):
     return render(request, "core/ingest_gerenciar.html", context)
 
 
+def _build_ingest_created_at_range(start_raw, end_raw):
+    if not start_raw and not end_raw:
+        return None, None, None
+
+    try:
+        start_date = date.fromisoformat(start_raw) if start_raw else None
+        end_date = date.fromisoformat(end_raw) if end_raw else None
+    except ValueError:
+        return None, None, "Informe datas validas para filtrar a limpeza."
+
+    if start_date is None:
+        start_date = end_date
+    if end_date is None:
+        end_date = start_date
+    if end_date < start_date:
+        return None, None, "A data final nao pode ser anterior a data inicial."
+
+    tz = timezone.get_current_timezone()
+    start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()), tz)
+    end_dt = timezone.make_aware(datetime.combine(end_date + timedelta(days=1), datetime.min.time()), tz)
+    return start_dt, end_dt, None
+
+
 @login_required
 def ingest_limpar(request):
     if not _is_admin_user(request.user):
@@ -1298,7 +1321,13 @@ def ingest_limpar(request):
         "client_id": (request.POST.get("client_id") if request.method == "POST" else request.GET.get("client_id") or "").strip(),
         "agent_id": (request.POST.get("agent_id") if request.method == "POST" else request.GET.get("agent_id") or "").strip(),
         "source": (request.POST.get("source") if request.method == "POST" else request.GET.get("source") or "").strip(),
+        "data_inicial": (request.POST.get("data_inicial") if request.method == "POST" else request.GET.get("data_inicial") or "").strip(),
+        "data_final": (request.POST.get("data_final") if request.method == "POST" else request.GET.get("data_final") or "").strip(),
     }
+    created_at_start, created_at_end, date_error = _build_ingest_created_at_range(
+        selected["data_inicial"],
+        selected["data_final"],
+    )
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -1306,12 +1335,17 @@ def ingest_limpar(request):
             if not selected["client_id"] or not selected["agent_id"] or not selected["source"]:
                 message = "Informe client_id, agent_id e source para limpar."
                 message_level = "error"
+            elif date_error:
+                message = date_error
+                message_level = "error"
             else:
                 qs = IngestRecord.objects.filter(
                     client_id=selected["client_id"],
                     agent_id=selected["agent_id"],
                     source=selected["source"],
                 )
+                if created_at_start and created_at_end:
+                    qs = qs.filter(created_at__gte=created_at_start, created_at__lt=created_at_end)
                 removed_count, _ = qs.delete()
                 message = f"{removed_count} registro(s) removido(s) para o filtro informado."
                 message_level = "success"
@@ -1323,7 +1357,9 @@ def ingest_limpar(request):
         preview_qs = preview_qs.filter(agent_id=selected["agent_id"])
     if selected["source"]:
         preview_qs = preview_qs.filter(source=selected["source"])
-    preview_count = preview_qs.count() if any(selected.values()) else 0
+    if created_at_start and created_at_end:
+        preview_qs = preview_qs.filter(created_at__gte=created_at_start, created_at__lt=created_at_end)
+    preview_count = preview_qs.count() if any(selected.values()) and not date_error else 0
 
     client_id_options = list(
         IngestRecord.objects.exclude(client_id="").values_list("client_id", flat=True).distinct().order_by("client_id")[:400]

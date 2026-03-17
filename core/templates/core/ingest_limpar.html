@@ -28,7 +28,7 @@
       <div class="page-hud-head">
         <div>
           <h1 class="page-title">Limpeza segmentada de registros</h1>
-          <p class="page-subtitle">Remove somente o conjunto de registros que casar exatamente com client_id + agent_id + source.</p>
+          <p class="page-subtitle">Remove o conjunto que casar com client_id + agent_id + source, com recorte opcional pela data de recebimento.</p>
         </div>
       </div>
     </div>
@@ -44,7 +44,7 @@
     <div class="page-hud-head">
       <div>
         <h2 class="page-title">Filtro de limpeza</h2>
-        <p class="page-subtitle">Preencha os 3 campos para habilitar a exclusao.</p>
+        <p class="page-subtitle">Preencha client_id, agent_id e source. As datas sao opcionais e filtram `created_at`.</p>
       </div>
     </div>
     <form method="post" class="stack" onsubmit="return confirm('Confirmar exclusao apenas para esse filtro?');">
@@ -69,7 +69,10 @@
             <option value="{{ option }}"></option>
           {% endfor %}
         </datalist>
+        <input class="field-input" style="min-width: 180px; max-width: 220px;" type="date" name="data_inicial" value="{{ selected.data_inicial }}">
+        <input class="field-input" style="min-width: 180px; max-width: 220px;" type="date" name="data_final" value="{{ selected.data_final }}">
       </div>
+      <div class="muted">Se informar apenas uma data, o sistema limpa somente aquele dia.</div>
       <div class="page-actions">
         <button class="btn btn-primary" type="submit">Limpar somente filtro informado</button>
         <a class="btn btn-ghost" href="{% url 'ingest_limpar' %}">Limpar campos</a>
