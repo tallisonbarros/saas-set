@@ -79,7 +79,7 @@
             </svg>
           </span>
         </div>
-        <div class="summary-value finance-summary-sensitive-value">R$ {{ resumo.total_mes|floatformat:2 }}</div>
+        <div class="summary-value finance-summary-sensitive-value" data-finance-summary-key="total_mes">R$ {{ resumo.total_mes|floatformat:2 }}</div>
       </div>
       <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
         <div class="summary-label finance-summary-label-row">
@@ -91,7 +91,7 @@
             </svg>
           </span>
         </div>
-        <div class="summary-value finance-summary-sensitive-value">R$ {{ resumo.total_pago|floatformat:2 }}</div>
+        <div class="summary-value finance-summary-sensitive-value" data-finance-summary-key="total_pago">R$ {{ resumo.total_pago|floatformat:2 }}</div>
       </div>
       <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
         <div class="summary-label finance-summary-label-row">
@@ -103,7 +103,7 @@
             </svg>
           </span>
         </div>
-        <div class="summary-value finance-summary-sensitive-value">R$ {{ resumo.total_pendente|floatformat:2 }}</div>
+        <div class="summary-value finance-summary-sensitive-value" data-finance-summary-key="total_pendente">R$ {{ resumo.total_pendente|floatformat:2 }}</div>
       </div>
       <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
         <div class="summary-label finance-summary-label-row">
@@ -115,7 +115,7 @@
             </svg>
           </span>
         </div>
-        <div class="summary-value finance-summary-sensitive-value">{{ resumo.total_compras }}</div>
+        <div class="summary-value finance-summary-sensitive-value" data-finance-summary-key="total_compras">{{ resumo.total_compras }}</div>
       </div>
     </div>
 
@@ -153,7 +153,18 @@
     <script>
       window.FinanceiroCadernoComprasConfig = {
         cadernoId: "{{ caderno.id }}",
-        selectedMonth: "{{ selected_month|escapejs }}"
+        selectedMonth: "{{ selected_month|escapejs }}",
+        defaultDate: "{{ quick_create_date|escapejs }}",
+        categorias: [
+          {% for categoria in categorias %}
+            { value: "{{ categoria.id }}", label: "{{ categoria.nome|escapejs }}" }{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        ],
+        centros: [
+          {% for centro in centros %}
+            { value: "{{ centro.id }}", label: "{{ centro.nome|escapejs }}" }{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        ]
       };
     </script>
     <script src="{% static 'core/datagrid.js' %}"></script>

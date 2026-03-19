@@ -7006,6 +7006,111 @@ def financeiro_caderno_detail(request, pk):
         end_date = date(selected_dt.year + 1, 1, 1)
     else:
         end_date = date(selected_dt.year, selected_dt.month + 1, 1)
+    zero_money = Decimal("0.00")
+
+    def build_compra_row(compra_obj):
+        itens = list(compra_obj.itens.all())
+        status_label = _compra_status_label(compra_obj)
+        status_key = status_label.lower()
+        total_itens = sum(
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens),
+            zero_money,
+        )
+        total_pago = sum(
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens if item.pago),
+            zero_money,
+        )
+        total_pendente = total_itens - total_pago
+        compra_obj.status_label = status_label
+        compra_obj.total_itens = total_itens
+        compra_obj.total_pago = total_pago
+        compra_obj.total_pendente = total_pendente
+        compra_obj.itens_count = len(itens)
+        return {
+            "id": compra_obj.id,
+            "nome": (compra_obj.nome or "").strip(),
+            "descricao": (compra_obj.descricao or "").strip(),
+            "status": status_key,
+            "status_label": status_label,
+            "data": compra_obj.data.isoformat() if compra_obj.data else "",
+            "data_label": compra_obj.data.strftime("%d/%m/%Y") if compra_obj.data else "-",
+            "itens_count": compra_obj.itens_count,
+            "total_itens": str(total_itens.quantize(Decimal("0.01"))),
+            "total_pago": str(total_pago.quantize(Decimal("0.01"))),
+            "total_pendente": str(total_pendente.quantize(Decimal("0.01"))),
+            "categoria": compra_obj.categoria.nome if compra_obj.categoria else "",
+            "centro": compra_obj.centro_custo.nome if compra_obj.centro_custo else "",
+            "detalhe_url": reverse("financeiro_compra_detail", args=[compra_obj.pk]),
+        }
+
+    if request.method == "POST" and request.POST.get("action") == "create_quick_compra":
+        nome = request.POST.get("nome", "").strip()
+        descricao = request.POST.get("descricao", "").strip()
+        data_raw = request.POST.get("data", "").strip()
+        categoria_id = request.POST.get("categoria", "").strip()
+        centro_id = request.POST.get("centro_custo", "").strip()
+        reference_month = request.POST.get("selected_month", "").strip() or selected_month
+
+        if not nome:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "message": "Informe o nome da compra.",
+                    "level": "error",
+                },
+                status=400,
+            )
+
+        if data_raw:
+            try:
+                data_compra = datetime.strptime(data_raw, "%Y-%m-%d").date()
+            except ValueError:
+                return JsonResponse(
+                    {
+                        "ok": False,
+                        "message": "Data invalida.",
+                        "level": "error",
+                    },
+                    status=400,
+                )
+        else:
+            data_compra = None
+
+        compra = Compra.objects.create(
+            caderno=caderno,
+            nome=nome,
+            descricao=descricao,
+            data=data_compra,
+            categoria_id=categoria_id or None,
+            centro_custo_id=centro_id or None,
+        )
+        compra = (
+            Compra.objects.filter(pk=compra.pk)
+            .select_related("categoria", "centro_custo")
+            .prefetch_related("itens")
+            .get()
+        )
+        row_payload = build_compra_row(compra)
+        in_selected_month = bool(data_compra and start_date <= data_compra < end_date)
+        total_compras_mes = Compra.objects.filter(caderno=caderno, data__gte=start_date, data__lt=end_date).count()
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            message = "Compra criada."
+            if reference_month and not in_selected_month:
+                message = "Compra criada fora do mes selecionado."
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "row": row_payload if in_selected_month else None,
+                    "message": message,
+                    "level": "success",
+                    "in_selected_month": in_selected_month,
+                    "summary": {
+                        "total_compras": total_compras_mes,
+                    },
+                }
+            )
+        return redirect("financeiro_compra_detail", pk=compra.pk)
 
     compras_base_qs = (
         Compra.objects.filter(caderno=caderno)
@@ -7024,40 +7129,10 @@ def financeiro_caderno_detail(request, pk):
     total_compras = 0
     total_pagas = 0
     total_pendentes = 0
-    zero_money = Decimal("0.00")
 
     for compra in compras_qs:
-        itens = list(compra.itens.all())
-        compra.status_label = _compra_status_label(compra)
+        compras_table_data.append(build_compra_row(compra))
         status_key = compra.status_label.lower()
-        compra.total_itens = sum(
-            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens),
-            zero_money,
-        )
-        compra.total_pago = sum(
-            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens if item.pago),
-            zero_money,
-        )
-        compra.total_pendente = compra.total_itens - compra.total_pago
-        compra.itens_count = len(itens)
-        compras_table_data.append(
-            {
-                "id": compra.id,
-                "nome": (compra.nome or "").strip(),
-                "descricao": (compra.descricao or "").strip(),
-                "status": status_key,
-                "status_label": compra.status_label,
-                "data": compra.data.isoformat() if compra.data else "",
-                "data_label": compra.data.strftime("%d/%m/%Y") if compra.data else "-",
-                "itens_count": compra.itens_count,
-                "total_itens": str(compra.total_itens.quantize(Decimal("0.01"))),
-                "total_pago": str(compra.total_pago.quantize(Decimal("0.01"))),
-                "total_pendente": str(compra.total_pendente.quantize(Decimal("0.01"))),
-                "categoria": compra.categoria.nome if compra.categoria else "",
-                "centro": compra.centro_custo.nome if compra.centro_custo else "",
-                "detalhe_url": reverse("financeiro_compra_detail", args=[compra.pk]),
-            }
-        )
         total_mes += compra.total_itens
         total_pago += compra.total_pago
         total_pendente += compra.total_pendente
@@ -7094,6 +7169,9 @@ def financeiro_caderno_detail(request, pk):
             "prev_month": prev_month,
             "next_month": next_month,
             "current_month": current_month,
+            "quick_create_date": today.strftime("%Y-%m-%d") if selected_month == current_month else start_date.strftime("%Y-%m-%d"),
+            "categorias": CategoriaCompra.objects.order_by("nome"),
+            "centros": CentroCusto.objects.order_by("nome"),
             "resumo": {
                 "total_mes": total_mes,
                 "total_pago": total_pago,
