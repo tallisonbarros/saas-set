@@ -62,6 +62,10 @@
     if (!node) {
       return;
     }
+    if (key === "total_compras") {
+      node.textContent = String(value) + " compra(s) no mes";
+      return;
+    }
     node.textContent = value;
   }
 
@@ -81,6 +85,29 @@
     if (summary.total_compras !== undefined) {
       updateSummaryChip("total_compras", String(summary.total_compras));
     }
+  }
+
+  function syncSummaryFromGrid() {
+    if (!grid || typeof grid.getRows !== "function") {
+      return;
+    }
+    var allRows = grid.getRows();
+    var totalMes = 0;
+    var totalPago = 0;
+    var totalPendente = 0;
+
+    (Array.isArray(allRows) ? allRows : []).forEach(function (row) {
+      totalMes += toMoneyNumber(row.total_itens);
+      totalPago += toMoneyNumber(row.total_pago);
+      totalPendente += toMoneyNumber(row.total_pendente);
+    });
+
+    applySummary({
+      total_mes: totalMes,
+      total_pago: totalPago,
+      total_pendente: totalPendente,
+      total_compras: Array.isArray(allRows) ? allRows.length : 0,
+    });
   }
 
   function monthLabel(isoMonth) {
@@ -450,4 +477,5 @@
   });
 
   window.FinanceiroCadernoComprasGrid = grid;
+  window.FinanceiroCadernoSyncSummary = syncSummaryFromGrid;
 })();

@@ -1520,6 +1520,13 @@ a.proposal-link-badge:hover {
   opacity: 1;
 }
 
+.finance-grid-footnote {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .summary-hint {
   font-size: 11px;
   color: var(--muted);

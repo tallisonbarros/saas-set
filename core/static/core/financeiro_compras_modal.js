@@ -235,6 +235,9 @@
     if (window.FinanceiroCadernoComprasGrid && typeof window.FinanceiroCadernoComprasGrid.updateRow === "function") {
       window.FinanceiroCadernoComprasGrid.updateRow(String(modalState.compraData.id || modalState.compraId), compraPatch);
     }
+    if (typeof window.FinanceiroCadernoSyncSummary === "function") {
+      window.FinanceiroCadernoSyncSummary();
+    }
     syncModalMeta();
   }
 

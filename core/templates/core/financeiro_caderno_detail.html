@@ -105,22 +105,11 @@
         </div>
         <div class="summary-value finance-summary-sensitive-value" data-finance-summary-key="total_pendente">R$ {{ resumo.total_pendente|floatformat:2 }}</div>
       </div>
-      <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
-        <div class="summary-label finance-summary-label-row">
-          <span>Total de compras</span>
-          <span class="finance-summary-eye" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false">
-              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
-              <circle cx="12" cy="12" r="3.2"></circle>
-            </svg>
-          </span>
-        </div>
-        <div class="summary-value finance-summary-sensitive-value" data-finance-summary-key="total_compras">{{ resumo.total_compras }}</div>
-      </div>
     </div>
 
     <div class="finance-card">
       {% include "core/components/datagrid.html" with grid_id="financeiro-compras-grid" table_class="financeiro-compras-table" scope=caderno.id grid_title="Compras do mes" %}
+      <div class="finance-grid-footnote" data-finance-summary-key="total_compras">{{ resumo.total_compras }} compra(s) no mes</div>
     </div>
 
     <div class="finance-card finance-card-muted">
