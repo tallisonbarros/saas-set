@@ -41,7 +41,7 @@
 
   var monthText = monthLabel(selectedMonth);
 
-  window.SAASDataGrid.create({
+  var grid = window.SAASDataGrid.create({
     rootId: "financeiro-compras-grid",
     storageKey: "financeiro-caderno-compras:" + cadernoId,
     rows: rows,
@@ -180,4 +180,6 @@
       },
     ],
   });
+
+  window.FinanceiroCadernoComprasGrid = grid;
 })();

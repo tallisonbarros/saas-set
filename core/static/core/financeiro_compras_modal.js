@@ -11,10 +11,10 @@
 
   var rows = utils.parseJsonScript("financeiro-compras-mes-data");
   var rowsById = {};
-  var rowObserver = null;
   var modalEl = null;
   var modalBodyEl = null;
   var modalGrid = null;
+  var statusRequestInFlight = false;
   var modalState = {
     isOpen: false,
     compraId: "",
@@ -63,6 +63,43 @@
     }
   }
 
+  function getCookie(name) {
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length === 2) {
+      return parts.pop().split(";").shift();
+    }
+    return "";
+  }
+
+  function parseJsonResponse(resp) {
+    return resp.text().then(function (text) {
+      var payload = {};
+      if (text) {
+        try {
+          payload = JSON.parse(text);
+        } catch (e) {
+          payload = {};
+        }
+      }
+      if (!resp.ok) {
+        throw payload;
+      }
+      return payload;
+    });
+  }
+
+  function postFormData(url, data) {
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      body: data,
+    }).then(parseJsonResponse);
+  }
+
   function buildGridShell() {
     return (
       '<div class="datagrid datagrid-modal-atividades" id="' + MODAL_GRID_ID + '">' +
@@ -94,7 +131,7 @@
     if (row.descricao) {
       parts.unshift(row.descricao);
     }
-    return parts.join(" · ") || "Itens da compra.";
+    return parts.join(" - ") || "Itens da compra.";
   }
 
   function buildCompraFooter(row, rowsCount) {
@@ -103,7 +140,7 @@
     parts.push("Total " + formatCurrency(row.total_itens));
     parts.push("Pago " + formatCurrency(row.total_pago));
     parts.push("Pendente " + formatCurrency(row.total_pendente));
-    return parts.join(" · ");
+    return parts.join(" - ");
   }
 
   function renderGridHeader() {
@@ -117,7 +154,7 @@
       '<h2 class="io-title">' +
       title +
       "</h2>" +
-      '<p class="muted">' +
+      '<p class="muted" data-financeiro-modal-subtitle>' +
       description +
       "</p>" +
       "</div>" +
@@ -125,7 +162,7 @@
       '<a class="btn btn-ghost btn-compact" href="' +
       detailUrl +
       '" target="_self">Abrir compra</a>' +
-      '<button type="button" class="btn btn-outline btn-compact" data-radar-work-modal-close>Fechar</button>' +
+      '<button type="button" class="financeiro-modal-close" data-radar-work-modal-close aria-label="Fechar modal" title="Fechar">&times;</button>' +
       "</div>" +
       "</div>"
     );
@@ -136,7 +173,7 @@
     return (
       '<footer class="radar-modal-grid-foot">' +
       '<span class="radar-modal-grid-foot-label">Resumo da compra</span>' +
-      '<span class="radar-modal-grid-foot-value">' +
+      '<span class="radar-modal-grid-foot-value" data-financeiro-modal-summary>' +
       utils.escHtml(buildCompraFooter(row, rowsCount)) +
       "</span>" +
       "</footer>"
@@ -173,6 +210,59 @@
     modalBodyEl = modalEl.querySelector("[data-radar-work-modal-body]");
   }
 
+  function syncModalMeta() {
+    if (!modalBodyEl || !modalState.compraData) {
+      return;
+    }
+    var subtitleEl = modalBodyEl.querySelector("[data-financeiro-modal-subtitle]");
+    if (subtitleEl) {
+      subtitleEl.textContent = buildCompraSubtitle(modalState.compraData);
+    }
+    var summaryEl = modalBodyEl.querySelector("[data-financeiro-modal-summary]");
+    if (summaryEl) {
+      var rowsCount = modalGrid ? modalGrid.getRows().length : (modalState.compraData.itens_count || 0);
+      summaryEl.textContent = buildCompraFooter(modalState.compraData, rowsCount);
+    }
+  }
+
+  function applyCompraPatch(compraPatch) {
+    if (!compraPatch || !modalState.compraData) {
+      return;
+    }
+    Object.keys(compraPatch).forEach(function (key) {
+      modalState.compraData[key] = compraPatch[key];
+    });
+    rowsById[String(modalState.compraData.id || modalState.compraId)] = modalState.compraData;
+    if (window.FinanceiroCadernoComprasGrid && typeof window.FinanceiroCadernoComprasGrid.updateRow === "function") {
+      window.FinanceiroCadernoComprasGrid.updateRow(String(modalState.compraData.id || modalState.compraId), compraPatch);
+    }
+    syncModalMeta();
+  }
+
+  function updateItemStatus(rowId) {
+    if (!modalState.detalheUrl || !modalGrid || !rowId || statusRequestInFlight) {
+      return;
+    }
+    statusRequestInFlight = true;
+    var data = new FormData();
+    data.set("action", "toggle_item_pago");
+    data.set("item_id", rowId);
+    postFormData(modalState.detalheUrl, data)
+      .then(function (payload) {
+        if (!payload || !payload.ok || !payload.row) {
+          throw payload || {};
+        }
+        modalGrid.updateRow(String(payload.row.id || rowId), payload.row);
+        applyCompraPatch(payload.compra || {});
+      })
+      .catch(function () {
+        // Mantem a interacao silenciosa; a tela detalhada segue disponivel.
+      })
+      .finally(function () {
+        statusRequestInFlight = false;
+      });
+  }
+
   function initializeGrid(itemRows) {
     modalGrid = window.SAASDataGrid.create({
       rootId: MODAL_GRID_ID,
@@ -196,41 +286,8 @@
           cellClass: "financeiro-col-nome",
           filter: { type: "text", placeholder: "Filtrar" },
           render: function (row, ctx) {
-            var nameHtml = ctx.esc(row.nome || "-");
-            if (!row.tipo) {
-              return nameHtml;
-            }
-            return nameHtml + '<div class="muted">' + ctx.esc(row.tipo) + "</div>";
+            return ctx.esc(row.nome || "-");
           },
-        },
-        {
-          key: "quantidade",
-          label: "Qtd.",
-          visible: true,
-          width: 90,
-          minWidth: 80,
-          compareType: "number",
-          filter: { type: "number", min: 1, step: 1, placeholder: "1" },
-        },
-        {
-          key: "valor",
-          label: "Valor",
-          visible: true,
-          width: 130,
-          minWidth: 120,
-          compareType: "number",
-          filter: { type: "number", min: 0, step: 0.01, placeholder: "0" },
-          render: function (row, ctx) {
-            return ctx.esc(formatCurrency(row.valor));
-          },
-        },
-        {
-          key: "parcela",
-          label: "Parcela",
-          visible: true,
-          width: 110,
-          minWidth: 100,
-          filter: { type: "text", placeholder: "Filtrar" },
         },
         {
           key: "total",
@@ -246,10 +303,10 @@
         },
         {
           key: "pago_status",
-          label: "Pago",
+          label: "Status",
           visible: true,
-          width: 120,
-          minWidth: 110,
+          width: 150,
+          minWidth: 140,
           filter: {
             type: "select",
             options: [
@@ -258,16 +315,14 @@
             ],
           },
           render: function (row, ctx) {
-            return ctx.statusBadge(row.pago_status || "pendente", row.pago_label || "Pendente");
+            return (
+              '<button class="financeiro-item-status-trigger js-financeiro-item-status" type="button" data-row-id="' +
+              ctx.esc(row.id) +
+              '" aria-label="Alternar status do item">' +
+              ctx.statusBadge(row.pago_status || "pendente", row.pago_label || "Pendente") +
+              "</button>"
+            );
           },
-        },
-        {
-          key: "tipo",
-          label: "Tipo",
-          visible: false,
-          width: 160,
-          minWidth: 140,
-          filter: { type: "text", placeholder: "Filtrar" },
         },
       ],
     });
@@ -351,16 +406,6 @@
     document.body.classList.remove("radar-work-modal-open");
   }
 
-  function syncClickableRows() {
-    var body = root.querySelector("[data-dg-body]");
-    if (!body) {
-      return;
-    }
-    body.querySelectorAll("tr[data-row-id]").forEach(function (rowEl) {
-      rowEl.classList.toggle("financeiro-compra-clickable-row", !!rowsById[String(rowEl.getAttribute("data-row-id") || "")]);
-    });
-  }
-
   function getCompraDataFromRow(rowEl) {
     if (!rowEl) {
       return null;
@@ -371,13 +416,11 @@
 
   function bindEvents() {
     root.addEventListener("click", function (event) {
-      var rowEl = event.target.closest("tbody tr[data-row-id]");
-      if (!rowEl || !root.contains(rowEl)) {
+      var triggerEl = event.target.closest(".radar-row-link[href]");
+      if (!triggerEl || !root.contains(triggerEl)) {
         return;
       }
-      if (event.target.closest("button, input, select, textarea, summary, details, [role='button']")) {
-        return;
-      }
+      var rowEl = triggerEl.closest("tbody tr[data-row-id]");
       var rowData = getCompraDataFromRow(rowEl);
       if (!rowData) {
         return;
@@ -385,15 +428,6 @@
       event.preventDefault();
       openModal(rowData);
     });
-
-    syncClickableRows();
-    var body = root.querySelector("[data-dg-body]");
-    if (body && !rowObserver) {
-      rowObserver = new MutationObserver(function () {
-        syncClickableRows();
-      });
-      rowObserver.observe(body, { childList: true, subtree: true });
-    }
   }
 
   ensureModal();
@@ -402,6 +436,12 @@
     if (closeTarget) {
       event.preventDefault();
       closeModal();
+      return;
+    }
+    var statusTrigger = event.target.closest(".js-financeiro-item-status");
+    if (statusTrigger && modalEl.contains(statusTrigger)) {
+      event.preventDefault();
+      updateItemStatus(statusTrigger.getAttribute("data-row-id") || "");
     }
   });
 

@@ -7113,6 +7113,44 @@ def financeiro_compra_detail(request, pk):
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
     compra = get_object_or_404(_financeiro_allowed_compras_qs(request.user, cliente), pk=pk)
+    zero_money = Decimal("0.00")
+
+    def serialize_item_payload(item):
+        total_valor = (item.valor or zero_money) * (item.quantidade or 0)
+        return {
+            "id": item.id,
+            "nome": item.nome,
+            "quantidade": item.quantidade,
+            "valor": str((item.valor or zero_money).quantize(Decimal("0.01"))),
+            "parcela": item.parcela or "1/1",
+            "total": str(total_valor.quantize(Decimal("0.01"))),
+            "tipo": item.tipo.nome if item.tipo else "",
+            "pago_status": "pago" if item.pago else "pendente",
+            "pago_label": "Pago" if item.pago else "Pendente",
+        }
+
+    def serialize_compra_summary(compra_obj):
+        itens_compra = list(compra_obj.itens.all())
+        total_itens = sum(
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens_compra),
+            zero_money,
+        )
+        total_pago = sum(
+            ((item.valor or zero_money) * (item.quantidade or 0) for item in itens_compra if item.pago),
+            zero_money,
+        )
+        total_pendente = total_itens - total_pago
+        status_label = _compra_status_label(compra_obj)
+        return {
+            "id": compra_obj.id,
+            "status": status_label.lower(),
+            "status_label": status_label,
+            "itens_count": len(itens_compra),
+            "total_itens": str(total_itens.quantize(Decimal("0.01"))),
+            "total_pago": str(total_pago.quantize(Decimal("0.01"))),
+            "total_pendente": str(total_pendente.quantize(Decimal("0.01"))),
+        }
+
     message = request.GET.get("msg", "").strip()
     message_level = request.GET.get("level", "").strip() or "info"
     open_cadastro = request.GET.get("cadastro", "").strip()
@@ -7344,9 +7382,19 @@ def financeiro_compra_detail(request, pk):
             return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "toggle_item_pago":
             item_id = request.POST.get("item_id")
-            item = get_object_or_404(CompraItem, pk=item_id, compra=compra)
+            item = get_object_or_404(CompraItem.objects.select_related("tipo"), pk=item_id, compra=compra)
             item.pago = not item.pago
             item.save(update_fields=["pago"])
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "row": serialize_item_payload(item),
+                        "compra": serialize_compra_summary(compra),
+                        "message": "Status do item atualizado.",
+                        "level": "success",
+                    }
+                )
             return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "update_item":
             item_id = request.POST.get("item_id")
@@ -7391,19 +7439,7 @@ def financeiro_compra_detail(request, pk):
     itens_table_data = []
     for item in itens:
         item.total_valor = (item.valor or 0) * (item.quantidade or 0)
-        itens_table_data.append(
-            {
-                "id": item.id,
-                "nome": item.nome,
-                "quantidade": item.quantidade,
-                "valor": str((item.valor or Decimal("0.00")).quantize(Decimal("0.01"))),
-                "parcela": item.parcela or "1/1",
-                "total": str(Decimal(item.total_valor or 0).quantize(Decimal("0.01"))),
-                "tipo": item.tipo.nome if item.tipo else "",
-                "pago_status": "pago" if item.pago else "pendente",
-                "pago_label": "Pago" if item.pago else "Pendente",
-            }
-        )
+        itens_table_data.append(serialize_item_payload(item))
     compra.total_itens = sum(item.total_valor for item in itens)
     tipos = TipoCompra.objects.order_by("nome")
     categorias = CategoriaCompra.objects.order_by("nome")
