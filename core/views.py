@@ -7571,6 +7571,39 @@ def financeiro_compra_detail(request, pk):
                     }
                 )
             return redirect("financeiro_compra_detail", pk=compra.pk)
+        if action == "update_item_valor":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(CompraItem.objects.select_related("tipo"), pk=item_id, compra=compra)
+            valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
+            try:
+                valor = Decimal(valor_raw) if valor_raw else None
+            except (InvalidOperation, ValueError):
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse(
+                        {
+                            "ok": False,
+                            "message": "Informe um valor valido.",
+                            "level": "error",
+                        },
+                        status=400,
+                    )
+                params = {"msg": "Informe um valor valido.", "level": "error"}
+                return redirect(
+                    f"{reverse('financeiro_compra_detail', kwargs={'pk': compra.pk})}?{urlencode(params)}"
+                )
+            item.valor = valor
+            item.save(update_fields=["valor"])
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "row": serialize_item_payload(item),
+                        "compra": serialize_compra_summary(compra),
+                        "message": "Valor do item atualizado.",
+                        "level": "success",
+                    }
+                )
+            return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "update_item":
             item_id = request.POST.get("item_id")
             item = get_object_or_404(CompraItem, pk=item_id, compra=compra)

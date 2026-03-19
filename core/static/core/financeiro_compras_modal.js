@@ -14,6 +14,7 @@
   var modalBodyEl = null;
   var modalGrid = null;
   var statusRequestInFlight = false;
+  var valueRequestInFlight = false;
   var modalState = {
     isOpen: false,
     compraId: "",
@@ -47,6 +48,13 @@
     return toMoneyNumber(value).toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  function formatCurrencyInput(value) {
+    return toMoneyNumber(value).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
@@ -269,6 +277,100 @@
       });
   }
 
+  function startValueEdit(trigger) {
+    if (!trigger || !modalGrid || valueRequestInFlight) {
+      return;
+    }
+    var rowId = String(trigger.getAttribute("data-row-id") || "");
+    if (!rowId) {
+      return;
+    }
+    var row = modalGrid.getRowById(rowId);
+    if (!row) {
+      return;
+    }
+    var cell = trigger.closest("td");
+    if (!cell) {
+      return;
+    }
+    cell.innerHTML =
+      '<form class="financeiro-item-value-editor" data-financeiro-item-value-form>' +
+      '<input class="financeiro-item-value-input" type="text" name="valor" value="' +
+      utils.escHtml(formatCurrencyInput(row.valor)) +
+      '" inputmode="decimal" autocomplete="off">' +
+      '<button class="btn btn-ghost btn-compact" type="submit">Salvar</button>' +
+      "</form>";
+    var form = cell.querySelector("[data-financeiro-item-value-form]");
+    var input = cell.querySelector(".financeiro-item-value-input");
+    if (!form || !input) {
+      return;
+    }
+    form.setAttribute("data-row-id", rowId);
+    input.focus();
+    input.select();
+  }
+
+  function finishValueEdit(formEl, shouldRestore) {
+    if (!formEl || !modalGrid) {
+      return;
+    }
+    var cell = formEl.closest("td");
+    var rowId = String(formEl.getAttribute("data-row-id") || "");
+    var row = modalGrid.getRowById(rowId);
+    if (!cell || !row || !shouldRestore) {
+      return;
+    }
+    cell.innerHTML =
+      '<button class="financeiro-item-value-trigger js-financeiro-item-value" type="button" data-row-id="' +
+      utils.escHtml(row.id) +
+      '" aria-label="Editar valor do item">' +
+      utils.escHtml(formatCurrency(row.valor)) +
+      "</button>";
+  }
+
+  function submitValueEdit(formEl) {
+    if (!formEl || !modalState.detalheUrl || !modalGrid || valueRequestInFlight) {
+      return;
+    }
+    var rowId = String(formEl.getAttribute("data-row-id") || "");
+    if (!rowId) {
+      return;
+    }
+    var input = formEl.querySelector("input[name='valor']");
+    if (!input) {
+      return;
+    }
+    valueRequestInFlight = true;
+    input.disabled = true;
+    var submitButton = formEl.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+    var data = new FormData();
+    data.set("action", "update_item_valor");
+    data.set("item_id", rowId);
+    data.set("valor", input.value || "");
+    postFormData(modalState.detalheUrl, data)
+      .then(function (payload) {
+        if (!payload || !payload.ok || !payload.row) {
+          throw payload || {};
+        }
+        modalGrid.updateRow(String(payload.row.id || rowId), payload.row);
+        applyCompraPatch(payload.compra || {});
+      })
+      .catch(function () {
+        input.disabled = false;
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+        input.focus();
+        input.select();
+      })
+      .finally(function () {
+        valueRequestInFlight = false;
+      });
+  }
+
   function initializeGrid(itemRows) {
     modalGrid = window.SAASDataGrid.create({
       rootId: MODAL_GRID_ID,
@@ -293,6 +395,24 @@
           filter: { type: "text", placeholder: "Filtrar" },
           render: function (row, ctx) {
             return ctx.esc(row.nome || "-");
+          },
+        },
+        {
+          key: "valor",
+          label: "Valor",
+          visible: true,
+          width: 130,
+          minWidth: 120,
+          compareType: "number",
+          filter: { type: "number", min: 0, step: 0.01, placeholder: "0" },
+          render: function (row, ctx) {
+            return (
+              '<button class="financeiro-item-value-trigger js-financeiro-item-value" type="button" data-row-id="' +
+              ctx.esc(row.id) +
+              '" aria-label="Editar valor do item">' +
+              ctx.esc(formatCurrency(row.valor)) +
+              "</button>"
+            );
           },
         },
         {
@@ -460,7 +580,46 @@
     if (statusTrigger && modalEl.contains(statusTrigger)) {
       event.preventDefault();
       updateItemStatus(statusTrigger.getAttribute("data-row-id") || "");
+      return;
     }
+    var valueTrigger = event.target.closest(".js-financeiro-item-value");
+    if (valueTrigger && modalEl.contains(valueTrigger)) {
+      event.preventDefault();
+      startValueEdit(valueTrigger);
+    }
+  });
+
+  modalEl.addEventListener("submit", function (event) {
+    var formEl = event.target.closest("[data-financeiro-item-value-form]");
+    if (!formEl || !modalEl.contains(formEl)) {
+      return;
+    }
+    event.preventDefault();
+    submitValueEdit(formEl);
+  });
+
+  modalEl.addEventListener("keydown", function (event) {
+    var formEl = event.target.closest("[data-financeiro-item-value-form]");
+    if (!formEl || !modalEl.contains(formEl)) {
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finishValueEdit(formEl, true);
+    }
+  });
+
+  modalEl.addEventListener("focusout", function (event) {
+    var formEl = event.target.closest("[data-financeiro-item-value-form]");
+    if (!formEl || !modalEl.contains(formEl)) {
+      return;
+    }
+    window.setTimeout(function () {
+      if (!formEl.isConnected || formEl.contains(document.activeElement) || valueRequestInFlight) {
+        return;
+      }
+      finishValueEdit(formEl, true);
+    }, 0);
   });
 
   document.addEventListener("keydown", function (event) {

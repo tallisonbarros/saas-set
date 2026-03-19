@@ -4495,6 +4495,43 @@ select {
   cursor: pointer;
 }
 
+.financeiro-item-value-trigger {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #f5f7fa;
+  cursor: pointer;
+  font: inherit;
+}
+
+.financeiro-item-value-trigger:hover {
+  color: #ff9d56;
+}
+
+.financeiro-item-value-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.financeiro-item-value-input {
+  width: 100%;
+  min-width: 88px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(141, 160, 178, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f5f7fa;
+}
+
+.financeiro-item-value-input:focus {
+  outline: 2px solid rgba(255, 157, 86, 0.42);
+  outline-offset: 1px;
+  border-color: rgba(255, 157, 86, 0.55);
+}
+
 #financeiro-compras-grid tbody tr[data-row-id] td[data-dg-col] {
   cursor: pointer;
 }
