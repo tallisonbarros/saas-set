@@ -7043,12 +7043,37 @@ def financeiro_caderno_detail(request, pk):
             "detalhe_url": reverse("financeiro_compra_detail", args=[compra_obj.pk]),
         }
 
+    def build_month_summary_payload():
+        month_compras = (
+            Compra.objects.filter(caderno=caderno, data__gte=start_date, data__lt=end_date)
+            .prefetch_related("itens")
+            .order_by("id")
+        )
+        summary_total_mes = Decimal("0.00")
+        summary_total_pago = Decimal("0.00")
+        summary_total_pendente = Decimal("0.00")
+        summary_total_compras = 0
+        for compra_mes in month_compras:
+            row = build_compra_row(compra_mes)
+            summary_total_mes += Decimal(row["total_itens"])
+            summary_total_pago += Decimal(row["total_pago"])
+            summary_total_pendente += Decimal(row["total_pendente"])
+            summary_total_compras += 1
+        return {
+            "total_mes": str(summary_total_mes.quantize(Decimal("0.01"))),
+            "total_pago": str(summary_total_pago.quantize(Decimal("0.01"))),
+            "total_pendente": str(summary_total_pendente.quantize(Decimal("0.01"))),
+            "total_compras": summary_total_compras,
+        }
+
     if request.method == "POST" and request.POST.get("action") == "create_quick_compra":
         nome = request.POST.get("nome", "").strip()
         descricao = request.POST.get("descricao", "").strip()
         data_raw = request.POST.get("data", "").strip()
         categoria_id = request.POST.get("categoria", "").strip()
         centro_id = request.POST.get("centro_custo", "").strip()
+        item_nome = request.POST.get("item_nome", "").strip()
+        item_valor_raw = request.POST.get("item_valor", "").replace(",", ".").strip()
         reference_month = request.POST.get("selected_month", "").strip() or selected_month
 
         if not nome:
@@ -7076,6 +7101,28 @@ def financeiro_caderno_detail(request, pk):
         else:
             data_compra = None
 
+        if item_valor_raw and not item_nome:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "message": "Informe o nome do item.",
+                    "level": "error",
+                },
+                status=400,
+            )
+
+        try:
+            item_valor = Decimal(item_valor_raw) if item_valor_raw else None
+        except (InvalidOperation, ValueError):
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "message": "Valor do item invalido.",
+                    "level": "error",
+                },
+                status=400,
+            )
+
         compra = Compra.objects.create(
             caderno=caderno,
             nome=nome,
@@ -7084,6 +7131,15 @@ def financeiro_caderno_detail(request, pk):
             categoria_id=categoria_id or None,
             centro_custo_id=centro_id or None,
         )
+        if item_nome:
+            CompraItem.objects.create(
+                compra=compra,
+                nome=item_nome,
+                valor=item_valor,
+                quantidade=1,
+                parcela="1/1",
+                pago=False,
+            )
         compra = (
             Compra.objects.filter(pk=compra.pk)
             .select_related("categoria", "centro_custo")
@@ -7092,10 +7148,12 @@ def financeiro_caderno_detail(request, pk):
         )
         row_payload = build_compra_row(compra)
         in_selected_month = bool(data_compra and start_date <= data_compra < end_date)
-        total_compras_mes = Compra.objects.filter(caderno=caderno, data__gte=start_date, data__lt=end_date).count()
+        month_summary = build_month_summary_payload() if in_selected_month else None
 
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             message = "Compra criada."
+            if item_nome:
+                message = "Compra criada com item inicial."
             if reference_month and not in_selected_month:
                 message = "Compra criada fora do mes selecionado."
             return JsonResponse(
@@ -7105,9 +7163,7 @@ def financeiro_caderno_detail(request, pk):
                     "message": message,
                     "level": "success",
                     "in_selected_month": in_selected_month,
-                    "summary": {
-                        "total_compras": total_compras_mes,
-                    },
+                    "summary": month_summary,
                 }
             )
         return redirect("financeiro_compra_detail", pk=compra.pk)

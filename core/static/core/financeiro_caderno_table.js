@@ -65,6 +65,24 @@
     node.textContent = value;
   }
 
+  function applySummary(summary) {
+    if (!summary || typeof summary !== "object") {
+      return;
+    }
+    if (summary.total_mes !== undefined) {
+      updateSummaryChip("total_mes", formatCurrency(summary.total_mes));
+    }
+    if (summary.total_pago !== undefined) {
+      updateSummaryChip("total_pago", formatCurrency(summary.total_pago));
+    }
+    if (summary.total_pendente !== undefined) {
+      updateSummaryChip("total_pendente", formatCurrency(summary.total_pendente));
+    }
+    if (summary.total_compras !== undefined) {
+      updateSummaryChip("total_compras", String(summary.total_compras));
+    }
+  }
+
   function monthLabel(isoMonth) {
     var match = /^(\d{4})-(\d{2})$/.exec(isoMonth);
     if (!match) {
@@ -128,7 +146,7 @@
       return;
     }
 
-    ["nome", "data"].forEach(function (fieldName) {
+    ["nome", "data", "item_nome", "item_valor"].forEach(function (fieldName) {
       var fieldInput = createForm.querySelector("[name='" + fieldName + "']");
       if (!fieldInput) {
         return;
@@ -254,6 +272,8 @@
         { name: "selected_month", type: "hidden", value: selectedMonth },
         { name: "nome", label: "Nome", type: "text", placeholder: "Nova compra", required: true },
         { name: "data", label: "Data", type: "date", value: defaultDate, required: true },
+        { name: "item_nome", label: "Item", type: "text", placeholder: "Item inicial" },
+        { name: "item_valor", label: "Valor", type: "text", placeholder: "0,00" },
         { name: "descricao", label: "Descricao", type: "textarea", placeholder: "Descricao resumida", wide: true },
         {
           name: "categoria",
@@ -274,9 +294,7 @@
             if (!payload || !payload.ok) {
               return { ok: false, message: "Nao foi possivel criar a compra." };
             }
-            if (payload.summary && payload.summary.total_compras !== undefined) {
-              updateSummaryChip("total_compras", String(payload.summary.total_compras));
-            }
+            applySummary(payload.summary);
             return {
               ok: true,
               row: payload.in_selected_month ? payload.row : null,
