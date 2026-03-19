@@ -265,6 +265,7 @@
       <input type="hidden" name="action" value="delete_compra">
       <button class="btn btn-outline" type="submit">Excluir compra</button>
     </form>
+  {{ itens_table_data|json_script:"financeiro-compra-itens-data" }}
   <script>
     (function () {
       function getCookie(name) {

@@ -7388,8 +7388,22 @@ def financeiro_compra_detail(request, pk):
             return redirect("financeiro_compra_detail", pk=compra.pk)
     compra.status_label = _compra_status_label(compra)
     itens = list(compra.itens.select_related("tipo").order_by("id"))
+    itens_table_data = []
     for item in itens:
         item.total_valor = (item.valor or 0) * (item.quantidade or 0)
+        itens_table_data.append(
+            {
+                "id": item.id,
+                "nome": item.nome,
+                "quantidade": item.quantidade,
+                "valor": str((item.valor or Decimal("0.00")).quantize(Decimal("0.01"))),
+                "parcela": item.parcela or "1/1",
+                "total": str(Decimal(item.total_valor or 0).quantize(Decimal("0.01"))),
+                "tipo": item.tipo.nome if item.tipo else "",
+                "pago_status": "pago" if item.pago else "pendente",
+                "pago_label": "Pago" if item.pago else "Pendente",
+            }
+        )
     compra.total_itens = sum(item.total_valor for item in itens)
     tipos = TipoCompra.objects.order_by("nome")
     categorias = CategoriaCompra.objects.order_by("nome")
@@ -7401,6 +7415,7 @@ def financeiro_compra_detail(request, pk):
         {
             "compra": compra,
             "itens": itens,
+            "itens_table_data": itens_table_data,
             "tipos": tipos,
             "categorias": categorias,
             "centros": centros,
