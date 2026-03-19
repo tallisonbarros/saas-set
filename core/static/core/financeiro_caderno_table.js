@@ -157,6 +157,10 @@
       }
       fieldEl.classList.add("radar-create-basic-field");
       fieldEl.style.order = "10";
+      var labelEl = fieldEl.querySelector("span");
+      if (labelEl) {
+        labelEl.style.display = "none";
+      }
     });
 
     actions.classList.add("radar-create-main-actions");
