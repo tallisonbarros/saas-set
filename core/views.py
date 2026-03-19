@@ -7066,6 +7066,56 @@ def financeiro_caderno_detail(request, pk):
             "total_compras": summary_total_compras,
         }
 
+    def build_month_snapshot():
+        month_compras = (
+            Compra.objects.filter(caderno=caderno, data__gte=start_date, data__lt=end_date)
+            .select_related("categoria", "centro_custo")
+            .prefetch_related("itens")
+            .order_by("-data", "-id")
+        )
+        month_rows = []
+        total_mes = Decimal("0.00")
+        total_pago = Decimal("0.00")
+        total_pendente = Decimal("0.00")
+        total_compras = 0
+        total_pagas = 0
+        total_pendentes = 0
+
+        for compra_mes in month_compras:
+            row = build_compra_row(compra_mes)
+            month_rows.append(row)
+            total_mes += Decimal(row["total_itens"])
+            total_pago += Decimal(row["total_pago"])
+            total_pendente += Decimal(row["total_pendente"])
+            total_compras += 1
+            if row["status"] == "pago":
+                total_pagas += 1
+            else:
+                total_pendentes += 1
+
+        ticket_medio = total_mes / total_compras if total_compras else Decimal("0.00")
+        return {
+            "rows": month_rows,
+            "summary": {
+                "total_mes": total_mes,
+                "total_pago": total_pago,
+                "total_pendente": total_pendente,
+                "total_compras": total_compras,
+                "total_pagas": total_pagas,
+                "total_pendentes": total_pendentes,
+                "ticket_medio": ticket_medio,
+            },
+        }
+
+    def build_month_navigation_payload():
+        return {
+            "selected_month": selected_month,
+            "prev_month": prev_month,
+            "next_month": next_month,
+            "current_month": current_month,
+            "quick_create_date": today.strftime("%Y-%m-%d") if selected_month == current_month else start_date.strftime("%Y-%m-%d"),
+        }
+
     if request.method == "POST" and request.POST.get("action") == "create_quick_compra":
         nome = request.POST.get("nome", "").strip()
         descricao = request.POST.get("descricao", "").strip()
@@ -7168,36 +7218,35 @@ def financeiro_caderno_detail(request, pk):
             )
         return redirect("financeiro_compra_detail", pk=compra.pk)
 
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        month_snapshot = build_month_snapshot()
+        navigation_payload = build_month_navigation_payload()
+        return JsonResponse(
+            {
+                "ok": True,
+                "rows": month_snapshot["rows"],
+                "summary": {
+                    "total_mes": str(month_snapshot["summary"]["total_mes"].quantize(Decimal("0.01"))),
+                    "total_pago": str(month_snapshot["summary"]["total_pago"].quantize(Decimal("0.01"))),
+                    "total_pendente": str(month_snapshot["summary"]["total_pendente"].quantize(Decimal("0.01"))),
+                    "total_compras": month_snapshot["summary"]["total_compras"],
+                },
+                **navigation_payload,
+            }
+        )
+
     compras_base_qs = (
         Compra.objects.filter(caderno=caderno)
         .select_related("categoria", "centro_custo")
         .prefetch_related("itens")
         .order_by("-data", "-id")
     )
-    compras_qs = compras_base_qs.filter(data__gte=start_date, data__lt=end_date)
     compras_sem_data_qs = compras_base_qs.filter(data__isnull=True)
 
-    compras_table_data = []
+    month_snapshot = build_month_snapshot()
+    compras_table_data = month_snapshot["rows"]
+    resumo = month_snapshot["summary"]
     compras_sem_data = []
-    total_mes = Decimal(0)
-    total_pago = Decimal(0)
-    total_pendente = Decimal(0)
-    total_compras = 0
-    total_pagas = 0
-    total_pendentes = 0
-
-    for compra in compras_qs:
-        compras_table_data.append(build_compra_row(compra))
-        status_key = compra.status_label.lower()
-        total_mes += compra.total_itens
-        total_pago += compra.total_pago
-        total_pendente += compra.total_pendente
-        total_compras += 1
-        if status_key == "pago":
-            total_pagas += 1
-        else:
-            total_pendentes += 1
-    ticket_medio = total_mes / total_compras if total_compras else Decimal(0)
 
     for compra in compras_sem_data_qs:
         itens = list(compra.itens.all())
@@ -7225,18 +7274,10 @@ def financeiro_caderno_detail(request, pk):
             "prev_month": prev_month,
             "next_month": next_month,
             "current_month": current_month,
-            "quick_create_date": today.strftime("%Y-%m-%d") if selected_month == current_month else start_date.strftime("%Y-%m-%d"),
+            "quick_create_date": build_month_navigation_payload()["quick_create_date"],
             "categorias": CategoriaCompra.objects.order_by("nome"),
             "centros": CentroCusto.objects.order_by("nome"),
-            "resumo": {
-                "total_mes": total_mes,
-                "total_pago": total_pago,
-                "total_pendente": total_pendente,
-                "total_compras": total_compras,
-                "total_pagas": total_pagas,
-                "total_pendentes": total_pendentes,
-                "ticket_medio": ticket_medio,
-            },
+            "resumo": resumo,
         },
     )
 

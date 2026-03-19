@@ -51,22 +51,6 @@
         <a class="btn btn-ghost icon-only month-nav-btn" href="?mes={{ next_month }}" aria-label="Proximo mes">&gt;</a>
       </div>
     </form>
-    <script>
-      (function () {
-        var input = document.getElementById("month-nav-input");
-        var form = document.getElementById("mes-navegacao-form");
-        if (!input || !form) {
-          return;
-        }
-        var lastValue = input.value;
-        input.addEventListener("change", function () {
-          if (input.value && input.value !== lastValue) {
-            lastValue = input.value;
-            form.submit();
-          }
-        });
-      })();
-    </script>
 
     <div class="finance-summary" data-finance-summary data-values-visible="false">
       <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
@@ -143,6 +127,7 @@
       window.FinanceiroCadernoComprasConfig = {
         cadernoId: "{{ caderno.id }}",
         selectedMonth: "{{ selected_month|escapejs }}",
+        currentMonth: "{{ current_month|escapejs }}",
         defaultDate: "{{ quick_create_date|escapejs }}",
         categorias: [
           {% for categoria in categorias %}

@@ -12,10 +12,18 @@
   var config = window.FinanceiroCadernoComprasConfig || {};
   var cadernoId = String(config.cadernoId || root.getAttribute("data-dg-scope") || "global");
   var selectedMonth = String(config.selectedMonth || "").trim();
+  var currentMonth = String(config.currentMonth || selectedMonth || "").trim();
   var defaultDate = String(config.defaultDate || "").trim();
   var categoriasOptions = Array.isArray(config.categorias) ? config.categorias : [];
   var centrosOptions = Array.isArray(config.centros) ? config.centros : [];
   var rows = utils.parseJsonScript("financeiro-compras-mes-data");
+  var monthNavForm = document.getElementById("mes-navegacao-form");
+  var monthNavInput = document.getElementById("month-nav-input");
+  var monthNavLabelMonth = document.querySelector(".month-nav-month");
+  var monthNavLabelYear = document.querySelector(".month-nav-year");
+  var monthNavPrevLink = document.querySelector('.month-nav-btn[aria-label="Mes anterior"]');
+  var monthNavNextLink = document.querySelector('.month-nav-btn[aria-label="Proximo mes"]');
+  var monthRequestInFlight = false;
 
   function parseJsonResponse(resp) {
     return resp.text().then(function (text) {
@@ -52,6 +60,16 @@
       },
       body: data,
     }).then(parseJsonResponse);
+  }
+
+  function getMonthUrl(targetMonth) {
+    var url = new window.URL(window.location.href);
+    if (targetMonth) {
+      url.searchParams.set("mes", targetMonth);
+    } else {
+      url.searchParams.delete("mes");
+    }
+    return url;
   }
 
   function updateSummaryChip(key, value) {
@@ -118,6 +136,19 @@
     return match[2] + "/" + match[1];
   }
 
+  function monthDisplayParts(isoMonth) {
+    var match = /^(\d{4})-(\d{2})$/.exec(isoMonth);
+    if (!match) {
+      return { month: "", year: "" };
+    }
+    var dateValue = new Date(Number(match[1]), Number(match[2]) - 1, 1);
+    var monthName = new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(dateValue);
+    return {
+      month: monthName ? monthName.charAt(0).toUpperCase() + monthName.slice(1) : "",
+      year: match[1],
+    };
+  }
+
   function toMoneyNumber(value) {
     var parsed = Number(value);
     if (!Number.isFinite(parsed)) {
@@ -136,6 +167,115 @@
   }
 
   var monthText = monthLabel(selectedMonth);
+
+  function updateMonthNavigation(payload) {
+    if (!payload || typeof payload !== "object") {
+      return;
+    }
+
+    if (payload.selected_month !== undefined) {
+      selectedMonth = String(payload.selected_month || "").trim();
+      monthText = monthLabel(selectedMonth);
+      config.selectedMonth = selectedMonth;
+      if (monthNavInput) {
+        monthNavInput.value = selectedMonth;
+      }
+      var monthField = root.querySelector('.datagrid-create-form [name="selected_month"]');
+      if (monthField) {
+        monthField.value = selectedMonth;
+      }
+    }
+
+    if (payload.current_month !== undefined) {
+      currentMonth = String(payload.current_month || currentMonth || "").trim();
+      config.currentMonth = currentMonth;
+    }
+
+    if (payload.quick_create_date !== undefined) {
+      defaultDate = String(payload.quick_create_date || "").trim();
+      config.defaultDate = defaultDate;
+      var dateField = root.querySelector('.datagrid-create-form [name="data"]');
+      if (dateField) {
+        dateField.value = defaultDate;
+      }
+    }
+
+    if (payload.prev_month && monthNavPrevLink) {
+      monthNavPrevLink.href = "?mes=" + encodeURIComponent(payload.prev_month);
+    }
+    if (payload.next_month && monthNavNextLink) {
+      monthNavNextLink.href = "?mes=" + encodeURIComponent(payload.next_month);
+    }
+
+    var display = monthDisplayParts(selectedMonth);
+    if (monthNavLabelMonth) {
+      monthNavLabelMonth.textContent = display.month;
+    }
+    if (monthNavLabelYear) {
+      monthNavLabelYear.textContent = display.year;
+    }
+  }
+
+  function setMonthLoading(isLoading) {
+    monthRequestInFlight = !!isLoading;
+    root.setAttribute("aria-busy", isLoading ? "true" : "false");
+    if (monthNavForm) {
+      monthNavForm.setAttribute("aria-busy", isLoading ? "true" : "false");
+    }
+    if (monthNavInput) {
+      monthNavInput.disabled = !!isLoading;
+    }
+    if (monthNavPrevLink) {
+      monthNavPrevLink.setAttribute("aria-disabled", isLoading ? "true" : "false");
+    }
+    if (monthNavNextLink) {
+      monthNavNextLink.setAttribute("aria-disabled", isLoading ? "true" : "false");
+    }
+  }
+
+  function applyMonthPayload(payload, options) {
+    if (!payload || payload.ok === false) {
+      throw payload || {};
+    }
+
+    if (window.FinanceiroComprasModal && typeof window.FinanceiroComprasModal.close === "function") {
+      window.FinanceiroComprasModal.close();
+    }
+
+    updateMonthNavigation(payload);
+    grid.setRows(Array.isArray(payload.rows) ? payload.rows : []);
+    applySummary(payload.summary || {});
+
+    if (window.FinanceiroComprasModal && typeof window.FinanceiroComprasModal.syncRows === "function") {
+      window.FinanceiroComprasModal.syncRows(Array.isArray(payload.rows) ? payload.rows : []);
+    }
+
+    if (!options || options.pushHistory !== false) {
+      window.history.pushState({ mes: selectedMonth }, "", getMonthUrl(selectedMonth));
+    }
+  }
+
+  function loadMonthData(targetMonth, options) {
+    var normalizedMonth = String(targetMonth || currentMonth || "").trim();
+    if (!normalizedMonth || normalizedMonth === selectedMonth || monthRequestInFlight) {
+      return Promise.resolve();
+    }
+
+    setMonthLoading(true);
+    return fetch(getMonthUrl(normalizedMonth), {
+      method: "GET",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    })
+      .then(parseJsonResponse)
+      .then(function (payload) {
+        applyMonthPayload(payload, options);
+      })
+      .finally(function () {
+        setMonthLoading(false);
+      });
+  }
 
   function setupQuickCreateAdvanced(scopeEl) {
     if (!scopeEl) {
@@ -476,6 +616,51 @@
     },
   });
 
+  function bindMonthNavigation() {
+    if (!monthNavForm || !monthNavInput) {
+      return;
+    }
+
+    monthNavForm.addEventListener("click", function (event) {
+      var link = event.target.closest(".month-nav-btn[href]");
+      if (!link || !monthNavForm.contains(link) || monthRequestInFlight) {
+        return;
+      }
+      event.preventDefault();
+      var href = link.getAttribute("href") || "";
+      var targetUrl = new window.URL(href, window.location.href);
+      var targetMonth = targetUrl.searchParams.get("mes") || "";
+      loadMonthData(targetMonth)
+        .catch(function () {
+          window.location.href = targetUrl.toString();
+        });
+    });
+
+    monthNavInput.addEventListener("change", function () {
+      var targetMonth = String(monthNavInput.value || "").trim();
+      if (!targetMonth || targetMonth === selectedMonth || monthRequestInFlight) {
+        return;
+      }
+      loadMonthData(targetMonth)
+        .catch(function () {
+          window.location.href = getMonthUrl(targetMonth).toString();
+        });
+    });
+
+    window.addEventListener("popstate", function () {
+      var currentUrl = new window.URL(window.location.href);
+      var targetMonth = currentUrl.searchParams.get("mes") || currentMonth;
+      if (!targetMonth || targetMonth === selectedMonth || monthRequestInFlight) {
+        return;
+      }
+      loadMonthData(targetMonth, { pushHistory: false })
+        .catch(function () {
+          window.location.reload();
+        });
+    });
+  }
+
+  bindMonthNavigation();
   window.FinanceiroCadernoComprasGrid = grid;
   window.FinanceiroCadernoSyncSummary = syncSummaryFromGrid;
 })();

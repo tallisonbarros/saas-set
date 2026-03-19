@@ -9,7 +9,6 @@
     return;
   }
 
-  var rows = utils.parseJsonScript("financeiro-compras-mes-data");
   var rowsById = {};
   var modalEl = null;
   var modalBodyEl = null;
@@ -24,12 +23,17 @@
   };
   var MODAL_GRID_ID = "financeiro-itens-modal-grid";
 
-  rows.forEach(function (row) {
-    var rowId = String((row && row.id) || "");
-    if (rowId) {
-      rowsById[rowId] = row;
-    }
-  });
+  function syncRowsIndex(nextRows) {
+    rowsById = {};
+    (Array.isArray(nextRows) ? nextRows : []).forEach(function (row) {
+      var rowId = String((row && row.id) || "");
+      if (rowId) {
+        rowsById[rowId] = row;
+      }
+    });
+  }
+
+  syncRowsIndex(utils.parseJsonScript("financeiro-compras-mes-data"));
 
   function toMoneyNumber(value) {
     var parsed = Number(value);
@@ -413,6 +417,12 @@
       return null;
     }
     var rowId = String(rowEl.getAttribute("data-row-id") || "");
+    if (window.FinanceiroCadernoComprasGrid && typeof window.FinanceiroCadernoComprasGrid.getRowById === "function") {
+      var gridRow = window.FinanceiroCadernoComprasGrid.getRowById(rowId);
+      if (gridRow) {
+        return gridRow;
+      }
+    }
     return rowsById[rowId] || null;
   }
 
@@ -460,4 +470,8 @@
   });
 
   bindEvents();
+  window.FinanceiroComprasModal = {
+    close: closeModal,
+    syncRows: syncRowsIndex,
+  };
 })();
