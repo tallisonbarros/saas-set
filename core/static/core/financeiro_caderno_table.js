@@ -43,7 +43,7 @@
 
   var grid = window.SAASDataGrid.create({
     rootId: "financeiro-compras-grid",
-    storageKey: "financeiro-caderno-compras:" + cadernoId,
+    storageKey: "financeiro-caderno-compras:v2:" + cadernoId,
     rows: rows,
     pageSize: 20,
     pageSizeOptions: [10, 20, 50, 100],
@@ -109,7 +109,7 @@
       {
         key: "itens_count",
         label: "Itens",
-        visible: true,
+        visible: false,
         width: 100,
         minWidth: 90,
         compareType: "number",
@@ -133,7 +133,7 @@
       {
         key: "total_pago",
         label: "Pago",
-        visible: true,
+        visible: false,
         width: 140,
         minWidth: 130,
         compareType: "number",
@@ -145,7 +145,7 @@
       {
         key: "total_pendente",
         label: "Pendente",
-        visible: true,
+        visible: false,
         width: 150,
         minWidth: 140,
         compareType: "number",

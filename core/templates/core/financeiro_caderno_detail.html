@@ -68,22 +68,54 @@
       })();
     </script>
 
-    <div class="finance-summary">
-      <div class="summary-card hud-card">
-        <div class="summary-label">Total do mes</div>
-        <div class="summary-value">R$ {{ resumo.total_mes|floatformat:2 }}</div>
+    <div class="finance-summary" data-finance-summary data-values-visible="false">
+      <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
+        <div class="summary-label finance-summary-label-row">
+          <span>Total do mes</span>
+          <span class="finance-summary-eye" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+              <circle cx="12" cy="12" r="3.2"></circle>
+            </svg>
+          </span>
+        </div>
+        <div class="summary-value finance-summary-sensitive-value">R$ {{ resumo.total_mes|floatformat:2 }}</div>
       </div>
-      <div class="summary-card hud-card">
-        <div class="summary-label">Pago</div>
-        <div class="summary-value">R$ {{ resumo.total_pago|floatformat:2 }}</div>
+      <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
+        <div class="summary-label finance-summary-label-row">
+          <span>Pago</span>
+          <span class="finance-summary-eye" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+              <circle cx="12" cy="12" r="3.2"></circle>
+            </svg>
+          </span>
+        </div>
+        <div class="summary-value finance-summary-sensitive-value">R$ {{ resumo.total_pago|floatformat:2 }}</div>
       </div>
-      <div class="summary-card hud-card">
-        <div class="summary-label">Pendente</div>
-        <div class="summary-value">R$ {{ resumo.total_pendente|floatformat:2 }}</div>
+      <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
+        <div class="summary-label finance-summary-label-row">
+          <span>Pendente</span>
+          <span class="finance-summary-eye" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+              <circle cx="12" cy="12" r="3.2"></circle>
+            </svg>
+          </span>
+        </div>
+        <div class="summary-value finance-summary-sensitive-value">R$ {{ resumo.total_pendente|floatformat:2 }}</div>
       </div>
-      <div class="summary-card hud-card">
-        <div class="summary-label">Total de compras</div>
-        <div class="summary-value">{{ resumo.total_compras }}</div>
+      <div class="summary-card hud-card finance-summary-privacy-card" data-finance-visibility-toggle role="button" tabindex="0" aria-pressed="false" aria-label="Mostrar valores do resumo">
+        <div class="summary-label finance-summary-label-row">
+          <span>Total de compras</span>
+          <span class="finance-summary-eye" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+              <circle cx="12" cy="12" r="3.2"></circle>
+            </svg>
+          </span>
+        </div>
+        <div class="summary-value finance-summary-sensitive-value">{{ resumo.total_compras }}</div>
       </div>
     </div>
 
@@ -127,5 +159,43 @@
     <script src="{% static 'core/datagrid.js' %}"></script>
     <script src="{% static 'core/financeiro_caderno_table.js' %}"></script>
     <script src="{% static 'core/financeiro_compras_modal.js' %}"></script>
+    <script>
+      (function () {
+        var summaryRoot = document.querySelector("[data-finance-summary]");
+        if (!summaryRoot) {
+          return;
+        }
+        var toggles = Array.prototype.slice.call(summaryRoot.querySelectorAll("[data-finance-visibility-toggle]"));
+        if (!toggles.length) {
+          return;
+        }
+
+        function syncState(isVisible) {
+          summaryRoot.setAttribute("data-values-visible", isVisible ? "true" : "false");
+          toggles.forEach(function (toggle) {
+            toggle.setAttribute("aria-pressed", isVisible ? "true" : "false");
+            toggle.setAttribute("aria-label", isVisible ? "Ocultar valores do resumo" : "Mostrar valores do resumo");
+          });
+        }
+
+        function toggleVisibility() {
+          var current = summaryRoot.getAttribute("data-values-visible") === "true";
+          syncState(!current);
+        }
+
+        toggles.forEach(function (toggle) {
+          toggle.addEventListener("click", toggleVisibility);
+          toggle.addEventListener("keydown", function (event) {
+            if (event.key !== "Enter" && event.key !== " ") {
+              return;
+            }
+            event.preventDefault();
+            toggleVisibility();
+          });
+        });
+
+        syncState(false);
+      })();
+    </script>
   </section>
 {% endblock %}

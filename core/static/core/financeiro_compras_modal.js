@@ -151,17 +151,16 @@
     return (
       '<div class="io-card-head radar-modal-grid-head">' +
       '<div class="radar-modal-grid-head-main">' +
-      '<h2 class="io-title">' +
+      '<h2 class="io-title"><a class="financeiro-modal-title-link" href="' +
+      detailUrl +
+      '" target="_self">' +
       title +
-      "</h2>" +
+      "</a></h2>" +
       '<p class="muted" data-financeiro-modal-subtitle>' +
       description +
       "</p>" +
       "</div>" +
-      '<div class="radar-modal-grid-head-actions">' +
-      '<a class="btn btn-ghost btn-compact" href="' +
-      detailUrl +
-      '" target="_self">Abrir compra</a>' +
+      '<div class="radar-modal-grid-head-actions financeiro-modal-head-actions">' +
       '<button type="button" class="financeiro-modal-close" data-radar-work-modal-close aria-label="Fechar modal" title="Fechar">&times;</button>' +
       "</div>" +
       "</div>"
@@ -416,11 +415,17 @@
 
   function bindEvents() {
     root.addEventListener("click", function (event) {
-      var triggerEl = event.target.closest(".radar-row-link[href]");
-      if (!triggerEl || !root.contains(triggerEl)) {
+      var titleLink = event.target.closest(".radar-row-link[href]");
+      if (titleLink && root.contains(titleLink)) {
         return;
       }
-      var rowEl = triggerEl.closest("tbody tr[data-row-id]");
+      if (event.target.closest("button, input, select, textarea, summary, details, [role='button']")) {
+        return;
+      }
+      var rowEl = event.target.closest("tbody tr[data-row-id]");
+      if (!rowEl || !root.contains(rowEl)) {
+        return;
+      }
       var rowData = getCompraDataFromRow(rowEl);
       if (!rowData) {
         return;

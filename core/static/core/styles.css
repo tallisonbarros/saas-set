@@ -1464,6 +1464,62 @@ a.proposal-link-badge:hover {
   font-weight: 700;
 }
 
+.finance-summary-privacy-card {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.finance-summary-privacy-card:focus-visible {
+  outline: 2px solid rgba(255, 102, 0, 0.28);
+  outline-offset: 2px;
+}
+
+.finance-summary-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.finance-summary-eye {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--muted);
+  opacity: 0.78;
+}
+
+.finance-summary-eye svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.finance-summary-sensitive-value {
+  transition: filter 0.18s ease, opacity 0.18s ease;
+}
+
+.finance-summary[data-values-visible="false"] .finance-summary-sensitive-value {
+  filter: blur(8px);
+  opacity: 0.72;
+}
+
+.finance-summary[data-values-visible="true"] .finance-summary-sensitive-value {
+  filter: blur(0);
+  opacity: 1;
+}
+
+.finance-summary[data-values-visible="true"] .finance-summary-eye {
+  color: #ff6600;
+  opacity: 1;
+}
+
 .summary-hint {
   font-size: 11px;
   color: var(--muted);
@@ -4397,11 +4453,46 @@ select {
   color: #ffffff;
 }
 
+.financeiro-modal-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.financeiro-modal-title-link:hover {
+  text-decoration: underline;
+}
+
+.radar-modal-grid-head {
+  position: relative;
+}
+
+.radar-modal-grid-head-main {
+  padding-right: 54px;
+}
+
+.financeiro-modal-head-actions {
+  position: relative;
+}
+
+.financeiro-modal-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
 .financeiro-item-status-trigger {
   appearance: none;
   border: 0;
   background: transparent;
   padding: 0;
+  cursor: pointer;
+}
+
+#financeiro-compras-grid tbody tr[data-row-id] td[data-dg-col] {
+  cursor: pointer;
+}
+
+#financeiro-compras-grid tbody tr[data-row-id] td[data-dg-col] .radar-row-link {
   cursor: pointer;
 }
 
