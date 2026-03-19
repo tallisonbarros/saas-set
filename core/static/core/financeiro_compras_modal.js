@@ -298,7 +298,7 @@
       '<input class="financeiro-item-value-input" type="text" name="valor" value="' +
       utils.escHtml(formatCurrencyInput(row.valor)) +
       '" inputmode="decimal" autocomplete="off">' +
-      '<button class="btn btn-ghost btn-compact" type="submit">Salvar</button>' +
+      '<button class="financeiro-item-value-submit" type="submit" aria-label="Salvar valor" title="Salvar valor">&#10003;</button>' +
       "</form>";
     var form = cell.querySelector("[data-financeiro-item-value-form]");
     var input = cell.querySelector(".financeiro-item-value-input");
@@ -413,18 +413,6 @@
               ctx.esc(formatCurrency(row.valor)) +
               "</button>"
             );
-          },
-        },
-        {
-          key: "total",
-          label: "Total",
-          visible: true,
-          width: 130,
-          minWidth: 120,
-          compareType: "number",
-          filter: { type: "number", min: 0, step: 0.01, placeholder: "0" },
-          render: function (row, ctx) {
-            return ctx.esc(formatCurrency(row.total));
           },
         },
         {
