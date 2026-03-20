@@ -5881,6 +5881,47 @@ select.datagrid-filter-input optgroup {
   margin-left: auto;
 }
 
+#financeiro-compras-grid .finance-create-toggle-row {
+  display: flex;
+  align-items: center;
+}
+
+#financeiro-compras-grid .finance-create-toggle {
+  appearance: none;
+  width: 100%;
+  border: 1px solid rgba(141, 160, 178, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  color: #f5f7fa;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 14px;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+#financeiro-compras-grid .finance-create-toggle:hover {
+  border-color: rgba(255, 157, 86, 0.4);
+  color: #ffbf92;
+}
+
+#financeiro-compras-grid .finance-create-toggle:focus-visible {
+  outline: 2px solid rgba(255, 157, 86, 0.42);
+  outline-offset: 2px;
+}
+
+#financeiro-compras-grid .finance-create-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+#financeiro-compras-grid .finance-create-panel.is-collapsed {
+  display: none;
+}
+
 #radar-trabalhos-grid .radar-create-advanced-row,
 #financeiro-compras-grid .radar-create-advanced-row {
   flex: 1 1 100%;

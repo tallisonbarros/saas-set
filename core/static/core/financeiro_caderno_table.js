@@ -293,6 +293,39 @@
     if (!actions) {
       return;
     }
+    var createMessage = createForm.querySelector(".datagrid-create-message");
+    var createFieldNames = ["nome", "data", "item_nome", "item_valor", "descricao", "categoria", "centro_custo"];
+
+    var createToggleRow = createForm.querySelector("[data-finance-create-toggle-row]");
+    if (!createToggleRow) {
+      createToggleRow = document.createElement("div");
+      createToggleRow.className = "finance-create-toggle-row";
+      createToggleRow.setAttribute("data-finance-create-toggle-row", "1");
+      createForm.insertBefore(createToggleRow, createForm.firstChild);
+    }
+
+    var createToggle = createToggleRow.querySelector("[data-finance-create-toggle]");
+    if (!createToggle) {
+      createToggle = document.createElement("button");
+      createToggle.type = "button";
+      createToggle.className = "finance-create-toggle";
+      createToggle.setAttribute("data-finance-create-toggle", "1");
+      createToggleRow.appendChild(createToggle);
+    }
+
+    var createPanel = createForm.querySelector("[data-finance-create-panel]");
+    if (!createPanel) {
+      createPanel = document.createElement("div");
+      createPanel.className = "finance-create-panel";
+      createPanel.setAttribute("data-finance-create-panel", "1");
+      createForm.appendChild(createPanel);
+    }
+    if (fieldsHost.parentNode !== createPanel) {
+      createPanel.appendChild(fieldsHost);
+    }
+    if (createMessage && createMessage.parentNode !== createPanel) {
+      createPanel.appendChild(createMessage);
+    }
 
     var advancedFieldNames = ["descricao", "categoria", "centro_custo"];
     var advancedFields = [];
@@ -396,6 +429,47 @@
       if (isOpen) {
         syncDescricaoHeight();
       }
+    }
+
+    function hasCreateValue() {
+      return createFieldNames.some(function (fieldName) {
+        var input = createForm.querySelector("[name='" + fieldName + "']");
+        if (!input) {
+          return false;
+        }
+        var value = input.value;
+        if (fieldName === "data") {
+          return String(value || "").trim() !== "" && String(value || "").trim() !== defaultDate;
+        }
+        return value !== null && value !== undefined && String(value).trim() !== "";
+      });
+    }
+
+    function setCreateOpen(isOpen) {
+      createPanel.classList.toggle("is-collapsed", !isOpen);
+      createPanel.classList.toggle("is-open", isOpen);
+      createToggle.textContent = isOpen ? "Ocultar nova compra" : "Nova compra";
+      createToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+
+    if (createToggle.dataset.initialized !== "1") {
+      setCreateOpen(hasCreateValue());
+      createToggle.dataset.initialized = "1";
+    }
+
+    if (createToggle.dataset.bound !== "1") {
+      createToggle.dataset.bound = "1";
+      createToggle.addEventListener("click", function () {
+        var isOpen = createToggle.getAttribute("aria-expanded") === "true";
+        setCreateOpen(!isOpen);
+        if (isOpen) {
+          return;
+        }
+        var firstBasicInput = createPanel.querySelector("[name='nome']");
+        if (firstBasicInput) {
+          firstBasicInput.focus();
+        }
+      });
     }
 
     if (toggle.dataset.initialized !== "1") {
