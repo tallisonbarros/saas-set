@@ -5707,6 +5707,13 @@ select.datagrid-filter-input optgroup {
   gap: 4px;
 }
 
+.radar-agenda-calendar-day-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .radar-agenda-calendar-grid > .radar-agenda-calendar-day:nth-child(7n + 1),
 .radar-agenda-calendar-grid > .radar-agenda-calendar-day:nth-child(7n) {
   border-color: rgba(148, 163, 184, 0.42);
@@ -5730,6 +5737,10 @@ select.datagrid-filter-input optgroup {
 
 .radar-agenda-calendar-day.has-activity {
   border-color: rgba(116, 224, 194, 0.45);
+}
+
+.radar-agenda-calendar-day.has-observation:not(.has-activity) {
+  border-color: rgba(255, 198, 112, 0.42);
 }
 
 .radar-agenda-calendar-day.is-selected {
@@ -5765,6 +5776,20 @@ select.datagrid-filter-input optgroup {
 .radar-agenda-calendar-day-count {
   font-size: 11px;
   color: #c4cbd3;
+}
+
+.radar-agenda-calendar-observation-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ffc670;
+  box-shadow: 0 0 0 1px rgba(255, 198, 112, 0.22);
+  flex: 0 0 auto;
+}
+
+.radar-agenda-calendar-day.is-selected .radar-agenda-calendar-observation-dot {
+  background: #fff0cf;
+  box-shadow: 0 0 0 1px rgba(255, 240, 207, 0.18);
 }
 
 .radar-agenda-work-list {
@@ -5830,6 +5855,36 @@ select.datagrid-filter-input optgroup {
 
 .radar-agenda-summary-table a:hover {
   text-decoration: underline;
+}
+
+.radar-agenda-empty-activities {
+  margin-top: 4px;
+}
+
+.radar-agenda-observacoes {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(141, 160, 178, 0.18);
+}
+
+.radar-agenda-observacoes-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #cdb48c;
+  margin-bottom: 8px;
+}
+
+.radar-agenda-observacoes-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.radar-agenda-observacoes-list li {
+  color: var(--text);
 }
 
 .table-scroll {

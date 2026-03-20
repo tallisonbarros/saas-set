@@ -1,10 +1,11 @@
 <section class="io-card radar-agenda-section">
   <div class="io-card-head">
     <div>
-      <h2 class="io-title">Atividades do dia {{ selected_day_display }}</h2>
+      <h2 class="io-title">Agenda do dia {{ selected_day_display }}</h2>
       <p class="muted">
         {{ daily_total_trabalhos }} trabalho(s),
-        {{ daily_total_atividades }} atividade(s).
+        {{ daily_total_atividades }} atividade(s),
+        {{ daily_total_observacoes|default:0 }} observacao(oes).
       </p>
     </div>
   </div>
@@ -20,30 +21,45 @@
               <div class="muted">
                 Status: {{ group.trabalho_status_label }} |
                 Equipe: {{ group.total_colaboradores|default:0 }} |
-                Atividades no dia: {{ group.total_atividades }}
+                Atividades no dia: {{ group.total_atividades }} |
+                Observacoes no dia: {{ group.total_observacoes|default:0 }}
               </div>
             </div>
           </div>
-          <table class="radar-agenda-mini-table">
-            <thead>
-              <tr>
-                <th>Atividade</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for atividade in group.atividades %}
+          {% if group.atividades %}
+            <table class="radar-agenda-mini-table">
+              <thead>
                 <tr>
-                  <td>{{ atividade.nome }}</td>
-                  <td>{{ atividade.status_label }}</td>
+                  <th>Atividade</th>
+                  <th>Status</th>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {% for atividade in group.atividades %}
+                  <tr>
+                    <td>{{ atividade.nome }}</td>
+                    <td>{{ atividade.status_label }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="muted radar-agenda-empty-activities">Nenhuma atividade programada para este trabalho neste dia.</div>
+          {% endif %}
+          {% if group.observacoes %}
+            <div class="radar-agenda-observacoes">
+              <div class="radar-agenda-observacoes-title">Observacoes do dia</div>
+              <ul class="radar-agenda-observacoes-list">
+                {% for observacao in group.observacoes %}
+                  <li>{{ observacao.texto }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
         </article>
       {% endfor %}
     </div>
   {% else %}
-    <div class="muted">Nenhuma atividade programada para este dia.</div>
+    <div class="muted">Nenhuma atividade ou observacao registrada para este dia.</div>
   {% endif %}
 </section>

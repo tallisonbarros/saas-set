@@ -4371,8 +4371,19 @@ def radar_agenda(request, pk):
         .select_related("atividade", "atividade__trabalho")
         .order_by("data_execucao")
     )
+    month_observation_rows = list(
+        RadarTrabalhoObservacao.objects.filter(
+            trabalho__radar=radar,
+            data_observacao__gte=month_start,
+            data_observacao__lte=month_end,
+        )
+        .select_related("trabalho")
+        .order_by("data_observacao", "trabalho__nome", "id")
+    )
     month_day_counts = {}
+    month_observation_counts = {}
     daily_rows = []
+    daily_observation_rows = []
     atividade_ids = {
         row.atividade_id
         for row in month_exec_rows
@@ -4418,6 +4429,13 @@ def radar_agenda(request, pk):
         summary["total_slots"] += 1
         summary["total_horas"] += horas_atividade_dia
 
+    for observation in month_observation_rows:
+        month_observation_counts[observation.data_observacao] = (
+            month_observation_counts.get(observation.data_observacao, 0) + 1
+        )
+        if observation.data_observacao == selected_day:
+            daily_observation_rows.append(observation)
+
     month_total_horas = month_total_horas.quantize(Decimal("0.01"))
     month_summary = []
     for summary in sorted(
@@ -4439,6 +4457,7 @@ def radar_agenda(request, pk):
     daily_groups = []
     daily_groups_map = {}
     daily_total_atividades = 0
+    daily_total_observacoes = 0
     daily_total_horas = Decimal("0.00")
     for row in daily_rows:
         atividade = row.atividade
@@ -4458,8 +4477,10 @@ def radar_agenda(request, pk):
                 "trabalho_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.id]),
                 "total_colaboradores": 0,
                 "total_atividades": 0,
+                "total_observacoes": 0,
                 "total_horas_dia": Decimal("0.00"),
                 "atividades": [],
+                "observacoes": [],
                 "_colaborador_keys": set(),
             }
             daily_groups_map[trabalho.id] = group
@@ -4490,9 +4511,50 @@ def radar_agenda(request, pk):
         daily_total_atividades += 1
         daily_total_horas += horas_atividade_dia
 
+    for observation in daily_observation_rows:
+        trabalho = observation.trabalho
+        if not trabalho:
+            continue
+
+        group = daily_groups_map.get(trabalho.id)
+        if group is None:
+            group = {
+                "trabalho_id": trabalho.id,
+                "trabalho_nome": trabalho.nome or "-",
+                "trabalho_status": trabalho.status,
+                "trabalho_status_label": trabalho.get_status_display(),
+                "trabalho_url": reverse("radar_trabalho_detail", args=[radar.pk, trabalho.id]),
+                "total_colaboradores": len(_trabalho_colaboradores_nomes(trabalho)),
+                "total_atividades": 0,
+                "total_observacoes": 0,
+                "total_horas_dia": Decimal("0.00"),
+                "atividades": [],
+                "observacoes": [],
+                "_colaborador_keys": set(),
+            }
+            daily_groups_map[trabalho.id] = group
+            daily_groups.append(group)
+
+        texto = (observation.texto or "").strip()
+        if not texto:
+            continue
+
+        group["observacoes"].append(
+            {
+                "id": observation.id,
+                "texto": texto,
+                "data_display": observation.data_observacao.strftime("%d/%m/%Y"),
+            }
+        )
+        group["total_observacoes"] += 1
+        daily_total_observacoes += 1
+
     for group in daily_groups:
         group["total_horas_dia"] = group["total_horas_dia"].quantize(Decimal("0.01"))
-        group["total_colaboradores"] = len(group.pop("_colaborador_keys"))
+        colaborador_keys = group.pop("_colaborador_keys")
+        if colaborador_keys:
+            group["total_colaboradores"] = len(colaborador_keys)
+    daily_groups.sort(key=lambda item: (item["trabalho_nome"] or "").casefold())
     daily_total_horas = daily_total_horas.quantize(Decimal("0.01"))
 
     calendar_weeks = []
@@ -4503,6 +4565,7 @@ def radar_agenda(request, pk):
         for cell_day in week:
             is_current_month = cell_day.month == selected_day.month
             activity_count = month_day_counts.get(cell_day, 0) if is_current_month else 0
+            observation_count = month_observation_counts.get(cell_day, 0) if is_current_month else 0
             week_cells.append(
                 {
                     "iso": cell_day.isoformat(),
@@ -4511,6 +4574,8 @@ def radar_agenda(request, pk):
                     "is_selected": cell_day == selected_day,
                     "is_today": cell_day == today,
                     "activity_count": activity_count,
+                    "observation_count": observation_count,
+                    "has_observation": observation_count > 0,
                 }
             )
         calendar_weeks.append(week_cells)
@@ -4550,6 +4615,7 @@ def radar_agenda(request, pk):
         "daily_groups": daily_groups,
         "daily_total_trabalhos": len(daily_groups),
         "daily_total_atividades": daily_total_atividades,
+        "daily_total_observacoes": daily_total_observacoes,
         "daily_total_horas": daily_total_horas,
         "month_summary": month_summary,
         "month_total_trabalhos": len(month_summary),

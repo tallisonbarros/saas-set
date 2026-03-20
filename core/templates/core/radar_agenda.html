@@ -81,10 +81,15 @@
         {% for week in calendar_weeks %}
           {% for cell in week %}
             <a
-              class="radar-agenda-calendar-day{% if not cell.is_current_month %} is-outside{% endif %}{% if cell.activity_count %} has-activity{% endif %}{% if cell.is_selected %} is-selected{% endif %}{% if cell.is_today %} is-today{% endif %}"
+              class="radar-agenda-calendar-day{% if not cell.is_current_month %} is-outside{% endif %}{% if cell.activity_count %} has-activity{% endif %}{% if cell.has_observation %} has-observation{% endif %}{% if cell.is_selected %} is-selected{% endif %}{% if cell.is_today %} is-today{% endif %}"
               href="?dia={{ cell.iso }}"
             >
-              <span class="radar-agenda-calendar-day-num">{{ cell.day }}</span>
+              <span class="radar-agenda-calendar-day-top">
+                <span class="radar-agenda-calendar-day-num">{{ cell.day }}</span>
+                {% if cell.is_current_month and cell.has_observation %}
+                  <span class="radar-agenda-calendar-observation-dot" title="Ha observacoes neste dia" aria-label="Ha observacoes neste dia"></span>
+                {% endif %}
+              </span>
               {% if cell.is_current_month and cell.activity_count %}
                 <span class="radar-agenda-calendar-day-count">{{ cell.activity_count }} ativ.</span>
               {% endif %}

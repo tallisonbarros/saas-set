@@ -416,6 +416,62 @@ class RadarCreatorPermissionTests(TestCase):
         row = next(item for item in rows if item["id"] == self.trabalho.id)
         self.assertEqual(row["total_horas"], "16.00")
 
+    def test_agenda_exibe_observacoes_do_dia_e_marcador_no_calendario(self):
+        self.client_http.force_login(self.owner_user)
+        atividade = RadarAtividade.objects.create(trabalho=self.trabalho, nome="Ativ Agenda Obs")
+        RadarAtividadeDiaExecucao.objects.create(atividade=atividade, data_execucao="2026-03-10")
+        RadarTrabalhoObservacao.objects.create(
+            trabalho=self.trabalho,
+            texto="Observacao no mesmo dia",
+            data_observacao=datetime(2026, 3, 10).date(),
+        )
+        RadarTrabalhoObservacao.objects.create(
+            trabalho=self.trabalho,
+            texto="Observacao em outro dia",
+            data_observacao=datetime(2026, 3, 11).date(),
+        )
+
+        response = self.client_http.get(f"/radar-atividades/{self.radar.id}/agenda/?dia=2026-03-10")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["daily_total_atividades"], 1)
+        self.assertEqual(response.context["daily_total_observacoes"], 1)
+        self.assertEqual(len(response.context["daily_groups"]), 1)
+        group = response.context["daily_groups"][0]
+        self.assertEqual(group["trabalho_id"], self.trabalho.id)
+        self.assertEqual(group["total_atividades"], 1)
+        self.assertEqual(group["total_observacoes"], 1)
+        self.assertEqual(group["observacoes"][0]["texto"], "Observacao no mesmo dia")
+        calendar_cells = [
+            cell
+            for week in response.context["calendar_weeks"]
+            for cell in week
+            if cell["iso"] == "2026-03-10"
+        ]
+        self.assertEqual(len(calendar_cells), 1)
+        self.assertTrue(calendar_cells[0]["has_observation"])
+        self.assertEqual(calendar_cells[0]["observation_count"], 1)
+
+    def test_agenda_exibe_trabalho_com_apenas_observacao_no_dia(self):
+        self.client_http.force_login(self.owner_user)
+        RadarTrabalhoObservacao.objects.create(
+            trabalho=self.trabalho,
+            texto="Apenas observacao",
+            data_observacao=datetime(2026, 3, 12).date(),
+        )
+
+        response = self.client_http.get(f"/radar-atividades/{self.radar.id}/agenda/?dia=2026-03-12")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["daily_total_atividades"], 0)
+        self.assertEqual(response.context["daily_total_observacoes"], 1)
+        self.assertEqual(len(response.context["daily_groups"]), 1)
+        group = response.context["daily_groups"][0]
+        self.assertEqual(group["trabalho_id"], self.trabalho.id)
+        self.assertEqual(group["total_atividades"], 0)
+        self.assertEqual(group["total_observacoes"], 1)
+        self.assertEqual(group["observacoes"][0]["texto"], "Apenas observacao")
+
     def test_update_trabalho_sincroniza_colaboradores(self):
         self.client_http.force_login(self.owner_user)
         response = self.client_http.post(
