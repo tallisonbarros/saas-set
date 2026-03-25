@@ -243,8 +243,19 @@
             </div>
             <div class="muted">Cadastro e acesso aos apps dedicados.</div>
           </a>
+          <a class="panel-card" href="{% url 'modulos_acesso_gerenciar' %}" style="--delay: 0.27s;">
+            <div class="panel-card-top">
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 7h14M5 12h14M5 17h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+                Modulos de acesso
+              </div>
+            </div>
+            <div class="muted">OID, tipos vinculados e acompanhamento da ACL nova.</div>
+          </a>
           {% if is_dev_user %}
-            <a class="panel-card" href="{% url 'colaboradores_gerenciar' %}" style="--delay: 0.27s;">
+            <a class="panel-card" href="{% url 'colaboradores_gerenciar' %}" style="--delay: 0.29s;">
               <div class="panel-card-top">
                 <div class="panel-title">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -259,7 +270,7 @@
               <div class="muted">Catalogo tecnico para selecao em trabalhos do radar.</div>
             </a>
           {% endif %}
-          <a class="panel-card" href="{% url 'admin_logs' %}" style="--delay: 0.3s;">
+          <a class="panel-card" href="{% url 'admin_logs' %}" style="--delay: 0.32s;">
             <div class="panel-card-top">
               <div class="panel-title">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -271,7 +282,7 @@
             </div>
             <div class="muted">Usuarios e modulos acessados.</div>
           </a>
-          <a class="panel-card" href="{% url 'admin_db_monitor' %}" style="--delay: 0.32s;">
+          <a class="panel-card" href="{% url 'admin_db_monitor' %}" style="--delay: 0.34s;">
             <div class="panel-card-top">
               <div class="panel-title">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">

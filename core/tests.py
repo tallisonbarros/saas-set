@@ -11,6 +11,7 @@ from django.utils import timezone
 from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_visual_flags
 from core.access_control import has_tipo_code, normalize_access_code
 from core.models import (
+    AccessControlShadowLog,
     PerfilUsuario,
     IngestRecord,
     ModuloAcesso,
@@ -57,6 +58,73 @@ class AccessControlFoundationTests(TestCase):
         perfil.tipos.add(tipo)
         self.assertEqual(normalize_access_code("acl teste"), "ACL_TESTE")
         self.assertTrue(has_tipo_code(user, "acl teste"))
+
+
+class AccessControlAdminAndShadowTests(TestCase):
+    def setUp(self):
+        self.client_http = Client()
+        self.tipo_dev = TipoPerfil.objects.get(codigo="DEV")
+        self.dev_user = User.objects.create_user(username="shadow-dev@set.local", email="shadow-dev@set.local", password="123456")
+        self.dev_perfil = PerfilUsuario.objects.create(
+            nome="Shadow Dev",
+            email="shadow-dev@set.local",
+            usuario=self.dev_user,
+        )
+        self.dev_perfil.tipos.add(self.tipo_dev)
+
+        self.user = User.objects.create_user(username="cliente-shadow@set.local", email="cliente-shadow@set.local", password="123456")
+        self.perfil = PerfilUsuario.objects.create(
+            nome="Cliente Shadow",
+            email="cliente-shadow@set.local",
+            usuario=self.user,
+        )
+
+    def test_dev_can_open_module_access_management(self):
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/modulos-acesso/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Modulos de acesso")
+
+    def test_dev_can_update_module_access_management(self):
+        modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.post(
+            "/modulos-acesso/",
+            {
+                "action": "update_module",
+                "module_id": modulo.id,
+                "nome": modulo.nome,
+                "codigo": modulo.codigo,
+                "oid": "1.3.6.1.4.1.9",
+                "tipo": modulo.tipo,
+                "rota_base": modulo.rota_base,
+                "auth_mode": ModuloAcesso.AuthMode.HYBRID,
+                "tipos": [self.tipo_dev.id],
+                "somente_dev": "on",
+                "mantem_escopo_ids": "on",
+                "ativo": "on",
+                "sistema": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        modulo.refresh_from_db()
+        self.assertEqual(modulo.oid, "1.3.6.1.4.1.9")
+        self.assertEqual(modulo.auth_mode, ModuloAcesso.AuthMode.HYBRID)
+        self.assertTrue(modulo.somente_dev)
+
+    def test_shadow_mode_logs_divergence_without_blocking_legacy_access(self):
+        modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
+        modulo.auth_mode = ModuloAcesso.AuthMode.HYBRID
+        modulo.tipos.clear()
+        modulo.save(update_fields=["auth_mode"])
+
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/financeiro/")
+        self.assertEqual(response.status_code, 200)
+        log = AccessControlShadowLog.objects.get(modulo=modulo, user=self.user)
+        self.assertTrue(log.legacy_allowed)
+        self.assertFalse(log.candidate_allowed)
+        self.assertEqual(log.response_status, 200)
 
 
 class DevAdminPrivilegesTests(TestCase):

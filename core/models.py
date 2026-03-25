@@ -1124,3 +1124,35 @@ class AdminAccessLog(models.Model):
     def __str__(self):
         user_label = self.user.username if self.user else "anon"
         return f"{user_label} - {self.module}"
+
+
+class AccessControlShadowLog(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="access_control_shadow_logs",
+    )
+    modulo = models.ForeignKey(
+        "ModuloAcesso",
+        on_delete=models.CASCADE,
+        related_name="shadow_logs",
+    )
+    request_path = models.CharField(max_length=220, blank=True, default="")
+    response_status = models.PositiveSmallIntegerField(default=200)
+    legacy_allowed = models.BooleanField(default=False)
+    candidate_allowed = models.BooleanField(default=False)
+    auth_mode = models.CharField(max_length=12, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["modulo", "created_at"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
+
+    def __str__(self):
+        user_label = self.user.username if self.user else "anon"
+        return f"{user_label} - {self.modulo.codigo} ({self.auth_mode})"

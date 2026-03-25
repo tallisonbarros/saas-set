@@ -62,6 +62,7 @@ urlpatterns = [
     path('meu-perfil/', views.meu_perfil, name="meu_perfil"),
     path('ajustes/', views.ajustes_sistema, name="ajustes_sistema"),
     path('admin-logs/', views.admin_logs, name="admin_logs"),
+    path('modulos-acesso/', views.modulos_acesso_gerenciar, name="modulos_acesso_gerenciar"),
     path('admin-db-monitor/', views.admin_db_monitor, name="admin_db_monitor"),
     path('admin-db-monitor/tabela/', views.admin_db_table, name="admin_db_table"),
     path('admin-db-monitor/tabela/data/', views.admin_db_table_data, name="admin_db_table_data"),
