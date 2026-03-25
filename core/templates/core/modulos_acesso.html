@@ -34,77 +34,22 @@
 
     <div class="user-page-grid">
       <div class="card compact-card">
-        <h2 style="margin-top: 0;">Novo modulo</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_module">
-          <label class="field">
-            <span>Nome</span>
-            <input type="text" name="nome" placeholder="Financeiro legado">
-          </label>
-          <label class="field">
-            <span>Codigo</span>
-            <input type="text" name="codigo" placeholder="FINANCEIRO">
-          </label>
-          <label class="field">
-            <span>OID</span>
-            <input type="text" name="oid" placeholder="1.3.6.1...">
-          </label>
-          <label class="field">
-            <span>Rota base</span>
-            <input type="text" name="rota_base" placeholder="financeiro">
-          </label>
-          <label class="field">
-            <span>Tipo</span>
-            <select name="tipo">
-              {% for value, label in module_types %}
-                <option value="{{ value }}">{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="field">
-            <span>Modo de autorizacao</span>
-            <select name="auth_mode">
-              {% for value, label in auth_modes %}
-                <option value="{{ value }}" {% if value == "LEGACY" %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="field">
-            <span>App vinculado</span>
-            <select name="app_id">
-              <option value="">Sem app vinculado</option>
-              {% for app in apps %}
-                <option value="{{ app.id }}">{{ app.nome }} ({{ app.slug }})</option>
-              {% endfor %}
-            </select>
-          </label>
-          <div class="checkbox-grid">
-            {% for tipo in tipos %}
-              <label class="checkbox-item">
-                <input type="checkbox" name="tipos" value="{{ tipo.id }}">
-                {{ tipo.nome }}
-              </label>
-            {% endfor %}
+        <h2 style="margin-top: 0;">Modelo desta etapa</h2>
+        <p class="muted" style="margin-top: 0;">
+          Os modulos internos ja existem e nao sao criados manualmente aqui. Nesta tela voce apenas vincula tipos de perfil aos modulos existentes.
+        </p>
+        <div class="stack">
+          <div class="card compact-card">
+            <strong>Modulos internos</strong>
+            <div class="muted">Entrada controlada por tipo de usuario.</div>
+            <div class="muted">Escopo interno continua pelos IDs atuais do modulo.</div>
           </div>
-          <label class="checkbox-item">
-            <input type="checkbox" name="somente_dev">
-            Somente Dev
-          </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="mantem_escopo_ids" checked>
-            Mantem escopo por IDs
-          </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="ativo" checked>
-            Modulo ativo
-          </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="sistema" checked>
-            Modulo de sistema
-          </label>
-          <button class="btn btn-primary" type="submit">Salvar modulo</button>
-        </form>
+          <div class="card compact-card">
+            <strong>Apps dedicados</strong>
+            <div class="muted">Continuam controlados por APP ID em `perfil.apps`.</div>
+            <div class="muted">A listagem abaixo e apenas referencia operacional nesta etapa.</div>
+          </div>
+        </div>
       </div>
 
       <div class="card compact-card">
@@ -144,7 +89,13 @@
     </div>
 
     <div class="stack">
-      {% for module in modules %}
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Catalogo fixo</div>
+          <h2 class="page-title" style="font-size: 1.4rem;">Modulos internos</h2>
+        </div>
+      </div>
+      {% for module in core_modules %}
         <div class="card compact-card">
           <form method="post" class="stack">
             {% csrf_token %}
@@ -153,17 +104,13 @@
             <div class="page-hud-head" style="gap: 12px;">
               <div>
                 <h2 style="margin: 0;">{{ module.nome }}</h2>
-                <div class="muted">{{ module.codigo }} | {{ module.get_tipo_display }} | {{ module.get_auth_mode_display }}</div>
+                <div class="muted">{{ module.codigo }} | {{ module.get_auth_mode_display }} | rota {{ module.rota_base }}</div>
               </div>
             </div>
             <div class="user-page-grid">
               <label class="field">
-                <span>Nome</span>
-                <input type="text" name="nome" value="{{ module.nome }}">
-              </label>
-              <label class="field">
                 <span>Codigo</span>
-                <input type="text" name="codigo" value="{{ module.codigo }}">
+                <input type="text" value="{{ module.codigo }}" disabled>
               </label>
               <label class="field">
                 <span>OID</span>
@@ -171,15 +118,7 @@
               </label>
               <label class="field">
                 <span>Rota base</span>
-                <input type="text" name="rota_base" value="{{ module.rota_base }}">
-              </label>
-              <label class="field">
-                <span>Tipo</span>
-                <select name="tipo">
-                  {% for value, label in module_types %}
-                    <option value="{{ value }}" {% if module.tipo == value %}selected{% endif %}>{{ label }}</option>
-                  {% endfor %}
-                </select>
+                <input type="text" value="{{ module.rota_base }}" disabled>
               </label>
               <label class="field">
                 <span>Modo de autorizacao</span>
@@ -221,10 +160,6 @@
                 <input type="checkbox" name="ativo" {% if module.ativo %}checked{% endif %}>
                 Modulo ativo
               </label>
-              <label class="checkbox-item">
-                <input type="checkbox" name="sistema" {% if module.sistema %}checked{% endif %}>
-                Modulo de sistema
-              </label>
             </div>
             <div class="page-actions">
               <button class="btn btn-primary" type="submit">Salvar modulo</button>
@@ -237,6 +172,44 @@
             <button class="btn btn-ghost" type="submit">Limpar divergencias deste modulo</button>
           </form>
         </div>
+      {% empty %}
+        <div class="muted">Nenhum modulo interno cadastrado.</div>
+      {% endfor %}
+    </div>
+
+    <div class="stack">
+      <div class="page-hud-head">
+        <div>
+          <div class="page-kicker">Referencia</div>
+          <h2 class="page-title" style="font-size: 1.4rem;">Apps dedicados</h2>
+        </div>
+      </div>
+      {% for module in app_modules %}
+        <div class="card compact-card">
+          <div class="page-hud-head" style="gap: 12px;">
+            <div>
+              <h2 style="margin: 0;">{{ module.nome }}</h2>
+              <div class="muted">{{ module.codigo }} | slug {% if module.app %}{{ module.app.slug }}{% else %}-{% endif %}</div>
+            </div>
+          </div>
+          <div class="user-page-grid">
+            <label class="field">
+              <span>OID</span>
+              <input type="text" value="{{ module.oid|default:'-' }}" disabled>
+            </label>
+            <label class="field">
+              <span>Rota base</span>
+              <input type="text" value="{{ module.rota_base }}" disabled>
+            </label>
+            <label class="field">
+              <span>Regra de acesso</span>
+              <input type="text" value="APP ID em perfil.apps" disabled>
+            </label>
+          </div>
+          <div class="muted">Nesta etapa, o acesso real continua sendo decidido exclusivamente pelo APP ID do usuario.</div>
+        </div>
+      {% empty %}
+        <div class="muted">Nenhum app dedicado catalogado.</div>
       {% endfor %}
     </div>
   </section>

@@ -7801,60 +7801,30 @@ def modulos_acesso_gerenciar(request):
     message_level = "info"
     if request.method == "POST":
         action = request.POST.get("action")
-        if action in {"create_module", "update_module"}:
-            module = None
-            if action == "update_module":
-                module = get_object_or_404(ModuloAcesso, pk=request.POST.get("module_id"))
-            codigo = request.POST.get("codigo", "").strip()
-            nome = request.POST.get("nome", "").strip()
+        if action == "update_module":
+            module = get_object_or_404(ModuloAcesso, pk=request.POST.get("module_id"))
             oid = request.POST.get("oid", "").strip()
-            tipo = request.POST.get("tipo", "").strip() or ModuloAcesso.Tipo.CORE
-            rota_base = request.POST.get("rota_base", "").strip().strip("/")
             auth_mode = request.POST.get("auth_mode", "").strip() or ModuloAcesso.AuthMode.LEGACY
-            app_id = request.POST.get("app_id", "").strip()
             tipo_ids = request.POST.getlist("tipos")
             somente_dev = request.POST.get("somente_dev") == "on"
             mantem_escopo_ids = request.POST.get("mantem_escopo_ids") == "on"
             ativo = request.POST.get("ativo") == "on"
-            sistema = request.POST.get("sistema") == "on"
-
-            if not nome:
-                message = "Informe um nome valido para o modulo."
-                message_level = "error"
-            elif tipo not in dict(ModuloAcesso.Tipo.choices):
-                message = "Tipo de modulo invalido."
-                message_level = "error"
-            elif auth_mode not in dict(ModuloAcesso.AuthMode.choices):
+            if auth_mode not in dict(ModuloAcesso.AuthMode.choices):
                 message = "Modo de autorizacao invalido."
                 message_level = "error"
             else:
-                app = App.objects.filter(pk=app_id).first() if app_id else None
-                if module is None:
-                    module = ModuloAcesso(
-                        codigo=codigo,
-                        nome=nome,
-                    )
-                else:
-                    module.codigo = codigo or module.codigo
-                    module.nome = nome
                 module.oid = oid
-                module.tipo = tipo
-                module.rota_base = rota_base
                 module.auth_mode = auth_mode
-                module.app = app
                 module.somente_dev = somente_dev
                 module.mantem_escopo_ids = mantem_escopo_ids
                 module.ativo = ativo
-                module.sistema = sistema
-                try:
-                    module.save()
-                except Exception:
-                    message = "Nao foi possivel salvar o modulo. Verifique codigo e rota."
-                    message_level = "error"
-                else:
+                if module.tipo == ModuloAcesso.Tipo.CORE:
                     tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
+                    module.save(update_fields=["oid", "auth_mode", "somente_dev", "mantem_escopo_ids", "ativo"])
                     module.tipos.set(tipos)
-                    return redirect("modulos_acesso_gerenciar")
+                else:
+                    module.save(update_fields=["oid", "auth_mode", "somente_dev", "mantem_escopo_ids", "ativo"])
+                return redirect("modulos_acesso_gerenciar")
         elif action == "clear_shadow_logs":
             modulo_id = request.POST.get("module_id")
             logs_qs = AccessControlShadowLog.objects.all()
@@ -7864,16 +7834,17 @@ def modulos_acesso_gerenciar(request):
             return redirect("modulos_acesso_gerenciar")
 
     modules = ModuloAcesso.objects.select_related("app").prefetch_related("tipos").order_by("nome")
+    core_modules = [module for module in modules if module.tipo == ModuloAcesso.Tipo.CORE]
+    app_modules = [module for module in modules if module.tipo == ModuloAcesso.Tipo.APP]
     recent_shadow_logs = AccessControlShadowLog.objects.select_related("user", "modulo").order_by("-created_at")[:120]
     return render(
         request,
         "core/modulos_acesso.html",
         {
-            "modules": modules,
+            "core_modules": core_modules,
+            "app_modules": app_modules,
             "tipos": TipoPerfil.objects.order_by("nome"),
-            "apps": App.objects.order_by("nome"),
             "recent_shadow_logs": recent_shadow_logs,
-            "module_types": ModuloAcesso.Tipo.choices,
             "auth_modes": ModuloAcesso.AuthMode.choices,
             "message": message,
             "message_level": message_level,

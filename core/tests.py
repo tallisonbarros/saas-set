@@ -84,6 +84,8 @@ class AccessControlAdminAndShadowTests(TestCase):
         response = self.client_http.get("/modulos-acesso/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Modulos de acesso")
+        self.assertNotContains(response, "Novo modulo")
+        self.assertContains(response, "APP ID em `perfil.apps`", html=False)
 
     def test_dev_can_update_module_access_management(self):
         modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
@@ -93,17 +95,12 @@ class AccessControlAdminAndShadowTests(TestCase):
             {
                 "action": "update_module",
                 "module_id": modulo.id,
-                "nome": modulo.nome,
-                "codigo": modulo.codigo,
                 "oid": "1.3.6.1.4.1.9",
-                "tipo": modulo.tipo,
-                "rota_base": modulo.rota_base,
                 "auth_mode": ModuloAcesso.AuthMode.HYBRID,
                 "tipos": [self.tipo_dev.id],
                 "somente_dev": "on",
                 "mantem_escopo_ids": "on",
                 "ativo": "on",
-                "sistema": "on",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -125,6 +122,12 @@ class AccessControlAdminAndShadowTests(TestCase):
         self.assertTrue(log.legacy_allowed)
         self.assertFalse(log.candidate_allowed)
         self.assertEqual(log.response_status, 200)
+
+    def test_dedicated_apps_stay_reference_only_in_module_access_screen(self):
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/modulos-acesso/")
+        self.assertContains(response, "Apps dedicados")
+        self.assertContains(response, "o acesso real continua sendo decidido exclusivamente pelo APP ID do usuario", html=False)
 
 
 class DevAdminPrivilegesTests(TestCase):
