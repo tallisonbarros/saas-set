@@ -12,127 +12,253 @@
 {% endblock %}
 
 {% block content %}
-  <section class="card stack">
+  <section class="card stack admin-shell">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel de usuarios</div>
         <div class="hud-pill">Administracao</div>
       </div>
       <div class="page-hud-head">
-        <div>
-          <div class="page-kicker">Administracaoistracao</div>
+        <div class="page-hud-main">
+          <div class="page-kicker">Administracao</div>
           <h1 class="page-title">Gerenciar usuarios</h1>
-          <p class="page-subtitle">Usuario atual: {{ request.user.username }}</p>
-        </div>
-        <div class="page-actions">
+          <p class="page-subtitle">Crie contas, mantenha tipos de perfil e acesse o painel contextual de cada usuario.</p>
         </div>
       </div>
-      <div class="hud-meta">Perfis, tipos e acessos.</div>
+      <div class="hud-meta">Usuario atual: {{ request.user.username }}</div>
     </div>
+
     {% if message %}
       <p class="muted">{{ message }}</p>
     {% endif %}
 
-    <div class="user-page-grid">
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Criar usuario</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="create_user" value="1">
-          <div class="field">
-            <label for="id_username">Email</label>
-            {{ form.username }}
+    <div class="admin-metric-grid">
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Usuarios encontrados</div>
+        <div class="admin-metric-value">{{ users.paginator.count }}</div>
+        <div class="admin-metric-note">Resultado da busca atual.</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Tipos de perfil</div>
+        <div class="admin-metric-value">{{ tipos|length }}</div>
+        <div class="admin-metric-note">Catalogo de tipos disponivel para liberacao.</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Paginacao</div>
+        <div class="admin-metric-value">{{ users.number }}</div>
+        <div class="admin-metric-note">Pagina atual de {{ users.paginator.num_pages }}.</div>
+      </div>
+    </div>
+
+    <div class="admin-main-grid">
+      <aside class="admin-sidebar admin-sticky">
+        <div class="card compact-card admin-subcard">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Criar usuario</h2>
+            <p class="admin-section-note">Cadastro rapido com email, senha e tipos iniciais.</p>
           </div>
-          <div class="field">
-            <label for="id_password">Senha</label>
-            {{ form.password }}
+          <form method="post" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="create_user" value="1">
+            <div class="field">
+              <label for="id_username">Email</label>
+              {{ form.username }}
+            </div>
+            <div class="field">
+              <label for="id_password">Senha</label>
+              {{ form.password }}
+            </div>
+            <label class="checkbox-item">
+              {{ form.is_staff }}
+              Administrador
+            </label>
+            <div class="admin-section-block">
+              <div class="admin-title-stack">
+                <h3 class="admin-section-title">Tipos iniciais</h3>
+                <p class="admin-section-note">Defina os tipos logo no cadastro para o usuario ja nascer com o acesso correto.</p>
+              </div>
+              <div class="checkbox-grid">
+                {% for tipo in tipos %}
+                  <label class="checkbox-item">
+                    <input type="checkbox" name="tipos" value="{{ tipo.id }}">
+                    {{ tipo.nome }}
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+            <button class="btn btn-primary" type="submit">Criar usuario</button>
+            {% if form.errors %}
+              <p class="muted">Erro ao criar usuario. Verifique os dados.</p>
+            {% endif %}
+          </form>
+        </div>
+
+        <div class="card compact-card admin-subcard">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Criar tipo</h2>
+            <p class="admin-section-note">Use para cadastrar novos tipos que liberam modulos internos.</p>
           </div>
-          <div class="field">
-            <label for="id_is_staff">Administracaoistrador</label>
-            {{ form.is_staff }}
+          <form method="post" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="create_tipo" value="1">
+            <div class="field">
+              <label for="id_nome">Nome do tipo</label>
+              {{ tipo_form.nome }}
+            </div>
+            <button class="btn btn-primary" type="submit">Criar tipo</button>
+            {% if tipo_form.errors %}
+              <p class="muted">Erro ao criar tipo. Verifique o nome.</p>
+            {% endif %}
+          </form>
+        </div>
+      </aside>
+
+      <div class="admin-switcher" data-tab-switcher>
+        <div class="card compact-card admin-subcard">
+          <div class="admin-title-row">
+            <div class="admin-title-stack">
+              <h2 class="admin-section-title">Workspace administrativo</h2>
+              <p class="admin-section-note">Alterne entre a lista de usuarios e a manutencao dos tipos sem sair da pagina.</p>
+            </div>
           </div>
-          <div class="field">
-            <label>Tipos de perfil</label>
-            <div class="checkbox-grid">
-              {% for tipo in tipos %}
-                <label class="checkbox-item">
-                  <input type="checkbox" name="tipos" value="{{ tipo.id }}">
-                  {{ tipo.nome }}
+          <div class="admin-tabbar">
+            <button class="admin-tab-btn is-active" type="button" data-tab-target="usuarios">
+              <span>Usuarios</span>
+              <span class="count">{{ users.paginator.count }}</span>
+            </button>
+            <button class="admin-tab-btn" type="button" data-tab-target="tipos">
+              <span>Tipos de perfil</span>
+              <span class="count">{{ tipos|length }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card compact-card admin-context-shell">
+          <section class="admin-tab-panel is-active" data-tab-panel="usuarios">
+            <div class="admin-title-row">
+              <div class="admin-title-stack">
+                <h2 class="admin-section-title">Usuarios cadastrados</h2>
+                <p class="admin-section-note">Busque por email e abra o contexto detalhado de cada conta.</p>
+              </div>
+            </div>
+            <form method="get" class="admin-section-block">
+              <div class="admin-form-grid two-col">
+                <label class="field">
+                  <span>Buscar usuario</span>
+                  <input id="id_user_filter" name="q" type="text" value="{{ user_query }}" placeholder="Digite parte do email">
                 </label>
+                <div class="page-actions" style="align-self: end;">
+                  <button class="btn btn-ghost" type="submit">Filtrar</button>
+                </div>
+              </div>
+            </form>
+            <div class="admin-list">
+              {% for user in users %}
+                <article class="admin-list-row">
+                  <div class="admin-list-row-main">
+                    <div class="admin-list-title">{{ user.username }}</div>
+                    <div class="admin-list-meta">
+                      <span class="admin-token is-neutral">ID {{ user.id }}</span>
+                      {% if user.is_staff %}
+                        <span class="admin-token is-success">Administrador</span>
+                      {% else %}
+                        <span class="admin-token is-neutral">Conta comum</span>
+                      {% endif %}
+                      {% if user.is_active %}
+                        <span class="admin-token is-success">Ativo</span>
+                      {% else %}
+                        <span class="admin-token is-neutral">Inativo</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <a class="btn btn-outline" href="{% url 'usuarios_gerenciar_usuario' user.id %}">Gerenciar</a>
+                </article>
+              {% empty %}
+                <p class="muted">Nenhum usuario cadastrado.</p>
               {% endfor %}
             </div>
-          </div>
-          <button class="btn btn-primary" type="submit">Criar</button>
-          {% if form.errors %}
-            <p class="muted">Erro ao criar usuario. Verifique os dados.</p>
-          {% endif %}
-        </form>
-      </div>
-
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Tipos de perfil</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="create_tipo" value="1">
-          <div class="field">
-            <label for="id_nome">Nome do tipo</label>
-            {{ tipo_form.nome }}
-          </div>
-          <button class="btn btn-primary" type="submit">Criar tipo</button>
-          {% if tipo_form.errors %}
-            <p class="muted">Erro ao criar tipo. Verifique o nome.</p>
-          {% endif %}
-        </form>
-        <div style="margin-top: 12px;">
-          <div class="panel-title">Tipos existentes</div>
-          <div class="tipo-list">
-            {% for tipo in tipos %}
-              <form method="post" class="tipo-row">
-                {% csrf_token %}
-                <input type="hidden" name="tipo_id" value="{{ tipo.id }}">
-                <input type="text" name="novo_nome" value="{{ tipo.nome }}">
-                <button class="btn btn-ghost" type="submit" name="update_tipo" value="1">Salvar</button>
-                <button class="btn btn-outline" type="submit" name="delete_tipo" value="1">Excluir</button>
-              </form>
-            {% empty %}
-              <p class="muted">Nenhum tipo cadastrado.</p>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Usuarios</h2>
-        <form method="get" class="stack">
-          <label for="id_user_filter">Buscar usuario</label>
-          <input id="id_user_filter" name="q" type="text" value="{{ user_query }}" placeholder="Digite parte do email">
-          <button class="btn btn-ghost btn-compact" type="submit">Filtrar</button>
-        </form>
-        <div class="user-list">
-          {% for user in users %}
-            <div class="user-row">
-              <div>
-                <div class="panel-title">{{ user.username }}</div>
-                <div class="muted">ID: {{ user.id }}</div>
+            {% if users.paginator.num_pages > 1 %}
+              <div class="pagination">
+                {% if users.has_previous %}
+                  <a class="btn btn-ghost btn-compact" href="?q={{ user_query|urlencode }}&page={{ users.previous_page_number }}">Anterior</a>
+                {% endif %}
+                <span class="pagination-info">Pagina {{ users.number }} de {{ users.paginator.num_pages }}</span>
+                {% if users.has_next %}
+                  <a class="btn btn-ghost btn-compact" href="?q={{ user_query|urlencode }}&page={{ users.next_page_number }}">Proxima</a>
+                {% endif %}
               </div>
-              <a class="btn btn-outline" href="{% url 'usuarios_gerenciar_usuario' user.id %}">Gerenciar</a>
+            {% endif %}
+          </section>
+
+          <section class="admin-tab-panel" data-tab-panel="tipos">
+            <div class="admin-title-row">
+              <div class="admin-title-stack">
+                <h2 class="admin-section-title">Tipos existentes</h2>
+                <p class="admin-section-note">Renomeie ou remova tipos a partir desta lista. Os vinculos dos usuarios dependem destes nomes.</p>
+              </div>
             </div>
-          {% empty %}
-            <p class="muted">Nenhum usuario cadastrado.</p>
-          {% endfor %}
+            <div class="admin-list">
+              {% for tipo in tipos %}
+                <form method="post" class="admin-list-row">
+                  {% csrf_token %}
+                  <input type="hidden" name="tipo_id" value="{{ tipo.id }}">
+                  <div class="admin-list-row-main">
+                    <div class="admin-form-grid two-col">
+                      <label class="field">
+                        <span>Nome do tipo</span>
+                        <input type="text" name="novo_nome" value="{{ tipo.nome }}">
+                      </label>
+                      <div class="admin-token-row" style="align-self: end;">
+                        {% if tipo.sistema %}
+                          <span class="admin-token is-warn">Tipo de sistema</span>
+                        {% endif %}
+                        {% if tipo.ativo %}
+                          <span class="admin-token is-success">Ativo</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="page-actions">
+                    <button class="btn btn-ghost" type="submit" name="update_tipo" value="1">Salvar</button>
+                    <button class="btn btn-outline" type="submit" name="delete_tipo" value="1">Excluir</button>
+                  </div>
+                </form>
+              {% empty %}
+                <p class="muted">Nenhum tipo cadastrado.</p>
+              {% endfor %}
+            </div>
+          </section>
         </div>
-        {% if users.paginator.num_pages > 1 %}
-          <div class="pagination">
-            {% if users.has_previous %}
-              <a class="btn btn-ghost btn-compact" href="?q={{ user_query|urlencode }}&page={{ users.previous_page_number }}">Anterior</a>
-            {% endif %}
-            <span class="pagination-info">Pagina {{ users.number }} de {{ users.paginator.num_pages }}</span>
-            {% if users.has_next %}
-              <a class="btn btn-ghost btn-compact" href="?q={{ user_query|urlencode }}&page={{ users.next_page_number }}">Proxima</a>
-            {% endif %}
-          </div>
-        {% endif %}
       </div>
     </div>
   </section>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    (function () {
+      const switchers = document.querySelectorAll("[data-tab-switcher]");
+      switchers.forEach((switcher) => {
+        const buttons = Array.from(switcher.querySelectorAll("[data-tab-target]"));
+        const panels = Array.from(switcher.querySelectorAll("[data-tab-panel]"));
+        if (!buttons.length || !panels.length) return;
+
+        const activate = (target) => {
+          buttons.forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.tabTarget === target);
+          });
+          panels.forEach((panel) => {
+            panel.classList.toggle("is-active", panel.dataset.tabPanel === target);
+          });
+        };
+
+        const initial = buttons.find((button) => button.classList.contains("is-active")) || buttons[0];
+        activate(initial.dataset.tabTarget);
+
+        buttons.forEach((button) => {
+          button.addEventListener("click", () => activate(button.dataset.tabTarget));
+        });
+      });
+    })();
+  </script>
 {% endblock %}

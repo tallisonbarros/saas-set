@@ -7915,11 +7915,8 @@ def modulos_acesso_gerenciar(request):
             module.oid = oid
             module.ativo = ativo
             if module.tipo == ModuloAcesso.Tipo.CORE:
-                module.mantem_escopo_ids = True
-                module.auth_mode = ModuloAcesso.AuthMode.STRICT
-                module.somente_dev = False
                 tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
-                module.save(update_fields=["oid", "ativo", "mantem_escopo_ids", "auth_mode", "somente_dev"])
+                module.save(update_fields=["oid", "ativo"])
                 module.tipos.set(tipos)
             else:
                 module.save(update_fields=["oid", "ativo"])

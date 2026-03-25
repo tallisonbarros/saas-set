@@ -12,17 +12,17 @@
 {% endblock %}
 
 {% block content %}
-  <section class="card stack">
+  <section class="card stack admin-shell">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Administracao</div>
         <div class="hud-pill">ACL</div>
       </div>
       <div class="page-hud-head">
-        <div>
+        <div class="page-hud-main">
           <div class="page-kicker">Seguranca de acesso</div>
           <h1 class="page-title">Modulos de acesso</h1>
-          <p class="page-subtitle">Configuracao dos modulos internos por tipo de usuario. Apps dedicados continuam por APP ID.</p>
+          <p class="page-subtitle">Escolha um modulo interno para configurar os tipos liberados. Apps dedicados continuam por APP ID.</p>
         </div>
       </div>
       <div class="hud-meta">Modulos internos entram por tipo. Apps dedicados entram por APP ID em perfil.apps.</div>
@@ -32,121 +32,183 @@
       <p class="muted">{{ message }}</p>
     {% endif %}
 
-    <div class="user-page-grid">
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Modelo desta etapa</h2>
-        <p class="muted" style="margin-top: 0;">
-          Os modulos internos ja existem e nao sao criados manualmente aqui. Nesta tela voce apenas vincula tipos de perfil aos modulos existentes.
-        </p>
-        <div class="stack">
-          <div class="card compact-card">
-            <strong>Modulos internos</strong>
-            <div class="muted">Entrada controlada por tipo de usuario.</div>
-            <div class="muted">Os IDs atuais continuam apenas como escopo e compartilhamento interno entre usuarios.</div>
-          </div>
-          <div class="card compact-card">
-            <strong>Apps dedicados</strong>
-            <div class="muted">Continuam controlados por APP ID em `perfil.apps`.</div>
-            <div class="muted">A listagem abaixo e apenas referencia operacional nesta etapa.</div>
-          </div>
-        </div>
+    <div class="admin-metric-grid">
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Modulos internos</div>
+        <div class="admin-metric-value">{{ core_modules|length }}</div>
+        <div class="admin-metric-note">Catalogo fixo do sistema operacional.</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Apps dedicados</div>
+        <div class="admin-metric-value">{{ app_modules|length }}</div>
+        <div class="admin-metric-note">Continuam vinculados por APP ID.</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Tipos cadastrados</div>
+        <div class="admin-metric-value">{{ tipos|length }}</div>
+        <div class="admin-metric-note">Usados para liberar entrada nos modulos internos.</div>
       </div>
     </div>
 
-    <div class="stack">
-      <div class="page-hud-head">
-        <div>
-          <div class="page-kicker">Catalogo fixo</div>
-          <h2 class="page-title" style="font-size: 1.4rem;">Modulos internos</h2>
+    <div class="admin-switcher" data-switcher>
+      <div class="card compact-card admin-subcard">
+        <div class="admin-title-row">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Selecao de modulo</h2>
+            <p class="admin-section-note">Clique em um modulo para abrir o contexto dele no painel ao lado.</p>
+          </div>
+        </div>
+        <div class="admin-selector-bar">
+          {% for module in core_modules %}
+            <button
+              class="admin-selector-btn {% if forloop.first %}is-active{% endif %}"
+              type="button"
+              data-switch-target="{{ module.codigo }}"
+            >
+              <span>{{ module.nome }}</span>
+              <span class="count">{{ module.tipos.count }}</span>
+            </button>
+          {% endfor %}
         </div>
       </div>
-      {% for module in core_modules %}
-        <div class="card compact-card">
-          <form method="post" class="stack">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_module">
-            <input type="hidden" name="module_id" value="{{ module.id }}">
-            <div class="page-hud-head" style="gap: 12px;">
-              <div>
-                <h2 style="margin: 0;">{{ module.nome }}</h2>
-                <div class="muted">{{ module.codigo }} | rota {{ module.rota_base }}</div>
+
+      <div class="card compact-card admin-context-shell">
+        {% for module in core_modules %}
+          <section class="admin-context-panel {% if forloop.first %}is-active{% endif %}" data-switch-panel="{{ module.codigo }}">
+            <form method="post" class="stack">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_module">
+              <input type="hidden" name="module_id" value="{{ module.id }}">
+
+              <div class="admin-title-row">
+                <div class="admin-title-stack">
+                  <h2 class="admin-section-title" style="margin: 0;">{{ module.nome }}</h2>
+                  <p class="admin-section-note">{{ module.codigo }} | rota {{ module.rota_base }}</p>
+                </div>
+                <div class="admin-pill-stack">
+                  {% if module.ativo %}
+                    <span class="admin-token is-success">Modulo ativo</span>
+                  {% else %}
+                    <span class="admin-token is-neutral">Modulo inativo</span>
+                  {% endif %}
+                  <span class="admin-token">{{ module.tipos.count }} tipos liberados</span>
+                </div>
               </div>
-            </div>
-            <div class="user-page-grid">
-              <label class="field">
-                <span>Codigo</span>
-                <input type="text" value="{{ module.codigo }}" disabled>
-              </label>
-              <label class="field">
-                <span>OID opcional</span>
-                <input type="text" name="oid" value="{{ module.oid }}">
-              </label>
-              <label class="field">
-                <span>Rota base</span>
-                <input type="text" value="{{ module.rota_base }}" disabled>
-              </label>
-            </div>
-            <label>Tipos liberados</label>
-            <div class="checkbox-grid">
-              {% for tipo in tipos %}
-                <label class="checkbox-item">
-                  <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if tipo in module.tipos.all %}checked{% endif %}>
-                  {{ tipo.nome }}
+
+              <div class="admin-form-grid">
+                <label class="field">
+                  <span>Codigo</span>
+                  <input type="text" value="{{ module.codigo }}" disabled>
                 </label>
-              {% endfor %}
-            </div>
-            <div class="muted">Os tipos acima controlam apenas a entrada no modulo.</div>
-            <div class="muted">Os IDs do modulo continuam sendo usados apenas dentro do conteudo, para compartilhamento e escopo entre usuarios.</div>
-            <div class="checkbox-grid">
-              <label class="checkbox-item">
-                <input type="checkbox" name="ativo" {% if module.ativo %}checked{% endif %}>
-                Modulo ativo
-              </label>
-            </div>
-            <div class="page-actions">
-              <button class="btn btn-primary" type="submit">Salvar modulo</button>
-            </div>
-          </form>
-        </div>
-      {% empty %}
-        <div class="muted">Nenhum modulo interno cadastrado.</div>
-      {% endfor %}
+                <label class="field">
+                  <span>OID opcional</span>
+                  <input type="text" name="oid" value="{{ module.oid }}" placeholder="Se quiser manter referencia administrativa">
+                </label>
+                <label class="field">
+                  <span>Rota base</span>
+                  <input type="text" value="{{ module.rota_base }}" disabled>
+                </label>
+              </div>
+
+              <div class="admin-section-block">
+                <div class="admin-title-stack">
+                  <h3 class="admin-section-title">Tipos liberados</h3>
+                  <p class="admin-section-note">Os tipos abaixo liberam a entrada neste modulo. IDs continuam apenas para escopo interno.</p>
+                </div>
+                <div class="checkbox-grid">
+                  {% for tipo in tipos %}
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if tipo in module.tipos.all %}checked{% endif %}>
+                      {{ tipo.nome }}
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="admin-section-block">
+                <div class="admin-title-stack">
+                  <h3 class="admin-section-title">Observacoes operacionais</h3>
+                </div>
+                <p class="admin-section-note">Os IDs atuais continuam apenas como escopo e compartilhamento interno entre usuarios.</p>
+                <div class="admin-token-row">
+                  <span class="admin-token is-neutral">Entrada por tipo de usuario</span>
+                  <span class="admin-token is-neutral">Escopo por IDs continua dentro do modulo</span>
+                  <span class="admin-token is-neutral">Nao ha criacao manual de modulo nesta tela</span>
+                </div>
+                <label class="checkbox-item">
+                  <input type="checkbox" name="ativo" {% if module.ativo %}checked{% endif %}>
+                  Modulo ativo
+                </label>
+              </div>
+
+              <div class="page-actions">
+                <button class="btn btn-primary" type="submit">Salvar modulo</button>
+              </div>
+            </form>
+          </section>
+        {% empty %}
+          <section class="admin-context-panel is-active">
+            <p class="muted">Nenhum modulo interno cadastrado.</p>
+          </section>
+        {% endfor %}
+      </div>
     </div>
 
-    <div class="stack">
-      <div class="page-hud-head">
-        <div>
-          <div class="page-kicker">Referencia</div>
-          <h2 class="page-title" style="font-size: 1.4rem;">Apps dedicados</h2>
+    <div class="card compact-card admin-subcard">
+      <div class="admin-title-row">
+        <div class="admin-title-stack">
+          <h2 class="admin-section-title">Apps dedicados</h2>
+          <p class="admin-section-note">Referencia operacional. Nesta etapa, o acesso real continua sendo decidido exclusivamente pelo APP ID do usuario.</p>
         </div>
       </div>
-      {% for module in app_modules %}
-        <div class="card compact-card">
-          <div class="page-hud-head" style="gap: 12px;">
-            <div>
-              <h2 style="margin: 0;">{{ module.nome }}</h2>
-              <div class="muted">{{ module.codigo }} | slug {% if module.app %}{{ module.app.slug }}{% else %}-{% endif %}</div>
+      <div class="admin-reference-grid">
+        {% for module in app_modules %}
+          <article class="admin-reference-item">
+            <div class="admin-title-row">
+              <div class="admin-title-stack">
+                <strong>{{ module.nome }}</strong>
+                <span class="muted">{{ module.codigo }} | slug {% if module.app %}{{ module.app.slug }}{% else %}-{% endif %}</span>
+              </div>
+              <span class="admin-token is-warn">APP ID em `perfil.apps`</span>
             </div>
-          </div>
-          <div class="user-page-grid">
-            <label class="field">
-              <span>OID opcional</span>
-              <input type="text" value="{{ module.oid|default:'-' }}" disabled>
-            </label>
-            <label class="field">
-              <span>Rota base</span>
-              <input type="text" value="{{ module.rota_base }}" disabled>
-            </label>
-            <label class="field">
-              <span>Regra de acesso</span>
-              <input type="text" value="APP ID em perfil.apps" disabled>
-            </label>
-          </div>
-          <div class="muted">Nesta etapa, o acesso real continua sendo decidido exclusivamente pelo APP ID do usuario.</div>
-        </div>
-      {% empty %}
-        <div class="muted">Nenhum app dedicado catalogado.</div>
-      {% endfor %}
+            <div class="admin-token-row">
+              <span class="admin-token is-neutral">Rota {{ module.rota_base|default:"-" }}</span>
+              <span class="admin-token is-neutral">OID {{ module.oid|default:"-" }}</span>
+            </div>
+          </article>
+        {% empty %}
+          <p class="muted">Nenhum app dedicado catalogado.</p>
+        {% endfor %}
+      </div>
     </div>
   </section>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    (function () {
+      const switchers = document.querySelectorAll("[data-switcher]");
+      switchers.forEach((switcher) => {
+        const buttons = Array.from(switcher.querySelectorAll("[data-switch-target]"));
+        const panels = Array.from(switcher.querySelectorAll("[data-switch-panel]"));
+        if (!buttons.length || !panels.length) return;
+
+        const activate = (target) => {
+          buttons.forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.switchTarget === target);
+          });
+          panels.forEach((panel) => {
+            panel.classList.toggle("is-active", panel.dataset.switchPanel === target);
+          });
+        };
+
+        const initial = buttons.find((button) => button.classList.contains("is-active")) || buttons[0];
+        activate(initial.dataset.switchTarget);
+
+        buttons.forEach((button) => {
+          button.addEventListener("click", () => activate(button.dataset.switchTarget));
+        });
+      });
+    })();
+  </script>
 {% endblock %}

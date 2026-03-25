@@ -14,7 +14,7 @@
 {% endblock %}
 
 {% block content %}
-  <section class="card stack">
+  <section class="card stack admin-shell">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel do usuario</div>
@@ -24,136 +24,284 @@
         </div>
       </div>
       <div class="page-hud-head">
-        <div>
-          <div class="page-kicker">Administracaoistracao</div>
+        <div class="page-hud-main">
+          <div class="page-kicker">Administracao</div>
           <h1 class="page-title">Gerenciar usuario</h1>
-          <p class="page-subtitle">ID: {{ user_item.id }} | Email: {{ user_item.username }}</p>
+          <p class="page-subtitle">ID {{ user_item.id }} | {{ user_item.username }}</p>
         </div>
       </div>
-      <div class="hud-meta">Conta, perfil e permissoes.</div>
+      <div class="hud-meta">Conta, tipos de perfil, escopos por ID e apps dedicados.</div>
     </div>
+
     {% if message %}
       <p class="muted">{{ message }}</p>
     {% endif %}
 
-    <div class="user-page-grid">
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Dados</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_user">
-          <label class="field">
-            <span>Email</span>
-            <input type="email" name="email" value="{{ user_item.username }}" required>
-          </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="is_staff" {% if user_item.is_staff %}checked{% endif %}>
-            Administracaoistrador
-          </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="is_active" {% if user_item.is_active %}checked{% endif %}>
-            Usuario ativo
-          </label>
-          <button class="btn btn-primary" type="submit">Salvar conta</button>
-        </form>
+    <div class="admin-summary-grid">
+      <div class="admin-summary-item">
+        <strong>Tipos de perfil</strong>
+        <span class="muted">{% if perfil %}{{ perfil.tipos.count }} vinculados{% else %}0 vinculados{% endif %}</span>
       </div>
+      <div class="admin-summary-item">
+        <strong>Escopos por ID</strong>
+        <span class="muted">
+          {% if perfil %}
+            {{ perfil.plantas.count }} plantas | {{ perfil.financeiros.count }} financeiros | {{ perfil.inventarios.count }} inventarios | {{ perfil.listas_ip.count }} listas IP | {{ perfil.radares.count }} radares
+          {% else %}
+            Nenhum escopo vinculado
+          {% endif %}
+        </span>
+      </div>
+      <div class="admin-summary-item">
+        <strong>Apps dedicados</strong>
+        <span class="muted">{% if perfil %}{{ perfil.apps.count }} vinculados{% else %}0 vinculados{% endif %}</span>
+      </div>
+      <div class="admin-summary-item">
+        <strong>Status da conta</strong>
+        <span class="muted">
+          {% if user_item.is_active %}Ativa{% else %}Inativa{% endif %}
+          {% if user_item.is_staff %} | Administrador{% endif %}
+        </span>
+      </div>
+    </div>
 
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Perfil</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_perfil">
-          <label class="field">
-            <span>Nome</span>
-            <input type="text" name="nome" value="{% if perfil %}{{ perfil.nome }}{% endif %}">
-          </label>
-          <label class="field">
-            <span>Empresa</span>
-            <input type="text" name="empresa" value="{% if perfil %}{{ perfil.empresa }}{% endif %}">
-          </label>
-          <label class="field">
-            <span>Sigla cidade</span>
-            <input type="text" name="sigla_cidade" value="{% if perfil %}{{ perfil.sigla_cidade }}{% endif %}">
-          </label>
-          <label>Tipos de perfil</label>
-          <div class="checkbox-grid">
-            {% for tipo in tipos %}
-              <label class="checkbox-item">
-                <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if perfil and tipo in perfil.tipos.all %}checked{% endif %}>
-                {{ tipo.nome }}
-              </label>
-            {% endfor %}
+    <div class="admin-switcher" data-user-switcher>
+      <div class="card compact-card admin-subcard">
+        <div class="admin-title-row">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Contexto de edicao</h2>
+            <p class="admin-section-note">Troque entre conta, acessos e senha sem perder o foco do usuario.</p>
           </div>
-          <label class="field">
-            <span>ID_PLANTA (separados por virgula)</span>
-            <input
-              type="text"
-              name="plantas"
-              placeholder="PLANTA-001, PLANTA-002"
-              value="{% if perfil %}{% for planta in perfil.plantas.all %}{{ planta.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_FINANCEIRO (separados por virgula)</span>
-            <input
-              type="text"
-              name="financeiros"
-              placeholder="FIN-001, FIN-002"
-              value="{% if perfil %}{% for fin in perfil.financeiros.all %}{{ fin.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_INVENTARIO (separados por virgula)</span>
-            <input
-              type="text"
-              name="inventarios"
-              placeholder="INV-001, INV-002"
-              value="{% if perfil %}{% for inv in perfil.inventarios.all %}{{ inv.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_LISTAIP (separados por virgula)</span>
-            <input
-              type="text"
-              name="listas_ip"
-              placeholder="LIP-001, LIP-002"
-              value="{% if perfil %}{% for lista in perfil.listas_ip.all %}{{ lista.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_RADAR (separados por virgula)</span>
-            <input
-              type="text"
-              name="radares"
-              placeholder="RDR-001, RDR-002"
-              value="{% if perfil %}{% for radar in perfil.radares.all %}{{ radar.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>APPS (separados por virgula)</span>
-            <input
-              type="text"
-              name="apps"
-              placeholder="app_milhao, app_ubs3"
-              value="{% if perfil %}{% for app in perfil.apps.all %}{{ app.slug }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <button class="btn btn-primary" type="submit">Salvar perfil</button>
-        </form>
+        </div>
+        <div class="admin-tabbar">
+          <button class="admin-tab-btn is-active" type="button" data-user-tab-target="conta">Conta</button>
+          <button class="admin-tab-btn" type="button" data-user-tab-target="acessos">Acessos</button>
+          <button class="admin-tab-btn" type="button" data-user-tab-target="senha">Senha</button>
+        </div>
       </div>
 
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Senha</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="set_password">
-          <label class="field">
-            <span>Nova senha</span>
-            <input type="password" name="new_password" placeholder="Digite a nova senha">
-          </label>
-          <button class="btn btn-ghost" type="submit">Atualizar senha</button>
-        </form>
+      <div class="card compact-card admin-context-shell">
+        <section class="admin-tab-panel is-active" data-user-tab-panel="conta">
+          <form method="post" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_user">
+            <div class="admin-title-row">
+              <div class="admin-title-stack">
+                <h2 class="admin-section-title">Conta</h2>
+                <p class="admin-section-note">Dados principais de login e status administrativo.</p>
+              </div>
+              <div class="admin-token-row">
+                {% if user_item.is_active %}
+                  <span class="admin-token is-success">Usuario ativo</span>
+                {% else %}
+                  <span class="admin-token is-neutral">Usuario inativo</span>
+                {% endif %}
+                {% if user_item.is_staff %}
+                  <span class="admin-token is-warn">Administrador</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="admin-form-grid two-col">
+              <label class="field">
+                <span>Email</span>
+                <input type="email" name="email" value="{{ user_item.username }}" required>
+              </label>
+            </div>
+            <div class="admin-section-block">
+              <div class="checkbox-grid">
+                <label class="checkbox-item">
+                  <input type="checkbox" name="is_staff" {% if user_item.is_staff %}checked{% endif %}>
+                  Administrador
+                </label>
+                <label class="checkbox-item">
+                  <input type="checkbox" name="is_active" {% if user_item.is_active %}checked{% endif %}>
+                  Usuario ativo
+                </label>
+              </div>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" type="submit">Salvar conta</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="admin-tab-panel" data-user-tab-panel="acessos">
+          <form method="post" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_perfil">
+
+            <div class="admin-title-row">
+              <div class="admin-title-stack">
+                <h2 class="admin-section-title">Perfil e acessos</h2>
+                <p class="admin-section-note">Aqui ficam juntos os tipos, os escopos por ID e os apps dedicados.</p>
+              </div>
+            </div>
+
+            <div class="admin-section-block">
+              <div class="admin-title-stack">
+                <h3 class="admin-section-title">Identidade do perfil</h3>
+              </div>
+              <div class="admin-form-grid">
+                <label class="field">
+                  <span>Nome</span>
+                  <input type="text" name="nome" value="{% if perfil %}{{ perfil.nome }}{% endif %}">
+                </label>
+                <label class="field">
+                  <span>Empresa</span>
+                  <input type="text" name="empresa" value="{% if perfil %}{{ perfil.empresa }}{% endif %}">
+                </label>
+                <label class="field">
+                  <span>Sigla cidade</span>
+                  <input type="text" name="sigla_cidade" value="{% if perfil %}{{ perfil.sigla_cidade }}{% endif %}">
+                </label>
+              </div>
+            </div>
+
+            <div class="admin-section-block">
+              <div class="admin-title-stack">
+                <h3 class="admin-section-title">Tipos de perfil</h3>
+                <p class="admin-section-note">Liberam a entrada nos modulos internos do sistema.</p>
+              </div>
+              <div class="checkbox-grid">
+                {% for tipo in tipos %}
+                  <label class="checkbox-item">
+                    <input type="checkbox" name="tipos" value="{{ tipo.id }}" {% if perfil and tipo in perfil.tipos.all %}checked{% endif %}>
+                    {{ tipo.nome }}
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="admin-section-block">
+              <div class="admin-title-stack">
+                <h3 class="admin-section-title">Escopos por ID</h3>
+                <p class="admin-section-note">IDs nao liberam modulo. Eles continuam apenas como compartilhamento e escopo interno.</p>
+              </div>
+              <div class="admin-form-grid two-col">
+                <label class="field">
+                  <span>ID_PLANTA</span>
+                  <input
+                    type="text"
+                    name="plantas"
+                    placeholder="PLANTA-001, PLANTA-002"
+                    value="{% if perfil %}{% for planta in perfil.plantas.all %}{{ planta.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+                  >
+                </label>
+                <label class="field">
+                  <span>ID_FINANCEIRO</span>
+                  <input
+                    type="text"
+                    name="financeiros"
+                    placeholder="FIN-001, FIN-002"
+                    value="{% if perfil %}{% for fin in perfil.financeiros.all %}{{ fin.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+                  >
+                </label>
+                <label class="field">
+                  <span>ID_INVENTARIO</span>
+                  <input
+                    type="text"
+                    name="inventarios"
+                    placeholder="INV-001, INV-002"
+                    value="{% if perfil %}{% for inv in perfil.inventarios.all %}{{ inv.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+                  >
+                </label>
+                <label class="field">
+                  <span>ID_LISTAIP</span>
+                  <input
+                    type="text"
+                    name="listas_ip"
+                    placeholder="LIP-001, LIP-002"
+                    value="{% if perfil %}{% for lista in perfil.listas_ip.all %}{{ lista.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+                  >
+                </label>
+                <label class="field">
+                  <span>ID_RADAR</span>
+                  <input
+                    type="text"
+                    name="radares"
+                    placeholder="RDR-001, RDR-002"
+                    value="{% if perfil %}{% for radar in perfil.radares.all %}{{ radar.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+                  >
+                </label>
+              </div>
+            </div>
+
+            <div class="admin-section-block">
+              <div class="admin-title-stack">
+                <h3 class="admin-section-title">Apps dedicados</h3>
+                <p class="admin-section-note">Slugs dos apps que o usuario pode abrir por APP ID.</p>
+              </div>
+              <div class="admin-form-grid one-col">
+                <label class="field">
+                  <span>APPS</span>
+                  <input
+                    type="text"
+                    name="apps"
+                    placeholder="app_milhao, app_ubs3"
+                    value="{% if perfil %}{% for app in perfil.apps.all %}{{ app.slug }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+                  >
+                </label>
+              </div>
+            </div>
+
+            <div class="page-actions">
+              <button class="btn btn-primary" type="submit">Salvar perfil</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="admin-tab-panel" data-user-tab-panel="senha">
+          <form method="post" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="set_password">
+            <div class="admin-title-row">
+              <div class="admin-title-stack">
+                <h2 class="admin-section-title">Senha</h2>
+                <p class="admin-section-note">Altere a senha da conta sem misturar com os outros dados do usuario.</p>
+              </div>
+            </div>
+            <div class="admin-form-grid one-col">
+              <label class="field">
+                <span>Nova senha</span>
+                <input type="password" name="new_password" placeholder="Digite a nova senha">
+              </label>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-ghost" type="submit">Atualizar senha</button>
+            </div>
+          </form>
+        </section>
       </div>
     </div>
   </section>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    (function () {
+      const switchers = document.querySelectorAll("[data-user-switcher]");
+      switchers.forEach((switcher) => {
+        const buttons = Array.from(switcher.querySelectorAll("[data-user-tab-target]"));
+        const panels = Array.from(switcher.querySelectorAll("[data-user-tab-panel]"));
+        if (!buttons.length || !panels.length) return;
+
+        const activate = (target) => {
+          buttons.forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.userTabTarget === target);
+          });
+          panels.forEach((panel) => {
+            panel.classList.toggle("is-active", panel.dataset.userTabPanel === target);
+          });
+        };
+
+        const initial = buttons.find((button) => button.classList.contains("is-active")) || buttons[0];
+        activate(initial.dataset.userTabTarget);
+
+        buttons.forEach((button) => {
+          button.addEventListener("click", () => activate(button.dataset.userTabTarget));
+        });
+      });
+    })();
+  </script>
 {% endblock %}

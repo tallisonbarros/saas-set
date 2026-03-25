@@ -36,11 +36,9 @@ class AccessControlFoundationTests(TestCase):
         self.assertTrue(TipoPerfil.objects.filter(codigo="DEV", sistema=True, ativo=True).exists())
         self.assertTrue(TipoPerfil.objects.filter(codigo="MASTER", sistema=True, ativo=True).exists())
 
-    def test_access_modules_are_seeded_in_legacy_mode(self):
+    def test_access_modules_are_seeded_with_expected_base_data(self):
         modulo = ModuloAcesso.objects.get(codigo="APP_MILHAO_BLA")
-        self.assertEqual(modulo.auth_mode, ModuloAcesso.AuthMode.LEGACY)
         self.assertEqual(modulo.tipo, ModuloAcesso.Tipo.APP)
-        self.assertFalse(modulo.somente_dev)
         self.assertEqual(modulo.rota_base, "apps/appmilhaobla")
 
     def test_tipo_perfil_generates_code_from_name_when_missing(self):
@@ -107,15 +105,11 @@ class AccessControlAdminAndVisibilityTests(TestCase):
         self.assertEqual(response.status_code, 302)
         modulo.refresh_from_db()
         self.assertEqual(modulo.oid, "1.3.6.1.4.1.9")
-        self.assertTrue(modulo.mantem_escopo_ids)
-        self.assertEqual(modulo.auth_mode, ModuloAcesso.AuthMode.STRICT)
-        self.assertFalse(modulo.somente_dev)
         self.assertSetEqual(set(modulo.tipos.values_list("codigo", flat=True)), {"FINANCEIRO"})
 
     def test_internal_module_route_is_blocked_without_matching_type(self):
         modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
         modulo.tipos.clear()
-        modulo.save(update_fields=["auth_mode"])
 
         self.client_http.force_login(self.user)
         response = self.client_http.get("/financeiro/")

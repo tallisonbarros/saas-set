@@ -53,31 +53,6 @@ def is_dev_user(user):
     return has_tipo_code(user, "DEV") or is_admin_user(user)
 
 
-def resolve_module_from_path(path):
-    from .models import ModuloAcesso
-
-    normalized_path = "/" + (path or "").strip().lstrip("/")
-    if normalized_path in {"/", ""}:
-        return None
-    if normalized_path.startswith("/static/") or normalized_path.startswith("/media/") or normalized_path.startswith("/admin/static/"):
-        return None
-
-    modules = (
-        ModuloAcesso.objects.filter(ativo=True)
-        .exclude(rota_base="")
-        .select_related("app")
-        .prefetch_related("tipos")
-        .order_by("-rota_base")
-    )
-    for module in modules:
-        route_base = "/" + (module.rota_base or "").strip().strip("/")
-        if route_base == "/":
-            continue
-        if normalized_path == route_base or normalized_path.startswith(route_base + "/"):
-            return module
-    return None
-
-
 def can_access_internal_module(user, module_code):
     if not user or not getattr(user, "is_authenticated", False):
         return False
