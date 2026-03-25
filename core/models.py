@@ -1,10 +1,17 @@
-from django.db import models
-from django.db.models import Max
+import re
+from decimal import Decimal
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.db import models
+from django.db.models import Max
 from django.utils import timezone
-from decimal import Decimal
+
+
+def _normalize_access_code(value):
+    cleaned = re.sub(r"[^0-9A-Za-z]+", "_", (value or "").strip().upper()).strip("_")
+    return cleaned[:60]
 
 class PerfilUsuario(models.Model):
     nome = models.CharField(max_length=120)
@@ -28,6 +35,17 @@ class PerfilUsuario(models.Model):
 
 class TipoPerfil(models.Model):
     nome = models.CharField(max_length=50, unique=True)
+    codigo = models.CharField(max_length=60, unique=True, blank=True)
+    sistema = models.BooleanField(default=False)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def save(self, *args, **kwargs):
+        if not self.codigo:
+            self.codigo = _normalize_access_code(self.nome)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nome
@@ -48,6 +66,48 @@ class App(models.Model):
 
     class Meta:
         ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class ModuloAcesso(models.Model):
+    class Tipo(models.TextChoices):
+        CORE = "CORE", "Modulo interno"
+        APP = "APP", "App dedicado"
+
+    class AuthMode(models.TextChoices):
+        LEGACY = "LEGACY", "Legado"
+        HYBRID = "HYBRID", "Hibrido"
+        STRICT = "STRICT", "Estrito"
+
+    codigo = models.CharField(max_length=60, unique=True)
+    nome = models.CharField(max_length=120)
+    oid = models.CharField(max_length=120, blank=True, default="")
+    tipo = models.CharField(max_length=12, choices=Tipo.choices, default=Tipo.CORE)
+    rota_base = models.CharField(max_length=160, blank=True, default="")
+    auth_mode = models.CharField(max_length=12, choices=AuthMode.choices, default=AuthMode.LEGACY)
+    somente_dev = models.BooleanField(default=False)
+    mantem_escopo_ids = models.BooleanField(default=True)
+    ativo = models.BooleanField(default=True)
+    sistema = models.BooleanField(default=False)
+    app = models.ForeignKey(
+        "App",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="modulos_acesso",
+    )
+    tipos = models.ManyToManyField("TipoPerfil", blank=True, related_name="modulos_acesso")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def save(self, *args, **kwargs):
+        self.codigo = _normalize_access_code(self.codigo or self.nome)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nome

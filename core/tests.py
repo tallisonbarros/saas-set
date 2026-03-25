@@ -9,9 +9,11 @@ from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_visual_flags
+from core.access_control import has_tipo_code, normalize_access_code
 from core.models import (
     PerfilUsuario,
     IngestRecord,
+    ModuloAcesso,
     Proposta,
     Radar,
     RadarAtividade,
@@ -26,6 +28,35 @@ from core.models import (
     TipoPerfil,
 )
 from core.views import _build_proposta_pdf_context, _build_radar_relatorio_pdf_context, _sanitize_proposta_descricao, _user_role
+
+
+class AccessControlFoundationTests(TestCase):
+    def test_system_types_are_seeded_with_stable_codes(self):
+        self.assertTrue(TipoPerfil.objects.filter(codigo="DEV", sistema=True, ativo=True).exists())
+        self.assertTrue(TipoPerfil.objects.filter(codigo="MASTER", sistema=True, ativo=True).exists())
+
+    def test_access_modules_are_seeded_in_legacy_mode(self):
+        modulo = ModuloAcesso.objects.get(codigo="APP_MILHAO_BLA")
+        self.assertEqual(modulo.auth_mode, ModuloAcesso.AuthMode.LEGACY)
+        self.assertEqual(modulo.tipo, ModuloAcesso.Tipo.APP)
+        self.assertFalse(modulo.somente_dev)
+        self.assertEqual(modulo.rota_base, "apps/appmilhaobla")
+
+    def test_tipo_perfil_generates_code_from_name_when_missing(self):
+        tipo = TipoPerfil.objects.create(nome="Radar Operacional")
+        self.assertEqual(tipo.codigo, "RADAR_OPERACIONAL")
+
+    def test_modulo_acesso_normalizes_code_on_save(self):
+        modulo = ModuloAcesso.objects.create(codigo="", nome="Modulo Piloto", oid="1.2.3")
+        self.assertEqual(modulo.codigo, "MODULO_PILOTO")
+
+    def test_tipo_code_helper_uses_stable_codes(self):
+        user = User.objects.create_user(username="acl@set.local", email="acl@set.local", password="123456")
+        perfil = PerfilUsuario.objects.create(nome="ACL", email="acl@set.local", usuario=user)
+        tipo = TipoPerfil.objects.create(nome="Teste ACL", codigo="ACL_TESTE")
+        perfil.tipos.add(tipo)
+        self.assertEqual(normalize_access_code("acl teste"), "ACL_TESTE")
+        self.assertTrue(has_tipo_code(user, "acl teste"))
 
 
 class DevAdminPrivilegesTests(TestCase):
