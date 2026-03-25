@@ -1,0 +1,11 @@
+{% if mural_notes %}
+  <div class="mural-day-list" data-mural-list>
+    {% for note in mural_notes %}
+      {% include "core/apps/app_milhao_bla/_mural_day_note.html" with note=note only %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="mural-day-empty" data-mural-empty>
+    Nenhuma nota registrada para {{ selected_date|date:"d/m/Y" }}.
+  </div>
+{% endif %}

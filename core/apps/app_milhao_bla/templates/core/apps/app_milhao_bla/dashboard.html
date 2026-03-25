@@ -208,6 +208,94 @@
     </div>
   </section>
 
+  <section class="card app-accent milhao-readings milhao-section mural-day-card" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+    <details
+      class="io-discrete"
+      data-mural-details
+      data-access-url="{% url 'app_milhao_bla_mural_day_access' %}"
+      data-live-url="{% url 'app_milhao_bla_mural_day_live' %}"
+      data-mark-viewed-url="{% url 'app_milhao_bla_mural_day_mark_viewed' %}"
+      data-selected-date="{{ selected_date|date:'Y-m-d' }}"
+    >
+      <summary class="io-discrete-summary">
+        <span class="mural-day-title-wrap">
+          <span class="io-title">Mural do dia</span>
+          <span class="mural-day-unread-indicator{% if not mural_has_unread %} is-hidden{% endif %}" data-mural-unread-indicator aria-label="Ha notas novas" title="Ha notas novas"></span>
+        </span>
+      </summary>
+      <div class="io-discrete-body">
+        <div class="mural-day-list-wrap{% if mural_notes_count > 10 %} is-scrollable{% endif %}" data-mural-list-wrap>
+          {% include "core/apps/app_milhao_bla/_mural_day_notes.html" with mural_notes=mural_notes selected_date=selected_date only %}
+        </div>
+        <form
+          class="io-form mural-day-form"
+          method="post"
+          action="{% url 'app_milhao_bla_mural_day_create' %}"
+          data-mural-form
+        >
+          {% csrf_token %}
+          <input type="hidden" name="data_referencia" value="{{ selected_date|date:'Y-m-d' }}">
+            <div class="mural-day-compose">
+              <label class="field mural-day-text-field">
+                <span class="field-label">Registrar nota</span>
+                <textarea
+                  name="texto"
+                rows="3"
+                maxlength="4000"
+                placeholder="Escreva uma nota para o mural deste dia."
+                aria-label="Texto da nota do mural do dia"
+                  required
+                ></textarea>
+              </label>
+              <div class="mural-day-compose-actions">
+                <button
+                  type="submit"
+                  class="btn mural-action-btn is-public"
+                  data-mural-submit
+                  name="visibilidade"
+                  value="PUBLICA"
+                >Para todos</button>
+                <button
+                  type="submit"
+                  class="btn btn-ghost mural-action-btn is-private"
+                  data-mural-submit
+                  name="visibilidade"
+                  value="PRIVADA"
+                >So para mim</button>
+              </div>
+            </div>
+            <div class="mural-day-error is-hidden" data-mural-error role="alert"></div>
+          </form>
+      </div>
+    </details>
+  </section>
+
+  <div
+    id="milhao-mural-intro-modal"
+    class="milhao-modal is-hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="milhao-mural-intro-title"
+    data-mural-intro-modal
+  >
+    <div class="milhao-modal-backdrop" data-mural-intro-close></div>
+    <div class="milhao-modal-dialog card app-accent milhao-mural-intro-dialog" {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
+      <div class="milhao-modal-head">
+        <h3 id="milhao-mural-intro-title">Sobre o mural do dia</h3>
+        <button type="button" class="milhao-modal-close" data-mural-intro-close aria-label="Fechar">x</button>
+      </div>
+      <p class="milhao-mural-intro-copy">
+        Use o mural do dia para registrar recados operacionais, acompanhar notas da equipe e manter o contexto rapido da rotina visivel no app.
+      </p>
+      <p class="milhao-mural-intro-copy is-secondary">
+        Notas para todos ficam disponiveis no mural do dia. Notas so para voce aparecem apenas no seu ambiente.
+      </p>
+      <div class="milhao-modal-actions">
+        <button type="button" class="btn" data-mural-intro-close>Entendi</button>
+      </div>
+    </div>
+  </div>
+
   <section class="card app-accent milhao-readings milhao-section" data-rt-shimmer-host {% if theme_color %}style="--app-accent: {{ theme_color }};"{% endif %}>
     <details class="io-discrete">
       <summary class="io-discrete-summary">
@@ -285,6 +373,7 @@
     aria-modal="true"
     aria-labelledby="milhao-export-title"
     data-export-url="{% url 'app_milhao_bla_export_excel' %}"
+    data-export-access-url="{% url 'app_milhao_bla_export_excel_access' %}"
     data-max-days="{{ export_max_days }}"
   >
     <div class="milhao-modal-backdrop" data-export-modal-close></div>
@@ -589,6 +678,268 @@
     .tools-card {
       padding: 10px 12px;
     }
+    .mural-day-card .io-discrete-body {
+      display: grid;
+      gap: 12px;
+    }
+    .mural-day-title-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mural-day-unread-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #fb923c;
+      box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.14), 0 0 12px rgba(251, 146, 60, 0.36);
+      animation: muralUnreadPulse 1.6s ease-in-out infinite;
+      flex: 0 0 auto;
+    }
+    .mural-day-form {
+      margin: 0;
+      display: grid;
+      gap: 8px;
+      border-top: 1px solid rgba(148, 163, 184, 0.12);
+      padding-top: 12px;
+    }
+    .mural-day-compose {
+      display: grid;
+      gap: 10px;
+    }
+    .mural-day-text-field {
+      margin: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .mural-day-text-field textarea {
+      min-height: 92px;
+      resize: vertical;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.88);
+      color: var(--text);
+    }
+    .mural-day-text-field textarea:focus,
+    .mural-day-visibility-field select:focus {
+      outline: none;
+      border-color: rgba(255, 122, 26, 0.66);
+      box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.14);
+    }
+    .mural-day-compose-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .mural-action-btn {
+      min-height: 38px;
+      border-radius: 12px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: 0.2px;
+      white-space: normal;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, opacity 0.16s ease;
+    }
+    .mural-action-btn:hover {
+      transform: translateY(-1px);
+    }
+    .mural-action-btn.is-public {
+      background: linear-gradient(180deg, rgba(34, 197, 94, 0.28), rgba(34, 197, 94, 0.16));
+      border: 1px solid rgba(34, 197, 94, 0.32);
+      color: #dcfce7;
+      box-shadow: 0 10px 22px rgba(34, 197, 94, 0.12);
+    }
+    .mural-action-btn.is-public:hover {
+      background: linear-gradient(180deg, rgba(34, 197, 94, 0.34), rgba(34, 197, 94, 0.2));
+      box-shadow: 0 12px 24px rgba(34, 197, 94, 0.16);
+    }
+    .mural-action-btn.is-private {
+      border-color: rgba(96, 165, 250, 0.3);
+      color: #dbeafe;
+      background: rgba(30, 41, 59, 0.38);
+      box-shadow: 0 10px 22px rgba(59, 130, 246, 0.08);
+    }
+    .mural-action-btn.is-private:hover {
+      border-color: rgba(96, 165, 250, 0.42);
+      background: rgba(30, 41, 59, 0.52);
+      box-shadow: 0 12px 24px rgba(59, 130, 246, 0.12);
+    }
+    .mural-day-error {
+      border-radius: 10px;
+      border: 1px solid rgba(239, 68, 68, 0.42);
+      background: rgba(127, 29, 29, 0.28);
+      color: #fecaca;
+      font-size: 12px;
+      padding: 8px 10px;
+    }
+    .mural-day-list-wrap {
+      display: grid;
+      gap: 10px;
+    }
+    .mural-day-list-wrap.is-scrollable {
+      max-height: 620px;
+      overflow-y: auto;
+      padding-right: 4px;
+      scrollbar-gutter: stable;
+    }
+    .mural-day-list-wrap.is-scrollable::-webkit-scrollbar {
+      width: 8px;
+    }
+    .mural-day-list-wrap.is-scrollable::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.3);
+    }
+    .mural-day-list-wrap.is-refreshing {
+      animation: muralListPulse 260ms ease;
+    }
+    .mural-day-list {
+      display: grid;
+      gap: 10px;
+    }
+    .mural-day-empty {
+      border: 1px dashed rgba(148, 163, 184, 0.24);
+      border-radius: 12px;
+      padding: 12px;
+      color: rgba(226, 232, 240, 0.68);
+      background: rgba(15, 23, 42, 0.35);
+    }
+    .mural-note {
+      position: relative;
+      width: 100%;
+      max-width: 92%;
+      justify-self: start;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: linear-gradient(180deg, rgba(50, 58, 69, 0.86), rgba(39, 46, 56, 0.9));
+      padding: 12px 14px 12px 12px;
+      display: grid;
+      gap: 10px;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+    .mural-note.is-own {
+      max-width: 86%;
+      justify-self: end;
+      border-bottom-right-radius: 4px;
+      background: linear-gradient(180deg, rgba(50, 58, 69, 0.9), rgba(39, 46, 56, 0.94));
+      border-color: rgba(110, 168, 137, 0.28);
+      box-shadow: 0 10px 20px rgba(36, 74, 60, 0.1);
+    }
+    .mural-note:not(.is-own) {
+      border-bottom-left-radius: 4px;
+      border-color: rgba(148, 163, 184, 0.16);
+    }
+    .mural-note.is-entering {
+      animation: muralNoteEnter 340ms cubic-bezier(.2,.85,.28,1);
+      box-shadow: 0 12px 28px rgba(255, 122, 26, 0.14);
+    }
+    .mural-note.is-removing {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.985);
+    }
+    .mural-note-head {
+      display: flex;
+      justify-content: flex-start;
+      align-items: flex-start;
+      gap: 8px;
+      padding-right: 26px;
+    }
+    .mural-note-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .mural-note-head-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      margin-left: 0;
+    }
+    .mural-note-author {
+      font-weight: 700;
+      color: rgba(248, 250, 252, 0.96);
+    }
+    .mural-note-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.15px;
+      text-transform: uppercase;
+    }
+    .mural-note-badge.is-public {
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.18);
+      color: rgba(134, 239, 172, 0.82);
+    }
+    .mural-note-badge.is-private {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.18);
+      color: rgba(147, 197, 253, 0.82);
+    }
+    .mural-note-body {
+      color: rgba(226, 232, 240, 0.92);
+      line-height: 1.55;
+      white-space: normal;
+      word-break: break-word;
+      text-align: left;
+      justify-self: stretch;
+      width: 100%;
+    }
+    .mural-note-foot {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 8px;
+      padding-top: 2px;
+    }
+    .mural-note-date {
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.64);
+    }
+    .mural-note-date.is-right {
+      margin-left: auto;
+      text-align: right;
+    }
+    .mural-note-time {
+      margin-left: auto;
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.64);
+      text-align: right;
+    }
+    .mural-note-time.is-left {
+      margin-left: 0;
+      text-align: left;
+    }
+    .mural-note-delete-icon {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: rgba(226, 232, 240, 0.88);
+      font: inherit;
+      font-size: 18px;
+      font-weight: 500;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+    }
+    .mural-note-delete-icon:hover {
+      transform: translateY(-1px);
+      color: rgba(248, 113, 113, 0.92);
+    }
     .tools-grid {
       display: flex;
       flex-wrap: wrap;
@@ -738,6 +1089,20 @@
       justify-content: flex-end;
       gap: 8px;
     }
+    .milhao-mural-intro-dialog {
+      width: min(440px, 100%);
+      border-color: rgba(110, 168, 137, 0.24);
+    }
+    .milhao-mural-intro-copy {
+      margin: 0;
+      color: rgba(226, 232, 240, 0.88);
+      line-height: 1.6;
+    }
+    .milhao-mural-intro-copy.is-secondary {
+      margin-top: 8px;
+      color: rgba(226, 232, 240, 0.7);
+      font-size: 13px;
+    }
     @media (max-width: 700px) {
       #milhao-hud-section { display: none; }
       .milhao-mobile-title { display: block; }
@@ -768,6 +1133,47 @@
         width: 68%;
         min-height: 38px;
       }
+      .mural-day-compose-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .mural-action-btn {
+        min-height: 36px;
+        padding: 6px 10px;
+        font-size: 11px;
+        letter-spacing: 0.08px;
+      }
+      .mural-note-head {
+        flex-direction: row;
+      }
+      .mural-note-head-actions {
+        margin-left: 0;
+      }
+      .mural-note-foot {
+        justify-content: flex-start;
+      }
+      .mural-note-date {
+        display: block;
+      }
+      .mural-note-time {
+        margin-left: auto;
+        text-align: left;
+      }
+      .mural-note-time.is-left {
+        margin-left: 0;
+      }
+      .mural-note-date.is-right {
+        margin-left: auto;
+        text-align: right;
+      }
+      .mural-note {
+        max-width: 96%;
+      }
+      .mural-note.is-own {
+        max-width: 90%;
+      }
+      .mural-day-list-wrap.is-scrollable {
+        max-height: 58vh;
+      }
       .milhao-export-grid {
         grid-template-columns: 1fr;
       }
@@ -779,6 +1185,19 @@
       0% { transform: scale(1); filter: brightness(1); }
       38% { transform: scale(1.032); filter: brightness(1.18) drop-shadow(0 0 8px rgba(255, 140, 46, 0.28)); }
       100% { transform: scale(1); filter: brightness(1); }
+    }
+    @keyframes muralNoteEnter {
+      0% { opacity: 0; transform: translateY(10px) scale(0.985); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes muralListPulse {
+      0% { opacity: 0.78; }
+      100% { opacity: 1; }
+    }
+    @keyframes muralUnreadPulse {
+      0% { transform: scale(0.95); opacity: 0.72; }
+      50% { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.72; }
     }
   </style>
 {% endblock %}

@@ -22,10 +22,14 @@
   }
 
   var rtStatus = document.getElementById("milhao-rt-status");
+  var muralIntroTargetDetails = null;
   var rtIntervalMs = 15000;
+  var muralPollIntervalMs = 6000;
   var rtTimer = null;
+  var muralPollTimer = null;
   var isNavigating = false;
   var isExporting = false;
+  var isSubmittingMural = false;
   var dateInput = null;
   var availableDates = [];
   var shimmerCleanupTimers = new WeakMap();
@@ -427,6 +431,10 @@
       clearInterval(rtTimer);
     }
     rtTimer = setInterval(refreshCardsRealtime, rtIntervalMs);
+    if (muralPollTimer) {
+      clearInterval(muralPollTimer);
+    }
+    muralPollTimer = setInterval(pollMuralUpdates, muralPollIntervalMs);
   }
 
   function parseIsoDate(value) {
@@ -479,6 +487,239 @@
 
   function getExportTriggerBtn() {
     return dynamicRoot ? dynamicRoot.querySelector("[data-export-open]") : null;
+  }
+
+  function getMuralForm() {
+    return dynamicRoot ? dynamicRoot.querySelector("[data-mural-form]") : null;
+  }
+
+  function getMuralDetails() {
+    return dynamicRoot ? dynamicRoot.querySelector("[data-mural-details]") : null;
+  }
+
+  function getMuralIntroModal() {
+    return dynamicRoot ? dynamicRoot.querySelector("[data-mural-intro-modal]") : null;
+  }
+
+  function getMuralListWrap() {
+    return dynamicRoot ? dynamicRoot.querySelector("[data-mural-list-wrap]") : null;
+  }
+
+  function getMuralUnreadIndicator() {
+    return dynamicRoot ? dynamicRoot.querySelector("[data-mural-unread-indicator]") : null;
+  }
+
+  function getMuralErrorBox() {
+    return dynamicRoot ? dynamicRoot.querySelector("[data-mural-error]") : null;
+  }
+
+  function getMuralSubmitButtons() {
+    return dynamicRoot ? dynamicRoot.querySelectorAll("[data-mural-submit]") : [];
+  }
+
+  function hasSeenMuralIntro() {
+    try {
+      return window.localStorage && window.localStorage.getItem("app_milhao_bla_mural_intro_seen_v1") === "1";
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function markMuralIntroSeen() {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem("app_milhao_bla_mural_intro_seen_v1", "1");
+      }
+    } catch (error) {
+    }
+  }
+
+  function logMuralAccess(details) {
+    if (!details) {
+      return;
+    }
+    var accessUrl = details.getAttribute("data-access-url") || "";
+    if (!accessUrl) {
+      return;
+    }
+    fetch(accessUrl, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin"
+    })
+      .then(function () {
+      })
+      .catch(function () {
+      });
+  }
+
+  function logExportAccess() {
+    if (!exportModal) {
+      return;
+    }
+    var accessUrl = exportModal.getAttribute("data-export-access-url") || "";
+    if (!accessUrl) {
+      return;
+    }
+    fetch(accessUrl, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin"
+    })
+      .then(function () {
+      })
+      .catch(function () {
+      });
+  }
+
+  function openMuralIntro(details) {
+    var modal = getMuralIntroModal();
+    if (!modal || !details) {
+      return;
+    }
+    muralIntroTargetDetails = details;
+    modal.classList.remove("is-hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeMuralIntro() {
+    var modal = getMuralIntroModal();
+    if (!modal) {
+      return;
+    }
+    modal.classList.add("is-hidden");
+    muralIntroTargetDetails = null;
+    if (!exportModal || exportModal.classList.contains("is-hidden")) {
+      document.body.style.overflow = "";
+    }
+  }
+
+  function completeMuralIntro() {
+    var details = muralIntroTargetDetails || getMuralDetails();
+    if (!details) {
+      closeMuralIntro();
+      return;
+    }
+    markMuralIntroSeen();
+    closeMuralIntro();
+    details.open = true;
+  }
+
+  function setMuralError(message) {
+    var errorBox = getMuralErrorBox();
+    if (!errorBox) {
+      return;
+    }
+    if (!message) {
+      errorBox.textContent = "";
+      errorBox.classList.add("is-hidden");
+      return;
+    }
+    errorBox.textContent = message;
+    errorBox.classList.remove("is-hidden");
+  }
+
+  function setMuralLoading(isLoading) {
+    isSubmittingMural = !!isLoading;
+    Array.prototype.forEach.call(getMuralSubmitButtons(), function (button) {
+      if (!button) {
+        return;
+      }
+      var defaultLabel = button.getAttribute("data-default-label") || button.textContent;
+      if (!button.getAttribute("data-default-label")) {
+        button.setAttribute("data-default-label", defaultLabel);
+      }
+      button.disabled = isSubmittingMural;
+      button.textContent = isSubmittingMural && button.classList.contains("is-active-submit")
+        ? "Enviando..."
+        : defaultLabel;
+      if (!isSubmittingMural) {
+        button.classList.remove("is-active-submit");
+      }
+    });
+  }
+
+  function updateMuralCount(count) {
+    var nextCount = parseInt(count, 10);
+    if (!isFinite(nextCount) || nextCount < 0) {
+      nextCount = 0;
+    }
+    dynamicRoot.querySelectorAll("[data-mural-count-text]").forEach(function (node) {
+      node.textContent = String(nextCount);
+    });
+  }
+
+  function setMuralUnread(hasUnread) {
+    var indicator = getMuralUnreadIndicator();
+    if (!indicator) {
+      return;
+    }
+    indicator.classList.toggle("is-hidden", !hasUnread);
+  }
+
+  function parseHtmlFragment(html) {
+    var template = document.createElement("template");
+    template.innerHTML = html || "";
+    return template.content;
+  }
+
+  function syncMuralListScrollState() {
+    var listWrap = getMuralListWrap();
+    if (!listWrap) {
+      return 0;
+    }
+    var notesCount = listWrap.querySelectorAll("[data-mural-note-id]").length;
+    listWrap.classList.toggle("is-scrollable", notesCount > 10);
+    return notesCount;
+  }
+
+  function replaceMuralList(html, highlightNoteId) {
+    var listWrap = getMuralListWrap();
+    if (!listWrap) {
+      return;
+    }
+    listWrap.innerHTML = "";
+    listWrap.appendChild(parseHtmlFragment(html));
+    syncMuralListScrollState();
+    listWrap.classList.remove("is-refreshing");
+    void listWrap.offsetWidth;
+    listWrap.classList.add("is-refreshing");
+    setTimeout(function () {
+      listWrap.classList.remove("is-refreshing");
+    }, 260);
+    if (!highlightNoteId) {
+      return;
+    }
+    var noteNode = listWrap.querySelector('[data-mural-note-id="' + highlightNoteId + '"]');
+    if (!noteNode) {
+      return;
+    }
+    noteNode.classList.add("is-entering");
+    if (typeof noteNode.scrollIntoView === "function") {
+      noteNode.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    setTimeout(function () {
+      noteNode.classList.remove("is-entering");
+    }, 420);
+  }
+
+  function getLatestMuralNoteId() {
+    var listWrap = getMuralListWrap();
+    if (!listWrap) {
+      return "";
+    }
+    var notes = listWrap.querySelectorAll("[data-mural-note-id]");
+    if (!notes.length) {
+      return "";
+    }
+    var lastNote = notes[notes.length - 1];
+    return lastNote.getAttribute("data-mural-note-id") || "";
   }
 
   function setExportError(message) {
@@ -689,6 +930,208 @@
       });
   }
 
+  function submitMuralForm(targetForm, submitter) {
+    if (!targetForm || isSubmittingMural) {
+      return;
+    }
+    if (!submitter) {
+      submitter = targetForm.querySelector('[data-mural-submit][name="visibilidade"]');
+    }
+    if (!submitter) {
+      setMuralError("Escolha o tipo de nota.");
+      return;
+    }
+
+    var formData = new FormData(targetForm);
+    var rawText = formData.get("texto");
+    var text = typeof rawText === "string" ? rawText.trim() : "";
+    if (!text) {
+      setMuralError("Informe o texto da nota.");
+      return;
+    }
+    formData.set("texto", text);
+    formData.set("visibilidade", submitter.value || "PUBLICA");
+    setMuralError("");
+    submitter.classList.add("is-active-submit");
+    setMuralLoading(true);
+
+    fetch(targetForm.action, {
+      method: "POST",
+      body: formData,
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin"
+    })
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || !payload.ok) {
+            throw new Error((payload && payload.error) || "Falha ao registrar nota.");
+          }
+          return payload;
+        });
+      })
+      .then(function (payload) {
+        replaceMuralList(payload.list_html, payload.note_id);
+        updateMuralCount(payload.notes_count);
+        setMuralUnread(!!payload.has_unread);
+        targetForm.reset();
+        var textField = targetForm.querySelector('textarea[name="texto"]');
+        if (textField) {
+          textField.focus({ preventScroll: true });
+        }
+      })
+      .catch(function (error) {
+        setMuralError((error && error.message) || "Falha ao registrar nota.");
+      })
+      .finally(function () {
+        setMuralLoading(false);
+      });
+  }
+
+  function deleteMuralNote(button) {
+    if (!button || isSubmittingMural) {
+      return;
+    }
+    var deleteUrl = button.getAttribute("data-delete-url") || "";
+    if (!deleteUrl) {
+      return;
+    }
+    if (!window.confirm("Excluir esta nota do mural?")) {
+      return;
+    }
+
+    var noteNode = button.closest("[data-mural-note-id]");
+    if (noteNode) {
+      noteNode.classList.add("is-removing");
+    }
+    setMuralError("");
+    setMuralLoading(true);
+
+    fetch(deleteUrl, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin"
+    })
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || !payload.ok) {
+            throw new Error((payload && payload.error) || "Falha ao excluir nota.");
+          }
+          return payload;
+        });
+      })
+      .then(function (payload) {
+        replaceMuralList(payload.list_html);
+        updateMuralCount(payload.notes_count);
+        setMuralUnread(!!payload.has_unread);
+      })
+      .catch(function (error) {
+        if (noteNode) {
+          noteNode.classList.remove("is-removing");
+        }
+        setMuralError((error && error.message) || "Falha ao excluir nota.");
+      })
+      .finally(function () {
+        setMuralLoading(false);
+      });
+  }
+
+  function markMuralDayViewed() {
+    var details = getMuralDetails();
+    if (!details || !details.open) {
+      return;
+    }
+    var indicator = getMuralUnreadIndicator();
+    if (!indicator || indicator.classList.contains("is-hidden")) {
+      return;
+    }
+    var markViewedUrl = details.getAttribute("data-mark-viewed-url") || "";
+    var selectedDate = details.getAttribute("data-selected-date") || "";
+    if (!markViewedUrl || !selectedDate) {
+      return;
+    }
+
+    var formData = new FormData();
+    formData.set("data_referencia", selectedDate);
+    fetch(markViewedUrl, {
+      method: "POST",
+      body: formData,
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin"
+    })
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || !payload.ok) {
+            throw new Error("Falha ao marcar mural como visualizado.");
+          }
+          return payload;
+        });
+      })
+      .then(function () {
+        setMuralUnread(false);
+      })
+      .catch(function () {
+      });
+  }
+
+  function pollMuralUpdates() {
+    if (document.visibilityState === "hidden" || isNavigating || isSubmittingMural) {
+      return;
+    }
+    var details = getMuralDetails();
+    if (!details) {
+      return;
+    }
+    var liveUrl = details.getAttribute("data-live-url") || "";
+    var selectedDate = details.getAttribute("data-selected-date") || "";
+    if (!liveUrl || !selectedDate) {
+      return;
+    }
+
+    var nextUrl = new URL(liveUrl, window.location.origin);
+    nextUrl.searchParams.set("date", selectedDate);
+    var latestNoteId = getLatestMuralNoteId();
+    if (latestNoteId) {
+      nextUrl.searchParams.set("latest_note_id", latestNoteId);
+    }
+
+    fetch(nextUrl.toString(), {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin"
+    })
+      .then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || !payload.ok) {
+            throw new Error("Falha ao consultar mural.");
+          }
+          return payload;
+        });
+      })
+      .then(function (payload) {
+        if (payload.has_changed && payload.list_html) {
+          replaceMuralList(payload.list_html, payload.latest_note_id);
+          if (typeof payload.notes_count !== "undefined") {
+            updateMuralCount(payload.notes_count);
+          }
+          if (details.open) {
+            markMuralDayViewed();
+            return;
+          }
+        }
+        setMuralUnread(!!payload.has_unread);
+      })
+      .catch(function () {
+      });
+  }
+
   function bindExportHandlers() {
     if (!exportModal || exportModal.getAttribute("data-js-bound") === "1") {
       return;
@@ -700,6 +1143,7 @@
       if (openBtn) {
         event.preventDefault();
         if (!isExporting) {
+          logExportAccess();
           openExportModal();
         }
         return;
@@ -726,6 +1170,11 @@
       if (event.key !== "Escape") {
         return;
       }
+      var introModal = getMuralIntroModal();
+      if (introModal && !introModal.classList.contains("is-hidden")) {
+        completeMuralIntro();
+        return;
+      }
       if (exportModal && !exportModal.classList.contains("is-hidden")) {
         closeExportModal();
       }
@@ -741,6 +1190,7 @@
       return;
     }
     dynamicRoot.setAttribute("data-js-bound", "1");
+    syncMuralListScrollState();
 
     dynamicRoot.addEventListener("click", function (event) {
       var directDateInput = event.target.closest("#milhao-date-input");
@@ -759,6 +1209,30 @@
       if (dateField && dateInput) {
         event.preventDefault();
         openDatePicker(dateInput);
+        return;
+      }
+
+      var introClose = event.target.closest("[data-mural-intro-close]");
+      if (introClose) {
+        event.preventDefault();
+        completeMuralIntro();
+        return;
+      }
+
+      var muralSummary = event.target.closest("summary.io-discrete-summary");
+      if (muralSummary) {
+        var summaryDetails = muralSummary.parentElement;
+        if (summaryDetails && summaryDetails.matches("[data-mural-details]") && !hasSeenMuralIntro()) {
+          event.preventDefault();
+          openMuralIntro(summaryDetails);
+          return;
+        }
+      }
+
+      var deleteBtn = event.target.closest("[data-mural-delete]");
+      if (deleteBtn) {
+        event.preventDefault();
+        deleteMuralNote(deleteBtn);
       }
     });
 
@@ -778,12 +1252,36 @@
 
     dynamicRoot.addEventListener("submit", function (event) {
       var targetForm = event.target;
-      if (!targetForm || !targetForm.matches(".milhao-date-nav-form")) {
+      if (!targetForm) {
         return;
       }
-      event.preventDefault();
-      navigatePartial(buildFormUrl(targetForm), true);
+      if (targetForm.matches(".milhao-date-nav-form")) {
+        event.preventDefault();
+        navigatePartial(buildFormUrl(targetForm), true);
+        return;
+      }
+      if (targetForm.matches("[data-mural-form]")) {
+        event.preventDefault();
+        submitMuralForm(targetForm, event.submitter || null);
+        return;
+      }
     });
+
+    dynamicRoot.addEventListener("toggle", function (event) {
+      var details = event.target;
+      if (!details || !details.matches("[data-mural-details]")) {
+        return;
+      }
+      if (details.open) {
+        if (!hasSeenMuralIntro()) {
+          details.open = false;
+          openMuralIntro(details);
+          return;
+        }
+        logMuralAccess(details);
+        markMuralDayViewed();
+      }
+    }, true);
   }
 
   window.addEventListener("popstate", function () {

@@ -159,6 +159,62 @@ class AppRotaConfig(models.Model):
         return f"{self.app.slug} - {self.prefixo}"
 
 
+class AppMilhaoBlaMuralDia(models.Model):
+    class Visibilidade(models.TextChoices):
+        PUBLICA = "PUBLICA", "Publica"
+        PRIVADA = "PRIVADA", "Privada"
+
+    data_referencia = models.DateField(default=timezone.localdate, db_index=True)
+    texto = models.TextField()
+    visibilidade = models.CharField(
+        max_length=12,
+        choices=Visibilidade.choices,
+        default=Visibilidade.PUBLICA,
+    )
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="app_milhao_bla_mural_notas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-criado_em", "-id"]
+        indexes = [
+            models.Index(fields=["data_referencia", "criado_em"]),
+            models.Index(fields=["autor", "data_referencia"]),
+        ]
+
+    def __str__(self):
+        return f"{self.data_referencia.isoformat()} - {self.autor_id}"
+
+
+class AppMilhaoBlaMuralDiaLeitura(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="app_milhao_bla_mural_leituras",
+    )
+    data_referencia = models.DateField(db_index=True)
+    visualizado_em = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-visualizado_em", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "data_referencia"],
+                name="unique_app_milhao_bla_mural_leitura_usuario_data",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["usuario", "data_referencia"]),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario_id} - {self.data_referencia.isoformat()}"
+
+
 class CategoriaCompra(models.Model):
     nome = models.CharField(max_length=80, unique=True)
 

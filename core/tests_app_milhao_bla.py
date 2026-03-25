@@ -1,12 +1,15 @@
+from datetime import date, datetime
 from io import BytesIO
 
 from django.contrib.auth.models import User
+from django.db.models import Q
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from core.models import App, IngestRecord, PerfilUsuario
+from core.apps.app_milhao_bla.views import EXPORT_ACCESS_AUDIT_MODULE, MURAL_ACCESS_AUDIT_MODULE
+from core.models import AdminAccessLog, App, AppMilhaoBlaMuralDia, AppMilhaoBlaMuralDiaLeitura, IngestRecord, PerfilUsuario, TipoPerfil
 
 
 class AppMilhaoBlaIngestConfigTests(TestCase):
@@ -27,6 +30,14 @@ class AppMilhaoBlaIngestConfigTests(TestCase):
             ativo=True,
         )
         self.perfil.apps.add(self.app)
+        self.other_user = User.objects.create_user(username="bla_peer", password="123456", email="peer@example.com")
+        self.other_perfil = PerfilUsuario.objects.create(
+            nome="Peer User",
+            email="peer@example.com",
+            usuario=self.other_user,
+            ativo=True,
+        )
+        self.other_perfil.apps.add(self.app)
 
     def test_dashboard_uses_ingest_config_from_app(self):
         now_iso = timezone.now().isoformat()
@@ -79,6 +90,254 @@ class AppMilhaoBlaIngestConfigTests(TestCase):
         total_card = next(item for item in payload["totals_by_balance"] if item["balance"] == "TOTAL")
         self.assertEqual(total_card["total_display"], "5")
         self.assertGreaterEqual(len(payload["composition"]), 1)
+
+    def test_dashboard_mural_exibe_publicas_e_privadas_do_autor_no_dia(self):
+        public_note = AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 5),
+            texto="Nota publica do dia",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
+            autor=self.other_user,
+        )
+        own_private_note = AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 5),
+            texto="Nota privada do autor logado",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PRIVADA,
+            autor=self.user,
+        )
+        AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 5),
+            texto="Nota privada de outro usuario",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PRIVADA,
+            autor=self.other_user,
+        )
+        AppMilhaoBlaMuralDia.objects.filter(pk=public_note.pk).update(
+            criado_em=timezone.make_aware(datetime(2026, 3, 5, 8, 0))
+        )
+        AppMilhaoBlaMuralDia.objects.filter(pk=own_private_note.pk).update(
+            criado_em=timezone.make_aware(datetime(2026, 3, 5, 9, 0))
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("app_milhao_bla_dashboard"), {"date": "2026-03-05"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_date"].isoformat(), "2026-03-05")
+        self.assertIn(date(2026, 3, 5), response.context["dates"])
+        self.assertEqual(response.context["mural_notes_count"], 2)
+        self.assertTrue(response.context["mural_has_unread"])
+        notes_texts = [item["text"] for item in response.context["mural_notes"]]
+        self.assertEqual(notes_texts, ["Nota publica do dia", "Nota privada do autor logado"])
+        self.assertIn("Nota publica do dia", notes_texts)
+        self.assertIn("Nota privada do autor logado", notes_texts)
+        self.assertNotIn("Nota privada de outro usuario", notes_texts)
+
+    def test_dashboard_mural_sem_nota_nova_apos_visualizacao_do_dia(self):
+        note = AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 5),
+            texto="Nota ja visualizada",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
+            autor=self.other_user,
+        )
+        AppMilhaoBlaMuralDiaLeitura.objects.create(
+            usuario=self.user,
+            data_referencia=date(2026, 3, 5),
+            visualizado_em=note.criado_em,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("app_milhao_bla_dashboard"), {"date": "2026-03-05"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["mural_has_unread"])
+
+    def test_mural_create_endpoint_persiste_nota_e_retorna_html_atualizado(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_milhao_bla_mural_day_create"),
+            {
+                "data_referencia": "2026-03-06",
+                "texto": "Primeira nota do mural",
+                "visibilidade": AppMilhaoBlaMuralDia.Visibilidade.PRIVADA,
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["notes_count"], 1)
+        self.assertFalse(payload["has_unread"])
+        note = AppMilhaoBlaMuralDia.objects.get(pk=payload["note_id"])
+        self.assertEqual(note.data_referencia.isoformat(), "2026-03-06")
+        self.assertEqual(note.texto, "Primeira nota do mural")
+        self.assertEqual(note.visibilidade, AppMilhaoBlaMuralDia.Visibilidade.PRIVADA)
+        self.assertEqual(note.autor, self.user)
+        self.assertIn("Primeira nota do mural", payload["list_html"])
+        self.assertIn("so eu", payload["list_html"])
+        self.assertTrue(
+            AppMilhaoBlaMuralDiaLeitura.objects.filter(
+                usuario=self.user,
+                data_referencia=date(2026, 3, 6),
+            ).exists()
+        )
+
+    def test_mural_mark_viewed_endpoint_registra_visualizacao(self):
+        AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 8),
+            texto="Nota nova para leitura",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
+            autor=self.other_user,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_milhao_bla_mural_day_mark_viewed"),
+            {"data_referencia": "2026-03-08"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["has_unread"])
+        self.assertTrue(
+            AppMilhaoBlaMuralDiaLeitura.objects.filter(
+                usuario=self.user,
+                data_referencia=date(2026, 3, 8),
+            ).exists()
+        )
+
+    def test_mural_live_endpoint_retorna_html_quando_existe_nota_nova(self):
+        note = AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 9),
+            texto="Nova nota de outro usuario",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
+            autor=self.other_user,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("app_milhao_bla_mural_day_live"),
+            {"date": "2026-03-09", "latest_note_id": ""},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["has_changed"])
+        self.assertTrue(payload["has_unread"])
+        self.assertEqual(payload["latest_note_id"], note.id)
+        self.assertIn("Nova nota de outro usuario", payload["list_html"])
+
+    def test_mural_live_endpoint_nao_retorna_html_sem_mudanca(self):
+        note = AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 10),
+            texto="Nota estavel",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
+            autor=self.other_user,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("app_milhao_bla_mural_day_live"),
+            {"date": "2026-03-10", "latest_note_id": str(note.id)},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["has_changed"])
+        self.assertNotIn("list_html", payload)
+
+    def test_autor_pode_excluir_nota_do_mural(self):
+        note = AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 7),
+            texto="Nota que sera removida",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
+            autor=self.user,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_milhao_bla_mural_day_delete", args=[note.id]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["notes_count"], 0)
+        self.assertFalse(AppMilhaoBlaMuralDia.objects.filter(pk=note.id).exists())
+        self.assertIn("Nenhuma nota registrada", payload["list_html"])
+
+    def test_outro_usuario_nao_pode_excluir_nota_do_mural(self):
+        note = AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 7),
+            texto="Nota protegida",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
+            autor=self.user,
+        )
+
+        self.client.force_login(self.other_user)
+        response = self.client.post(
+            reverse("app_milhao_bla_mural_day_delete", args=[note.id]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(AppMilhaoBlaMuralDia.objects.filter(pk=note.id).exists())
+
+    def test_usuario_dev_enxerga_notas_privadas_de_outros(self):
+        tipo_dev = TipoPerfil.objects.filter(Q(nome__iexact="DEV") | Q(codigo__iexact="DEV")).first()
+        if not tipo_dev:
+            tipo_dev = TipoPerfil.objects.create(nome="DEV", codigo="DEV")
+        self.perfil.tipos.add(tipo_dev)
+        AppMilhaoBlaMuralDia.objects.create(
+            data_referencia=date(2026, 3, 11),
+            texto="Privada de outro usuario",
+            visibilidade=AppMilhaoBlaMuralDia.Visibilidade.PRIVADA,
+            autor=self.other_user,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("app_milhao_bla_dashboard"), {"date": "2026-03-11"})
+
+        self.assertEqual(response.status_code, 200)
+        notes_texts = [item["text"] for item in response.context["mural_notes"]]
+        self.assertIn("Privada de outro usuario", notes_texts)
+
+    def test_mural_access_endpoint_registra_auditoria_a_cada_abertura(self):
+        self.client.force_login(self.user)
+
+        first_response = self.client.post(
+            reverse("app_milhao_bla_mural_day_access"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        second_response = self.client.post(
+            reverse("app_milhao_bla_mural_day_access"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(
+            AdminAccessLog.objects.filter(user=self.user, module=MURAL_ACCESS_AUDIT_MODULE).count(),
+            2,
+        )
+
+    def test_export_access_endpoint_registra_auditoria(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("app_milhao_bla_export_excel_access"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            AdminAccessLog.objects.filter(user=self.user, module=EXPORT_ACCESS_AUDIT_MODULE).exists()
+        )
 
     def test_export_excel_endpoint_returns_workbook_with_expected_structure(self):
         IngestRecord.objects.create(

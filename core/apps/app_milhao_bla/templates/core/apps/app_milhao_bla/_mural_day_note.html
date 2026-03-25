@@ -1,0 +1,35 @@
+<article class="mural-note{% if note.is_own %} is-own{% endif %}" data-mural-note-id="{{ note.id }}">
+  <div class="mural-note-head">
+    <div class="mural-note-meta">
+      <span class="mural-note-author">{{ note.author_label }}</span>
+    </div>
+    <div class="mural-note-head-actions">
+      {% if note.is_own %}
+        <span class="mural-note-badge {% if note.visibility == 'PUBLICA' %}is-public{% else %}is-private{% endif %}">
+          {{ note.visibility_badge_label }}
+        </span>
+      {% endif %}
+      {% if note.can_delete %}
+        <button
+          type="button"
+          class="mural-note-delete-icon"
+          data-mural-delete
+          data-delete-url="{{ note.delete_url }}"
+          data-note-id="{{ note.id }}"
+          aria-label="Excluir nota"
+          title="Excluir nota"
+        >x</button>
+      {% endif %}
+    </div>
+  </div>
+  <div class="mural-note-body">{{ note.text|linebreaksbr }}</div>
+  <div class="mural-note-foot">
+    {% if note.is_own %}
+      <span class="mural-note-date">{{ note.created_at_date_label }}</span>
+      <span class="mural-note-time">{{ note.time_label }}</span>
+    {% else %}
+      <span class="mural-note-time is-left">{{ note.time_label }}</span>
+      <span class="mural-note-date is-right">{{ note.created_at_date_label }}</span>
+    {% endif %}
+  </div>
+</article>
