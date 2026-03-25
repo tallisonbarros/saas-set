@@ -78,18 +78,8 @@ class ModuloAcesso(models.Model):
 
     codigo = models.CharField(max_length=60, unique=True)
     nome = models.CharField(max_length=120)
-    oid = models.CharField(max_length=120, blank=True, default="")
     tipo = models.CharField(max_length=12, choices=Tipo.choices, default=Tipo.CORE)
-    rota_base = models.CharField(max_length=160, blank=True, default="")
     ativo = models.BooleanField(default=True)
-    sistema = models.BooleanField(default=False)
-    app = models.ForeignKey(
-        "App",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="modulos_acesso",
-    )
     tipos = models.ManyToManyField("TipoPerfil", blank=True, related_name="modulos_acesso")
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)

@@ -83,7 +83,7 @@
               <div class="admin-title-row">
                 <div class="admin-title-stack">
                   <h2 class="admin-section-title" style="margin: 0;">{{ module.nome }}</h2>
-                  <p class="admin-section-note">{{ module.codigo }} | rota {{ module.rota_base }}</p>
+                  <p class="admin-section-note">{{ module.codigo }}</p>
                 </div>
                 <div class="admin-pill-stack">
                   {% if module.ativo %}
@@ -95,19 +95,12 @@
                 </div>
               </div>
 
-              <div class="admin-form-grid">
+              <div class="admin-form-grid two-col">
                 <label class="field">
                   <span>Codigo</span>
                   <input type="text" value="{{ module.codigo }}" disabled>
                 </label>
-                <label class="field">
-                  <span>OID opcional</span>
-                  <input type="text" name="oid" value="{{ module.oid }}" placeholder="Se quiser manter referencia administrativa">
-                </label>
-                <label class="field">
-                  <span>Rota base</span>
-                  <input type="text" value="{{ module.rota_base }}" disabled>
-                </label>
+                <div class="admin-section-note" style="align-self: end;">Codigo fixo do catalogo. A autorizacao usa os tipos liberados abaixo.</div>
               </div>
 
               <div class="admin-section-block">
@@ -167,13 +160,17 @@
             <div class="admin-title-row">
               <div class="admin-title-stack">
                 <strong>{{ module.nome }}</strong>
-                <span class="muted">{{ module.codigo }} | slug {% if module.app %}{{ module.app.slug }}{% else %}-{% endif %}</span>
+                <span class="muted">{{ module.codigo }}</span>
               </div>
               <span class="admin-token is-warn">APP ID em `perfil.apps`</span>
             </div>
             <div class="admin-token-row">
-              <span class="admin-token is-neutral">Rota {{ module.rota_base|default:"-" }}</span>
-              <span class="admin-token is-neutral">OID {{ module.oid|default:"-" }}</span>
+              {% if module.ativo %}
+                <span class="admin-token is-success">Catalogado</span>
+              {% else %}
+                <span class="admin-token is-neutral">Inativo</span>
+              {% endif %}
+              <span class="admin-token is-neutral">Referencia ACL para app dedicado</span>
             </div>
           </article>
         {% empty %}

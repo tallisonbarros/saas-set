@@ -39,14 +39,14 @@ class AccessControlFoundationTests(TestCase):
     def test_access_modules_are_seeded_with_expected_base_data(self):
         modulo = ModuloAcesso.objects.get(codigo="APP_MILHAO_BLA")
         self.assertEqual(modulo.tipo, ModuloAcesso.Tipo.APP)
-        self.assertEqual(modulo.rota_base, "apps/appmilhaobla")
+        self.assertTrue(modulo.ativo)
 
     def test_tipo_perfil_generates_code_from_name_when_missing(self):
         tipo = TipoPerfil.objects.create(nome="Radar Operacional")
         self.assertEqual(tipo.codigo, "RADAR_OPERACIONAL")
 
     def test_modulo_acesso_normalizes_code_on_save(self):
-        modulo = ModuloAcesso.objects.create(codigo="", nome="Modulo Piloto", oid="1.2.3")
+        modulo = ModuloAcesso.objects.create(codigo="", nome="Modulo Piloto")
         self.assertEqual(modulo.codigo, "MODULO_PILOTO")
 
     def test_tipo_code_helper_uses_stable_codes(self):
@@ -97,14 +97,12 @@ class AccessControlAdminAndVisibilityTests(TestCase):
             {
                 "action": "update_module",
                 "module_id": modulo.id,
-                "oid": "1.3.6.1.4.1.9",
                 "tipos": [self.tipo_financeiro.id],
                 "ativo": "on",
             },
         )
         self.assertEqual(response.status_code, 302)
         modulo.refresh_from_db()
-        self.assertEqual(modulo.oid, "1.3.6.1.4.1.9")
         self.assertSetEqual(set(modulo.tipos.values_list("codigo", flat=True)), {"FINANCEIRO"})
 
     def test_internal_module_route_is_blocked_without_matching_type(self):

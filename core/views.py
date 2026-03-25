@@ -7909,20 +7909,18 @@ def modulos_acesso_gerenciar(request):
         action = request.POST.get("action")
         if action == "update_module":
             module = get_object_or_404(ModuloAcesso, pk=request.POST.get("module_id"))
-            oid = request.POST.get("oid", "").strip()
             tipo_ids = request.POST.getlist("tipos")
             ativo = request.POST.get("ativo") == "on"
-            module.oid = oid
             module.ativo = ativo
             if module.tipo == ModuloAcesso.Tipo.CORE:
                 tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
-                module.save(update_fields=["oid", "ativo"])
+                module.save(update_fields=["ativo"])
                 module.tipos.set(tipos)
             else:
-                module.save(update_fields=["oid", "ativo"])
+                module.save(update_fields=["ativo"])
             return redirect("modulos_acesso_gerenciar")
 
-    modules = ModuloAcesso.objects.select_related("app").prefetch_related("tipos").order_by("nome")
+    modules = ModuloAcesso.objects.prefetch_related("tipos").order_by("nome")
     core_modules = [module for module in modules if module.tipo == ModuloAcesso.Tipo.CORE]
     app_modules = [module for module in modules if module.tipo == ModuloAcesso.Tipo.APP]
     return render(
