@@ -22,10 +22,10 @@
         <div>
           <div class="page-kicker">Seguranca de acesso</div>
           <h1 class="page-title">Modulos de acesso</h1>
-          <p class="page-subtitle">Configuracao dos modulos internos por tipo de usuario e monitoramento do modo sombra.</p>
+          <p class="page-subtitle">Configuracao dos modulos internos por tipo de usuario. Apps dedicados continuam por APP ID.</p>
         </div>
       </div>
-      <div class="hud-meta">Nenhuma permissao nova e aplicada nesta etapa. O monitoramento apenas registra divergencias.</div>
+      <div class="hud-meta">Modulos internos entram por tipo. Apps dedicados entram por APP ID em perfil.apps.</div>
     </div>
 
     {% if message %}
@@ -49,47 +49,6 @@
             <div class="muted">Continuam controlados por APP ID em `perfil.apps`.</div>
             <div class="muted">A listagem abaixo e apenas referencia operacional nesta etapa.</div>
           </div>
-          <div class="card compact-card">
-            <strong>Modos de autorizacao</strong>
-            <div class="muted">Legado: usa a entrada atual.</div>
-            <div class="muted">Hibrido: compara a regra atual com a nova, sem bloquear nesta etapa.</div>
-            <div class="muted">Restrito: sera usado na proxima etapa para exigir tipo no modulo.</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Monitoramento sombra</h2>
-        <p class="muted" style="margin-top: 0;">Mostra apenas divergencias entre a regra legada e a ACL nova.</p>
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Data/Hora</th>
-                <th>Usuario</th>
-                <th>Modulo</th>
-                <th>Legado</th>
-                <th>Nova ACL</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for log in recent_shadow_logs %}
-                <tr>
-                  <td>{{ log.created_at|date:"d/m/Y H:i" }}</td>
-                  <td>{{ log.user.username|default:"-" }}</td>
-                  <td>{{ log.modulo.nome }}</td>
-                  <td>{% if log.legacy_allowed %}Permitido{% else %}Negado{% endif %}</td>
-                  <td>{% if log.candidate_allowed %}Permitido{% else %}Negado{% endif %}</td>
-                  <td>{{ log.response_status }}</td>
-                </tr>
-              {% empty %}
-                <tr>
-                  <td colspan="6" class="muted">Nenhuma divergencia registrada ainda.</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -110,7 +69,7 @@
             <div class="page-hud-head" style="gap: 12px;">
               <div>
                 <h2 style="margin: 0;">{{ module.nome }}</h2>
-                <div class="muted">{{ module.codigo }} | {{ module.get_auth_mode_display }} | rota {{ module.rota_base }}</div>
+                <div class="muted">{{ module.codigo }} | rota {{ module.rota_base }}</div>
               </div>
             </div>
             <div class="user-page-grid">
@@ -126,14 +85,6 @@
                 <span>Rota base</span>
                 <input type="text" value="{{ module.rota_base }}" disabled>
               </label>
-              <label class="field">
-                <span>Modo de autorizacao</span>
-                <select name="auth_mode">
-                  {% for value, label in auth_modes %}
-                    <option value="{{ value }}" {% if module.auth_mode == value %}selected{% endif %}>{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
             </div>
             <label>Tipos liberados</label>
             <div class="checkbox-grid">
@@ -148,10 +99,6 @@
             <div class="muted">Os IDs do modulo continuam sendo usados apenas dentro do conteudo, para compartilhamento e escopo entre usuarios.</div>
             <div class="checkbox-grid">
               <label class="checkbox-item">
-                <input type="checkbox" name="somente_dev" {% if module.somente_dev %}checked{% endif %}>
-                Somente Dev
-              </label>
-              <label class="checkbox-item">
                 <input type="checkbox" name="ativo" {% if module.ativo %}checked{% endif %}>
                 Modulo ativo
               </label>
@@ -159,12 +106,6 @@
             <div class="page-actions">
               <button class="btn btn-primary" type="submit">Salvar modulo</button>
             </div>
-          </form>
-          <form method="post" class="stack" style="margin-top: 12px;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="clear_shadow_logs">
-            <input type="hidden" name="module_id" value="{{ module.id }}">
-            <button class="btn btn-ghost" type="submit">Limpar divergencias deste modulo</button>
           </form>
         </div>
       {% empty %}

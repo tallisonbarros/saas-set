@@ -11,7 +11,7 @@ from django.utils import timezone
 from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_visual_flags
 from core.access_control import has_tipo_code, normalize_access_code
 from core.models import (
-    AccessControlShadowLog,
+    App,
     PerfilUsuario,
     IngestRecord,
     ModuloAcesso,
@@ -60,10 +60,11 @@ class AccessControlFoundationTests(TestCase):
         self.assertTrue(has_tipo_code(user, "acl teste"))
 
 
-class AccessControlAdminAndShadowTests(TestCase):
+class AccessControlAdminAndVisibilityTests(TestCase):
     def setUp(self):
         self.client_http = Client()
         self.tipo_dev = TipoPerfil.objects.get(codigo="DEV")
+        self.tipo_financeiro = TipoPerfil.objects.get(codigo="FINANCEIRO")
         self.dev_user = User.objects.create_user(username="shadow-dev@set.local", email="shadow-dev@set.local", password="123456")
         self.dev_perfil = PerfilUsuario.objects.create(
             nome="Shadow Dev",
@@ -88,6 +89,7 @@ class AccessControlAdminAndShadowTests(TestCase):
         self.assertNotContains(response, "App vinculado")
         self.assertContains(response, "APP ID em `perfil.apps`", html=False)
         self.assertContains(response, "Os IDs atuais continuam apenas como escopo e compartilhamento interno entre usuarios.", html=False)
+        self.assertNotContains(response, "Modos de autorizacao")
 
     def test_dev_can_update_module_access_management(self):
         modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
@@ -98,39 +100,60 @@ class AccessControlAdminAndShadowTests(TestCase):
                 "action": "update_module",
                 "module_id": modulo.id,
                 "oid": "1.3.6.1.4.1.9",
-                "auth_mode": ModuloAcesso.AuthMode.HYBRID,
-                "tipos": [self.tipo_dev.id],
-                "somente_dev": "on",
-                "mantem_escopo_ids": "on",
+                "tipos": [self.tipo_financeiro.id],
                 "ativo": "on",
             },
         )
         self.assertEqual(response.status_code, 302)
         modulo.refresh_from_db()
         self.assertEqual(modulo.oid, "1.3.6.1.4.1.9")
-        self.assertEqual(modulo.auth_mode, ModuloAcesso.AuthMode.HYBRID)
-        self.assertTrue(modulo.somente_dev)
         self.assertTrue(modulo.mantem_escopo_ids)
+        self.assertEqual(modulo.auth_mode, ModuloAcesso.AuthMode.STRICT)
+        self.assertFalse(modulo.somente_dev)
+        self.assertSetEqual(set(modulo.tipos.values_list("codigo", flat=True)), {"FINANCEIRO"})
 
-    def test_shadow_mode_logs_divergence_without_blocking_legacy_access(self):
+    def test_internal_module_route_is_blocked_without_matching_type(self):
         modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
-        modulo.auth_mode = ModuloAcesso.AuthMode.HYBRID
         modulo.tipos.clear()
         modulo.save(update_fields=["auth_mode"])
 
         self.client_http.force_login(self.user)
         response = self.client_http.get("/financeiro/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_internal_module_card_stays_hidden_without_matching_type(self):
+        modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
+        modulo.tipos.set([self.tipo_financeiro])
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/painel/")
         self.assertEqual(response.status_code, 200)
-        log = AccessControlShadowLog.objects.get(modulo=modulo, user=self.user)
-        self.assertTrue(log.legacy_allowed)
-        self.assertFalse(log.candidate_allowed)
-        self.assertEqual(log.response_status, 200)
+        self.assertNotContains(response, 'href="/financeiro/"')
+
+    def test_internal_module_card_and_route_are_enabled_by_tipo(self):
+        modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
+        modulo.tipos.set([self.tipo_financeiro])
+        self.perfil.tipos.add(self.tipo_financeiro)
+        self.client_http.force_login(self.user)
+        painel_response = self.client_http.get("/painel/")
+        self.assertEqual(painel_response.status_code, 200)
+        self.assertContains(painel_response, 'href="/financeiro/"')
+        route_response = self.client_http.get("/financeiro/")
+        self.assertEqual(route_response.status_code, 200)
 
     def test_dedicated_apps_stay_reference_only_in_module_access_screen(self):
         self.client_http.force_login(self.dev_user)
         response = self.client_http.get("/modulos-acesso/")
         self.assertContains(response, "Apps dedicados")
         self.assertContains(response, "o acesso real continua sendo decidido exclusivamente pelo APP ID do usuario", html=False)
+
+    def test_dedicated_apps_remain_visible_by_app_id_only(self):
+        app = App.objects.create(nome="BLA", slug="bla", ativo=True)
+        self.perfil.apps.add(app)
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/painel/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BLA")
+        self.assertNotContains(response, 'href="/financeiro/"')
 
 
 class DevAdminPrivilegesTests(TestCase):

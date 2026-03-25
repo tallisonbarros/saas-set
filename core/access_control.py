@@ -78,30 +78,14 @@ def resolve_module_from_path(path):
     return None
 
 
-def legacy_module_entry_allowed(user, module):
-    if not user or not getattr(user, "is_authenticated", False) or not module:
+def can_access_internal_module(user, module_code):
+    if not user or not getattr(user, "is_authenticated", False):
         return False
     if is_admin_user(user):
         return True
-    perfil = resolve_perfil(user)
-    if module.codigo == "PROPOSTAS":
-        return True
-    if module.codigo in {"FINANCEIRO", "IOS", "INVENTARIO", "LISTA_IP", "RADAR"}:
-        return bool(perfil)
-    if module.codigo in {"APP_MILHAO_BLA", "APP_ROTAS"}:
-        if not perfil or not module.app_id:
-            return False
-        return perfil.apps.filter(pk=module.app_id).exists()
-    return bool(perfil)
-
-
-def candidate_module_allowed(user, module):
-    if not user or not getattr(user, "is_authenticated", False) or not module or not module.ativo:
+    module = resolve_module_by_code(module_code)
+    if not module or not module.ativo or module.tipo != module.Tipo.CORE:
         return False
-    if is_admin_user(user):
-        return True
-    if module.somente_dev:
-        return is_dev_user(user)
     allowed_codes = {
         (codigo or "").strip().upper()
         for codigo in module.tipos.values_list("codigo", flat=True)
@@ -112,15 +96,23 @@ def candidate_module_allowed(user, module):
     return bool(user_tipo_codes(user) & allowed_codes)
 
 
-def shadow_decision_for_request(user, path):
-    module = resolve_module_from_path(path)
-    if not module or module.auth_mode == module.AuthMode.LEGACY:
+def visible_internal_module_codes(user):
+    from .models import ModuloAcesso
+
+    modules = ModuloAcesso.objects.filter(tipo=ModuloAcesso.Tipo.CORE, ativo=True).prefetch_related("tipos")
+    if is_admin_user(user):
+        return {module.codigo for module in modules}
+    visible = set()
+    for module in modules:
+        if can_access_internal_module(user, module.codigo):
+            visible.add(module.codigo)
+    return visible
+
+
+def resolve_module_by_code(module_code):
+    from .models import ModuloAcesso
+
+    normalized = normalize_access_code(module_code)
+    if not normalized:
         return None
-    legacy_allowed = legacy_module_entry_allowed(user, module)
-    candidate_allowed = candidate_module_allowed(user, module)
-    return {
-        "module": module,
-        "legacy_allowed": legacy_allowed,
-        "candidate_allowed": candidate_allowed,
-        "divergent": legacy_allowed != candidate_allowed,
-    }
+    return ModuloAcesso.objects.filter(codigo=normalized).first()

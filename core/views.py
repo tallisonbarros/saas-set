@@ -33,7 +33,6 @@ from django.db.models.functions import Cast, Coalesce
 
 from .forms import RegisterForm, TipoPerfilCreateForm, UserCreateForm
 from .models import (
-    AccessControlShadowLog,
     CanalRackIO,
     CategoriaCompra,
     Caderno,
@@ -80,6 +79,7 @@ from .models import (
     AtivoItem,
     TipoAtivo,
 )
+from .access_control import can_access_internal_module, visible_internal_module_codes
 
 logger = logging.getLogger(__name__)
 ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
@@ -436,6 +436,12 @@ def _has_tipo_any(user, nomes):
     if not cliente:
         return False
     return cliente.tipos.filter(nome__in=nomes).exists()
+
+
+def _require_internal_module_access(request, module_code):
+    if can_access_internal_module(request.user, module_code):
+        return None
+    return HttpResponseForbidden("Sem permissao.")
 
 
 def _create_grupo_payload(request, cliente):
@@ -1304,18 +1310,17 @@ def painel(request):
         apps = App.objects.none()
     module_signal_badges = _build_module_signal_badges(request.user, cliente)
     is_dev_user = _is_dev_user(request.user)
+    visible_internal_modules = visible_internal_module_codes(request.user)
     return render(
         request,
         "core/painel.html",
         {
             "display_name": display_name,
             "role": role,
-            "is_financeiro": True,
-            "is_cliente": True,
-            "is_vendedor": True,
             "apps": apps,
             "module_signal_badges": module_signal_badges,
             "is_dev_user": is_dev_user,
+            "visible_internal_modules": visible_internal_modules,
         },
     )
 
@@ -1998,6 +2003,9 @@ def register(request):
 
 @login_required
 def ios_list(request):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -2233,6 +2241,9 @@ def ios_list(request):
 
 @login_required
 def ios_rack_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3082,6 +3093,9 @@ def _render_proposta_pdf(
 
 @login_required
 def ios_rack_io_list(request, pk):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3120,6 +3134,9 @@ def ios_rack_io_list(request, pk):
 
 @login_required
 def ios_modulos(request):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3169,6 +3186,9 @@ def ios_modulos(request):
 
 @login_required
 def ios_modulo_modelo_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3217,6 +3237,9 @@ def ios_modulo_modelo_detail(request, pk):
 
 @login_required
 def inventarios_list(request):
+    denied_response = _require_internal_module_access(request, "INVENTARIO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3273,6 +3296,9 @@ def inventarios_list(request):
 
 @login_required
 def inventario_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "INVENTARIO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3449,6 +3475,9 @@ def inventario_detail(request, pk):
 
 @login_required
 def inventario_tagset_preview(request, pk):
+    denied_response = _require_internal_module_access(request, "INVENTARIO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3493,6 +3522,9 @@ def inventario_tagset_preview(request, pk):
 
 @login_required
 def inventario_ativo_detail(request, inventario_pk, pk):
+    denied_response = _require_internal_module_access(request, "INVENTARIO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3655,6 +3687,9 @@ def inventario_ativo_detail(request, inventario_pk, pk):
 
 @login_required
 def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
+    denied_response = _require_internal_module_access(request, "INVENTARIO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3742,6 +3777,9 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
 
 @login_required
 def listas_ip_list(request):
+    denied_response = _require_internal_module_access(request, "LISTA_IP")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3805,6 +3843,9 @@ def listas_ip_list(request):
 
 @login_required
 def lista_ip_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "LISTA_IP")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3972,6 +4013,9 @@ def lista_ip_detail(request, pk):
 
 @login_required
 def radar_list(request):
+    denied_response = _require_internal_module_access(request, "RADAR")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -4029,6 +4073,9 @@ def radar_list(request):
 
 @login_required
 def radar_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "RADAR")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -4326,6 +4373,9 @@ def radar_detail(request, pk):
 
 @login_required
 def radar_agenda(request, pk):
+    denied_response = _require_internal_module_access(request, "RADAR")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -4930,6 +4980,9 @@ def _radar_export_error_response(request, message, status=400):
 
 @login_required
 def radar_export_pdf(request, pk):
+    denied_response = _require_internal_module_access(request, "RADAR")
+    if denied_response:
+        return denied_response
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
 
@@ -4980,6 +5033,9 @@ def radar_export_pdf(request, pk):
 
 @login_required
 def radar_trabalho_detail(request, radar_pk, pk):
+    denied_response = _require_internal_module_access(request, "RADAR")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -5534,6 +5590,9 @@ def radar_trabalho_detail(request, radar_pk, pk):
 
 @login_required
 def ios_rack_modulo_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -5898,6 +5957,9 @@ def _proposta_quick_stats(user, cliente, tipo):
 
 @login_required
 def proposta_list(request):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
     status_filter = None
@@ -5938,6 +6000,9 @@ def proposta_list(request):
 
 @login_required
 def proposta_data(request):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
     cliente = _get_cliente(request.user)
@@ -5976,6 +6041,9 @@ def proposta_data(request):
 
 @login_required
 def proposta_finalizadas_arquivo(request):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
     cutoff = timezone.now() - timedelta(days=90)
@@ -6000,6 +6068,9 @@ def proposta_finalizadas_arquivo(request):
 
 @login_required
 def proposta_busca(request):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     tipo_ativo = _normalize_proposta_tipo(request.GET.get("mode") or request.GET.get("tipo") or "recebidas")
     status_filter = request.GET.get("status", "").strip().lower() or None
@@ -6024,6 +6095,9 @@ def proposta_busca(request):
 
 @login_required
 def proposta_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     proposta_qs_base = Proposta.objects.select_related(
         "cliente",
@@ -6149,6 +6223,9 @@ def proposta_detail(request, pk):
 
 @login_required
 def proposta_export_pdf(request, pk):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     select_related_fields = [
         "cliente",
@@ -6192,6 +6269,9 @@ def proposta_export_pdf(request, pk):
 
 @login_required
 def proposta_nova_vendedor(request):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     message = None
     form_data = {
         "email": "",
@@ -6289,6 +6369,9 @@ def proposta_nova_vendedor(request):
 
 @login_required
 def proposta_nova_de_trabalho(request, trabalho_pk):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     trabalho = _get_radar_trabalho_acessivel(request.user, trabalho_pk)
     if not trabalho:
         return HttpResponseForbidden("Sem permissao.")
@@ -6320,6 +6403,9 @@ def proposta_nova_de_trabalho(request, trabalho_pk):
 @login_required
 @require_POST
 def aprovar_proposta(request, pk):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
@@ -6337,6 +6423,9 @@ def aprovar_proposta(request, pk):
 @login_required
 @require_POST
 def reprovar_proposta(request, pk):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     proposta = get_object_or_404(Proposta, pk=pk, cliente=cliente)
     if proposta.cliente.usuario_id != request.user.id:
@@ -6352,6 +6441,9 @@ def reprovar_proposta(request, pk):
 @login_required
 @require_POST
 def salvar_observacao(request, pk):
+    denied_response = _require_internal_module_access(request, "PROPOSTAS")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if cliente:
         proposta_qs = Proposta.objects.filter(Q(criada_por=request.user) | Q(cliente=cliente))
@@ -6664,6 +6756,9 @@ def meu_perfil(request):
 
 @login_required
 def financeiro_overview(request):
+    denied_response = _require_internal_module_access(request, "FINANCEIRO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -6714,6 +6809,9 @@ def financeiro_overview(request):
 
 @login_required
 def financeiro_nova(request):
+    denied_response = _require_internal_module_access(request, "FINANCEIRO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -6930,6 +7028,9 @@ def financeiro_nova(request):
 
 @login_required
 def financeiro_cadernos(request):
+    denied_response = _require_internal_module_access(request, "FINANCEIRO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -7043,6 +7144,9 @@ def financeiro_cadernos(request):
 
 @login_required
 def financeiro_caderno_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "FINANCEIRO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -7352,6 +7456,9 @@ def financeiro_caderno_detail(request, pk):
 
 @login_required
 def financeiro_compra_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "FINANCEIRO")
+    if denied_response:
+        return denied_response
     cliente = _get_cliente(request.user)
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -7798,44 +7905,29 @@ def modulos_acesso_gerenciar(request):
     if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     message = None
-    message_level = "info"
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_module":
             module = get_object_or_404(ModuloAcesso, pk=request.POST.get("module_id"))
             oid = request.POST.get("oid", "").strip()
-            auth_mode = request.POST.get("auth_mode", "").strip() or ModuloAcesso.AuthMode.LEGACY
             tipo_ids = request.POST.getlist("tipos")
-            somente_dev = request.POST.get("somente_dev") == "on"
             ativo = request.POST.get("ativo") == "on"
-            if auth_mode not in dict(ModuloAcesso.AuthMode.choices):
-                message = "Modo de autorizacao invalido."
-                message_level = "error"
+            module.oid = oid
+            module.ativo = ativo
+            if module.tipo == ModuloAcesso.Tipo.CORE:
+                module.mantem_escopo_ids = True
+                module.auth_mode = ModuloAcesso.AuthMode.STRICT
+                module.somente_dev = False
+                tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
+                module.save(update_fields=["oid", "ativo", "mantem_escopo_ids", "auth_mode", "somente_dev"])
+                module.tipos.set(tipos)
             else:
-                module.oid = oid
-                module.auth_mode = auth_mode
-                module.somente_dev = somente_dev
-                module.ativo = ativo
-                if module.tipo == ModuloAcesso.Tipo.CORE:
-                    module.mantem_escopo_ids = True
-                    tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
-                    module.save(update_fields=["oid", "auth_mode", "somente_dev", "mantem_escopo_ids", "ativo"])
-                    module.tipos.set(tipos)
-                else:
-                    module.save(update_fields=["oid", "auth_mode", "somente_dev", "ativo"])
-                return redirect("modulos_acesso_gerenciar")
-        elif action == "clear_shadow_logs":
-            modulo_id = request.POST.get("module_id")
-            logs_qs = AccessControlShadowLog.objects.all()
-            if modulo_id:
-                logs_qs = logs_qs.filter(modulo_id=modulo_id)
-            logs_qs.delete()
+                module.save(update_fields=["oid", "ativo"])
             return redirect("modulos_acesso_gerenciar")
 
     modules = ModuloAcesso.objects.select_related("app").prefetch_related("tipos").order_by("nome")
     core_modules = [module for module in modules if module.tipo == ModuloAcesso.Tipo.CORE]
     app_modules = [module for module in modules if module.tipo == ModuloAcesso.Tipo.APP]
-    recent_shadow_logs = AccessControlShadowLog.objects.select_related("user", "modulo").order_by("-created_at")[:120]
     return render(
         request,
         "core/modulos_acesso.html",
@@ -7843,10 +7935,7 @@ def modulos_acesso_gerenciar(request):
             "core_modules": core_modules,
             "app_modules": app_modules,
             "tipos": TipoPerfil.objects.order_by("nome"),
-            "recent_shadow_logs": recent_shadow_logs,
-            "auth_modes": ModuloAcesso.AuthMode.choices,
             "message": message,
-            "message_level": message_level,
         },
     )
 

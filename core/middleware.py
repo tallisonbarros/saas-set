@@ -3,8 +3,7 @@ from datetime import timedelta
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .access_control import shadow_decision_for_request
-from .models import AdminAccessLog, AccessControlShadowLog, PerfilUsuario
+from .models import AdminAccessLog, PerfilUsuario
 
 
 ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
@@ -81,39 +80,4 @@ class AccessControlShadowMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        response = self.get_response(request)
-
-        try:
-            user = getattr(request, "user", None)
-            if not user or not user.is_authenticated:
-                return response
-            decision = shadow_decision_for_request(user, request.path or "")
-            if not decision or not decision["divergent"]:
-                return response
-
-            modulo = decision["module"]
-            cutoff_recent = timezone.now() - timedelta(minutes=5)
-            already_logged = AccessControlShadowLog.objects.filter(
-                user=user,
-                modulo=modulo,
-                request_path=request.path or "",
-                legacy_allowed=decision["legacy_allowed"],
-                candidate_allowed=decision["candidate_allowed"],
-                created_at__gte=cutoff_recent,
-            ).exists()
-            if not already_logged:
-                AccessControlShadowLog.objects.create(
-                    user=user,
-                    modulo=modulo,
-                    request_path=request.path or "",
-                    response_status=getattr(response, "status_code", 200) or 200,
-                    legacy_allowed=decision["legacy_allowed"],
-                    candidate_allowed=decision["candidate_allowed"],
-                    auth_mode=modulo.auth_mode,
-                )
-            retention_cutoff = timezone.now() - timedelta(days=30)
-            AccessControlShadowLog.objects.filter(created_at__lt=retention_cutoff).delete()
-        except Exception:
-            pass
-
-        return response
+        return self.get_response(request)
