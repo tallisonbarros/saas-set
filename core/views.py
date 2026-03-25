@@ -7807,7 +7807,6 @@ def modulos_acesso_gerenciar(request):
             auth_mode = request.POST.get("auth_mode", "").strip() or ModuloAcesso.AuthMode.LEGACY
             tipo_ids = request.POST.getlist("tipos")
             somente_dev = request.POST.get("somente_dev") == "on"
-            mantem_escopo_ids = request.POST.get("mantem_escopo_ids") == "on"
             ativo = request.POST.get("ativo") == "on"
             if auth_mode not in dict(ModuloAcesso.AuthMode.choices):
                 message = "Modo de autorizacao invalido."
@@ -7816,14 +7815,14 @@ def modulos_acesso_gerenciar(request):
                 module.oid = oid
                 module.auth_mode = auth_mode
                 module.somente_dev = somente_dev
-                module.mantem_escopo_ids = mantem_escopo_ids
                 module.ativo = ativo
                 if module.tipo == ModuloAcesso.Tipo.CORE:
+                    module.mantem_escopo_ids = True
                     tipos = TipoPerfil.objects.filter(id__in=tipo_ids)
                     module.save(update_fields=["oid", "auth_mode", "somente_dev", "mantem_escopo_ids", "ativo"])
                     module.tipos.set(tipos)
                 else:
-                    module.save(update_fields=["oid", "auth_mode", "somente_dev", "mantem_escopo_ids", "ativo"])
+                    module.save(update_fields=["oid", "auth_mode", "somente_dev", "ativo"])
                 return redirect("modulos_acesso_gerenciar")
         elif action == "clear_shadow_logs":
             modulo_id = request.POST.get("module_id")

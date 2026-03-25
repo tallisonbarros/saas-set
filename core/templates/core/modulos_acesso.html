@@ -22,7 +22,7 @@
         <div>
           <div class="page-kicker">Seguranca de acesso</div>
           <h1 class="page-title">Modulos de acesso</h1>
-          <p class="page-subtitle">Cadastro de modulos, OID, tipos vinculados e monitoramento do modo sombra.</p>
+          <p class="page-subtitle">Configuracao dos modulos internos por tipo de usuario e monitoramento do modo sombra.</p>
         </div>
       </div>
       <div class="hud-meta">Nenhuma permissao nova e aplicada nesta etapa. O monitoramento apenas registra divergencias.</div>
@@ -42,12 +42,18 @@
           <div class="card compact-card">
             <strong>Modulos internos</strong>
             <div class="muted">Entrada controlada por tipo de usuario.</div>
-            <div class="muted">Escopo interno continua pelos IDs atuais do modulo.</div>
+            <div class="muted">Os IDs atuais continuam apenas como escopo e compartilhamento interno entre usuarios.</div>
           </div>
           <div class="card compact-card">
             <strong>Apps dedicados</strong>
             <div class="muted">Continuam controlados por APP ID em `perfil.apps`.</div>
             <div class="muted">A listagem abaixo e apenas referencia operacional nesta etapa.</div>
+          </div>
+          <div class="card compact-card">
+            <strong>Modos de autorizacao</strong>
+            <div class="muted">Legado: usa a entrada atual.</div>
+            <div class="muted">Hibrido: compara a regra atual com a nova, sem bloquear nesta etapa.</div>
+            <div class="muted">Restrito: sera usado na proxima etapa para exigir tipo no modulo.</div>
           </div>
         </div>
       </div>
@@ -113,7 +119,7 @@
                 <input type="text" value="{{ module.codigo }}" disabled>
               </label>
               <label class="field">
-                <span>OID</span>
+                <span>OID opcional</span>
                 <input type="text" name="oid" value="{{ module.oid }}">
               </label>
               <label class="field">
@@ -128,15 +134,6 @@
                   {% endfor %}
                 </select>
               </label>
-              <label class="field">
-                <span>App vinculado</span>
-                <select name="app_id">
-                  <option value="">Sem app vinculado</option>
-                  {% for app in apps %}
-                    <option value="{{ app.id }}" {% if module.app_id == app.id %}selected{% endif %}>{{ app.nome }} ({{ app.slug }})</option>
-                  {% endfor %}
-                </select>
-              </label>
             </div>
             <label>Tipos liberados</label>
             <div class="checkbox-grid">
@@ -147,14 +144,12 @@
                 </label>
               {% endfor %}
             </div>
+            <div class="muted">Os tipos acima controlam apenas a entrada no modulo.</div>
+            <div class="muted">Os IDs do modulo continuam sendo usados apenas dentro do conteudo, para compartilhamento e escopo entre usuarios.</div>
             <div class="checkbox-grid">
               <label class="checkbox-item">
                 <input type="checkbox" name="somente_dev" {% if module.somente_dev %}checked{% endif %}>
                 Somente Dev
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" name="mantem_escopo_ids" {% if module.mantem_escopo_ids %}checked{% endif %}>
-                Mantem escopo por IDs
               </label>
               <label class="checkbox-item">
                 <input type="checkbox" name="ativo" {% if module.ativo %}checked{% endif %}>
@@ -194,7 +189,7 @@
           </div>
           <div class="user-page-grid">
             <label class="field">
-              <span>OID</span>
+              <span>OID opcional</span>
               <input type="text" value="{{ module.oid|default:'-' }}" disabled>
             </label>
             <label class="field">

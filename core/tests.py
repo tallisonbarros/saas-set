@@ -85,7 +85,9 @@ class AccessControlAdminAndShadowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Modulos de acesso")
         self.assertNotContains(response, "Novo modulo")
+        self.assertNotContains(response, "App vinculado")
         self.assertContains(response, "APP ID em `perfil.apps`", html=False)
+        self.assertContains(response, "Os IDs atuais continuam apenas como escopo e compartilhamento interno entre usuarios.", html=False)
 
     def test_dev_can_update_module_access_management(self):
         modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
@@ -108,6 +110,7 @@ class AccessControlAdminAndShadowTests(TestCase):
         self.assertEqual(modulo.oid, "1.3.6.1.4.1.9")
         self.assertEqual(modulo.auth_mode, ModuloAcesso.AuthMode.HYBRID)
         self.assertTrue(modulo.somente_dev)
+        self.assertTrue(modulo.mantem_escopo_ids)
 
     def test_shadow_mode_logs_divergence_without_blocking_legacy_access(self):
         modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
