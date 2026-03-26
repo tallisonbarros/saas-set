@@ -517,21 +517,15 @@
     return dynamicRoot ? dynamicRoot.querySelectorAll("[data-mural-submit]") : [];
   }
 
-  function hasSeenMuralIntro() {
-    try {
-      return window.localStorage && window.localStorage.getItem("app_milhao_bla_mural_intro_seen_v1") === "1";
-    } catch (error) {
-      return false;
-    }
+  function shouldOpenMuralIntro(details) {
+    return !!details && details.getAttribute("data-intro-should-open") === "1";
   }
 
-  function markMuralIntroSeen() {
-    try {
-      if (window.localStorage) {
-        window.localStorage.setItem("app_milhao_bla_mural_intro_seen_v1", "1");
-      }
-    } catch (error) {
+  function setMuralIntroSeen(details) {
+    if (!details) {
+      return;
     }
+    details.setAttribute("data-intro-should-open", "0");
   }
 
   function logMuralAccess(details) {
@@ -606,14 +600,30 @@
       closeMuralIntro();
       return;
     }
-    markMuralIntroSeen();
+    var introSeenUrl = details.getAttribute("data-intro-seen-url") || "";
+    setMuralIntroSeen(details);
     closeMuralIntro();
     details.open = true;
+    if (!introSeenUrl) {
+      return;
+    }
+    fetch(introSeenUrl, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin"
+    })
+      .then(function () {
+      })
+      .catch(function () {
+      });
   }
 
   function maybeShowMuralIntroOnLoad() {
     var details = getMuralDetails();
-    if (!details || hasSeenMuralIntro()) {
+    if (!details || !shouldOpenMuralIntro(details)) {
       return;
     }
     openMuralIntro(details);
@@ -1227,6 +1237,16 @@
         return;
       }
 
+      var muralSummary = event.target.closest("summary.io-discrete-summary");
+      if (muralSummary) {
+        var summaryDetails = muralSummary.parentElement;
+        if (summaryDetails && summaryDetails.matches("[data-mural-details]") && shouldOpenMuralIntro(summaryDetails)) {
+          event.preventDefault();
+          openMuralIntro(summaryDetails);
+          return;
+        }
+      }
+
       var deleteBtn = event.target.closest("[data-mural-delete]");
       if (deleteBtn) {
         event.preventDefault();
@@ -1271,6 +1291,11 @@
         return;
       }
       if (details.open) {
+        if (shouldOpenMuralIntro(details)) {
+          details.open = false;
+          openMuralIntro(details);
+          return;
+        }
         logMuralAccess(details);
         markMuralDayViewed();
       }

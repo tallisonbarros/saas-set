@@ -22,6 +22,7 @@ DEFAULT_SOURCES = ("balanca_acumulado_hora", "balanca_acumulado")
 MAX_EXPORT_RANGE_DAYS = 93
 MURAL_ACCESS_AUDIT_MODULE = "apps:appmilhaobla:mural_dia"
 EXPORT_ACCESS_AUDIT_MODULE = "apps:appmilhaobla:export_excel"
+MURAL_INTRO_SEEN_AUDIT_MODULE = "apps:appmilhaobla:mural_intro_visto"
 BALANCE_LABELS = {
     "LIMBL01": "MILHO",
     "SECBL01": "GERMEN",
@@ -115,6 +116,19 @@ def _register_app_access_event(user, module):
     if not user or not user.is_authenticated or not module:
         return None
     return AdminAccessLog.objects.create(user=user, module=module)
+
+
+def _has_seen_mural_intro(user):
+    if not user or not user.is_authenticated:
+        return True
+    return AdminAccessLog.objects.filter(user=user, module=MURAL_INTRO_SEEN_AUDIT_MODULE).exists()
+
+
+def _mark_mural_intro_seen(user):
+    if not user or not user.is_authenticated:
+        return None
+    log, _ = AdminAccessLog.objects.get_or_create(user=user, module=MURAL_INTRO_SEEN_AUDIT_MODULE)
+    return log
 
 
 def _get_mural_author_label(user):
@@ -412,6 +426,7 @@ def _build_dashboard_context(request, app):
 
     mural_notes = _load_mural_notes_for_day(selected_date, request.user)
     mural_has_unread = _mural_day_has_unread(selected_date, request.user)
+    mural_intro_should_open = not _has_seen_mural_intro(request.user)
 
     return {
         "entries": filtered,
@@ -434,6 +449,7 @@ def _build_dashboard_context(request, app):
         "mural_notes": mural_notes,
         "mural_notes_count": len(mural_notes),
         "mural_has_unread": mural_has_unread,
+        "mural_intro_should_open": mural_intro_should_open,
         "mural_visibility_options": [
             {
                 "value": AppMilhaoBlaMuralDia.Visibilidade.PUBLICA,
@@ -501,6 +517,16 @@ def dashboard_cards_data(request):
             ],
         }
     )
+
+
+@login_required
+@require_POST
+def mural_day_intro_seen(request):
+    app = _get_app_if_allowed(request)
+    if not app:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    _mark_mural_intro_seen(request.user)
+    return JsonResponse({"ok": True})
 
 
 @login_required

@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from core.apps.app_milhao_bla.views import EXPORT_ACCESS_AUDIT_MODULE, MURAL_ACCESS_AUDIT_MODULE
+from core.apps.app_milhao_bla.views import EXPORT_ACCESS_AUDIT_MODULE, MURAL_ACCESS_AUDIT_MODULE, MURAL_INTRO_SEEN_AUDIT_MODULE
 from core.models import AdminAccessLog, App, AppMilhaoBlaMuralDia, AppMilhaoBlaMuralDiaLeitura, IngestRecord, PerfilUsuario, TipoPerfil
 
 
@@ -149,6 +149,26 @@ class AppMilhaoBlaIngestConfigTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context["mural_has_unread"])
+
+    def test_dashboard_sinaliza_intro_do_mural_para_usuario_que_ainda_nao_viu(self):
+        self.client.force_login(self.user)
+
+        first_response = self.client.get(reverse("app_milhao_bla_dashboard"))
+        self.assertEqual(first_response.status_code, 200)
+        self.assertTrue(first_response.context["mural_intro_should_open"])
+
+        seen_response = self.client.post(
+            reverse("app_milhao_bla_mural_day_intro_seen"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(seen_response.status_code, 200)
+        self.assertTrue(
+            AdminAccessLog.objects.filter(user=self.user, module=MURAL_INTRO_SEEN_AUDIT_MODULE).exists()
+        )
+
+        second_response = self.client.get(reverse("app_milhao_bla_dashboard"))
+        self.assertEqual(second_response.status_code, 200)
+        self.assertFalse(second_response.context["mural_intro_should_open"])
 
     def test_mural_create_endpoint_persiste_nota_e_retorna_html_atualizado(self):
         self.client.force_login(self.user)

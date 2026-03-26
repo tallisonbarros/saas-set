@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path("", views.dashboard, name="app_milhao_bla_dashboard"),
     path("cards-data/", views.dashboard_cards_data, name="app_milhao_bla_cards_data"),
+    path("mural-day/intro-seen/", views.mural_day_intro_seen, name="app_milhao_bla_mural_day_intro_seen"),
     path("mural-day/access/", views.mural_day_access, name="app_milhao_bla_mural_day_access"),
     path("mural-day/live/", views.mural_day_live, name="app_milhao_bla_mural_day_live"),
     path("mural-day/create/", views.mural_day_create, name="app_milhao_bla_mural_day_create"),

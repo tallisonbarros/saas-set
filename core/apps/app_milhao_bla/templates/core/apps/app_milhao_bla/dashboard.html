@@ -213,6 +213,8 @@
       class="io-discrete"
       data-mural-details
       data-access-url="{% url 'app_milhao_bla_mural_day_access' %}"
+      data-intro-seen-url="{% url 'app_milhao_bla_mural_day_intro_seen' %}"
+      data-intro-should-open="{% if mural_intro_should_open %}1{% else %}0{% endif %}"
       data-live-url="{% url 'app_milhao_bla_mural_day_live' %}"
       data-mark-viewed-url="{% url 'app_milhao_bla_mural_day_mark_viewed' %}"
       data-selected-date="{{ selected_date|date:'Y-m-d' }}"
