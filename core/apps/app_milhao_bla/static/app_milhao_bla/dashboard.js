@@ -611,6 +611,14 @@
     details.open = true;
   }
 
+  function maybeShowMuralIntroOnLoad() {
+    var details = getMuralDetails();
+    if (!details || hasSeenMuralIntro()) {
+      return;
+    }
+    openMuralIntro(details);
+  }
+
   function setMuralError(message) {
     var errorBox = getMuralErrorBox();
     if (!errorBox) {
@@ -1219,16 +1227,6 @@
         return;
       }
 
-      var muralSummary = event.target.closest("summary.io-discrete-summary");
-      if (muralSummary) {
-        var summaryDetails = muralSummary.parentElement;
-        if (summaryDetails && summaryDetails.matches("[data-mural-details]") && !hasSeenMuralIntro()) {
-          event.preventDefault();
-          openMuralIntro(summaryDetails);
-          return;
-        }
-      }
-
       var deleteBtn = event.target.closest("[data-mural-delete]");
       if (deleteBtn) {
         event.preventDefault();
@@ -1273,15 +1271,11 @@
         return;
       }
       if (details.open) {
-        if (!hasSeenMuralIntro()) {
-          details.open = false;
-          openMuralIntro(details);
-          return;
-        }
         logMuralAccess(details);
         markMuralDayViewed();
       }
     }, true);
+    maybeShowMuralIntroOnLoad();
   }
 
   window.addEventListener("popstate", function () {
