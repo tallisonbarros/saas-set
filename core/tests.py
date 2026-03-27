@@ -26,6 +26,7 @@ from core.models import (
     RadarTrabalho,
     RadarTrabalhoColaborador,
     RadarTrabalhoObservacao,
+    SystemConfiguration,
     TipoPerfil,
 )
 from core.views import _build_proposta_pdf_context, _build_radar_relatorio_pdf_context, _sanitize_proposta_descricao, _user_role
@@ -190,6 +191,55 @@ class DevAdminPrivilegesTests(TestCase):
         self.client_http.force_login(self.user)
         response = self.client_http.get("/admin-logs/")
         self.assertEqual(response.status_code, 403)
+
+
+class MaintenanceModeTests(TestCase):
+    def setUp(self):
+        self.client_http = Client()
+        self.tipo_dev = TipoPerfil.objects.get(codigo="DEV")
+        self.tipo_cliente = TipoPerfil.objects.get(codigo="CLIENTE")
+
+        self.dev_user = User.objects.create_user(username="maintenance-dev@set.local", email="maintenance-dev@set.local", password="123456")
+        self.dev_perfil = PerfilUsuario.objects.create(
+            nome="Maintenance Dev",
+            email="maintenance-dev@set.local",
+            usuario=self.dev_user,
+        )
+        self.dev_perfil.tipos.add(self.tipo_dev)
+
+        self.user = User.objects.create_user(username="maintenance-user@set.local", email="maintenance-user@set.local", password="123456")
+        self.perfil = PerfilUsuario.objects.create(
+            nome="Maintenance User",
+            email="maintenance-user@set.local",
+            usuario=self.user,
+        )
+        self.perfil.tipos.add(self.tipo_cliente)
+
+        self.config = SystemConfiguration.load()
+        self.config.maintenance_mode_enabled = True
+        self.config.maintenance_message = "Sistema temporariamente indisponivel."
+        self.config.save()
+
+    def test_non_dev_user_is_redirected_to_maintenance(self):
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/painel/")
+        self.assertRedirects(response, "/manutencao/", fetch_redirect_response=False)
+
+    def test_dev_user_bypasses_maintenance_mode(self):
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/painel/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_maintenance_page_renders_configured_message(self):
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/manutencao/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sistema temporariamente indisponivel.")
+
+    def test_logout_remains_accessible_during_maintenance(self):
+        self.client_http.force_login(self.user)
+        response = self.client_http.post("/logout/")
+        self.assertEqual(response.status_code, 302)
 
 
 class RouteTimelineStateTests(SimpleTestCase):

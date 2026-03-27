@@ -1162,3 +1162,35 @@ class AdminAccessLog(models.Model):
     def __str__(self):
         user_label = self.user.username if self.user else "anon"
         return f"{user_label} - {self.module}"
+
+
+class SystemConfiguration(models.Model):
+    DEFAULT_MAINTENANCE_MESSAGE = "O site esta em manutencao. Tente novamente em instantes."
+
+    maintenance_mode_enabled = models.BooleanField(default=False)
+    maintenance_message = models.TextField(blank=True, default=DEFAULT_MAINTENANCE_MESSAGE)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="system_configuration_updates",
+    )
+
+    class Meta:
+        verbose_name = "Configuracao do sistema"
+        verbose_name_plural = "Configuracoes do sistema"
+
+    @classmethod
+    def load(cls):
+        config, _ = cls.objects.get_or_create(pk=1)
+        return config
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.maintenance_message = (self.maintenance_message or "").strip() or self.DEFAULT_MAINTENANCE_MESSAGE
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Configuracoes do sistema"

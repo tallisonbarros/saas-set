@@ -1,12 +1,49 @@
 from datetime import timedelta
 
 from django.contrib.auth.models import User
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils import timezone
 
-from .models import AdminAccessLog, PerfilUsuario
+from .access_control import has_tipo_code
+from .models import AdminAccessLog, PerfilUsuario, SystemConfiguration
 
 
 ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
+
+
+class MaintenanceModeMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if self._should_redirect_to_maintenance(request):
+            return redirect("maintenance")
+        return self.get_response(request)
+
+    def _should_redirect_to_maintenance(self, request):
+        if self._is_allowed_path(request.path or ""):
+            return False
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, "is_superuser", False) or has_tipo_code(user, "DEV"):
+            return False
+        try:
+            config = SystemConfiguration.load()
+        except Exception:
+            return False
+        return bool(config.maintenance_mode_enabled)
+
+    def _is_allowed_path(self, path):
+        allowed_prefixes = ("/static/", "/media/", "/admin/static/")
+        if path.startswith(allowed_prefixes):
+            return True
+        allowed_paths = {
+            reverse("maintenance"),
+            reverse("logout"),
+        }
+        return path in allowed_paths
 
 
 class AdminAccessLogMiddleware:

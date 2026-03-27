@@ -33,6 +33,7 @@ from .models import (
     TipoPerfil,
     TipoAtivo,
     App,
+    SystemConfiguration,
 )
 
 admin.site.site_header = "SET Admin"
@@ -166,6 +167,16 @@ class AppAdmin(admin.ModelAdmin):
     list_display = ("nome", "slug", "ativo", "icon", "logo", "theme_color", "criado_em")
     search_fields = ("nome", "slug")
     list_filter = ("ativo",)
+
+
+@admin.register(SystemConfiguration)
+class SystemConfigurationAdmin(admin.ModelAdmin):
+    list_display = ("maintenance_mode_enabled", "updated_at", "updated_by")
+
+    def has_add_permission(self, request):
+        if SystemConfiguration.objects.exists():
+            return False
+        return super().has_add_permission(request)
 
 
 @admin.register(PlantaIO)

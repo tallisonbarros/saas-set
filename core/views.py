@@ -56,6 +56,7 @@ from .models import (
     IngestErrorLog,
     IngestRule,
     AdminAccessLog,
+    SystemConfiguration,
     Radar,
     RadarAtividade,
     RadarAtividadeColaborador,
@@ -79,7 +80,7 @@ from .models import (
     AtivoItem,
     TipoAtivo,
 )
-from .access_control import can_access_internal_module, visible_internal_module_codes
+from .access_control import can_access_internal_module, has_tipo_code, visible_internal_module_codes
 
 logger = logging.getLogger(__name__)
 ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
@@ -1210,6 +1211,32 @@ def home(request):
     if request.user.is_authenticated:
         logout(request)
     return render(request, "core/home.html")
+
+
+def maintenance_page(request):
+    try:
+        config = SystemConfiguration.load()
+    except Exception:
+        config = None
+    maintenance_enabled = bool(config and config.maintenance_mode_enabled)
+    maintenance_message = (
+        config.maintenance_message
+        if config and (config.maintenance_message or "").strip()
+        else SystemConfiguration.DEFAULT_MAINTENANCE_MESSAGE
+    )
+    if request.user.is_authenticated and (request.user.is_superuser or has_tipo_code(request.user, "DEV")):
+        return redirect("painel")
+    if not maintenance_enabled:
+        if request.user.is_authenticated:
+            return redirect("painel")
+        return redirect("home")
+    return render(
+        request,
+        "core/maintenance.html",
+        {
+            "maintenance_message": maintenance_message,
+        },
+    )
 
 
 @csrf_exempt
@@ -8437,6 +8464,7 @@ def ajustes_sistema(request):
     if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
     message = None
+    system_config = SystemConfiguration.load()
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_channel_type":
@@ -8457,6 +8485,12 @@ def ajustes_sistema(request):
             if tipo:
                 tipo.ativo = not tipo.ativo
                 tipo.save(update_fields=["ativo"])
+        if action == "update_maintenance_mode":
+            system_config.maintenance_mode_enabled = request.POST.get("maintenance_mode_enabled") == "on"
+            system_config.maintenance_message = request.POST.get("maintenance_message", "").strip()
+            system_config.updated_by = request.user
+            system_config.save(update_fields=["maintenance_mode_enabled", "maintenance_message", "updated_by", "updated_at"])
+            message = "Modo manutencao atualizado."
     channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
     tipos_ativos = TipoAtivo.objects.order_by("nome")
     return render(
@@ -8466,6 +8500,7 @@ def ajustes_sistema(request):
             "message": message,
             "channel_types": channel_types,
             "tipos_ativos": tipos_ativos,
+            "system_config": system_config,
         },
     )
 

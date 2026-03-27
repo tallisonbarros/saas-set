@@ -43,6 +43,7 @@ urlpatterns = [
     path('apps/<slug:slug>/', views.app_home, name="app_home"),
     path('login/', auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
     path('logout/', auth_views.LogoutView.as_view(), name="logout"),
+    path('manutencao/', views.maintenance_page, name="maintenance"),
     path('cadastre-se/', views.register, name="register"),
     path('propostas/', views.proposta_list, name="propostas"),
     path('propostas/data/', views.proposta_data, name="propostas_data"),
