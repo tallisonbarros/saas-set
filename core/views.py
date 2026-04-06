@@ -588,6 +588,210 @@ def _normalize_channel_tag(value):
     return value.upper()
 
 
+def _ios_inventarios_queryset(user, cliente):
+    if _is_admin_user(user) and not cliente:
+        return Inventario.objects.all()
+    return Inventario.objects.filter(Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all()))
+
+
+def _ios_locais_grupos(cliente):
+    locais = LocalRackIO.objects.none()
+    grupos = GrupoRackIO.objects.none()
+    if cliente:
+        locais = LocalRackIO.objects.filter(cliente=cliente).order_by("nome")
+        grupos = GrupoRackIO.objects.filter(cliente=cliente).order_by("nome")
+    return locais, grupos
+
+
+def _ios_racks_queryset(user, cliente):
+    if _is_admin_user(user) and not cliente:
+        racks = RackIO.objects.all()
+    else:
+        racks = RackIO.objects.filter(Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()))
+    return racks.select_related("inventario", "local", "grupo").annotate(
+        ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)),
+        canais_total=Count("slots__modulo__canais", distinct=True),
+        canais_comissionados=Count(
+            "slots__modulo__canais",
+            filter=Q(slots__modulo__canais__comissionado=True),
+            distinct=True,
+        ),
+    )
+
+
+def _ios_build_rack_groups(racks, locais=None):
+    rack_groups = []
+    grouped = {}
+    for local in locais or []:
+        local_name = (local.nome or "").strip()
+        local_key = local_name.lower() if local_name else "__sem_local__"
+        grouped.setdefault(
+            local_key,
+            {
+                "local": local,
+                "groups": {},
+                "racks_sem_grupo": [],
+            },
+        )
+    for rack in racks.order_by("local__nome", "grupo__nome", "inventario__nome", "nome"):
+        rack.all_canais_comissionados = bool(rack.canais_total) and rack.canais_total == rack.canais_comissionados
+        local_name = (rack.local.nome if rack.local_id and rack.local else "").strip()
+        grupo_name = (rack.grupo.nome if rack.grupo_id and rack.grupo else "").strip()
+        local_key = local_name.lower() if local_name else "__sem_local__"
+        grupo_key = grupo_name.lower() if grupo_name else "__sem_grupo__"
+        local_bucket = grouped.setdefault(
+            local_key,
+            {
+                "local": rack.local if rack.local_id else None,
+                "groups": {},
+                "racks_sem_grupo": [],
+            },
+        )
+        if rack.grupo_id:
+            group_bucket = local_bucket["groups"].setdefault(
+                grupo_key,
+                {
+                    "grupo": rack.grupo if rack.grupo_id else None,
+                    "racks": [],
+                },
+            )
+            group_bucket["racks"].append(rack)
+        else:
+            local_bucket["racks_sem_grupo"].append(rack)
+
+    for _, local_data in grouped.items():
+        groups = list(local_data["groups"].values())
+        if local_data["racks_sem_grupo"]:
+            groups.insert(
+                0,
+                {
+                    "grupo": None,
+                    "racks": local_data["racks_sem_grupo"],
+                },
+            )
+        rack_groups.append(
+            {
+                "local": local_data["local"],
+                "groups": groups,
+            }
+        )
+    return rack_groups
+
+
+def _ios_search_channels(racks, search_term="", rack_filter="", local_filter="", grupo_filter=""):
+    search_term = (search_term or "").strip()
+    rack_filter = (rack_filter or "").strip()
+    local_filter = (local_filter or "").strip()
+    grupo_filter = (grupo_filter or "").strip()
+    if not (search_term or rack_filter or local_filter or grupo_filter):
+        return []
+
+    slot_pos_subquery = RackSlotIO.objects.filter(modulo_id=OuterRef("modulo_id")).values("posicao")[:1]
+    search_filter = Q()
+    if search_term:
+        search_filter = (
+            Q(tag__icontains=search_term)
+            | Q(descricao__icontains=search_term)
+            | Q(modulo__nome__icontains=search_term)
+            | Q(modulo__modulo_modelo__nome__icontains=search_term)
+            | Q(modulo__modulo_modelo__marca__icontains=search_term)
+            | Q(modulo__modulo_modelo__modelo__icontains=search_term)
+            | Q(modulo__rack__nome__icontains=search_term)
+            | Q(modulo__rack__local__nome__icontains=search_term)
+            | Q(modulo__rack__grupo__nome__icontains=search_term)
+        )
+        if search_term.isdigit():
+            search_filter = search_filter | Q(indice=int(search_term))
+
+    channels = CanalRackIO.objects.filter(modulo__rack__in=racks)
+    if rack_filter.isdigit():
+        channels = channels.filter(modulo__rack_id=int(rack_filter))
+    if local_filter.isdigit():
+        channels = channels.filter(modulo__rack__local_id=int(local_filter))
+    if grupo_filter.isdigit():
+        channels = channels.filter(modulo__rack__grupo_id=int(grupo_filter))
+    if search_term:
+        channels = channels.filter(search_filter)
+
+    return list(
+        channels.select_related("modulo", "modulo__rack", "modulo__modulo_modelo", "tipo")
+        .annotate(slot_pos=Subquery(slot_pos_subquery))
+        .order_by("modulo__rack__nome", "slot_pos", "indice")[:200]
+    )
+
+
+def _ios_search_payload(search_results):
+    payload = []
+    for channel in search_results:
+        payload.append(
+            {
+                "rack": channel.modulo.rack.nome,
+                "slot": f"S{channel.slot_pos}" if channel.slot_pos else "-",
+                "modulo": channel.modulo.nome or channel.modulo.modulo_modelo.nome,
+                "canal": f"CH{channel.indice:02d}",
+                "canal_tag": channel.tag or "-",
+                "tipo": channel.tipo.nome,
+                "local": channel.modulo.rack.local.nome if channel.modulo.rack.local_id else "-",
+                "grupo": channel.modulo.rack.grupo.nome if channel.modulo.rack.grupo_id else "-",
+                "url": _ios_module_panel_url(channel.modulo.rack_id, channel.modulo.id),
+            }
+        )
+    return payload
+
+
+def _ios_module_panel_url(rack_id, module_id):
+    return f"{reverse('ios_rack_detail', kwargs={'pk': rack_id})}?module={module_id}#rack-module-panel"
+
+
+def _ios_build_module_editor_data(slots, channel_types):
+    module_editor_data = {}
+    for slot in slots:
+        if not slot.modulo_id:
+            continue
+        modulo = slot.modulo
+        channels_payload = []
+        for channel in modulo.canais.all():
+            channels_payload.append(
+                {
+                    "id": channel.id,
+                    "indice": channel.indice,
+                    "tag": channel.tag or "",
+                    "descricao": channel.descricao or "",
+                    "tipo_id": channel.tipo_id,
+                    "comissionado": bool(channel.comissionado),
+                }
+            )
+        module_editor_data[str(modulo.id)] = {
+            "id": modulo.id,
+            "slot_id": slot.id,
+            "slot_pos": slot.posicao,
+            "nome": modulo.nome or "",
+            "display_name": modulo.nome or modulo.modulo_modelo.nome,
+            "model_name": modulo.modulo_modelo.nome,
+            "type_name": modulo.modulo_modelo.tipo_base.nome if modulo.modulo_modelo.tipo_base_id else "",
+            "brand": modulo.modulo_modelo.marca or "",
+            "model": modulo.modulo_modelo.modelo or "",
+            "channels": channels_payload,
+            "all_canais_comissionados": bool(getattr(modulo, "all_canais_comissionados", False)),
+        }
+    return module_editor_data
+
+
+def _ios_build_module_channels_summary(module_editor_data, channel_types_data):
+    type_map = {str(item["id"]): item["nome"] for item in channel_types_data}
+    payload = {}
+    for module_id, module_info in module_editor_data.items():
+        payload[module_id] = [
+            {
+                "canal": f"{int(channel['indice']):02d}",
+                "tag": channel["tag"] or "-",
+                "tipo": type_map.get(str(channel["tipo_id"]), "-"),
+            }
+            for channel in module_info.get("channels", [])
+        ]
+    return payload
+
+
 def _ip_range_values(start, end, limit=2048):
     try:
         start_ip = ipaddress.ip_address((start or "").strip())
@@ -2037,17 +2241,8 @@ def ios_list(request):
     if not cliente and not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
-    if _is_admin_user(request.user) and not cliente:
-        inventarios_qs = Inventario.objects.all()
-    else:
-        inventarios_qs = Inventario.objects.filter(
-            Q(cliente=cliente) | Q(id_inventario__in=cliente.inventarios.all())
-        )
-    locais = LocalRackIO.objects.none()
-    grupos = GrupoRackIO.objects.none()
-    if cliente:
-        locais = LocalRackIO.objects.filter(cliente=cliente).order_by("nome")
-        grupos = GrupoRackIO.objects.filter(cliente=cliente).order_by("nome")
+    inventarios_qs = _ios_inventarios_queryset(request.user, cliente)
+    locais, grupos = _ios_locais_grupos(cliente)
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
@@ -2132,133 +2327,248 @@ def ios_list(request):
                 TipoCanalIO.objects.get_or_create(nome=nome, defaults={"ativo": True})
             return redirect("ios_list")
 
-    if _is_admin_user(request.user) and not cliente:
-        racks = RackIO.objects.all()
-    else:
-        racks = RackIO.objects.filter(Q(cliente=cliente) | Q(id_planta__in=cliente.plantas.all()))
-    racks = racks.select_related("inventario", "local", "grupo").annotate(
-        ocupados=Count("slots", filter=Q(slots__modulo__isnull=False)),
-        canais_total=Count("slots__modulo__canais", distinct=True),
-        canais_comissionados=Count(
-            "slots__modulo__canais",
-            filter=Q(slots__modulo__canais__comissionado=True),
-            distinct=True,
-        ),
-    )
-    racks_ordered = racks.order_by("local__nome", "grupo__nome", "inventario__nome", "nome")
-    rack_groups = []
-    grouped = {}
-    for rack in racks_ordered:
-        rack.all_canais_comissionados = bool(rack.canais_total) and rack.canais_total == rack.canais_comissionados
-        local_name = (rack.local.nome if rack.local_id and rack.local else "").strip()
-        grupo_name = (rack.grupo.nome if rack.grupo_id and rack.grupo else "").strip()
-        local_key = local_name.lower() if local_name else "__sem_local__"
-        grupo_key = grupo_name.lower() if grupo_name else "__sem_grupo__"
-        local_bucket = grouped.setdefault(
-            local_key,
-            {
-                "local": rack.local if rack.local_id else None,
-                "groups": {},
-            },
-        )
-        group_bucket = local_bucket["groups"].setdefault(
-            grupo_key,
-            {
-                "grupo": rack.grupo if rack.grupo_id else None,
-                "racks": [],
-            },
-        )
-        group_bucket["racks"].append(rack)
-
-    for _, local_data in grouped.items():
-        group_rows = list(local_data["groups"].values())
-        rack_groups.append(
-            {
-                "local": local_data["local"],
-                "groups": group_rows,
-            }
-        )
-    channel_types = TipoCanalIO.objects.filter(ativo=True).order_by("nome")
-    locais = LocalRackIO.objects.none()
-    grupos = GrupoRackIO.objects.none()
-    if cliente:
-        locais = LocalRackIO.objects.filter(cliente=cliente).order_by("nome")
-        grupos = GrupoRackIO.objects.filter(cliente=cliente).order_by("nome")
-    search_term = request.GET.get("q", "").strip()
-    rack_filter = request.GET.get("rack", "").strip()
-    local_filter = request.GET.get("local", "").strip()
-    grupo_filter = request.GET.get("grupo", "").strip()
-    search_results = []
-    search_count = 0
-    if search_term or rack_filter or local_filter or grupo_filter:
-        slot_pos_subquery = RackSlotIO.objects.filter(modulo_id=OuterRef("modulo_id")).values("posicao")[:1]
-        search_filter = Q()
-        if search_term:
-            search_filter = (
-                Q(tag__icontains=search_term)
-                | Q(descricao__icontains=search_term)
-                | Q(modulo__nome__icontains=search_term)
-                | Q(modulo__modulo_modelo__nome__icontains=search_term)
-                | Q(modulo__modulo_modelo__marca__icontains=search_term)
-                | Q(modulo__modulo_modelo__modelo__icontains=search_term)
-                | Q(modulo__rack__nome__icontains=search_term)
-                | Q(modulo__rack__local__nome__icontains=search_term)
-                | Q(modulo__rack__grupo__nome__icontains=search_term)
-            )
-            if search_term.isdigit():
-                search_filter = search_filter | Q(indice=int(search_term))
-        channels = CanalRackIO.objects.filter(modulo__rack__in=racks)
-        if rack_filter and rack_filter.isdigit():
-            channels = channels.filter(modulo__rack_id=int(rack_filter))
-        if local_filter and local_filter.isdigit():
-            channels = channels.filter(modulo__rack__local_id=int(local_filter))
-        if grupo_filter and grupo_filter.isdigit():
-            channels = channels.filter(modulo__rack__grupo_id=int(grupo_filter))
-        if search_term:
-            channels = channels.filter(search_filter)
-        channels = (
-            channels.select_related("modulo", "modulo__rack", "modulo__modulo_modelo", "tipo")
-            .annotate(slot_pos=Subquery(slot_pos_subquery))
-            .order_by("modulo__rack__nome", "slot_pos", "indice")[:200]
-        )
-        search_results = list(channels)
-        search_count = len(search_results)
-    if request.headers.get("x-requested-with") == "XMLHttpRequest":
-        payload = []
-        for channel in search_results:
-            payload.append(
-                {
-                    "rack": channel.modulo.rack.nome,
-                    "slot": f"S{channel.slot_pos}" if channel.slot_pos else "-",
-                    "modulo": channel.modulo.nome or channel.modulo.modulo_modelo.nome,
-                    "canal": f"CH{channel.indice:02d}",
-                    "canal_tag": channel.tag or "-",
-                    "tipo": channel.tipo.nome,
-                    "local": channel.modulo.rack.local.nome if channel.modulo.rack.local_id else "-",
-                    "grupo": channel.modulo.rack.grupo.nome if channel.modulo.rack.grupo_id else "-",
-                    "url": reverse("ios_rack_modulo_detail", kwargs={"pk": channel.modulo.id}),
-                }
-            )
-        return JsonResponse(
-            {
-                "count": search_count,
-                "results": payload,
-            }
-        )
+    racks = _ios_racks_queryset(request.user, cliente)
+    rack_groups = _ios_build_rack_groups(racks, locais=locais)
+    total_grupos = sum(len(group["groups"]) for group in rack_groups)
     return render(
         request,
         "core/ios_list.html",
         {
-            "racks": racks,
             "rack_groups": rack_groups,
-            "channel_types": channel_types,
             "can_manage": bool(cliente),
+            "total_locais": len(rack_groups),
+            "total_grupos": total_grupos,
+            "total_racks": racks.count(),
+            "inventarios": inventarios_qs.order_by("nome"),
+            "locais": locais,
+            "grupos": grupos,
+        },
+    )
+
+
+@login_required
+def ios_search(request):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
+    cliente = _get_cliente(request.user)
+    if not cliente and not _is_admin_user(request.user):
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    inventarios_qs = _ios_inventarios_queryset(request.user, cliente)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_rack":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            local_id = request.POST.get("local")
+            grupo_id = request.POST.get("grupo")
+            id_planta_raw = request.POST.get("id_planta", "").strip()
+            inventario_id = request.POST.get("inventario")
+            slots_raw = request.POST.get("slots_total", "").strip()
+            try:
+                slots_total = int(slots_raw)
+            except (TypeError, ValueError):
+                slots_total = None
+            if slots_total is not None:
+                slots_total = max(1, min(60, slots_total))
+            if nome and slots_total:
+                planta = None
+                if id_planta_raw:
+                    planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
+                inventario = None
+                if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
+                    inventario = inventarios_qs.filter(pk=inventario_id).first()
+                local = None
+                if local_id and cliente:
+                    local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
+                grupo = None
+                if grupo_id and cliente:
+                    grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
+                rack = RackIO.objects.create(
+                    cliente=cliente,
+                    nome=nome,
+                    descricao=descricao,
+                    local=local,
+                    grupo=grupo,
+                    id_planta=planta,
+                    inventario=inventario,
+                    slots_total=slots_total,
+                )
+                slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
+                RackSlotIO.objects.bulk_create(slots)
+            return redirect("ios_search")
+        if action == "create_local":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("local_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de local."
+                level = "error"
+                created = False
+            else:
+                local, created = LocalRackIO.objects.get_or_create(nome=nome, cliente=cliente)
+                if created:
+                    msg = "Local criado."
+                    level = "success"
+                else:
+                    msg = "Local ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": local.id if nome and "local" in locals() else None,
+                        "nome": local.nome if nome and "local" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            return redirect("ios_search")
+        if action == "create_grupo":
+            payload = _create_grupo_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
+            return redirect("ios_search")
+
+    racks = _ios_racks_queryset(request.user, cliente)
+    locais, grupos = _ios_locais_grupos(cliente)
+    search_term = request.GET.get("q", "").strip()
+    rack_filter = request.GET.get("rack", "").strip()
+    local_filter = request.GET.get("local", "").strip()
+    grupo_filter = request.GET.get("grupo", "").strip()
+    search_results = _ios_search_channels(
+        racks,
+        search_term=search_term,
+        rack_filter=rack_filter,
+        local_filter=local_filter,
+        grupo_filter=grupo_filter,
+    )
+    search_count = len(search_results)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse(
+            {
+                "count": search_count,
+                "results": _ios_search_payload(search_results),
+            }
+        )
+
+    return render(
+        request,
+        "core/ios_search.html",
+        {
+            "can_manage": bool(cliente),
+            "racks": racks.order_by("nome"),
+            "locais": locais,
+            "grupos": grupos,
             "search_term": search_term,
             "rack_filter": rack_filter,
             "local_filter": local_filter,
             "grupo_filter": grupo_filter,
             "search_results": search_results,
             "search_count": search_count,
+        },
+    )
+
+
+@login_required
+def ios_rack_new(request):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
+    cliente = _get_cliente(request.user)
+    if not cliente and not _is_admin_user(request.user):
+        return HttpResponseForbidden("Sem cadastro de cliente.")
+
+    inventarios_qs = _ios_inventarios_queryset(request.user, cliente)
+    locais, grupos = _ios_locais_grupos(cliente)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_rack":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("nome", "").strip()
+            descricao = request.POST.get("descricao", "").strip()
+            local_id = request.POST.get("local")
+            grupo_id = request.POST.get("grupo")
+            id_planta_raw = request.POST.get("id_planta", "").strip()
+            inventario_id = request.POST.get("inventario")
+            slots_raw = request.POST.get("slots_total", "").strip()
+            try:
+                slots_total = int(slots_raw)
+            except (TypeError, ValueError):
+                slots_total = None
+            if slots_total is not None:
+                slots_total = max(1, min(60, slots_total))
+            if nome and slots_total:
+                planta = None
+                if id_planta_raw:
+                    planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
+                inventario = None
+                if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
+                    inventario = inventarios_qs.filter(pk=inventario_id).first()
+                local = None
+                if local_id and cliente:
+                    local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
+                grupo = None
+                if grupo_id and cliente:
+                    grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
+                rack = RackIO.objects.create(
+                    cliente=cliente,
+                    nome=nome,
+                    descricao=descricao,
+                    local=local,
+                    grupo=grupo,
+                    id_planta=planta,
+                    inventario=inventario,
+                    slots_total=slots_total,
+                )
+                slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
+                RackSlotIO.objects.bulk_create(slots)
+                return redirect("ios_list")
+        if action == "create_local":
+            if not cliente:
+                return HttpResponseForbidden("Sem cadastro de cliente.")
+            nome = request.POST.get("local_nome", "").strip()
+            if not nome:
+                msg = "Informe um nome de local."
+                level = "error"
+                created = False
+            else:
+                local, created = LocalRackIO.objects.get_or_create(nome=nome, cliente=cliente)
+                if created:
+                    msg = "Local criado."
+                    level = "success"
+                else:
+                    msg = "Local ja existe."
+                    level = "warning"
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": bool(nome),
+                        "created": created,
+                        "id": local.id if nome and "local" in locals() else None,
+                        "nome": local.nome if nome and "local" in locals() else None,
+                        "message": msg,
+                        "level": level,
+                    }
+                )
+            return redirect("ios_rack_new")
+        if action == "create_grupo":
+            payload = _create_grupo_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
+            return redirect("ios_rack_new")
+
+    return render(
+        request,
+        "core/ios_rack_new.html",
+        {
+            "can_manage": bool(cliente),
             "inventarios": inventarios_qs.order_by("nome"),
             "locais": locais,
             "grupos": grupos,
@@ -2304,6 +2614,18 @@ def ios_rack_detail(request, pk):
         )
     )
     message = None
+    selected_module_id = ""
+
+    def get_rack_module_or_404(module_id):
+        return get_object_or_404(
+            ModuloRackIO.objects.select_related("modulo_modelo", "rack", "modulo_modelo__tipo_base"),
+            pk=module_id,
+            rack=rack,
+        )
+
+    def redirect_to_selected_module(module_id):
+        return redirect(_ios_module_panel_url(rack.pk, module_id))
+
     if request.method == "POST":
         action = request.POST.get("action")
         if action in {
@@ -2315,6 +2637,10 @@ def ios_rack_detail(request, pk):
             "remove_from_slot",
             "move_left",
             "move_right",
+            "update_selected_module",
+            "delete_selected_module",
+            "bulk_update_channels",
+            "inline_update_channel",
         } and not can_manage:
             return HttpResponseForbidden("Sem permissao.")
         if action == "create_local":
@@ -2350,6 +2676,89 @@ def ios_rack_detail(request, pk):
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(payload)
             return redirect("ios_rack_detail", pk=rack.pk)
+        if action == "update_selected_module":
+            module_id = request.POST.get("module_id")
+            module = get_rack_module_or_404(module_id)
+            current_slot = RackSlotIO.objects.filter(rack=rack, modulo=module).first()
+            nome = request.POST.get("nome", "").strip()
+            if nome:
+                module.nome = nome
+                module.save(update_fields=["nome"])
+            target_slot_id = request.POST.get("slot_id")
+            moved = False
+            if target_slot_id:
+                target_slot = get_object_or_404(RackSlotIO, pk=target_slot_id, rack=rack)
+                if not target_slot.modulo_id:
+                    if current_slot:
+                        current_slot.modulo = None
+                        current_slot.save(update_fields=["modulo"])
+                    target_slot.modulo = module
+                    target_slot.save(update_fields=["modulo"])
+                    moved = True
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                current_slot = RackSlotIO.objects.filter(rack=rack, modulo=module).first()
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "module_id": module.id,
+                        "name": module.nome or module.modulo_modelo.nome,
+                        "slot_pos": current_slot.posicao if current_slot else None,
+                        "moved": moved,
+                    }
+                )
+            return redirect_to_selected_module(module.id)
+        if action == "delete_selected_module":
+            module_id = request.POST.get("module_id")
+            module = get_rack_module_or_404(module_id)
+            module.delete()
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "deleted_module_id": int(module_id)})
+            return redirect("ios_rack_detail", pk=rack.pk)
+        if action == "bulk_update_channels":
+            module_id = request.POST.get("module_id")
+            module = get_rack_module_or_404(module_id)
+            channel_ids = request.POST.getlist("channel_id")
+            channels_qs = module.canais.filter(id__in=channel_ids)
+            channels_map = {str(channel.id): channel for channel in channels_qs}
+            for channel_id in channel_ids:
+                channel = channels_map.get(channel_id)
+                if not channel:
+                    continue
+                tag_raw = request.POST.get(f"tag_{channel_id}", "")
+                descricao_raw = request.POST.get(f"descricao_{channel_id}", "")
+                tipo_id = request.POST.get(f"tipo_{channel_id}")
+                comissionado = request.POST.get(f"comissionado_{channel_id}") == "on"
+                channel.tag = _normalize_channel_tag(tag_raw)
+                channel.descricao = (descricao_raw or "").strip()
+                if tipo_id:
+                    channel.tipo_id = tipo_id
+                channel.comissionado = comissionado
+            if channels_map:
+                CanalRackIO.objects.bulk_update(
+                    channels_map.values(),
+                    ["tag", "descricao", "tipo_id", "comissionado"],
+                )
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "updated": len(channels_map), "module_id": module.id})
+            return redirect_to_selected_module(module.id)
+        if action == "inline_update_channel":
+            module_id = request.POST.get("module_id")
+            module = get_rack_module_or_404(module_id)
+            channel_id = request.POST.get("channel_id")
+            channel = get_object_or_404(module.canais, pk=channel_id)
+            tag_raw = request.POST.get("tag", "")
+            descricao_raw = request.POST.get("descricao", "")
+            tipo_id = request.POST.get("tipo")
+            comissionado = request.POST.get("comissionado") == "on"
+            channel.tag = _normalize_channel_tag(tag_raw)
+            channel.descricao = (descricao_raw or "").strip()
+            if tipo_id:
+                channel.tipo_id = tipo_id
+            channel.comissionado = comissionado
+            channel.save(update_fields=["tag", "descricao", "tipo_id", "comissionado"])
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "module_id": module.id, "channel_id": channel.id})
+            return redirect_to_selected_module(module.id)
         if action == "update_rack":
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
@@ -2402,22 +2811,20 @@ def ios_rack_detail(request, pk):
                             .select_related("tipo_base")
                             .order_by("nome")
                         )
-                        modulo_ids = [slot.modulo_id for slot in slots if slot.modulo_id]
-                        module_channels = {}
-                        if modulo_ids:
-                            channels = (
-                                CanalRackIO.objects.filter(modulo_id__in=modulo_ids)
-                                .select_related("tipo")
-                                .order_by("modulo_id", "indice")
-                            )
-                            for channel in channels:
-                                module_channels.setdefault(channel.modulo_id, []).append(
-                                    {
-                                        "canal": f"{channel.indice:02d}",
-                                        "tag": channel.tag or "-",
-                                        "tipo": channel.tipo.nome if channel.tipo_id else "-",
-                                    }
-                                )
+                        channel_types = list(TipoCanalIO.objects.filter(ativo=True).order_by("nome"))
+                        channel_types_data = [
+                            {"id": channel_type.id, "nome": channel_type.nome} for channel_type in channel_types
+                        ]
+                        vacant_slots = list(
+                            RackSlotIO.objects.filter(rack=rack, modulo__isnull=True)
+                            .order_by("posicao")
+                            .values("id", "posicao")
+                        )
+                        module_editor_data = _ios_build_module_editor_data(slots, channel_types)
+                        module_channels = _ios_build_module_channels_summary(
+                            module_editor_data,
+                            channel_types_data,
+                        )
                         ocupados = rack.slots.filter(modulo__isnull=False).count()
                         slots_livres = max(rack.slots_total - ocupados, 0)
                         return render(
@@ -2429,11 +2836,16 @@ def ios_rack_detail(request, pk):
                                 "modules": modules,
                                 "ocupados": ocupados,
                                 "slots_livres": slots_livres,
-                                "module_channels": module_channels,
                                 "message": message,
+                                "can_manage": can_manage,
                                 "inventarios": inventarios_qs.order_by("nome"),
                                 "locais": locais,
                                 "grupos": grupos,
+                                "channel_types_data": channel_types_data,
+                                "vacant_slots": vacant_slots,
+                                "module_editor_data": module_editor_data,
+                                "module_channels": module_channels,
+                                "selected_module_id": "",
                             },
                         )
                     slots_para_remover.delete()
@@ -2556,21 +2968,21 @@ def ios_rack_detail(request, pk):
     for slot in slots:
         if slot.modulo_id:
             slot.modulo.all_canais_comissionados = modulo_status.get(slot.modulo_id, False)
-    module_channels = {}
-    if modulo_ids:
-        channels = (
-            CanalRackIO.objects.filter(modulo_id__in=modulo_ids)
-            .select_related("tipo")
-            .order_by("modulo_id", "indice")
-        )
-        for channel in channels:
-            module_channels.setdefault(channel.modulo_id, []).append(
-                {
-                    "canal": f"{channel.indice:02d}",
-                    "tag": channel.tag or "-",
-                    "tipo": channel.tipo.nome if channel.tipo_id else "-",
-                }
-            )
+    channel_types = list(TipoCanalIO.objects.filter(ativo=True).order_by("nome"))
+    channel_types_data = [{"id": channel_type.id, "nome": channel_type.nome} for channel_type in channel_types]
+    module_editor_data = _ios_build_module_editor_data(slots, channel_types)
+    module_channels = _ios_build_module_channels_summary(
+        module_editor_data,
+        channel_types_data,
+    )
+    vacant_slots = list(
+        RackSlotIO.objects.filter(rack=rack, modulo__isnull=True)
+        .order_by("posicao")
+        .values("id", "posicao")
+    )
+    selected_module_id_raw = request.GET.get("module", "").strip()
+    if selected_module_id_raw and selected_module_id_raw in module_editor_data:
+        selected_module_id = selected_module_id_raw
     modules = (
         ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True))
         .select_related("tipo_base")
@@ -2598,11 +3010,16 @@ def ios_rack_detail(request, pk):
             "ocupados": ocupados,
             "slots_livres": slots_livres,
             "canais_disponiveis": canais_disponiveis,
-            "module_channels": module_channels,
             "message": message,
+            "can_manage": can_manage,
             "inventarios": inventarios_qs.order_by("nome"),
             "locais": locais,
             "grupos": grupos,
+            "channel_types_data": channel_types_data,
+            "vacant_slots": vacant_slots,
+            "module_editor_data": module_editor_data,
+            "module_channels": module_channels,
+            "selected_module_id": selected_module_id,
         },
     )
 
@@ -5645,6 +6062,8 @@ def ios_rack_modulo_detail(request, pk):
             )
         )
     )
+    if request.method == "GET":
+        return redirect(_ios_module_panel_url(module.rack_id, module.id))
     slot = RackSlotIO.objects.filter(modulo=module).select_related("rack").first()
     prev_slot = None
     next_slot = None

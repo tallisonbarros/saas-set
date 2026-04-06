@@ -1,0 +1,244 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Novo Rack{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'ios_list' %}">IOs</a>
+    <span class="crumb-sep">/</span>
+    <span>Novo rack</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <div class="radar-export-modal is-open" id="ios-rack-new-modal">
+    <a class="radar-export-modal-backdrop" href="{% url 'ios_list' %}" aria-label="Fechar"></a>
+    <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ios-rack-new-title">
+      <header class="radar-export-modal-head">
+        <h2 id="ios-rack-new-title">Novo rack</h2>
+        <a class="btn btn-outline btn-compact" href="{% url 'ios_list' %}">Fechar</a>
+      </header>
+      <div class="radar-export-modal-body">
+        {% if can_manage %}
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_rack">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome do rack</span>
+                <input type="text" name="nome" placeholder="Rack Principal" required autofocus>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
+              </label>
+              <label class="field">
+                <div class="field-row">
+                  <span>Local</span>
+                  <details class="inline-pop inline-pop-centered" id="local-pop">
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Local</label>
+                      <input type="text" name="local_nome" form="create-local-form" placeholder="Novo local">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-local-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="local" id="local-select">
+                  <option value="">Sem local</option>
+                  {% for local in locais %}
+                    <option value="{{ local.id }}">{{ local.nome }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <div class="field-row">
+                  <span>Grupo</span>
+                  <details class="inline-pop inline-pop-centered" id="grupo-pop">
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Grupo</label>
+                      <input type="text" name="grupo_nome" form="create-grupo-form" placeholder="Novo grupo">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-grupo-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="grupo" id="grupo-select">
+                  <option value="">Sem grupo</option>
+                  {% for grupo in grupos %}
+                    <option value="{{ grupo.id }}">{{ grupo.nome }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <span>ID_PLANTA</span>
+                <input type="text" name="id_planta" placeholder="PLANTA-001">
+              </label>
+              <label class="field">
+                <span>Slots totais</span>
+                <input type="number" name="slots_total" min="1" max="60" value="10" required>
+              </label>
+            </div>
+            <div id="local-message" class="notice" style="display: none;"></div>
+            <div id="grupo-message" class="notice" style="display: none;"></div>
+            <footer class="radar-export-modal-foot">
+              <button class="btn btn-primary" type="submit">Salvar rack</button>
+            </footer>
+          </form>
+          <form id="create-local-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_local">
+          </form>
+          <form id="create-grupo-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_grupo">
+          </form>
+        {% else %}
+          <div class="muted">Apenas clientes cadastrados podem criar racks.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  <script>
+    (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+      function setMessage(boxId, message, level) {
+        var box = document.getElementById(boxId);
+        if (!box) {
+          return;
+        }
+        box.textContent = message;
+        box.className = "notice notice-" + (level || "info");
+        box.style.display = "block";
+      }
+      function bindCadastro() {
+        var formCadastro = document.getElementById("create-local-form");
+        var input = document.querySelector("input[name='local_nome'][form='create-local-form']");
+        var select = document.getElementById("local-select");
+        var details = document.getElementById("local-pop");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("local-message", "Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage("local-message", payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("local-message", "Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+      function bindGrupo() {
+        var formCadastro = document.getElementById("create-grupo-form");
+        var input = document.querySelector("input[name='grupo_nome'][form='create-grupo-form']");
+        var select = document.getElementById("grupo-select");
+        var details = document.getElementById("grupo-pop");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("grupo-message", "Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage("grupo-message", payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("grupo-message", "Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+      bindCadastro();
+      bindGrupo();
+    })();
+  </script>
+{% endblock %}

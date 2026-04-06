@@ -1,0 +1,584 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Pesquisa de I/Os{% endblock %}
+{% block body_class %}page page-ios{% endblock %}
+
+{% block header %}
+  <header class="site-header">
+    <div class="nav-shell ios-header-shell">
+      <div class="nav-top ios-header-top">
+        <div class="ios-header-left">
+          <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
+        </div>
+        <a class="brand ios-brand-center" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
+          <img class="logo ios-logo-small" src="{% static 'core/logoset.png' %}" alt="Logo SET">
+        </a>
+        <div class="ios-header-right">
+          {% if request.user.is_authenticated %}
+            <div class="nav-actions user-actions-bar">
+              <a class="profile-icon-btn" href="{% url 'meu_perfil' %}" title="Meu Perfil" aria-label="Meu Perfil">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                  <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+              </a>
+              <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="btn btn-ghost btn-compact logout-btn" type="submit" aria-label="Sair">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M10 6H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                    <path d="M15 16l4-4-4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M9 12h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                  </svg>
+                  <span class="logout-text">Sair</span>
+                </button>
+              </form>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </header>
+{% endblock %}
+
+{% block content %}
+  <section class="ios-ops-shell">
+    <div class="ios-ops-topbar">
+      <div class="hud-menu ios-hud-menu" aria-label="Menu do modulo">
+        <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
+        <a class="hud-menu-pill" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
+        {% if can_manage %}
+          <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ios-rack-open>Novo rack</button>
+        {% endif %}
+      </div>
+    </div>
+
+    <section class="io-card io-wide io-search">
+    <div class="io-card-head">
+      <div>
+        <h2 class="io-title">Pesquisa de I/Os</h2>
+        <p class="muted">Busque por rack, modulo, canal ou TAG.</p>
+      </div>
+    </div>
+    <form class="io-search-form" method="get">
+      <div class="io-search-row">
+        <label class="field io-search-field">
+          <span>Pesquisar</span>
+          <input type="text" name="q" value="{{ search_term }}" placeholder="Ex: Rack Principal, Modulo A, Canal 05" autocomplete="off">
+        </label>
+        <label class="field io-search-field">
+          <span>Rack</span>
+          <select name="rack" id="io-search-rack">
+            <option value="">Todos</option>
+            {% for rack in racks %}
+              <option value="{{ rack.id }}" {% if rack_filter == rack.id|stringformat:"s" %}selected{% endif %}>
+                {{ rack.nome }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field io-search-field">
+          <span>Local</span>
+          <select name="local" id="io-search-local">
+            <option value="">Todos</option>
+            {% for local in locais %}
+              <option value="{{ local.id }}" {% if local_filter == local.id|stringformat:"s" %}selected{% endif %}>
+                {{ local.nome }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field io-search-field">
+          <span>Grupo</span>
+          <select name="grupo" id="io-search-grupo">
+            <option value="">Todos</option>
+            {% for grupo in grupos %}
+              <option value="{{ grupo.id }}" {% if grupo_filter == grupo.id|stringformat:"s" %}selected{% endif %}>
+                {{ grupo.nome }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="io-search-actions">
+          <button class="btn btn-primary" type="submit">Pesquisar</button>
+          {% if search_term or rack_filter or local_filter or grupo_filter %}
+            <a class="btn btn-ghost" href="{% url 'ios_search' %}">Limpar</a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+    <div class="io-search-loading is-hidden" id="io-search-loading">Buscando...</div>
+    <div id="io-search-results" {% if not search_term and not rack_filter and not local_filter and not grupo_filter %}class="is-hidden"{% endif %}>
+      <div class="io-search-meta io-search-meta-alert" id="io-search-meta">
+        <span class="slot-badge" id="io-search-count">{{ search_count }} resultado{{ search_count|pluralize }}</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table io-search-table">
+          <thead>
+            <tr>
+              <th>Rack</th>
+              <th>Local</th>
+              <th>Grupo</th>
+              <th>Slot</th>
+              <th>Canal</th>
+              <th>Tipo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="io-search-table-body">
+            {% for channel in search_results %}
+              <tr>
+                <td>{{ channel.modulo.rack.nome }}</td>
+                <td>{% if channel.modulo.rack.local %}{{ channel.modulo.rack.local.nome }}{% else %}-{% endif %}</td>
+                <td>{% if channel.modulo.rack.grupo %}{{ channel.modulo.rack.grupo.nome }}{% else %}-{% endif %}</td>
+                <td>
+                  {% if channel.slot_pos %}
+                    S{{ channel.slot_pos }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>
+                  CH{{ channel.indice }} -
+                  {% if channel.tag %}
+                    {{ channel.tag }}
+                  {% else %}
+                    Sem TAG
+                  {% endif %}
+                </td>
+                <td>{{ channel.tipo.nome }}</td>
+                <td>
+                  <a class="btn btn-ghost icon-only" href="{% url 'ios_rack_detail' channel.modulo.rack.id %}?module={{ channel.modulo.id }}#rack-module-panel" aria-label="Abrir painel do modulo" title="Abrir painel">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M14 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                      <path d="M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                    </svg>
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="notice notice-warning {% if search_results %}is-hidden{% endif %}" id="io-search-empty">
+        Nenhum resultado encontrado.
+      </div>
+    </div>
+    </section>
+  </section>
+
+  {% if can_manage %}
+    <div class="radar-export-modal" id="ios-rack-modal" hidden>
+      <div class="radar-export-modal-backdrop" data-ios-rack-close></div>
+      <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ios-rack-modal-title">
+        <header class="radar-export-modal-head">
+          <h2 id="ios-rack-modal-title">Novo rack</h2>
+          <button class="btn btn-outline btn-compact" type="button" data-ios-rack-close>Fechar</button>
+        </header>
+        <div class="radar-export-modal-body">
+          <form class="io-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_rack">
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Nome do rack</span>
+                <input type="text" name="nome" placeholder="Rack Principal" required data-ios-rack-autofocus>
+              </label>
+              <label class="field">
+                <span>Descricao</span>
+                <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
+              </label>
+              <label class="field">
+                <div class="field-row">
+                  <span>Local</span>
+                  <details class="inline-pop inline-pop-centered" id="local-pop">
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Local</label>
+                      <input type="text" name="local_nome" form="create-local-form" placeholder="Novo local">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-local-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="local" id="local-select">
+                  <option value="">Sem local</option>
+                  {% for local in locais %}
+                    <option value="{{ local.id }}">{{ local.nome }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <div class="field-row">
+                  <span>Grupo</span>
+                  <details class="inline-pop inline-pop-centered" id="grupo-pop">
+                    <summary>+ novo</summary>
+                    <div class="inline-pop-body">
+                      <label>Grupo</label>
+                      <input type="text" name="grupo_nome" form="create-grupo-form" placeholder="Novo grupo">
+                      <button class="btn btn-ghost btn-compact" type="submit" form="create-grupo-form">Adicionar</button>
+                    </div>
+                  </details>
+                </div>
+                <select name="grupo" id="grupo-select">
+                  <option value="">Sem grupo</option>
+                  {% for grupo in grupos %}
+                    <option value="{{ grupo.id }}">{{ grupo.nome }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <span>ID_PLANTA</span>
+                <input type="text" name="id_planta" placeholder="PLANTA-001">
+              </label>
+              <label class="field">
+                <span>Slots totais</span>
+                <input type="number" name="slots_total" min="1" max="60" value="10" required>
+              </label>
+            </div>
+            <div id="local-message" class="notice" style="display: none;"></div>
+            <div id="grupo-message" class="notice" style="display: none;"></div>
+            <footer class="radar-export-modal-foot">
+              <button class="btn btn-primary" type="submit">Salvar rack</button>
+            </footer>
+          </form>
+          <form id="create-local-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_local">
+          </form>
+          <form id="create-grupo-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_grupo">
+          </form>
+        </div>
+      </section>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  <script>
+    (function () {
+      var modal = document.getElementById("ios-rack-modal");
+      var openButtons = document.querySelectorAll("[data-ios-rack-open]");
+      var closeButtons = document.querySelectorAll("[data-ios-rack-close]");
+      var autofocusInput = modal ? modal.querySelector("[data-ios-rack-autofocus]") : null;
+
+      function openModal() {
+        if (!modal) {
+          return;
+        }
+        modal.hidden = false;
+        modal.classList.add("is-open");
+        document.body.classList.add("radar-export-modal-open");
+        if (autofocusInput) {
+          window.setTimeout(function () {
+            autofocusInput.focus();
+          }, 0);
+        }
+      }
+
+      function closeModal() {
+        if (!modal) {
+          return;
+        }
+        modal.classList.remove("is-open");
+        modal.hidden = true;
+        document.body.classList.remove("radar-export-modal-open");
+      }
+
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+
+      function setMessage(boxId, message, level) {
+        var box = document.getElementById(boxId);
+        if (!box) {
+          return;
+        }
+        box.textContent = message;
+        box.className = "notice notice-" + (level || "info");
+        box.style.display = "block";
+      }
+
+      function bindCadastro() {
+        var formCadastro = document.getElementById("create-local-form");
+        var input = document.querySelector("input[name='local_nome'][form='create-local-form']");
+        var select = document.getElementById("local-select");
+        var details = document.getElementById("local-pop");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("local-message", "Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage("local-message", payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("local-message", "Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+
+      function bindGrupo() {
+        var formCadastro = document.getElementById("create-grupo-form");
+        var input = document.querySelector("input[name='grupo_nome'][form='create-grupo-form']");
+        var select = document.getElementById("grupo-select");
+        var details = document.getElementById("grupo-pop");
+        if (!formCadastro || !input || !select || !details) {
+          return;
+        }
+        formCadastro.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var value = input.value.trim();
+          if (!value) {
+            setMessage("grupo-message", "Informe um nome valido.", "error");
+            details.open = true;
+            return;
+          }
+          var data = new FormData(formCadastro);
+          data.set(input.name, value);
+          fetch(window.location.pathname + window.location.search, {
+            method: "POST",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: data,
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function (payload) {
+              if (payload && payload.id && payload.nome) {
+                var exists = Array.from(select.options).some(function (opt) {
+                  return opt.value === String(payload.id);
+                });
+                if (!exists) {
+                  var option = document.createElement("option");
+                  option.value = payload.id;
+                  option.textContent = payload.nome;
+                  select.appendChild(option);
+                }
+                select.value = String(payload.id);
+              }
+              if (payload && payload.message) {
+                setMessage("grupo-message", payload.message, payload.level);
+              }
+              if (payload && payload.ok) {
+                input.value = "";
+                details.open = false;
+              } else {
+                details.open = true;
+              }
+            })
+            .catch(function () {
+              setMessage("grupo-message", "Nao foi possivel salvar agora.", "error");
+              details.open = true;
+            });
+        });
+      }
+
+      function debounce(fn, wait) {
+        var timeout;
+        return function () {
+          var context = this;
+          var args = arguments;
+          clearTimeout(timeout);
+          timeout = setTimeout(function () {
+            fn.apply(context, args);
+          }, wait);
+        };
+      }
+
+      function updateSearchUI(payload) {
+        var resultsWrap = document.getElementById("io-search-results");
+        var countEl = document.getElementById("io-search-count");
+        var body = document.getElementById("io-search-table-body");
+        var emptyEl = document.getElementById("io-search-empty");
+        var metaEl = document.getElementById("io-search-meta");
+        if (!resultsWrap || !countEl || !body || !emptyEl) {
+          return;
+        }
+        var count = payload.count || 0;
+        countEl.textContent = count + " resultado" + (count === 1 ? "" : "s");
+        body.innerHTML = "";
+        if (!payload.results || !payload.results.length) {
+          emptyEl.textContent = "Nenhum resultado encontrado.";
+          emptyEl.classList.remove("is-hidden");
+          if (metaEl) {
+            metaEl.classList.remove("notice", "notice-success");
+          }
+          resultsWrap.classList.remove("is-hidden");
+          return;
+        }
+        if (metaEl) {
+          metaEl.classList.add("notice", "notice-success");
+        }
+        payload.results.forEach(function (row) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + row.rack + "</td>" +
+            "<td>" + row.local + "</td>" +
+            "<td>" + row.grupo + "</td>" +
+            "<td>" + row.slot + "</td>" +
+            "<td>" + row.canal + " - " + row.canal_tag + "</td>" +
+            "<td>" + row.tipo + "</td>" +
+            "<td><a class=\"btn btn-ghost icon-only\" href=\"" + row.url + "\" aria-label=\"Abrir painel do modulo\" title=\"Abrir painel\">" +
+            "<svg class=\"icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">" +
+            "<path d=\"M14 5l7 7-7 7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>" +
+            "<path d=\"M3 12h18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"></path>" +
+            "</svg></a></td>";
+          body.appendChild(tr);
+        });
+        emptyEl.classList.add("is-hidden");
+        resultsWrap.classList.remove("is-hidden");
+      }
+
+      function bindSearch() {
+        var form = document.querySelector(".io-search-form");
+        var input = form ? form.querySelector("input[name='q']") : null;
+        var rackSelect = document.getElementById("io-search-rack");
+        var localSelect = document.getElementById("io-search-local");
+        var grupoSelect = document.getElementById("io-search-grupo");
+        var loadingEl = document.getElementById("io-search-loading");
+        var metaEl = document.getElementById("io-search-meta");
+        if (!form || !input || !rackSelect || !localSelect || !grupoSelect) {
+          return;
+        }
+
+        var runSearch = function () {
+          var term = input.value.trim();
+          var rack = rackSelect.value;
+          var local = localSelect.value;
+          var grupo = grupoSelect.value;
+          var wrap = document.getElementById("io-search-results");
+          var emptyEl = document.getElementById("io-search-empty");
+
+          if (!term && !rack && !local && !grupo) {
+            if (wrap) {
+              wrap.classList.add("is-hidden");
+            }
+            if (loadingEl) {
+              loadingEl.classList.add("is-hidden");
+            }
+            return;
+          }
+
+          if (loadingEl) {
+            loadingEl.classList.remove("is-hidden");
+          }
+
+          var params = new URLSearchParams();
+          if (term) {
+            params.set("q", term);
+          }
+          if (rack) {
+            params.set("rack", rack);
+          }
+          if (local) {
+            params.set("local", local);
+          }
+          if (grupo) {
+            params.set("grupo", grupo);
+          }
+
+          fetch(window.location.pathname + "?" + params.toString(), {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          })
+            .then(function (resp) {
+              if (!resp.ok) {
+                throw new Error("HTTP " + resp.status);
+              }
+              return resp.json();
+            })
+            .then(updateSearchUI)
+            .catch(function () {
+              if (emptyEl) {
+                emptyEl.textContent = "Nao foi possivel buscar agora.";
+                emptyEl.classList.remove("is-hidden");
+              }
+              if (metaEl) {
+                metaEl.classList.remove("notice", "notice-success");
+              }
+              if (wrap) {
+                wrap.classList.remove("is-hidden");
+              }
+            })
+            .finally(function () {
+              if (loadingEl) {
+                loadingEl.classList.add("is-hidden");
+              }
+            });
+        };
+
+        var debounced = debounce(runSearch, 300);
+        input.addEventListener("input", debounced);
+        rackSelect.addEventListener("change", runSearch);
+        localSelect.addEventListener("change", runSearch);
+        grupoSelect.addEventListener("change", runSearch);
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          runSearch();
+        });
+      }
+
+      openButtons.forEach(function (button) {
+        button.addEventListener("click", openModal);
+      });
+      closeButtons.forEach(function (button) {
+        button.addEventListener("click", closeModal);
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && modal && modal.classList.contains("is-open")) {
+          closeModal();
+        }
+      });
+      bindCadastro();
+      bindGrupo();
+      bindSearch();
+    })();
+  </script>
+{% endblock %}
