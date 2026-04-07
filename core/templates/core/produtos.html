@@ -1,0 +1,190 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Produtos{% endblock %}
+
+{% block content %}
+  <section class="card stack admin-shell">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Administracao</div>
+        <div class="hud-pill">Produtos</div>
+      </div>
+      <div class="page-hud-head">
+        <div class="page-hud-main">
+          <div class="page-kicker">Catalogo comercial</div>
+          <h1 class="page-title">Produtos</h1>
+          <p class="page-subtitle">Gerencie os produtos pagos e a estrutura comercial usada para trial e liberacao manual.</p>
+        </div>
+      </div>
+      <div class="hud-meta">Os acessos por usuario sao gerenciados dentro de Usuarios. Aqui fica o catalogo base dos produtos.</div>
+    </div>
+
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
+
+    <div class="admin-metric-grid">
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Produtos</div>
+        <div class="admin-metric-value">{{ products|length }}</div>
+        <div class="admin-metric-note">Catalogados no admin interno.</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Acessos totais</div>
+        <div class="admin-metric-value">{{ total_product_accesses }}</div>
+        <div class="admin-metric-note">Soma de usuarios vinculados aos produtos.</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Landing atual</div>
+        <div class="admin-metric-value">1</div>
+        <div class="admin-metric-note"><a class="hud-link" href="{% url 'produto_documentacao_tecnica' %}">Documentacao tecnica</a></div>
+      </div>
+    </div>
+
+    <div class="card compact-card admin-subcard">
+      <div class="admin-title-row">
+        <div class="admin-title-stack">
+          <h2 class="admin-section-title">Novo produto</h2>
+          <p class="admin-section-note">Crie produtos futuros sem depender do Django Admin.</p>
+        </div>
+      </div>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_product">
+        <div class="admin-form-grid two-col">
+          <label class="field">
+            <span>Codigo</span>
+            <input type="text" name="codigo" placeholder="DOCUMENTACAO_TECNICA">
+          </label>
+          <label class="field">
+            <span>Nome</span>
+            <input type="text" name="nome" placeholder="Documentacao tecnica" required>
+          </label>
+          <label class="field">
+            <span>Descricao</span>
+            <input type="text" name="descricao" placeholder="Resumo curto do produto">
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" name="ativo" checked>
+            Produto ativo
+          </label>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-primary" type="submit">Criar produto</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="admin-switcher" data-switcher>
+      <div class="card compact-card admin-subcard">
+        <div class="admin-title-row">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Selecao de produto</h2>
+            <p class="admin-section-note">Escolha um produto para editar o cadastro base.</p>
+          </div>
+        </div>
+        <div class="admin-selector-bar">
+          {% for product in products %}
+            <button class="admin-selector-btn {% if forloop.first %}is-active{% endif %}" type="button" data-switch-target="produto-{{ product.id }}">
+              <span>{{ product.nome }}</span>
+              <span class="count">{{ product.acessos_ativos }}</span>
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card compact-card admin-context-shell">
+        {% for product in products %}
+          <section class="admin-context-panel {% if forloop.first %}is-active{% endif %}" data-switch-panel="produto-{{ product.id }}">
+            <form method="post" class="stack">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_product">
+              <input type="hidden" name="product_id" value="{{ product.id }}">
+
+              <div class="admin-title-row">
+                <div class="admin-title-stack">
+                  <h2 class="admin-section-title" style="margin: 0;">{{ product.nome }}</h2>
+                  <p class="admin-section-note">{{ product.codigo }}</p>
+                </div>
+                <div class="admin-pill-stack">
+                  {% if product.ativo %}
+                    <span class="admin-token is-success">Produto ativo</span>
+                  {% else %}
+                    <span class="admin-token is-neutral">Produto inativo</span>
+                  {% endif %}
+                  <span class="admin-token">{{ product.acessos_ativos }} acessos ativos</span>
+                </div>
+              </div>
+
+              <div class="admin-form-grid two-col">
+                <label class="field">
+                  <span>Codigo</span>
+                  <input type="text" name="codigo" value="{{ product.codigo }}" required>
+                </label>
+                <label class="field">
+                  <span>Nome</span>
+                  <input type="text" name="nome" value="{{ product.nome }}" required>
+                </label>
+                <label class="field" style="grid-column: 1 / -1;">
+                  <span>Descricao</span>
+                  <input type="text" name="descricao" value="{{ product.descricao }}">
+                </label>
+              </div>
+
+              <div class="admin-section-block">
+                <div class="admin-token-row">
+                  <span class="admin-token is-neutral">{{ product.total_acessos }} acessos totais</span>
+                  {% if product.codigo == "DOCUMENTACAO_TECNICA" %}
+                    <span class="admin-token is-warn"><a class="hud-link" href="{% url 'produto_documentacao_tecnica' %}">Abrir landing</a></span>
+                  {% endif %}
+                </div>
+                <label class="checkbox-item">
+                  <input type="checkbox" name="ativo" {% if product.ativo %}checked{% endif %}>
+                  Produto ativo
+                </label>
+              </div>
+
+              <div class="page-actions">
+                <button class="btn btn-primary" type="submit">Salvar produto</button>
+              </div>
+            </form>
+          </section>
+        {% empty %}
+          <section class="admin-context-panel is-active">
+            <p class="muted">Nenhum produto cadastrado.</p>
+          </section>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    (function () {
+      const switchers = document.querySelectorAll("[data-switcher]");
+      switchers.forEach((switcher) => {
+        const buttons = Array.from(switcher.querySelectorAll("[data-switch-target]"));
+        const panels = Array.from(switcher.querySelectorAll("[data-switch-panel]"));
+        if (!buttons.length || !panels.length) return;
+
+        const activate = (target) => {
+          buttons.forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.switchTarget === target);
+          });
+          panels.forEach((panel) => {
+            panel.classList.toggle("is-active", panel.dataset.switchPanel === target);
+          });
+        };
+
+        const initial = buttons.find((button) => button.classList.contains("is-active")) || buttons[0];
+        activate(initial.dataset.switchTarget);
+
+        buttons.forEach((button) => {
+          button.addEventListener("click", () => activate(button.dataset.switchTarget));
+        });
+      });
+    })();
+  </script>
+{% endblock %}

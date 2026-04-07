@@ -33,6 +33,8 @@ from .models import (
     TipoPerfil,
     TipoAtivo,
     App,
+    AcessoProdutoUsuario,
+    ProdutoPlataforma,
     SystemConfiguration,
 )
 
@@ -167,6 +169,21 @@ class AppAdmin(admin.ModelAdmin):
     list_display = ("nome", "slug", "ativo", "icon", "logo", "theme_color", "criado_em")
     search_fields = ("nome", "slug")
     list_filter = ("ativo",)
+
+
+@admin.register(ProdutoPlataforma)
+class ProdutoPlataformaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "codigo", "ativo", "atualizado_em")
+    search_fields = ("nome", "codigo")
+    list_filter = ("ativo",)
+
+
+@admin.register(AcessoProdutoUsuario)
+class AcessoProdutoUsuarioAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "produto", "origem", "status", "trial_fim", "acesso_fim", "atualizado_em")
+    search_fields = ("usuario__username", "usuario__email", "produto__nome", "produto__codigo")
+    list_filter = ("produto", "origem", "status")
+    autocomplete_fields = ("usuario", "produto")
 
 
 @admin.register(SystemConfiguration)

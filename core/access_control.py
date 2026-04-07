@@ -1,5 +1,13 @@
 import re
 
+from django.utils import timezone
+
+
+TRIAL_DURATION_DAYS = 30
+COMMERCIAL_PRODUCT_BY_MODULE = {
+    "IOS": "DOCUMENTACAO_TECNICA",
+    "LISTA_IP": "DOCUMENTACAO_TECNICA",
+}
 
 def normalize_access_code(value):
     cleaned = re.sub(r"[^0-9A-Za-z]+", "_", (value or "").strip().upper()).strip("_")
@@ -71,6 +79,73 @@ def can_access_internal_module(user, module_code):
     return bool(user_tipo_codes(user) & allowed_codes)
 
 
+def resolve_product_by_code(product_code):
+    from .models import ProdutoPlataforma
+
+    normalized = normalize_access_code(product_code)
+    if not normalized:
+        return None
+    return ProdutoPlataforma.objects.filter(codigo=normalized).first()
+
+
+def resolve_commercial_product_code(module_code):
+    return COMMERCIAL_PRODUCT_BY_MODULE.get(normalize_access_code(module_code))
+
+
+def get_user_product_access(user, product_code, sync_status=True):
+    from .models import AcessoProdutoUsuario
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+    normalized = normalize_access_code(product_code)
+    if not normalized:
+        return None
+    access = (
+        AcessoProdutoUsuario.objects.select_related("produto")
+        .filter(usuario=user, produto__codigo=normalized, produto__ativo=True)
+        .first()
+    )
+    if not access or not sync_status:
+        return access
+    now = timezone.now()
+    updated_fields = []
+    if access.status == AcessoProdutoUsuario.Status.TRIAL_ATIVO and access.trial_fim and access.trial_fim <= now:
+        access.status = AcessoProdutoUsuario.Status.EXPIRADO
+        updated_fields.append("status")
+    elif access.status == AcessoProdutoUsuario.Status.ATIVO and access.acesso_fim and access.acesso_fim <= now:
+        access.status = AcessoProdutoUsuario.Status.EXPIRADO
+        updated_fields.append("status")
+    if updated_fields:
+        access.save(update_fields=updated_fields + ["atualizado_em"])
+    return access
+
+
+def user_has_product_access(user, product_code):
+    from .models import AcessoProdutoUsuario
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if is_admin_user(user):
+        return True
+    access = get_user_product_access(user, product_code)
+    if not access:
+        return False
+    if access.status == AcessoProdutoUsuario.Status.BLOQUEADO:
+        return False
+    if access.status == AcessoProdutoUsuario.Status.TRIAL_ATIVO:
+        return not access.trial_fim or access.trial_fim > timezone.now()
+    if access.status == AcessoProdutoUsuario.Status.ATIVO:
+        return not access.acesso_fim or access.acesso_fim > timezone.now()
+    return False
+
+
+def user_has_commercial_module_access(user, module_code):
+    product_code = resolve_commercial_product_code(module_code)
+    if not product_code:
+        return False
+    return user_has_product_access(user, product_code)
+
+
 def visible_internal_module_codes(user):
     from .models import ModuloAcesso
 
@@ -81,6 +156,9 @@ def visible_internal_module_codes(user):
     for module in modules:
         if can_access_internal_module(user, module.codigo):
             visible.add(module.codigo)
+    for module_code, product_code in COMMERCIAL_PRODUCT_BY_MODULE.items():
+        if user_has_product_access(user, product_code):
+            visible.add(module_code)
     return visible
 
 

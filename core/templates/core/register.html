@@ -36,6 +36,9 @@
       {% endif %}
       <form method="post" class="stack" style="margin-top: 16px;">
         {% csrf_token %}
+        {% if next_url %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+        {% endif %}
         <div class="field">
           <label for="id_nome">Nome</label>
           {{ form.nome }}

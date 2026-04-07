@@ -1,0 +1,85 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Documentacao tecnica{% endblock %}
+
+{% block content %}
+  <section class="product-gate-shell">
+    <div class="card product-gate-card">
+      <div class="page-hud product-gate-hud">
+        <div class="hud-top">
+          <div class="hud-title">Produto</div>
+          <div class="hud-pill">Trial 30 dias</div>
+        </div>
+        <div class="page-hud-head">
+          <div>
+            <div class="page-kicker">IOs + IPs</div>
+            <h1 class="page-title">Documentacao tecnica</h1>
+            <p class="page-subtitle">Controle seus racks de IO e o inventario de rede no mesmo produto.</p>
+          </div>
+        </div>
+      </div>
+
+      {% if message %}
+        <div class="notice notice-{{ message_level }}">{{ message }}</div>
+      {% endif %}
+
+      <div class="product-gate-grid">
+        <section class="product-gate-panel">
+          <div class="product-gate-label">Inclui</div>
+          <h2>Dois modulos em um pacote</h2>
+          <p class="muted">Entrada unica para montar racks, documentar canais e manter a lista de IPs atualizada.</p>
+          <div class="product-gate-feature-list">
+            <div class="product-gate-feature">Racks e modulos de IO</div>
+            <div class="product-gate-feature">Listas de IP e inventario de rede</div>
+            <div class="product-gate-feature">Acesso individual por usuario</div>
+          </div>
+        </section>
+
+        <section class="product-gate-panel product-gate-panel-accent">
+          <div class="product-gate-label">Acesso</div>
+          {% if request.user.is_authenticated %}
+            {% if access_state == "trial_ativo" %}
+              <h2>Trial ativo</h2>
+              <p class="muted">Seu acesso experimental esta liberado ate {{ access.trial_fim|date:"d/m/Y H:i" }}.</p>
+              <div class="product-gate-actions">
+                <a class="btn btn-primary" href="{{ entry_url }}">Abrir modulos</a>
+              </div>
+            {% elif access_state == "ativo" %}
+              <h2>Acesso liberado</h2>
+              <p class="muted">Seu usuario ja possui liberacao para este produto.</p>
+              <div class="product-gate-actions">
+                <a class="btn btn-primary" href="{{ entry_url }}">Abrir modulos</a>
+              </div>
+            {% elif access_state == "expirado" %}
+              <h2>Trial encerrado</h2>
+              <p class="muted">O acesso experimental terminou. A liberacao manual pode ser feita a qualquer momento no admin.</p>
+              <div class="product-gate-actions">
+                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+              </div>
+            {% elif access_state == "bloqueado" %}
+              <h2>Acesso bloqueado</h2>
+              <p class="muted">Seu acesso a este produto foi bloqueado manualmente.</p>
+              <div class="product-gate-actions">
+                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+              </div>
+            {% else %}
+              <h2>Inicie seu trial</h2>
+              <p class="muted">Ative agora e use IOs e IPs por 30 dias sem alterar o acesso aos outros modulos da plataforma.</p>
+              <div class="product-gate-actions">
+                <a class="btn btn-primary" href="{{ activate_url }}">Iniciar trial de 30 dias</a>
+              </div>
+            {% endif %}
+          {% else %}
+            <h2>Crie sua conta e experimente</h2>
+            <p class="muted">Entre com uma conta existente ou crie um novo acesso para liberar o trial individual.</p>
+            <div class="product-gate-actions">
+              <a class="btn btn-primary" href="{{ register_url }}">Criar conta</a>
+              <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
+            </div>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+  </section>
+{% endblock %}

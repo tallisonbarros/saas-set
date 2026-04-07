@@ -95,6 +95,59 @@ class ModuloAcesso(models.Model):
         return self.nome
 
 
+class ProdutoPlataforma(models.Model):
+    codigo = models.CharField(max_length=60, unique=True)
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome"]
+
+    def save(self, *args, **kwargs):
+        self.codigo = _normalize_access_code(self.codigo or self.nome)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nome
+
+
+class AcessoProdutoUsuario(models.Model):
+    class Origem(models.TextChoices):
+        TRIAL = "TRIAL", "Trial"
+        MANUAL = "MANUAL", "Manual"
+        INTERNO = "INTERNO", "Interno"
+
+    class Status(models.TextChoices):
+        TRIAL_ATIVO = "TRIAL_ATIVO", "Trial ativo"
+        ATIVO = "ATIVO", "Ativo"
+        EXPIRADO = "EXPIRADO", "Expirado"
+        BLOQUEADO = "BLOQUEADO", "Bloqueado"
+
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="acessos_produto")
+    produto = models.ForeignKey(ProdutoPlataforma, on_delete=models.CASCADE, related_name="acessos_usuario")
+    origem = models.CharField(max_length=16, choices=Origem.choices, default=Origem.TRIAL)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TRIAL_ATIVO)
+    trial_inicio = models.DateTimeField(null=True, blank=True)
+    trial_fim = models.DateTimeField(null=True, blank=True)
+    acesso_inicio = models.DateTimeField(default=timezone.now)
+    acesso_fim = models.DateTimeField(null=True, blank=True)
+    observacao = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["produto__nome", "usuario__username"]
+        constraints = [
+            models.UniqueConstraint(fields=["usuario", "produto"], name="unique_acesso_produto_usuario"),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} - {self.produto} ({self.status})"
+
+
 class Caderno(models.Model):
     nome = models.CharField(max_length=80)
     criador = models.ForeignKey(

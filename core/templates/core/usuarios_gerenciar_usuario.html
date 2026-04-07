@@ -57,6 +57,13 @@
         <span class="muted">{% if perfil %}{{ perfil.apps.count }} vinculados{% else %}0 vinculados{% endif %}</span>
       </div>
       <div class="admin-summary-item">
+        <strong>Produtos</strong>
+        <span class="muted">
+          {{ product_access_count }} com acesso
+          {% if product_access_rows %}| {{ product_access_rows|length }} catalogados{% else %}| Nenhum produto cadastrado{% endif %}
+        </span>
+      </div>
+      <div class="admin-summary-item">
         <strong>Status da conta</strong>
         <span class="muted">
           {% if user_item.is_active %}Ativa{% else %}Inativa{% endif %}
@@ -242,6 +249,68 @@
                     value="{% if perfil %}{% for app in perfil.apps.all %}{{ app.slug }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
                   >
                 </label>
+              </div>
+            </div>
+
+            <div class="admin-section-block">
+              <div class="admin-title-stack">
+                <h3 class="admin-section-title">Produtos</h3>
+                <p class="admin-section-note">Aqui voce cria, edita ou remove o acesso comercial do usuario aos produtos pagos da plataforma.</p>
+              </div>
+              <div class="admin-reference-grid">
+                {% for row in product_access_rows %}
+                  <article class="admin-reference-item">
+                    <div class="admin-title-row">
+                      <div class="admin-title-stack">
+                        <strong>{{ row.product.nome }}</strong>
+                        <span class="muted">{{ row.product.codigo }}</span>
+                      </div>
+                      <label class="checkbox-item">
+                        <input type="checkbox" name="produto_mode_{{ row.product.id }}" value="ON" {% if row.access %}checked{% endif %}>
+                        Com acesso
+                      </label>
+                    </div>
+                    <div class="admin-form-grid two-col" style="margin-top: 12px;">
+                      <label class="field">
+                        <span>Status</span>
+                        <select name="produto_status_{{ row.product.id }}">
+                          {% for value, label in product_status_choices %}
+                            <option value="{{ value }}" {% if row.access and row.access.status == value %}selected{% elif not row.access and value == 'ATIVO' %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Origem</span>
+                        <select name="produto_origem_{{ row.product.id }}">
+                          {% for value, label in product_origin_choices %}
+                            <option value="{{ value }}" {% if row.access and row.access.origem == value %}selected{% elif not row.access and value == 'MANUAL' %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Trial ate</span>
+                        <input type="date" name="produto_trial_fim_{{ row.product.id }}" value="{% if row.access and row.access.trial_fim %}{{ row.access.trial_fim|date:'Y-m-d' }}{% endif %}">
+                      </label>
+                      <label class="field">
+                        <span>Acesso ate</span>
+                        <input type="date" name="produto_acesso_fim_{{ row.product.id }}" value="{% if row.access and row.access.acesso_fim %}{{ row.access.acesso_fim|date:'Y-m-d' }}{% endif %}">
+                      </label>
+                      <label class="field" style="grid-column: 1 / -1;">
+                        <span>Observacao</span>
+                        <input type="text" name="produto_observacao_{{ row.product.id }}" value="{% if row.access %}{{ row.access.observacao }}{% endif %}" placeholder="Liberacao manual, trial especial, observacao interna...">
+                      </label>
+                    </div>
+                    <div class="admin-token-row" style="margin-top: 10px;">
+                      {% if row.access %}
+                        <span class="admin-token is-neutral">Atualizado em {{ row.access.atualizado_em|date:"d/m/Y H:i" }}</span>
+                      {% else %}
+                        <span class="admin-token is-neutral">Sem acesso configurado</span>
+                      {% endif %}
+                    </div>
+                  </article>
+                {% empty %}
+                  <p class="muted">Nenhum produto cadastrado no modulo interno de produtos.</p>
+                {% endfor %}
               </div>
             </div>
 

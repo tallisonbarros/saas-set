@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.contrib.staticfiles import finders
 from urllib.parse import urlencode
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
@@ -52,10 +53,12 @@ from .models import (
     ListaIPID,
     ListaIPItem,
     App,
+    AcessoProdutoUsuario,
     IngestRecord,
     IngestErrorLog,
     IngestRule,
     AdminAccessLog,
+    ProdutoPlataforma,
     SystemConfiguration,
     Radar,
     RadarAtividade,
@@ -80,7 +83,15 @@ from .models import (
     AtivoItem,
     TipoAtivo,
 )
-from .access_control import can_access_internal_module, has_tipo_code, visible_internal_module_codes
+from .access_control import (
+    TRIAL_DURATION_DAYS,
+    can_access_internal_module,
+    get_user_product_access,
+    has_tipo_code,
+    resolve_commercial_product_code,
+    user_has_product_access,
+    visible_internal_module_codes,
+)
 
 logger = logging.getLogger(__name__)
 ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
@@ -439,7 +450,85 @@ def _has_tipo_any(user, nomes):
     return cliente.tipos.filter(nome__in=nomes).exists()
 
 
+def _get_safe_next_url(request, fallback="painel"):
+    next_url = (request.POST.get("next") or request.GET.get("next") or "").strip()
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return reverse(fallback)
+
+
+def _documentacao_tecnica_product():
+    produto, _ = ProdutoPlataforma.objects.get_or_create(
+        codigo="DOCUMENTACAO_TECNICA",
+        defaults={
+            "nome": "Documentacao tecnica",
+            "descricao": "Acesso conjunto aos modulos de IOs e Listas de IP.",
+            "ativo": True,
+        },
+    )
+    return produto
+
+
+def _documentacao_tecnica_entry_url():
+    return reverse("ios_list")
+
+
+def _parse_local_date_boundary(value, end=False):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = date.fromisoformat(raw)
+    except ValueError:
+        return None
+    clock = datetime.max.time().replace(microsecond=0) if end else datetime.min.time()
+    combined = datetime.combine(parsed, clock)
+    if timezone.is_naive(combined):
+        combined = timezone.make_aware(combined, timezone.get_current_timezone())
+    return combined
+
+
+def _user_documentacao_access_state(user):
+    product_code = "DOCUMENTACAO_TECNICA"
+    if user_has_product_access(user, product_code):
+        access = get_user_product_access(user, product_code)
+        if access and access.status == AcessoProdutoUsuario.Status.TRIAL_ATIVO:
+            return "trial_ativo", access
+        return "ativo", access
+    access = get_user_product_access(user, product_code)
+    if not access:
+        return "disponivel", None
+    if access.status == AcessoProdutoUsuario.Status.EXPIRADO:
+        return "expirado", access
+    if access.status == AcessoProdutoUsuario.Status.BLOQUEADO:
+        return "bloqueado", access
+    return "disponivel", access
+
+
+def _build_product_access_rows(user):
+    products = list(ProdutoPlataforma.objects.order_by("nome"))
+    accesses = {
+        access.produto_id: access
+        for access in AcessoProdutoUsuario.objects.select_related("produto").filter(usuario=user)
+    }
+    rows = []
+    for product in products:
+        rows.append({"product": product, "access": accesses.get(product.id)})
+    return rows
+
+
 def _require_internal_module_access(request, module_code):
+    product_code = resolve_commercial_product_code(module_code)
+    if product_code:
+        if user_has_product_access(request.user, product_code):
+            return None
+        state, _ = _user_documentacao_access_state(request.user)
+        query = urlencode({"state": state, "next": request.path})
+        return redirect(f"{reverse('produto_documentacao_tecnica')}?{query}")
     if can_access_internal_module(request.user, module_code):
         return None
     return HttpResponseForbidden("Sem permissao.")
@@ -2199,11 +2288,13 @@ def colaboradores_gerenciar(request):
 
 def register(request):
     if request.user.is_authenticated:
-        return redirect("painel")
+        return redirect(_get_safe_next_url(request))
     message = None
+    next_url = _get_safe_next_url(request)
     form = RegisterForm()
     if request.method == "POST":
         form = RegisterForm(request.POST)
+        next_url = _get_safe_next_url(request)
         if form.is_valid():
             user = form.save()
             nome = form.cleaned_data["nome"].strip()
@@ -2219,7 +2310,7 @@ def register(request):
             authenticated = authenticate(request, username=user.username, password=form.cleaned_data["senha"])
             if authenticated:
                 login(request, authenticated)
-                return redirect("painel")
+                return redirect(next_url)
             return redirect("login")
         message = "Revise os campos e tente novamente."
     return render(
@@ -2228,8 +2319,86 @@ def register(request):
         {
             "form": form,
             "message": message,
+            "next_url": next_url if next_url != reverse("painel") else "",
         },
     )
+
+
+def produto_documentacao_tecnica(request):
+    produto = _documentacao_tecnica_product()
+    state = (request.GET.get("state") or "").strip().lower()
+    requested_next = _get_safe_next_url(request, fallback="ios_list")
+    entry_url = _documentacao_tecnica_entry_url()
+    activate_url = reverse("produto_documentacao_tecnica_ativar")
+    if requested_next:
+        activate_url = f"{activate_url}?{urlencode({'next': requested_next})}"
+    login_url = f"{reverse('login')}?{urlencode({'next': activate_url})}"
+    register_url = f"{reverse('register')}?{urlencode({'next': activate_url})}"
+
+    access_state = "disponivel"
+    access = None
+    if request.user.is_authenticated:
+        access_state, access = _user_documentacao_access_state(request.user)
+        if not state:
+            state = access_state
+    state = state or "disponivel"
+
+    message = None
+    message_level = "info"
+    if state == "required":
+        message = "Ative o trial para liberar IOs e Listas de IP."
+    elif state == "expirado":
+        message = "Seu trial de 30 dias terminou. Entre em contato para liberar o produto novamente."
+        message_level = "warning"
+    elif state == "bloqueado":
+        message = "Seu acesso a este produto esta bloqueado no momento."
+        message_level = "warning"
+
+    return render(
+        request,
+        "core/produto_documentacao_tecnica.html",
+        {
+            "produto": produto,
+            "access": access,
+            "access_state": access_state,
+            "entry_url": entry_url,
+            "activate_url": activate_url,
+            "login_url": login_url,
+            "register_url": register_url,
+            "requested_next": requested_next,
+            "message": message,
+            "message_level": message_level,
+        },
+    )
+
+
+@login_required
+def produto_documentacao_tecnica_ativar(request):
+    produto = _documentacao_tecnica_product()
+    entry_url = _get_safe_next_url(request, fallback="ios_list")
+    access_state, access = _user_documentacao_access_state(request.user)
+    if access_state in {"trial_ativo", "ativo"}:
+        return redirect(entry_url)
+    if access_state in {"expirado", "bloqueado"}:
+        query = urlencode({"state": access_state})
+        return redirect(f"{reverse('produto_documentacao_tecnica')}?{query}")
+
+    now = timezone.now()
+    trial_end = now + timedelta(days=TRIAL_DURATION_DAYS)
+    AcessoProdutoUsuario.objects.update_or_create(
+        usuario=request.user,
+        produto=produto,
+        defaults={
+            "origem": AcessoProdutoUsuario.Origem.TRIAL,
+            "status": AcessoProdutoUsuario.Status.TRIAL_ATIVO,
+            "trial_inicio": now,
+            "trial_fim": trial_end,
+            "acesso_inicio": now,
+            "acesso_fim": None,
+            "observacao": "Trial iniciado pela landing de Documentacao tecnica.",
+        },
+    )
+    return redirect(entry_url)
 
 
 @login_required
@@ -7075,6 +7244,55 @@ def usuarios_gerenciar_usuario(request, pk):
                     app.save(update_fields=["nome"])
                 apps.append(app)
             perfil.apps.set(apps)
+            now = timezone.now()
+            for product in ProdutoPlataforma.objects.order_by("nome"):
+                access_mode = (request.POST.get(f"produto_mode_{product.id}") or "").strip().upper()
+                existing_access = AcessoProdutoUsuario.objects.filter(usuario=user, produto=product).first()
+                if access_mode != "ON":
+                    if existing_access:
+                        existing_access.delete()
+                    continue
+                status = (
+                    request.POST.get(f"produto_status_{product.id}") or AcessoProdutoUsuario.Status.ATIVO
+                ).strip().upper()
+                origem = (
+                    request.POST.get(f"produto_origem_{product.id}") or AcessoProdutoUsuario.Origem.MANUAL
+                ).strip().upper()
+                trial_fim = _parse_local_date_boundary(request.POST.get(f"produto_trial_fim_{product.id}"), end=True)
+                acesso_fim = _parse_local_date_boundary(request.POST.get(f"produto_acesso_fim_{product.id}"), end=True)
+                observacao = (request.POST.get(f"produto_observacao_{product.id}") or "").strip()
+                defaults = {
+                    "origem": origem if origem in AcessoProdutoUsuario.Origem.values else AcessoProdutoUsuario.Origem.MANUAL,
+                    "status": status if status in AcessoProdutoUsuario.Status.values else AcessoProdutoUsuario.Status.ATIVO,
+                    "observacao": observacao,
+                    "trial_fim": None,
+                    "acesso_fim": None,
+                }
+                if existing_access:
+                    defaults["acesso_inicio"] = existing_access.acesso_inicio or now
+                    defaults["trial_inicio"] = existing_access.trial_inicio
+                else:
+                    defaults["acesso_inicio"] = now
+                    defaults["trial_inicio"] = None
+                if defaults["status"] == AcessoProdutoUsuario.Status.TRIAL_ATIVO:
+                    defaults["trial_inicio"] = defaults["trial_inicio"] or now
+                    if trial_fim:
+                        defaults["trial_fim"] = trial_fim
+                    elif existing_access and existing_access.trial_fim:
+                        defaults["trial_fim"] = existing_access.trial_fim
+                    else:
+                        defaults["trial_fim"] = now + timedelta(days=TRIAL_DURATION_DAYS)
+                    defaults["acesso_fim"] = None
+                else:
+                    defaults["acesso_fim"] = acesso_fim
+                    if defaults["status"] != AcessoProdutoUsuario.Status.EXPIRADO:
+                        defaults["trial_inicio"] = None
+                        defaults["trial_fim"] = None
+                AcessoProdutoUsuario.objects.update_or_create(
+                    usuario=user,
+                    produto=product,
+                    defaults=defaults,
+                )
             return redirect("usuarios_gerenciar_usuario", pk=user.pk)
         if action == "set_password":
             new_password = request.POST.get("new_password", "").strip()
@@ -7084,6 +7302,7 @@ def usuarios_gerenciar_usuario(request, pk):
                 message = "Senha atualizada."
             else:
                 message = "Informe uma senha valida."
+    product_access_rows = _build_product_access_rows(user)
     return render(
         request,
         "core/usuarios_gerenciar_usuario.html",
@@ -7091,6 +7310,10 @@ def usuarios_gerenciar_usuario(request, pk):
             "user_item": user,
             "perfil": perfil,
             "tipos": TipoPerfil.objects.order_by("nome"),
+            "product_access_rows": product_access_rows,
+            "product_access_count": sum(1 for row in product_access_rows if row["access"]),
+            "product_status_choices": AcessoProdutoUsuario.Status.choices,
+            "product_origin_choices": AcessoProdutoUsuario.Origem.choices,
             "message": message,
         },
     )
@@ -8369,6 +8592,75 @@ def modulos_acesso_gerenciar(request):
             "core_modules": core_modules,
             "app_modules": app_modules,
             "tipos": TipoPerfil.objects.order_by("nome"),
+            "message": message,
+        },
+    )
+
+
+@login_required
+def produtos_gerenciar(request):
+    if not _is_admin_user(request.user):
+        return HttpResponseForbidden("Sem permissao.")
+    message = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_product":
+            codigo = (request.POST.get("codigo") or "").strip().upper()
+            nome = (request.POST.get("nome") or "").strip()
+            descricao = (request.POST.get("descricao") or "").strip()
+            ativo = request.POST.get("ativo") == "on"
+            if not nome:
+                message = "Informe um nome para o produto."
+            else:
+                product = ProdutoPlataforma(
+                    codigo=codigo or nome,
+                    nome=nome,
+                    descricao=descricao,
+                    ativo=ativo,
+                )
+                try:
+                    product.save()
+                    return redirect("produtos_gerenciar")
+                except Exception:
+                    message = "Nao foi possivel salvar o produto. Verifique se o codigo ja existe."
+        if action == "update_product":
+            product = get_object_or_404(ProdutoPlataforma, pk=request.POST.get("product_id"))
+            codigo = (request.POST.get("codigo") or "").strip().upper()
+            nome = (request.POST.get("nome") or "").strip()
+            descricao = (request.POST.get("descricao") or "").strip()
+            ativo = request.POST.get("ativo") == "on"
+            if not nome:
+                message = "Informe um nome para o produto."
+            else:
+                product.codigo = codigo or product.codigo
+                product.nome = nome
+                product.descricao = descricao
+                product.ativo = ativo
+                try:
+                    product.save()
+                    return redirect("produtos_gerenciar")
+                except Exception:
+                    message = "Nao foi possivel atualizar o produto. Verifique se o codigo ja existe."
+
+    products = list(
+        ProdutoPlataforma.objects.annotate(
+            total_acessos=Count("acessos_usuario"),
+            acessos_ativos=Count(
+                "acessos_usuario",
+                filter=Q(acessos_usuario__status__in=[
+                    AcessoProdutoUsuario.Status.ATIVO,
+                    AcessoProdutoUsuario.Status.TRIAL_ATIVO,
+                ]),
+            ),
+        ).order_by("nome")
+    )
+    total_product_accesses = sum(product.total_acessos for product in products)
+    return render(
+        request,
+        "core/produtos.html",
+        {
+            "products": products,
+            "total_product_accesses": total_product_accesses,
             "message": message,
         },
     )
