@@ -3985,7 +3985,7 @@ select {
   scrollbar-gutter: stable;
   scroll-snap-type: x mandatory;
   gap: var(--rack-slot-gap);
-  padding: 16px 16px 16px 14px;
+  padding: 16px 16px 16px 22px;
 }
 
 .rack-carousel-track::-webkit-scrollbar {
