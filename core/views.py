@@ -2287,6 +2287,7 @@ def ios_list(request):
                 )
                 slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
                 RackSlotIO.objects.bulk_create(slots)
+                return redirect("ios_rack_detail", pk=rack.pk)
             return redirect("ios_list")
         if action == "create_local":
             if not cliente:
@@ -2399,6 +2400,7 @@ def ios_search(request):
                 )
                 slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
                 RackSlotIO.objects.bulk_create(slots)
+                return redirect("ios_rack_detail", pk=rack.pk)
             return redirect("ios_search")
         if action == "create_local":
             if not cliente:
@@ -2529,7 +2531,7 @@ def ios_rack_new(request):
                 )
                 slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
                 RackSlotIO.objects.bulk_create(slots)
-                return redirect("ios_list")
+                return redirect("ios_rack_detail", pk=rack.pk)
         if action == "create_local":
             if not cliente:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -4253,7 +4255,7 @@ def listas_ip_list(request):
                         protocolo_padrao=protocolo_padrao,
                     )
                     _sync_lista_ip_items(lista, ip_values)
-                    return redirect("listas_ip_list")
+                    return redirect("lista_ip_detail", pk=lista.pk)
 
     if _is_admin_user(request.user) and not cliente:
         listas = ListaIP.objects.all()
@@ -4419,6 +4421,12 @@ def lista_ip_detail(request, pk):
             mac_counts[mac_key] = mac_counts.get(mac_key, 0) + 1
     nomes_repetidos = {key for key, count in nome_counts.items() if count > 1}
     macs_repetidos = {key for key, count in mac_counts.items() if count > 1}
+    page_obj = _paginate_queryset(request, items, per_page=50)
+    items = list(page_obj.object_list)
+    page_params = request.GET.copy()
+    if "page" in page_params:
+        page_params.pop("page")
+    page_query = page_params.urlencode()
     total_ips = ListaIPItem.objects.filter(lista=lista).count()
     total_preenchidos = ListaIPItem.objects.filter(
         lista=lista,
@@ -4439,6 +4447,8 @@ def lista_ip_detail(request, pk):
             "can_manage": can_manage,
             "message": message,
             "message_level": message_level,
+            "page_obj": page_obj,
+            "page_query": page_query,
             "nomes_repetidos": nomes_repetidos,
             "macs_repetidos": macs_repetidos,
         },

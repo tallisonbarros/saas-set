@@ -12,53 +12,42 @@
     <div class="bg"></div>
     {% block header %}
       <header class="site-header">
-        <div class="nav-shell">
-          <div class="nav-top">
-            <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
-            {% if request.user.is_authenticated %}
-              <div class="nav-actions user-actions-bar">
-                <a class="profile-icon-btn" href="{% url 'meu_perfil' %}" title="Meu Perfil" aria-label="Meu Perfil">
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
-                    <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-                  </svg>
-                </a>
-                <form method="post" action="{% url 'logout' %}">
-                  {% csrf_token %}
-                  <button class="btn btn-ghost btn-compact logout-btn" type="submit" aria-label="Sair">
+        <div class="nav-shell ios-header-shell">
+          <div class="nav-top ios-header-top">
+            <div class="ios-header-left">
+              <span class="version-badge" aria-label="Versao Beta">Versao Beta</span>
+            </div>
+            <a class="brand ios-brand-center" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
+              <img class="logo ios-logo-small" src="{% static 'core/logoset.png' %}" alt="Logo SET">
+            </a>
+            <div class="ios-header-right">
+              {% if request.user.is_authenticated %}
+                <div class="nav-actions user-actions-bar">
+                  <a class="profile-icon-btn" href="{% url 'meu_perfil' %}" title="Meu Perfil" aria-label="Meu Perfil">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M10 6H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-                      <path d="M15 16l4-4-4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-                      <path d="M9 12h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                      <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="1.6"></path>
+                      <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
                     </svg>
-                    <span class="logout-text">Sair</span>
-                  </button>
-                </form>
-              </div>
-            {% endif %}
+                  </a>
+                  <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button class="btn btn-ghost btn-compact logout-btn" type="submit" aria-label="Sair">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M10 6H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                        <path d="M15 16l4-4-4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M9 12h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                      </svg>
+                      <span class="logout-text">Sair</span>
+                    </button>
+                  </form>
+                </div>
+              {% endif %}
+            </div>
           </div>
-          <a class="brand brand-centered" href="{% if request.user.is_authenticated %}{% url 'painel' %}{% else %}{% url 'home' %}{% endif %}">
-            <img class="logo logo-small" src="{% static 'core/logoset.png' %}" alt="Logo">
-          </a>
-          {% if request.user.is_authenticated %}
-            {% if request.resolver_match.url_name != 'painel' and request.resolver_match.url_name != 'home' and request.resolver_match.url_name != 'login' %}
-              <div class="panel-icon-row">
-                <a class="btn btn-ghost icon-only panel-icon-btn" href="{% url 'painel' %}" title="Painel" aria-label="Painel">
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 8l8-4 8 4-8 4-8-4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
-                    <path d="M4 12l8 4 8-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
-                    <path d="M4 16l8 4 8-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"></path>
-                  </svg>
-                </a>
-              </div>
-            {% endif %}
-          {% else %}
-          {% endif %}
         </div>
       </header>
     {% endblock %}
     <main class="main">
-      {% block breadcrumbs %}{% endblock %}
       {% block content %}{% endblock %}
     </main>
     {% block footer %}

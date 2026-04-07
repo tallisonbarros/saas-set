@@ -4168,9 +4168,10 @@ select {
 .slot-card::before {
   content: "";
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 1px auto 1px 1px;
   width: 3px;
   background: linear-gradient(180deg, rgba(214, 128, 64, 0.88), rgba(214, 128, 64, 0.18));
+  border-radius: 6px 0 0 6px;
   opacity: 0.8;
 }
 
@@ -4645,6 +4646,318 @@ select {
   background: var(--surface-soft);
   color: var(--text);
   font-family: inherit;
+}
+
+button.hud-menu-pill {
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.card.ip-network-hub {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.page-hud.ip-network-hud {
+  padding: 18px 20px;
+}
+
+.io-card.ip-list-shell-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(88, 101, 115, 0.38);
+  background: linear-gradient(180deg, rgba(52, 60, 70, 0.98) 0%, rgba(35, 40, 47, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.34),
+    0 14px 26px rgba(4, 8, 14, 0.18);
+}
+
+.io-card.ip-list-shell-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)) top / 100% 28px no-repeat,
+    repeating-linear-gradient(90deg, transparent, transparent 64px, rgba(255, 255, 255, 0.025) 64px, rgba(255, 255, 255, 0.025) 65px);
+  opacity: 0.5;
+}
+
+.ip-list-grid,
+.ip-list-summary-grid {
+  gap: 12px;
+}
+
+.proposal-card.io-proposal-card.ip-list-entry-card {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 168px;
+  padding: 16px 16px 14px;
+  overflow: hidden;
+  border-radius: 12px;
+  border-color: rgba(87, 99, 112, 0.44);
+  background: linear-gradient(180deg, rgba(49, 56, 65, 0.98) 0 30px, rgba(35, 40, 47, 1) 30px 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+}
+
+.proposal-card.io-proposal-card.ip-list-entry-card::before {
+  content: "";
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  width: 3px;
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(180deg, rgba(214, 128, 64, 0.84), rgba(214, 128, 64, 0.14));
+  opacity: 0.78;
+}
+
+.ip-list-entry-kicker {
+  position: relative;
+  z-index: 1;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #aab3bc;
+}
+
+.proposal-card.io-proposal-card.ip-list-entry-card .proposal-head,
+.proposal-card.io-proposal-card.ip-list-entry-card .proposal-meta,
+.proposal-card.io-proposal-card.ip-list-entry-card .proposal-title {
+  position: relative;
+  z-index: 1;
+}
+
+.proposal-card.io-proposal-card.ip-list-entry-card > :not(.proposal-link) {
+  pointer-events: none;
+}
+
+.proposal-card.io-proposal-card.ip-list-entry-card .proposal-link {
+  z-index: 2;
+}
+
+.proposal-card.io-proposal-card.ip-list-entry-card .proposal-title {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.proposal-card.io-proposal-card.ip-list-entry-card .proposal-meta {
+  color: #98a4af;
+}
+
+.slot-badge.ip-list-badge {
+  align-self: start;
+  border-color: rgba(255, 147, 74, 0.18);
+  background: rgba(255, 147, 74, 0.08);
+  color: #cfab8a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ip-list-meta-row {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.io-card.io-wide.ip-list-panel {
+  position: relative;
+  margin-top: -2px;
+  padding: 16px 16px 14px;
+  padding-top: 26px;
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  overflow: visible;
+  background:
+    linear-gradient(180deg, rgba(112, 124, 136, 0.48), rgba(112, 124, 136, 0.04)) 0 0 / 1px 18px no-repeat,
+    linear-gradient(180deg, rgba(112, 124, 136, 0.48), rgba(112, 124, 136, 0.04)) 100% 0 / 1px 18px no-repeat,
+    linear-gradient(180deg, rgba(86, 95, 106, 0.96), rgba(58, 65, 74, 0.98)) 14px 0 / 62px 12px no-repeat,
+    linear-gradient(180deg, rgba(86, 95, 106, 0.96), rgba(58, 65, 74, 0.98)) calc(100% - 14px) 0 / 62px 12px no-repeat,
+    linear-gradient(180deg, rgba(63, 72, 82, 0.98) 0 18px, rgba(35, 40, 47, 0.98) 18px 100%);
+  box-shadow:
+    inset 1px 0 0 rgba(96, 109, 122, 0.38),
+    inset -1px 0 0 rgba(96, 109, 122, 0.38),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.34),
+    inset 0 18px 24px rgba(255, 255, 255, 0.018),
+    0 12px 22px rgba(4, 8, 14, 0.18);
+}
+
+.io-layout.ip-list-detail-layout {
+  margin-top: 8px;
+}
+
+.ip-list-toolbar {
+  margin-bottom: 16px;
+}
+
+.ip-list-search-form {
+  margin-top: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(80, 92, 106, 0.42);
+  background: linear-gradient(180deg, rgba(31, 37, 44, 0.96), rgba(24, 29, 35, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.ip-list-panel .io-card-head {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ip-list-panel .io-title {
+  font-size: 18px;
+}
+
+.ip-list-panel .io-card-head .muted {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.ip-list-search-form .io-search-row {
+  gap: 8px;
+  align-items: center;
+}
+
+.ip-list-search-form .io-search-field span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.ip-list-search-form .io-search-field input {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.ip-list-search-form .io-search-actions {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ip-list-search-form .btn {
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.table-wrap.ip-list-table-shell {
+  margin-top: 10px;
+  padding-bottom: 6px;
+  border: 1px solid rgba(80, 92, 106, 0.42);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(31, 36, 42, 0.98), rgba(24, 28, 33, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.34);
+}
+
+.ip-list-table-actions {
+  margin: 0;
+  padding: 10px 10px 0;
+  justify-content: flex-end;
+}
+
+.ip-list-save-btn {
+  border-color: rgba(92, 105, 119, 0.34);
+  background: rgba(255, 255, 255, 0.03);
+  color: #c5ced7;
+}
+
+.ip-list-save-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(118, 132, 146, 0.42);
+  color: #e3e8ed;
+}
+
+.table.ip-list-table {
+  min-width: 980px;
+  margin-top: 0;
+}
+
+.ip-list-table thead th {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.ip-list-table td:first-child {
+  color: #d7dee5;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.ip-list-table th,
+.ip-list-table td {
+  padding: 8px 8px;
+}
+
+.ip-list-table td input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(79, 92, 106, 0.42);
+  background: linear-gradient(180deg, rgba(40, 46, 53, 0.98), rgba(35, 40, 47, 0.98));
+  color: #e3e8ed;
+  font-size: 12px;
+  line-height: 1.2;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.ip-list-table td input::placeholder {
+  color: #8e99a4;
+}
+
+.ip-list-modal .radar-export-modal-dialog {
+  width: min(820px, calc(100vw - 28px));
+  border-color: rgba(85, 98, 112, 0.42);
+  background: linear-gradient(180deg, rgba(38, 44, 51, 0.99), rgba(27, 32, 38, 0.99));
+}
+
+.ip-list-modal .radar-export-modal-head {
+  border-bottom-color: rgba(85, 98, 112, 0.42);
+  background: linear-gradient(180deg, rgba(59, 68, 78, 0.98), rgba(42, 48, 56, 0.98));
+}
+
+.ip-list-modal .radar-export-modal-body {
+  gap: 14px;
+}
+
+.ip-list-modal-form {
+  margin-top: 0;
+}
+
+.ip-list-modal-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ip-list-delete-form {
+  margin-top: 2px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(85, 98, 112, 0.32);
+}
+
+.ip-list-footer-strip {
+  margin-top: 18px;
 }
 
 .colab-picker {
@@ -7686,7 +7999,7 @@ select.datagrid-filter-input optgroup {
   display: grid;
   gap: 10px;
   align-items: center;
-  grid-template-columns: 86px 132px minmax(260px, 1.5fr) 140px 112px;
+  grid-template-columns: 86px 172px minmax(260px, 1.5fr) 140px 112px;
 }
 
 .channel-index {

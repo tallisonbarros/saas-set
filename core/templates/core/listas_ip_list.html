@@ -12,71 +12,77 @@
 {% endblock %}
 
 {% block content %}
-  <section class="card">
-    <div class="page-hud">
-      <div class="hud-top">
-        <div class="hud-title">Controle de rede</div>
-        <div class="hud-pill">Listas de IP</div>
-      </div>
-      <div class="page-hud-head">
-        <div>
-          <p class="page-subtitle">Gerencie faixas de IP e inventario de equipamentos.</p>
+  <section class="ios-ops-shell">
+    <div class="ios-ops-topbar">
+      {% if can_manage and listas %}
+        <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Acoes de lista">
+          <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ip-list-create-open>Nova lista</button>
         </div>
-      </div>
-      <div class="hud-meta">Crie listas, compartilhe por ID e mantenha os dados atualizados.</div>
+      {% endif %}
     </div>
-    <div class="hud-bottom-actions">
-      {% if can_manage %}
-        <a class="btn btn-ghost btn-compact" href="#nova-lista">Nova lista</a>
+
+    {% if message %}
+      <div class="notice notice-{{ message_level }}">{{ message }}</div>
+    {% endif %}
+
+    <div class="io-layout">
+      {% if listas %}
+        <section class="io-card ip-list-shell-card">
+          <div class="io-card-head">
+            <div>
+              <h2 class="io-title">Listas cadastradas</h2>
+              <p class="muted">Selecione uma lista para editar IPs, MAC e protocolo.</p>
+            </div>
+          </div>
+          <div class="proposal-grid ip-list-grid">
+            {% for lista in listas %}
+              <article class="proposal-card io-proposal-card ip-list-entry-card">
+                <a class="proposal-link" href="{% url 'lista_ip_detail' lista.id %}" aria-label="Abrir lista"></a>
+                <div class="ip-list-entry-kicker">LISTA {{ forloop.counter|stringformat:"02d" }}</div>
+                <div class="proposal-head">
+                  <div>
+                    <div class="proposal-title">{{ lista.nome }}</div>
+                    <div class="proposal-meta">{{ lista.descricao|default:"Lista sem descricao." }}</div>
+                  </div>
+                  <span class="slot-badge ip-list-badge">{{ lista.total_ips }} IPs</span>
+                </div>
+                <div class="proposal-meta ip-list-meta-row">Faixa: {{ lista.faixa_inicio }} - {{ lista.faixa_fim }}</div>
+                {% if lista.protocolo_padrao %}
+                  <div class="proposal-meta ip-list-meta-row">Protocolo padrao: {{ lista.protocolo_padrao }}</div>
+                {% endif %}
+                {% if lista.id_listaip %}
+                  <div class="proposal-meta ip-list-meta-row">ID_LISTAIP: {{ lista.id_listaip.codigo }}</div>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% else %}
+        <section class="io-card ios-empty-state io-center">
+          <div class="ios-empty-icon">+</div>
+          <h2 class="ios-empty-title">Nenhuma lista cadastrada</h2>
+          <p class="muted">Crie a primeira lista para começar a organizar os IPs da rede.</p>
+          {% if can_manage %}
+            <div class="form-actions" style="justify-content: center;">
+              <button class="btn btn-primary" type="button" data-ip-list-create-open>+ Criar primeira lista</button>
+            </div>
+          {% endif %}
+        </section>
       {% endif %}
     </div>
   </section>
 
-  {% if message %}
-    <div class="notice notice-{{ message_level }}">{{ message }}</div>
-  {% endif %}
-
-  <div class="io-layout">
-    <section class="io-card">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title">Listas cadastradas</h2>
-          <p class="muted">Selecione uma lista para editar IPs, MAC e protocolo.</p>
-        </div>
-      </div>
-      <div class="proposal-grid">
-        {% for lista in listas %}
-          <article class="proposal-card io-proposal-card">
-            <a class="proposal-link" href="{% url 'lista_ip_detail' lista.id %}" aria-label="Abrir lista"></a>
-            <div class="proposal-head">
-              <div>
-                <div class="proposal-title">{{ lista.nome }}</div>
-                <div class="proposal-meta">{{ lista.descricao|default:"Lista sem descricao." }}</div>
-              </div>
-              <span class="slot-badge">{{ lista.total_ips }} IPs</span>
-            </div>
-            <div class="proposal-meta">Faixa: {{ lista.faixa_inicio }} - {{ lista.faixa_fim }}</div>
-            {% if lista.protocolo_padrao %}
-              <div class="proposal-meta">Protocolo padrao: {{ lista.protocolo_padrao }}</div>
-            {% endif %}
-            {% if lista.id_listaip %}
-              <div class="proposal-meta">ID_LISTAIP: {{ lista.id_listaip.codigo }}</div>
-            {% endif %}
-          </article>
-        {% empty %}
-          <div class="muted">Nenhuma lista cadastrada ainda.</div>
-        {% endfor %}
-      </div>
-    </section>
-
-    <details class="io-card io-discrete" id="nova-lista">
-      <summary class="io-discrete-summary">
-        <span class="io-title">Nova lista de IP</span>
-        <span class="muted">Cadastrar lista e gerar IPs automaticamente.</span>
-      </summary>
-      <div class="io-discrete-body">
-        {% if can_manage %}
-          <form class="io-form" method="post">
+  {% if can_manage %}
+    <div class="radar-export-modal ip-list-modal" id="ip-list-create-modal" hidden>
+      <div class="radar-export-modal-backdrop" data-ip-list-create-close></div>
+      <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ip-list-create-title">
+        <header class="radar-export-modal-head">
+          <h2 id="ip-list-create-title">Nova lista de IP</h2>
+          <button class="btn btn-ghost btn-compact" type="button" data-ip-list-create-close>Fechar</button>
+        </header>
+        <div class="radar-export-modal-body">
+          <p class="muted">Cadastrar lista e gerar IPs automaticamente.</p>
+          <form class="io-form ip-list-modal-form" method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="create_lista">
             <div class="io-form-grid">
@@ -105,14 +111,47 @@
                 <input type="text" name="id_listaip" placeholder="LIP-001">
               </label>
             </div>
-            <div class="form-actions">
+            <div class="radar-export-modal-foot">
               <button class="btn btn-primary" type="submit">Salvar lista</button>
             </div>
           </form>
-        {% else %}
-          <div class="muted">Apenas clientes cadastrados podem criar listas.</div>
-        {% endif %}
-      </div>
-    </details>
-  </div>
+        </div>
+      </section>
+    </div>
+    <script>
+      (function () {
+        var modal = document.getElementById("ip-list-create-modal");
+        if (!modal) {
+          return;
+        }
+        var openers = document.querySelectorAll("[data-ip-list-create-open]");
+        var closers = document.querySelectorAll("[data-ip-list-create-close]");
+        function openModal() {
+          modal.hidden = false;
+          modal.classList.add("is-open");
+          document.body.classList.add("radar-export-modal-open");
+        }
+        function closeModal() {
+          modal.classList.remove("is-open");
+          modal.hidden = true;
+          document.body.classList.remove("radar-export-modal-open");
+        }
+        openers.forEach(function (button) {
+          button.addEventListener("click", function () {
+            openModal();
+          });
+        });
+        closers.forEach(function (button) {
+          button.addEventListener("click", function () {
+            closeModal();
+          });
+        });
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape" && modal.classList.contains("is-open")) {
+            closeModal();
+          }
+        });
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

@@ -14,22 +14,19 @@
   <section class="panel-shell">
     <div class="page-hud panel-hud">
       <div class="hud-top">
-        <div class="hud-title">Painel de Controle</div>
       </div>
       <div class="page-hud-head panel-hero-head">
         <div>
-          <div class="page-kicker">Plataforma SET</div>
           <h1 class="page-title">Bem vindo {{ display_name }}</h1>
         </div>
         <div class="page-actions"></div>
       </div>
-      <div class="hud-meta">Acesso rapido aos principais modulos.</div>
     </div>
 
     <div class="panel-section panel-section-surface panel-section-operacao">
       <div class="panel-section-head">
         <div>
-          <div class="panel-section-title">Operacao</div>
+          <div class="panel-section-title">Painel de controle</div>
         </div>
       </div>
       <div class="panel-grid panel-grid-spaced apps-grid">
@@ -133,14 +130,14 @@
       </div>
     </div>
 
-    <div class="panel-section panel-section-surface panel-section-apps">
-      <div class="panel-section-head">
-        <div>
-          <div class="panel-section-title">Apps dedicados</div>
+    {% if apps %}
+      <div class="panel-section panel-section-surface panel-section-apps">
+        <div class="panel-section-head">
+          <div>
+            <div class="panel-section-title">Apps dedicados</div>
+          </div>
         </div>
-      </div>
-      <div class="panel-grid panel-grid-spaced apps-grid">
-        {% if apps %}
+        <div class="panel-grid panel-grid-spaced apps-grid">
           {% for app in apps %}
             <a class="panel-card app-card" href="{% url 'app_home' app.slug %}" style="--delay: 0.05s;{% if app.theme_color %}--app-accent: {{ app.theme_color }};{% endif %}">
               <div class="panel-card-top">
@@ -159,11 +156,9 @@
               <div class="muted">{{ app.descricao|default:"Aplicativo dedicado." }}</div>
             </a>
           {% endfor %}
-        {% else %}
-          <div class="muted">Nenhum aplicativo liberado ainda.</div>
-        {% endif %}
+        </div>
       </div>
-    </div>
+    {% endif %}
 
     {% if role == "ADMIN" %}
       <div class="panel-section panel-section-surface panel-section-admin">
