@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}{{ module.nome }}{% endblock %}
+{% block title %}{{ module.modulo_modelo.modelo|default:module.modulo_modelo.nome }}{% endblock %}
 
 {% block breadcrumbs %}
   <nav class="page-crumbs" aria-label="Breadcrumb">
@@ -11,7 +11,7 @@
     <span class="crumb-sep">/</span>
     <a href="{% url 'ios_rack_detail' rack.id %}">{{ rack.nome }}</a>
     <span class="crumb-sep">/</span>
-    <span>{{ module.nome|default:module.modulo_modelo.nome }}</span>
+    <span>{{ module.modulo_modelo.modelo|default:module.modulo_modelo.nome }}</span>
   </nav>
 {% endblock %}
 
@@ -82,7 +82,7 @@
               {% endfor %}
             </div>
           </div>
-          <div class="page-subtitle">{{ module.nome|default:module.modulo_modelo.nome }}</div>
+          <div class="page-subtitle">{{ module.modulo_modelo.modelo|default:module.modulo_modelo.nome }}</div>
         </div>
       </div>
     </div>
@@ -160,16 +160,12 @@
   <details class="io-card io-compact io-compact-card" data-auto-collapse="true">
     <summary class="io-discrete-summary compact">
       <span class="io-title">Gerenciar modulo</span>
-      <span class="muted">Renomear, mover ou excluir.</span>
+      <span class="muted">Mover ou excluir.</span>
     </summary>
     <div class="io-discrete-body">
       <form class="manage-form" method="post">
         {% csrf_token %}
         <input type="hidden" name="action" value="update_module">
-        <div class="manage-row">
-          <label class="manage-label" for="module-nome">Nome</label>
-          <input id="module-nome" type="text" name="nome" value="{{ module.nome }}" placeholder="Renomear modulo">
-        </div>
         <div class="manage-row">
           <label class="manage-label" for="module-slot">Mover para slot vazio</label>
           <select id="module-slot" name="slot_id" {% if not has_vacant_slots %}disabled{% endif %}>

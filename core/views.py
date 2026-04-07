@@ -727,7 +727,7 @@ def _ios_search_payload(search_results):
             {
                 "rack": channel.modulo.rack.nome,
                 "slot": f"S{channel.slot_pos}" if channel.slot_pos else "-",
-                "modulo": channel.modulo.nome or channel.modulo.modulo_modelo.nome,
+                "modulo": channel.modulo.modulo_modelo.modelo or channel.modulo.modulo_modelo.nome,
                 "canal": f"CH{channel.indice:02d}",
                 "canal_tag": channel.tag or "-",
                 "tipo": channel.tipo.nome,
@@ -765,9 +765,9 @@ def _ios_build_module_editor_data(slots, channel_types):
             "id": modulo.id,
             "slot_id": slot.id,
             "slot_pos": slot.posicao,
-            "nome": modulo.nome or "",
-            "display_name": modulo.nome or modulo.modulo_modelo.nome,
-            "model_name": modulo.modulo_modelo.nome,
+            "nome": "",
+            "display_name": modulo.modulo_modelo.modelo or modulo.modulo_modelo.nome,
+            "model_name": modulo.modulo_modelo.modelo or modulo.modulo_modelo.nome,
             "type_name": modulo.modulo_modelo.tipo_base.nome if modulo.modulo_modelo.tipo_base_id else "",
             "brand": modulo.modulo_modelo.marca or "",
             "model": modulo.modulo_modelo.modelo or "",
@@ -2680,10 +2680,6 @@ def ios_rack_detail(request, pk):
             module_id = request.POST.get("module_id")
             module = get_rack_module_or_404(module_id)
             current_slot = RackSlotIO.objects.filter(rack=rack, modulo=module).first()
-            nome = request.POST.get("nome", "").strip()
-            if nome:
-                module.nome = nome
-                module.save(update_fields=["nome"])
             target_slot_id = request.POST.get("slot_id")
             moved = False
             if target_slot_id:
@@ -2701,7 +2697,7 @@ def ios_rack_detail(request, pk):
                     {
                         "ok": True,
                         "module_id": module.id,
-                        "name": module.nome or module.modulo_modelo.nome,
+                        "name": module.modulo_modelo.modelo or module.modulo_modelo.nome,
                         "slot_pos": current_slot.posicao if current_slot else None,
                         "moved": moved,
                     }
@@ -2876,7 +2872,6 @@ def ios_rack_detail(request, pk):
                 modulo = ModuloRackIO.objects.create(
                     rack=rack,
                     modulo_modelo=module_modelo,
-                    nome=module_modelo.nome,
                 )
                 canais = [
                     CanalRackIO(
@@ -2911,7 +2906,6 @@ def ios_rack_detail(request, pk):
                 modulo = ModuloRackIO.objects.create(
                     rack=rack,
                     modulo_modelo=module_modelo,
-                    nome=module_modelo.nome,
                 )
                 canais = [
                     CanalRackIO(
@@ -2986,7 +2980,7 @@ def ios_rack_detail(request, pk):
     modules = (
         ModuloIO.objects.filter(Q(cliente=rack.cliente) | Q(is_default=True))
         .select_related("tipo_base")
-        .order_by("nome")
+        .order_by("modelo", "id")
     )
     available_qs = (
             CanalRackIO.objects.filter(modulo__rack=rack)
@@ -3589,7 +3583,6 @@ def ios_modulos(request):
         if action == "create_module":
             if not cliente:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
-            nome = request.POST.get("nome", "").strip()
             modelo = request.POST.get("modelo", "").strip()
             marca = request.POST.get("marca", "").strip()
             canais_raw = request.POST.get("quantidade_canais", "").strip()
@@ -3600,11 +3593,11 @@ def ios_modulos(request):
                 quantidade_canais = None
             if quantidade_canais is not None:
                 quantidade_canais = max(1, min(512, quantidade_canais))
-            if nome and quantidade_canais and tipo_id:
+            if modelo and quantidade_canais and tipo_id:
                 tipo_base = get_object_or_404(TipoCanalIO, pk=tipo_id)
-                modulo = ModuloIO.objects.create(
+                ModuloIO.objects.create(
                     cliente=cliente,
-                    nome=nome,
+                    nome="",
                     modelo=modelo,
                     marca=marca,
                     quantidade_canais=quantidade_canais,
@@ -3643,7 +3636,6 @@ def ios_modulo_modelo_detail(request, pk):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_model":
-            nome = request.POST.get("nome", "").strip()
             modelo = request.POST.get("modelo", "").strip()
             marca = request.POST.get("marca", "").strip()
             canais_raw = request.POST.get("quantidade_canais", "").strip()
@@ -3653,14 +3645,12 @@ def ios_modulo_modelo_detail(request, pk):
             except (TypeError, ValueError):
                 quantidade_canais = module.quantidade_canais
             quantidade_canais = max(1, min(512, quantidade_canais))
-            if nome:
-                module.nome = nome
             module.modelo = modelo
             module.marca = marca
             if tipo_id:
                 module.tipo_base_id = tipo_id
             module.quantidade_canais = quantidade_canais
-            module.save(update_fields=["nome", "modelo", "marca", "tipo_base", "quantidade_canais"])
+            module.save(update_fields=["modelo", "marca", "tipo_base", "quantidade_canais"])
             return redirect("ios_modulo_modelo_detail", pk=module.pk)
         if action == "delete_model":
             if not module.instancias.exists():
@@ -6091,15 +6081,8 @@ def ios_rack_modulo_detail(request, pk):
         } and not can_manage:
             return HttpResponseForbidden("Sem permissao.")
         if action == "update_module_name":
-            nome = request.POST.get("nome", "").strip()
-            module.nome = nome
-            module.save(update_fields=["nome"])
             return redirect("ios_rack_modulo_detail", pk=module.pk)
         if action == "update_module":
-            nome = request.POST.get("nome", "").strip()
-            if nome:
-                module.nome = nome
-                module.save(update_fields=["nome"])
             if request.POST.get("delete_module") == "on":
                 rack_id = module.rack_id
                 module.delete()

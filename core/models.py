@@ -880,10 +880,10 @@ class ModuloIO(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["nome"]
+        ordering = ["modelo", "id"]
 
     def __str__(self):
-        return self.nome
+        return self.modelo or self.nome or f"Modulo {self.pk}"
 
 
 class ModuloRackIO(models.Model):
@@ -896,7 +896,7 @@ class ModuloRackIO(models.Model):
         ordering = ["id"]
 
     def __str__(self):
-        return self.nome or self.modulo_modelo.nome
+        return self.modulo_modelo.modelo or self.modulo_modelo.nome or f"Modulo rack {self.pk}"
 
 
 class CanalRackIO(models.Model):

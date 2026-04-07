@@ -54,10 +54,10 @@
   var vacantSlots = JSON.parse(vacantSlotsNode.textContent || "[]");
   var canManage = panel.dataset.canManage === "1";
   var moduleCards = Array.from(document.querySelectorAll(".js-rack-module-card"));
+  var rackTrack = byId("rack-carousel-track");
   var activeModuleId = panel.dataset.selectedModuleId || "";
   var manageModal = byId("rack-module-manage-modal");
   var manageModalId = byId("rack-module-manage-id");
-  var manageModalName = byId("rack-module-manage-name");
   var manageModalSlot = byId("rack-module-manage-slot");
   var manageModalNote = byId("rack-module-manage-note");
   var manageForm = byId("rack-module-manage-form");
@@ -154,9 +154,6 @@
     if (deleteModalId) {
       deleteModalId.value = info.id;
     }
-    if (manageModalName) {
-      manageModalName.value = info.nome || "";
-    }
     if (manageModalSlot) {
       manageModalSlot.innerHTML = buildVacantOptions();
       manageModalSlot.disabled = !vacantSlots.length;
@@ -184,13 +181,34 @@
     });
   }
 
+  function syncPanelDock(card) {
+    if (!panel) {
+      return;
+    }
+    var activeCard = card || document.querySelector(".js-rack-module-card.slot-selected");
+    if (!activeCard) {
+      panel.style.removeProperty("--rack-panel-dock-x");
+      return;
+    }
+    var panelRect = panel.getBoundingClientRect();
+    var cardRect = activeCard.getBoundingClientRect();
+    var rawOffset = (cardRect.left + (cardRect.width / 2)) - panelRect.left;
+    var margin = 40;
+    var maxOffset = Math.max(margin, panel.clientWidth - margin);
+    var clampedOffset = Math.min(Math.max(rawOffset, margin), maxOffset);
+    panel.style.setProperty("--rack-panel-dock-x", clampedOffset + "px");
+  }
+
   function syncSelectedCard(moduleId) {
     clearSelectedCards();
+    var selectedCard = null;
     moduleCards.forEach(function (card) {
       if (String(card.dataset.moduleId) === String(moduleId)) {
         card.classList.add("slot-selected");
+        selectedCard = card;
       }
     });
+    syncPanelDock(selectedCard);
   }
 
   function postInlineSave(row) {
@@ -392,7 +410,6 @@
         var data = new FormData();
         data.set("action", "update_selected_module");
         data.set("module_id", moduleInfo.id);
-        data.set("nome", manageForm.querySelector("input[name='nome']").value || "");
         var slotSelect = manageForm.querySelector("select[name='slot_id']");
         if (slotSelect && slotSelect.value) {
           data.set("slot_id", slotSelect.value);
@@ -486,6 +503,9 @@
         : "");
 
     syncSelectedCard(info.id);
+    window.requestAnimationFrame(function () {
+      syncPanelDock();
+    });
     bindEditorInteractions(info);
 
     try {
@@ -515,6 +535,16 @@
     renderPanel(activeModuleId);
   }
 
+  if (rackTrack) {
+    rackTrack.addEventListener("scroll", function () {
+      syncPanelDock();
+    }, { passive: true });
+  }
+
+  window.addEventListener("resize", function () {
+    syncPanelDock();
+  });
+
   if (panelBody) {
     panelBody.addEventListener("click", function (event) {
       var openButton = event.target.closest("[data-rack-module-manage-open]");
@@ -540,7 +570,6 @@
       var data = new FormData();
       data.set("action", "update_selected_module");
       data.set("module_id", manageModalId ? manageModalId.value : "");
-      data.set("nome", manageModalName ? manageModalName.value : "");
       if (manageModalSlot && manageModalSlot.value) {
         data.set("slot_id", manageModalSlot.value);
       }

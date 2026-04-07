@@ -95,19 +95,7 @@
       </div>
     </section>
 
-    <section class="io-card rack-layout-card">
-      <div class="io-card-head">
-        <div></div>
-        <div class="rack-carousel-actions">
-          <button class="btn btn-ghost btn-compact rack-carousel-btn" type="button" data-dir="-1" aria-label="Voltar slots">
-            &lt;
-          </button>
-          <button class="btn btn-ghost btn-compact rack-carousel-btn" type="button" data-dir="1" aria-label="Avancar slots">
-            &gt;
-          </button>
-        </div>
-      </div>
-    <form method="post">
+    <form method="post" class="rack-layout-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="assign_modules">
       <div class="rack-carousel">
@@ -118,8 +106,8 @@
             <article class="proposal-card slot-card {% if slot.modulo %}slot-filled js-rack-module-card{% else %}slot-empty{% endif %}"
               {% if slot.modulo %}
                 data-module-id="{{ slot.modulo.id }}"
-                data-module-title="{% if slot.modulo.nome %}{{ slot.modulo.nome }}{% else %}{{ slot.modulo.modulo_modelo.nome }}{% endif %}"
-                data-module-subtitle="{{ slot.modulo.modulo_modelo.nome }}"
+                data-module-title="{{ slot.modulo.modulo_modelo.modelo|default:slot.modulo.modulo_modelo.nome }}"
+                data-module-subtitle="{{ slot.modulo.modulo_modelo.marca }}"
                 data-module-type="{{ slot.modulo.modulo_modelo.tipo_base.nome }}"
                 data-module-panel-url="{% url 'ios_rack_detail' rack.id %}?module={{ slot.modulo.id }}#rack-module-panel"
               {% endif %}
@@ -127,12 +115,7 @@
               <div class="proposal-head">
                 <div>
                   {% if slot.modulo %}
-                    {% if slot.modulo.nome %}
-                      <div class="proposal-title">{{ slot.modulo.nome }}</div>
-                      <div class="proposal-meta">{{ slot.modulo.modulo_modelo.nome }}</div>
-                    {% else %}
-                      <div class="proposal-title">{{ slot.modulo.modulo_modelo.nome }}</div>
-                    {% endif %}
+                    <div class="proposal-title">{{ slot.modulo.modulo_modelo.modelo|default:slot.modulo.modulo_modelo.nome }}</div>
                   {% else %}
                     <div class="proposal-title">Slot livre</div>
                   {% endif %}
@@ -140,23 +123,22 @@
                 {% if slot.modulo %}
                   <div class="slot-card-actions">
                     <div class="module-meta">
-                      <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
                       <span class="slot-state-led {% if slot.modulo.all_canais_comissionados %}is-ok{% else %}is-pending{% endif %}" aria-label="{% if slot.modulo.all_canais_comissionados %}Comissionado{% else %}Nao comissionado{% endif %}"></span>
                     </div>
                   </div>
                 {% endif %}
               </div>
               {% if slot.modulo %}
-                <div class="proposal-meta">{{ slot.modulo.modulo_modelo.marca }} - {{ slot.modulo.modulo_modelo.modelo }}</div>
                 <div class="slot-actions">
-                  <span class="slot-hint">Ver canais.</span>
+                  <span class="slot-hint">Tipo {{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
+                  <span class="slot-hint">{{ slot.modulo.modulo_modelo.quantidade_canais }} canais</span>
                 </div>
               {% else %}
                 <div class="slot-form">
                   <select name="slot_{{ slot.id }}">
                     <option value="">Selecione um modulo</option>
                     {% for module in modules %}
-                      <option value="{{ module.id }}">{{ module.nome }} ({{ module.tipo_base.nome }})</option>
+                      <option value="{{ module.id }}">{{ module.modelo|default:module.nome }} ({{ module.tipo_base.nome }})</option>
                     {% endfor %}
                   </select>
                 </div>
@@ -165,24 +147,20 @@
           </div>
         {% endfor %}
         </div>
+        <div class="rack-scroll-ui" id="rack-scroll-ui" aria-hidden="true">
+          <span class="rack-scroll-ball" id="rack-scroll-ball">&lt;&gt;</span>
+        </div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary is-hidden" type="submit" id="rack-save-btn">Salvar</button>
       </div>
     </form>
-    </section>
 
     <section class="io-card rack-module-note" id="rack-module-note">
       <p class="muted">Clique em um modulo do rack para ver os canais.</p>
     </section>
 
     <section class="io-card rack-module-panel is-hidden" id="rack-module-panel" data-selected-module-id="{{ selected_module_id }}" data-can-manage="{% if can_manage %}1{% else %}0{% endif %}">
-      <div class="io-card-head">
-        <div>
-          <h2 class="io-title" id="rack-module-panel-title">Canais do modulo</h2>
-          <p class="muted" id="rack-module-panel-subtitle">Clique em um modulo do rack para ver os canais.</p>
-        </div>
-      </div>
       <a class="btn btn-ghost btn-compact rack-module-panel-link is-hidden" href="#" id="rack-module-panel-link" style="display:none;"></a>
       <div class="rack-module-empty is-hidden" id="rack-module-empty" style="display:none;">Nenhum modulo selecionado.</div>
       <div class="rack-channel-list is-hidden" id="rack-channel-list" style="display:none;">
@@ -206,10 +184,6 @@
           <div class="radar-export-modal-body">
             <form class="manage-form rack-module-manage-form" id="rack-module-manage-form">
               <input type="hidden" name="module_id" id="rack-module-manage-id">
-              <div class="manage-row">
-                <label class="manage-label" for="rack-module-manage-name">Nome</label>
-                <input id="rack-module-manage-name" type="text" name="nome" placeholder="Renomear modulo">
-              </div>
               <div class="manage-row">
                 <label class="manage-label" for="rack-module-manage-slot">Mover para slot vazio</label>
                 <select id="rack-module-manage-slot" name="slot_id"></select>
@@ -501,7 +475,74 @@
         });
       }
       const track = document.getElementById("rack-carousel-track");
-      const buttons = document.querySelectorAll(".rack-carousel-btn");
+      const carousel = track ? track.closest(".rack-carousel") : null;
+      const scrollUi = document.getElementById("rack-scroll-ui");
+      const scrollBall = document.getElementById("rack-scroll-ball");
+      let rackScrollDragging = false;
+      const syncRackScrollBall = () => {
+        if (!track || !scrollUi || !scrollBall) {
+          return;
+        }
+        const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+        const ballWidth = scrollBall.offsetWidth || 0;
+        const usable = Math.max(0, scrollUi.clientWidth - ballWidth);
+        const progress = maxScroll > 0 ? (track.scrollLeft / maxScroll) : 0;
+        scrollUi.classList.toggle("is-hidden", maxScroll <= 2);
+        scrollBall.style.transform = "translate(" + (usable * progress) + "px, -50%)";
+      };
+      const syncRackScrollState = () => {
+        if (!track || !carousel) {
+          return;
+        }
+        const trackStyles = window.getComputedStyle(track);
+        const paddingRight = parseFloat(trackStyles.paddingRight || "0") || 0;
+        const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+        const left = track.scrollLeft;
+        const epsilon = 2;
+        carousel.classList.toggle("can-scroll-left", left > epsilon);
+        carousel.classList.toggle("can-scroll-right", (left + track.clientWidth) < ((track.scrollWidth - paddingRight) - epsilon));
+        syncRackScrollBall();
+      };
+      const setRackScrollFromPointer = (clientX) => {
+        if (!track || !scrollUi || !scrollBall) {
+          return;
+        }
+        const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+        const rect = scrollUi.getBoundingClientRect();
+        const ballWidth = scrollBall.offsetWidth || 0;
+        const usable = Math.max(0, rect.width - ballWidth);
+        const raw = clientX - rect.left - (ballWidth / 2);
+        const clamped = Math.min(Math.max(raw, 0), usable);
+        const progress = usable > 0 ? (clamped / usable) : 0;
+        track.scrollLeft = progress * maxScroll;
+      };
+      if (track && carousel) {
+        const syncLater = () => window.requestAnimationFrame(syncRackScrollState);
+        track.addEventListener("scroll", syncRackScrollState, { passive: true });
+        window.addEventListener("resize", syncLater);
+        syncLater();
+      }
+      if (scrollUi) {
+        scrollUi.addEventListener("pointerdown", (event) => {
+          rackScrollDragging = true;
+          if (scrollUi.setPointerCapture) {
+            scrollUi.setPointerCapture(event.pointerId);
+          }
+          setRackScrollFromPointer(event.clientX);
+        });
+        scrollUi.addEventListener("pointermove", (event) => {
+          if (!rackScrollDragging) {
+            return;
+          }
+          setRackScrollFromPointer(event.clientX);
+        });
+        const stopRackScrollDrag = () => {
+          rackScrollDragging = false;
+        };
+        scrollUi.addEventListener("pointerup", stopRackScrollDrag);
+        scrollUi.addEventListener("pointercancel", stopRackScrollDrag);
+        scrollUi.addEventListener("lostpointercapture", stopRackScrollDrag);
+      }
       const moduleCards = document.querySelectorAll(".js-rack-module-card");
       const notePanel = document.getElementById("rack-module-note");
       const panel = document.getElementById("rack-module-panel");
@@ -520,20 +561,6 @@
         const hasValue = Array.from(slotSelects).some((select) => select.value);
         saveBtn.classList.toggle("is-hidden", !hasValue);
       };
-
-      if (track && buttons.length) {
-        buttons.forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const dir = Number(btn.dataset.dir) || 1;
-            const firstSlot = track.querySelector(".rack-slot-shell");
-            const gap = parseFloat(window.getComputedStyle(track).columnGap || window.getComputedStyle(track).gap || "0") || 0;
-            const slotWidth = firstSlot ? firstSlot.getBoundingClientRect().width + gap : 220;
-            const visibleSlots = Math.max(1, Math.min(5, Math.floor(track.clientWidth / Math.max(slotWidth, 1))));
-            const scrollAmount = slotWidth * visibleSlots;
-            track.scrollBy({ left: dir * scrollAmount, behavior: "smooth" });
-          });
-        });
-      }
 
       const setRows = (moduleId) => {
         const rows = channelMap[moduleId] || [];

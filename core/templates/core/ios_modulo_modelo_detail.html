@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}Modulo - {{ module.nome }}{% endblock %}
+{% block title %}Modulo - {{ module.modelo|default:module.nome }}{% endblock %}
 
 {% block breadcrumbs %}
   <nav class="page-crumbs" aria-label="Breadcrumb">
@@ -11,7 +11,7 @@
     <span class="crumb-sep">/</span>
     <a href="{% url 'ios_modulos' %}">Modelos</a>
     <span class="crumb-sep">/</span>
-    <span>{{ module.nome }}</span>
+    <span>{{ module.modelo|default:module.nome }}</span>
   </nav>
 {% endblock %}
 
@@ -28,8 +28,8 @@
       </div>
       <div class="page-hud-head">
         <div>
-          <h1 class="page-title">{{ module.nome }}</h1>
-          <p class="page-subtitle">{{ module.marca }} - {{ module.modelo }}</p>
+          <h1 class="page-title">{{ module.modelo|default:module.nome }}</h1>
+          <p class="page-subtitle">{{ module.marca }}</p>
         </div>
       </div>
     </div>
@@ -61,12 +61,8 @@
       <input type="hidden" name="action" value="update_model">
       <div class="io-form-grid">
         <label class="field">
-          <span>Nome do modulo</span>
-          <input type="text" name="nome" value="{{ module.nome }}" required>
-        </label>
-        <label class="field">
           <span>Modelo</span>
-          <input type="text" name="modelo" value="{{ module.modelo }}">
+          <input type="text" name="modelo" value="{{ module.modelo }}" required>
         </label>
         <label class="field">
           <span>Marca</span>

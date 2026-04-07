@@ -104,9 +104,6 @@
                               </div>
                             </div>
                             <div class="ios-rack-foot">
-                              {% if rack.id_planta %}
-                                <span class="ios-rack-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</span>
-                              {% endif %}
                               {% if rack.canais_total %}
                                 <span class="ios-status-pill {% if rack.all_canais_comissionados %}is-ok{% else %}is-pending{% endif %}">
                                   {% if rack.all_canais_comissionados %}Comissionado{% else %}Nao comissionado{% endif %}
