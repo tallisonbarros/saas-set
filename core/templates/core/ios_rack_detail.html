@@ -47,13 +47,13 @@
 {% block content %}
   <section class="ios-ops-shell">
     <div class="ios-ops-topbar">
-      <div class="hud-menu ios-hud-menu" aria-label="Menu do modulo">
-        <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
+      <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Menu do modulo">
+        <a class="hud-menu-pill" href="{% url 'ios_list' %}">Meus Racks</a>
         <a class="hud-menu-pill" href="{% url 'ios_search' %}">Pesquisa de I/Os</a>
         <a class="hud-menu-pill" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
         <a class="hud-menu-pill" href="{% url 'ios_rack_io_list' rack.id %}?format=pdf">Exportar PDF</a>
         {% if can_manage %}
-          <a class="hud-menu-pill ios-hud-menu-primary" href="#rack-edit-card">Editar rack</a>
+          <a class="hud-menu-pill ios-hud-menu-primary" href="#" data-rack-edit-open>Editar rack</a>
         {% endif %}
       </div>
     </div>
@@ -143,9 +143,6 @@
                       <span class="module-pill">{{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
                       <span class="slot-state-led {% if slot.modulo.all_canais_comissionados %}is-ok{% else %}is-pending{% endif %}" aria-label="{% if slot.modulo.all_canais_comissionados %}Comissionado{% else %}Nao comissionado{% endif %}"></span>
                     </div>
-                    <a class="slot-menu-btn" href="{% url 'ios_rack_detail' rack.id %}?module={{ slot.modulo.id }}#rack-module-panel" aria-label="Abrir painel do modulo">
-                      ...
-                    </a>
                   </div>
                 {% endif %}
               </div>
@@ -231,93 +228,97 @@
       </div>
     {% endif %}
 
-    {% if message %}
-      <div class="notice notice-warning">{{ message }}</div>
-    {% endif %}
     {% if can_manage %}
-      <details class="io-card io-discrete rack-edit-card" id="rack-edit-card">
-        <summary class="io-discrete-summary compact">
-          <span class="io-title">Editar rack</span>
-        </summary>
-        <div class="io-discrete-body">
-          <form class="rack-edit-form" method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_rack">
-            <div class="rack-edit-grid">
-              <div class="rack-edit-field">
-                <label for="rack-nome">Nome</label>
-                <input id="rack-nome" type="text" name="nome" value="{{ rack.nome }}" required>
-              </div>
-              <div class="rack-edit-field">
-                <label for="rack-slots">Slots totais</label>
-                <input id="rack-slots" type="number" name="slots_total" min="1" max="60" value="{{ rack.slots_total }}" required>
-              </div>
-              <div class="rack-edit-field rack-edit-wide">
-                <label for="rack-descricao">Descricao</label>
-                <input id="rack-descricao" type="text" name="descricao" value="{{ rack.descricao }}">
-              </div>
-              <div class="rack-edit-field">
-                <div class="rack-edit-label-row">
-                  <label for="local-select-rack">Local</label>
-                  <details class="inline-pop inline-pop-centered" id="local-pop-rack">
-                    <summary>+ novo</summary>
-                    <div class="inline-pop-body">
-                      <label>Local</label>
-                      <input type="text" name="local_nome" form="create-local-form-rack" placeholder="Novo local">
-                      <button class="btn btn-ghost btn-compact" type="submit" form="create-local-form-rack">Adicionar</button>
-                    </div>
-                  </details>
+      <div class="radar-export-modal rack-edit-modal" id="rack-edit-modal" hidden data-open-on-load="{% if message %}1{% else %}0{% endif %}">
+        <div class="radar-export-modal-backdrop" data-rack-edit-close></div>
+        <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="rack-edit-modal-title">
+          <header class="radar-export-modal-head">
+            <h2 id="rack-edit-modal-title">Editar rack</h2>
+            <button class="btn btn-ghost btn-compact" type="button" data-rack-edit-close>Fechar</button>
+          </header>
+          <div class="radar-export-modal-body">
+            {% if message %}
+              <div class="notice notice-warning">{{ message }}</div>
+            {% endif %}
+            <form class="rack-edit-form" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_rack">
+              <div class="rack-edit-grid">
+                <div class="rack-edit-field">
+                  <label for="rack-nome">Nome</label>
+                  <input id="rack-nome" type="text" name="nome" value="{{ rack.nome }}" required>
                 </div>
-                <select name="local" id="local-select-rack">
-                  <option value="">Sem local</option>
-                  {% for local in locais %}
-                    <option value="{{ local.id }}" {% if rack.local_id == local.id %}selected{% endif %}>{{ local.nome }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="rack-edit-field">
-                <div class="rack-edit-label-row">
-                  <label for="grupo-select-rack">Grupo</label>
-                  <details class="inline-pop inline-pop-centered" id="grupo-pop-rack">
-                    <summary>+ novo</summary>
-                    <div class="inline-pop-body">
-                      <label>Grupo</label>
-                      <input type="text" name="grupo_nome" form="create-grupo-form-rack" placeholder="Novo grupo">
-                      <button class="btn btn-ghost btn-compact" type="submit" form="create-grupo-form-rack">Adicionar</button>
-                    </div>
-                  </details>
+                <div class="rack-edit-field">
+                  <label for="rack-slots">Slots totais</label>
+                  <input id="rack-slots" type="number" name="slots_total" min="1" max="60" value="{{ rack.slots_total }}" required>
                 </div>
-                <select name="grupo" id="grupo-select-rack">
-                  <option value="">Sem grupo</option>
-                  {% for grupo in grupos %}
-                    <option value="{{ grupo.id }}" {% if rack.grupo_id == grupo.id %}selected{% endif %}>{{ grupo.nome }}</option>
-                  {% endfor %}
-                </select>
+                <div class="rack-edit-field rack-edit-wide">
+                  <label for="rack-descricao">Descricao</label>
+                  <input id="rack-descricao" type="text" name="descricao" value="{{ rack.descricao }}">
+                </div>
+                <div class="rack-edit-field">
+                  <div class="rack-edit-label-row">
+                    <label for="local-select-rack">Local</label>
+                    <details class="inline-pop inline-pop-centered" id="local-pop-rack">
+                      <summary>+ novo</summary>
+                      <div class="inline-pop-body">
+                        <label>Local</label>
+                        <input type="text" name="local_nome" form="create-local-form-rack" placeholder="Novo local">
+                        <button class="btn btn-ghost btn-compact" type="submit" form="create-local-form-rack">Adicionar</button>
+                      </div>
+                    </details>
+                  </div>
+                  <select name="local" id="local-select-rack">
+                    <option value="">Sem local</option>
+                    {% for local in locais %}
+                      <option value="{{ local.id }}" {% if rack.local_id == local.id %}selected{% endif %}>{{ local.nome }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="rack-edit-field">
+                  <div class="rack-edit-label-row">
+                    <label for="grupo-select-rack">Grupo</label>
+                    <details class="inline-pop inline-pop-centered" id="grupo-pop-rack">
+                      <summary>+ novo</summary>
+                      <div class="inline-pop-body">
+                        <label>Grupo</label>
+                        <input type="text" name="grupo_nome" form="create-grupo-form-rack" placeholder="Novo grupo">
+                        <button class="btn btn-ghost btn-compact" type="submit" form="create-grupo-form-rack">Adicionar</button>
+                      </div>
+                    </details>
+                  </div>
+                  <select name="grupo" id="grupo-select-rack">
+                    <option value="">Sem grupo</option>
+                    {% for grupo in grupos %}
+                      <option value="{{ grupo.id }}" {% if rack.grupo_id == grupo.id %}selected{% endif %}>{{ grupo.nome }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="rack-edit-field">
+                  <label for="rack-planta">ID_PLANTA</label>
+                  <input id="rack-planta" type="text" name="id_planta" value="{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% endif %}">
+                </div>
               </div>
-              <div class="rack-edit-field">
-                <label for="rack-planta">ID_PLANTA</label>
-                <input id="rack-planta" type="text" name="id_planta" value="{% if rack.id_planta %}{{ rack.id_planta.codigo }}{% endif %}">
+              <div class="rack-edit-actions">
+                <button class="btn btn-primary" type="submit">Salvar rack</button>
+                <button class="btn btn-outline" type="submit" name="action" value="delete_rack" data-confirm="1">
+                  Excluir rack
+                </button>
               </div>
-            </div>
-            <div class="rack-edit-actions">
-              <button class="btn btn-primary" type="submit">Salvar rack</button>
-              <button class="btn btn-outline" type="submit" name="action" value="delete_rack" data-confirm="1">
-                Excluir rack
-              </button>
-            </div>
-            <div id="local-message-rack" class="notice" style="display: none;"></div>
-            <div id="grupo-message-rack" class="notice" style="display: none;"></div>
-          </form>
-          <form id="create-local-form-rack" method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_local">
-          </form>
-          <form id="create-grupo-form-rack" method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_grupo">
-          </form>
-        </div>
-      </details>
+              <div id="local-message-rack" class="notice" style="display: none;"></div>
+              <div id="grupo-message-rack" class="notice" style="display: none;"></div>
+            </form>
+            <form id="create-local-form-rack" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="create_local">
+            </form>
+            <form id="create-grupo-form-rack" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="create_grupo">
+            </form>
+          </div>
+        </section>
+      </div>
     {% endif %}
 
     <section class="ios-rack-footer-strip" aria-label="Resumo do rack">
@@ -367,6 +368,25 @@
         box.textContent = message;
         box.className = "notice notice-" + (level || "info");
         box.style.display = "block";
+      }
+      var rackEditModal = document.getElementById("rack-edit-modal");
+      var rackEditOpeners = document.querySelectorAll("[data-rack-edit-open]");
+      var rackEditClosers = document.querySelectorAll("[data-rack-edit-close]");
+      function openRackEditModal() {
+        if (!rackEditModal) {
+          return;
+        }
+        rackEditModal.hidden = false;
+        rackEditModal.classList.add("is-open");
+        document.body.classList.add("radar-export-modal-open");
+      }
+      function closeRackEditModal() {
+        if (!rackEditModal) {
+          return;
+        }
+        rackEditModal.classList.remove("is-open");
+        rackEditModal.hidden = true;
+        document.body.classList.remove("radar-export-modal-open");
       }
       function bindCadastro() {
         var formCadastro = document.getElementById("create-local-form-rack");
@@ -570,9 +590,6 @@
 
       moduleCards.forEach((card) => {
         card.addEventListener("click", (event) => {
-          if (event.target.closest(".slot-menu-btn")) {
-            return;
-          }
           clearSelected();
           setPanel(card);
           if (panel) {
@@ -587,6 +604,30 @@
           });
         });
         updateSaveVisibility();
+      }
+      if (rackEditOpeners.length) {
+        rackEditOpeners.forEach(function (trigger) {
+          trigger.addEventListener("click", function (event) {
+            event.preventDefault();
+            openRackEditModal();
+          });
+        });
+      }
+      if (rackEditClosers.length) {
+        rackEditClosers.forEach(function (trigger) {
+          trigger.addEventListener("click", function (event) {
+            event.preventDefault();
+            closeRackEditModal();
+          });
+        });
+      }
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && rackEditModal && rackEditModal.classList.contains("is-open")) {
+          closeRackEditModal();
+        }
+      });
+      if (rackEditModal && rackEditModal.dataset.openOnLoad === "1") {
+        openRackEditModal();
       }
       bindCadastro();
       bindGrupo();

@@ -45,7 +45,7 @@
 {% block content %}
   <section class="ios-ops-shell">
     <div class="ios-ops-topbar">
-      <div class="hud-menu ios-hud-menu" aria-label="Menu do modulo">
+      <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Menu do modulo">
         <a class="hud-menu-pill" href="{% url 'ios_search' %}">Pesquisa de I/Os</a>
         <a class="hud-menu-pill" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
         {% if can_manage %}
@@ -101,20 +101,19 @@
                               </div>
                               <div class="ios-rack-status">
                                 <span class="slot-badge ios-slot-badge">{{ rack.slots_total }} Slots</span>
-                                {% if rack.canais_total %}
-                                  <span class="ios-status-pill {% if rack.all_canais_comissionados %}is-ok{% else %}is-pending{% endif %}">
-                                    {% if rack.all_canais_comissionados %}Comissionado{% else %}Nao comissionado{% endif %}
-                                  </span>
-                                {% else %}
-                                  <span class="ios-status-pill is-empty">Sem canais</span>
-                                {% endif %}
                               </div>
                             </div>
                             <div class="ios-rack-foot">
                               {% if rack.id_planta %}
                                 <span class="ios-rack-meta">ID_PLANTA: {{ rack.id_planta.codigo }}</span>
                               {% endif %}
-                              <span class="ios-rack-open-cta">Abrir rack</span>
+                              {% if rack.canais_total %}
+                                <span class="ios-status-pill {% if rack.all_canais_comissionados %}is-ok{% else %}is-pending{% endif %}">
+                                  {% if rack.all_canais_comissionados %}Comissionado{% else %}Nao comissionado{% endif %}
+                                </span>
+                              {% else %}
+                                <span class="ios-status-pill is-empty">Sem canais</span>
+                              {% endif %}
                             </div>
                           </article>
                         {% endfor %}

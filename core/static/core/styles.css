@@ -4370,6 +4370,14 @@ select {
   box-shadow: var(--shadow);
 }
 
+.rack-edit-modal .radar-export-modal-dialog {
+  width: min(760px, calc(100vw - 28px));
+}
+
+.rack-edit-modal .radar-export-modal-body {
+  gap: 14px;
+}
+
 .rack-edit-form {
   display: grid;
   gap: 16px;
@@ -6852,12 +6860,16 @@ select.datagrid-filter-input optgroup {
 }
 
 .ios-rack-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  --ios-rack-card-width: 320px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--ios-rack-card-width), var(--ios-rack-card-width)));
+  justify-content: flex-start;
   gap: 14px;
 }
 
 .ios-rack-grid > .ios-rack-card {
-  max-width: none;
+  width: var(--ios-rack-card-width);
+  max-width: var(--ios-rack-card-width);
+  min-width: 0;
 }
 
 .page-ios .ios-rack-card {

@@ -45,8 +45,8 @@
 {% block content %}
   <section class="ios-ops-shell">
     <div class="ios-ops-topbar">
-      <div class="hud-menu ios-hud-menu" aria-label="Menu do modulo">
-        <a class="hud-menu-pill" href="{% url 'ios_list' %}">Inicio do modulo</a>
+      <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Menu do modulo">
+        <a class="hud-menu-pill" href="{% url 'ios_list' %}">Meus Racks</a>
         <a class="hud-menu-pill" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
         {% if can_manage %}
           <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ios-rack-open>Novo rack</button>
