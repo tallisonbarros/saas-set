@@ -1,85 +1,660 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}Documentacao tecnica{% endblock %}
+{% block title %}Documentação técnica{% endblock %}
+{% block body_class %}page page-product-doc{% endblock %}
 
 {% block content %}
-  <section class="product-gate-shell">
-    <div class="card product-gate-card">
-      <div class="page-hud product-gate-hud">
-        <div class="hud-top">
-          <div class="hud-title">Produto</div>
-          <div class="hud-pill">Trial 30 dias</div>
-        </div>
-        <div class="page-hud-head">
-          <div>
-            <div class="page-kicker">IOs + IPs</div>
-            <h1 class="page-title">Documentacao tecnica</h1>
-            <p class="page-subtitle">Controle seus racks de IO e o inventario de rede no mesmo produto.</p>
+  <section class="product-doc-shell">
+    {% if message %}
+      <div class="notice notice-{{ message_level }}">{{ message }}</div>
+    {% endif %}
+
+    <section class="card product-doc-hero reveal-on-scroll is-visible">
+      <div class="product-doc-hero-grid">
+        <div class="product-doc-hero-copy">
+          <div class="product-doc-kicker">Produto técnico SET</div>
+          <h1 class="product-doc-title">Documentação técnica para racks, canais e rede industrial</h1>
+          <p class="product-doc-subtitle">
+            Reúna IOs e Listas de IP em um fluxo técnico único para documentar estrutura de rack,
+            canais, equipamentos e rede com leitura mais clara no dia a dia.
+          </p>
+          <p class="product-doc-value-line">
+            Um único produto para documentar hardware e rede com mais contexto técnico.
+          </p>
+
+          <div class="product-doc-chip-row">
+            <span class="product-doc-chip">IOs</span>
+            <span class="product-doc-chip">Listas de IP</span>
+            <span class="product-doc-chip is-highlight">Teste por 30 dias</span>
+            <span class="product-doc-chip">Acesso individual</span>
           </div>
-        </div>
-      </div>
 
-      {% if message %}
-        <div class="notice notice-{{ message_level }}">{{ message }}</div>
-      {% endif %}
-
-      <div class="product-gate-grid">
-        <section class="product-gate-panel">
-          <div class="product-gate-label">Inclui</div>
-          <h2>Dois modulos em um pacote</h2>
-          <p class="muted">Entrada unica para montar racks, documentar canais e manter a lista de IPs atualizada.</p>
-          <div class="product-gate-feature-list">
-            <div class="product-gate-feature">Racks e modulos de IO</div>
-            <div class="product-gate-feature">Listas de IP e inventario de rede</div>
-            <div class="product-gate-feature">Acesso individual por usuario</div>
-          </div>
-        </section>
-
-        <section class="product-gate-panel product-gate-panel-accent">
-          <div class="product-gate-label">Acesso</div>
-          {% if request.user.is_authenticated %}
-            {% if access_state == "trial_ativo" %}
-              <h2>Trial ativo</h2>
-              <p class="muted">Seu acesso experimental esta liberado ate {{ access.trial_fim|date:"d/m/Y H:i" }}.</p>
-              <div class="product-gate-actions">
-                <a class="btn btn-primary" href="{{ entry_url }}">Abrir modulos</a>
-              </div>
-            {% elif access_state == "ativo" %}
-              <h2>Acesso liberado</h2>
-              <p class="muted">Seu usuario ja possui liberacao para este produto.</p>
-              <div class="product-gate-actions">
-                <a class="btn btn-primary" href="{{ entry_url }}">Abrir modulos</a>
-              </div>
-            {% elif access_state == "expirado" %}
-              <h2>Trial encerrado</h2>
-              <p class="muted">O acesso experimental terminou. A liberacao manual pode ser feita a qualquer momento no admin.</p>
-              <div class="product-gate-actions">
+          <div class="product-doc-actions">
+            {% if request.user.is_authenticated %}
+              {% if access_state == "trial_ativo" or access_state == "ativo" %}
+                <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
                 <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-              </div>
-            {% elif access_state == "bloqueado" %}
-              <h2>Acesso bloqueado</h2>
-              <p class="muted">Seu acesso a este produto foi bloqueado manualmente.</p>
-              <div class="product-gate-actions">
+              {% elif access_state == "expirado" or access_state == "bloqueado" %}
                 <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-              </div>
+              {% else %}
+                <a class="btn btn-primary" href="{{ activate_url }}">Iniciar trial</a>
+                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+              {% endif %}
             {% else %}
-              <h2>Inicie seu trial</h2>
-              <p class="muted">Ative agora e use IOs e IPs por 30 dias sem alterar o acesso aos outros modulos da plataforma.</p>
-              <div class="product-gate-actions">
-                <a class="btn btn-primary" href="{{ activate_url }}">Iniciar trial de 30 dias</a>
-              </div>
-            {% endif %}
-          {% else %}
-            <h2>Crie sua conta e experimente</h2>
-            <p class="muted">Entre com uma conta existente ou crie um novo acesso para liberar o trial individual.</p>
-            <div class="product-gate-actions">
               <a class="btn btn-primary" href="{{ register_url }}">Criar conta</a>
               <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="product-doc-hero-visual">
+          <article class="product-doc-proof-board">
+            <div class="product-doc-board-head">
+              <span>Documentação técnica</span>
+              <span>IOs + IPs</span>
             </div>
-          {% endif %}
-        </section>
+            <div class="product-doc-rack-slots">
+              <div class="product-doc-rack-slot is-ai">
+                <div class="product-doc-led is-green"></div>
+                <strong>AI-08</strong>
+                <span>Tipo AI</span>
+                <span>8 canais</span>
+              </div>
+              <div class="product-doc-rack-slot is-di">
+                <div class="product-doc-led is-amber"></div>
+                <strong>DI-16</strong>
+                <span>Tipo DI</span>
+                <span>16 canais</span>
+              </div>
+              <div class="product-doc-rack-slot is-empty">
+                <strong>Slot livre</strong>
+                <span>Selecione um módulo</span>
+              </div>
+            </div>
+            <div class="product-doc-rack-rail"></div>
+            <div class="product-doc-proof-summary">
+              <div class="product-doc-proof-metric">
+                <strong>Racks e canais</strong>
+                <span>estrutura visual por slot e módulo</span>
+              </div>
+              <div class="product-doc-proof-metric">
+                <strong>Inventário de rede</strong>
+                <span>IP, equipamento, MAC e protocolo</span>
+              </div>
+            </div>
+          </article>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <section class="card product-doc-gains-panel reveal-on-scroll">
+      <div class="product-doc-gains">
+        <article class="product-doc-gain-card reveal-on-scroll">
+          <strong>Consulta mais rápida</strong>
+          <p>Rack e rede no mesmo fluxo.</p>
+        </article>
+        <article class="product-doc-gain-card reveal-on-scroll">
+          <strong>Menos planilhas paralelas</strong>
+          <p>Menos arquivos soltos para manter.</p>
+        </article>
+        <article class="product-doc-gain-card reveal-on-scroll">
+          <strong>Mais contexto técnico</strong>
+          <p>Canais, equipamentos e IPs conectados.</p>
+        </article>
+        <article class="product-doc-gain-card reveal-on-scroll">
+          <strong>Atualização mais prática</strong>
+          <p>Documentação mais fácil de revisar.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="product-doc-module-section reveal-on-scroll">
+      <div class="product-doc-module-copy">
+        <div class="product-doc-kicker">Módulo IOs</div>
+        <h2>Documente racks e canais com leitura próxima do hardware real.</h2>
+        <p class="product-doc-module-subtitle">
+          O módulo organiza o rack por slots, módulos e canais para consulta técnica mais clara.
+        </p>
+        <div class="product-doc-module-benefits">
+          <div class="product-doc-module-benefit">
+            <strong>Leitura visual do rack</strong>
+            <span>Estrutura por slot e módulo.</span>
+          </div>
+          <div class="product-doc-module-benefit">
+            <strong>Documentação de canais</strong>
+            <span>Tag, descrição e status.</span>
+          </div>
+          <div class="product-doc-module-benefit">
+            <strong>Estrutura próxima do campo</strong>
+            <span>Leitura mais útil para manutenção.</span>
+          </div>
+        </div>
+        <div class="product-doc-module-flow">
+          <div class="product-doc-flow-label">Fluxo de uso</div>
+          <ol class="product-doc-flow-list">
+            <li>Criar rack</li>
+            <li>Definir slots</li>
+            <li>Instalar módulos</li>
+            <li>Documentar canais</li>
+            <li>Consultar rack</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="product-doc-module-visual-shell">
+        <div class="product-doc-panel-caption">Leitura visual do rack</div>
+        <div class="product-doc-rack-detail" data-rack-demo>
+          <div class="product-doc-rack-chassis">
+            <div class="product-doc-rack-detail-top">
+              <span>SLOT 01</span>
+              <span>SLOT 02</span>
+              <span>SLOT 03</span>
+              <span>SLOT 04</span>
+            </div>
+            <div class="product-doc-rack-detail-grid">
+              <button type="button" class="product-doc-rack-card is-ai is-active" data-rack-module-trigger="ai08" aria-pressed="true">
+                <div class="product-doc-led is-green"></div>
+                <div class="product-doc-rack-card-copy">
+                  <strong>AI-08</strong>
+                  <span>Tipo AI</span>
+                  <span>8 canais</span>
+                </div>
+              </button>
+              <button type="button" class="product-doc-rack-card is-di" data-rack-module-trigger="di16" aria-pressed="false">
+                <div class="product-doc-led is-amber"></div>
+                <div class="product-doc-rack-card-copy">
+                  <strong>DI-16</strong>
+                  <span>Tipo DI</span>
+                  <span>16 canais</span>
+                </div>
+              </button>
+              <button type="button" class="product-doc-rack-card is-do" data-rack-module-trigger="do16" aria-pressed="false">
+                <div class="product-doc-led is-amber"></div>
+                <div class="product-doc-rack-card-copy">
+                  <strong>DO-16</strong>
+                  <span>Tipo DO</span>
+                  <span>16 canais</span>
+                </div>
+              </button>
+              <div class="product-doc-rack-card is-empty" aria-hidden="true">
+                <div class="product-doc-rack-card-copy">
+                  <strong>Slot livre</strong>
+                  <span>Selecione</span>
+                  <span>um módulo</span>
+                </div>
+              </div>
+            </div>
+            <div class="product-doc-rack-rail"></div>
+          </div>
+          <div class="product-doc-rack-detail-panel" data-rack-panel-shell>
+            <article class="product-doc-rack-channel-panel" data-rack-panel>
+              <div class="product-doc-rack-channel-head">
+                <strong data-rack-active-title>AI-08</strong>
+                <span data-rack-active-meta>SLOT 01 · Tipo AI · 8 canais</span>
+              </div>
+              <div class="product-doc-rack-channel-table">
+                <div class="product-doc-rack-channel-headings">
+                  <span>Canal</span>
+                  <span>Tag</span>
+                  <span>Descrição</span>
+                  <span>Tipo</span>
+                </div>
+                <div class="product-doc-rack-channel-body" data-rack-channel-body>
+                  <div class="product-doc-rack-channel-row">
+                    <span>Canal 1</span>
+                    <span>PT-101</span>
+                    <span>Pressão da linha</span>
+                    <span>AI</span>
+                  </div>
+                  <div class="product-doc-rack-channel-row">
+                    <span>Canal 2</span>
+                    <span>TT-201</span>
+                    <span>Temperatura do tanque</span>
+                    <span>AI</span>
+                  </div>
+                  <div class="product-doc-rack-channel-row">
+                    <span>Canal 3</span>
+                    <span>LT-301</span>
+                    <span>Nível do reservatório</span>
+                    <span>AI</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="product-doc-module-section is-reverse reveal-on-scroll">
+      <div class="product-doc-module-visual-shell">
+        <div class="product-doc-panel-caption">Inventário de rede</div>
+        <div class="product-doc-ip-panel">
+          <div class="product-doc-ip-panel-top">
+            <strong>Rede fábrica</strong>
+            <span>192.168.0.0 - 192.168.0.255</span>
+          </div>
+          <div class="product-doc-ip-search">
+            <span class="product-doc-ip-search-text" data-ip-search-display>PLC-01</span>
+          </div>
+          <div class="product-doc-ip-table">
+            <div class="product-doc-ip-table-head">
+              <span>IP</span>
+              <span>Equipamento</span>
+              <span>Descrição</span>
+              <span>MAC</span>
+              <span>Protocolo</span>
+            </div>
+            <div class="product-doc-ip-table-row" data-ip-search-match="192.168.0.10 REM1 08:AF:2C:11 TCP/IP">
+              <span>192.168.0.10</span>
+              <span>REM1</span>
+              <span>Remota</span>
+              <span>08:AF:2C:11</span>
+              <span>TCP/IP</span>
+            </div>
+            <div class="product-doc-ip-table-row" data-ip-search-match="192.168.0.11 PLC-01 Modbus">
+              <span>192.168.0.11</span>
+              <span>PLC-01</span>
+              <span>Controlador</span>
+              <span>08:AF:2C:12</span>
+              <span>Modbus</span>
+            </div>
+            <div class="product-doc-ip-table-row" data-ip-search-match="192.168.0.12 IHM-01 Profinet">
+              <span>192.168.0.12</span>
+              <span>IHM-01</span>
+              <span>Interface local</span>
+              <span>08:AF:2C:13</span>
+              <span>Profinet</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="product-doc-module-copy">
+        <div class="product-doc-kicker">Módulo Listas de IP</div>
+        <h2>Organize a rede com a mesma disciplina usada no rack.</h2>
+        <p class="product-doc-module-subtitle">
+          O módulo transforma a faixa de IP em inventário técnico para equipamentos e rede.
+        </p>
+        <div class="product-doc-module-benefits">
+          <div class="product-doc-module-benefit">
+            <strong>Inventário centralizado</strong>
+            <span>Faixa e equipamentos no mesmo lugar.</span>
+          </div>
+          <div class="product-doc-module-benefit">
+            <strong>Menos perda de contexto</strong>
+            <span>MAC e protocolo ligados ao item certo.</span>
+          </div>
+          <div class="product-doc-module-benefit">
+            <strong>Padronização da rede</strong>
+            <span>Estrutura mais clara para revisão.</span>
+          </div>
+        </div>
+        <div class="product-doc-module-flow">
+          <div class="product-doc-flow-label">Fluxo de uso</div>
+          <ol class="product-doc-flow-list">
+            <li>Criar faixa</li>
+            <li>Gerar IPs</li>
+            <li>Pesquisar itens</li>
+            <li>Editar dados</li>
+            <li>Manter inventário</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="product-doc-section product-doc-problem-section reveal-on-scroll">
+      <div class="product-doc-section-head">
+        <div class="product-doc-kicker">Problema operacional</div>
+        <h2>Quando rack e rede vivem separados, a documentação perde valor rápido.</h2>
+        <p class="product-doc-section-subtitle">O problema não é falta de software. É perda de contexto técnico.</p>
+      </div>
+      <div class="card product-doc-problem-panel">
+        <div class="product-doc-problem-grid">
+          <article class="product-doc-problem-card reveal-on-scroll">
+            <strong>Rack disperso</strong>
+            <p>Slots e canais espalhados em arquivos sem leitura única.</p>
+          </article>
+          <article class="product-doc-problem-card reveal-on-scroll">
+            <strong>Rede paralela</strong>
+            <p>IPs e MACs ficam fora da documentação do equipamento.</p>
+          </article>
+          <article class="product-doc-problem-card reveal-on-scroll">
+            <strong>Atualização fraca</strong>
+            <p>A estrutura envelhece rápido e perde confiabilidade.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="card product-doc-solution reveal-on-scroll">
+      <div class="product-doc-section-head">
+        <h2>IOs e Listas de IP no mesmo fluxo técnico.</h2>
+        <p class="product-doc-section-subtitle">Um lado documenta hardware e canais. O outro documenta rede e equipamentos.</p>
+      </div>
+      <div class="product-doc-solution-layout">
+        <article class="product-doc-solution-side">
+          <div class="product-doc-solution-label">IOs</div>
+          <strong>Rack, módulos e canais</strong>
+        </article>
+        <div class="product-doc-solution-bridge">
+          <span>Fluxo técnico único</span>
+        </div>
+        <article class="product-doc-solution-side">
+          <div class="product-doc-solution-label">Listas de IP</div>
+          <strong>Faixa, equipamento e protocolo</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="card product-doc-merge reveal-on-scroll">
+      <div class="product-doc-section-head">
+        <div class="product-doc-kicker">Por que os dois juntos</div>
+        <h2>O produto fecha o contexto técnico entre hardware e rede.</h2>
+        <p class="product-doc-section-subtitle">Não são dois módulos soltos. É uma documentação operacional única.</p>
+      </div>
+      <div class="product-doc-merge-grid">
+        <article class="product-doc-merge-card">
+          <strong>IOs documentam hardware e canais</strong>
+        </article>
+        <article class="product-doc-merge-card">
+          <strong>Listas de IP documentam rede e equipamentos</strong>
+        </article>
+      </div>
+      <div class="product-doc-merge-bar">
+        <span>Centralização, rastreabilidade e atualização no mesmo fluxo técnico.</span>
+      </div>
+    </section>
+
+    <section class="product-doc-scenarios reveal-on-scroll">
+      <div class="product-doc-section-head">
+        <h2>Onde o produto faz sentido no dia a dia.</h2>
+      </div>
+      <div class="product-doc-scenario-grid">
+        <article class="product-doc-scenario-card reveal-on-scroll">
+          <strong>Comissionamento</strong>
+          <p>Apoia testes e validação em campo.</p>
+        </article>
+        <article class="product-doc-scenario-card reveal-on-scroll">
+          <strong>Manutenção</strong>
+          <p>Facilita consulta técnica e revisão.</p>
+        </article>
+        <article class="product-doc-scenario-card reveal-on-scroll">
+          <strong>Revisão técnica</strong>
+          <p>Ajuda a manter a documentação atualizada.</p>
+        </article>
+        <article class="product-doc-scenario-card reveal-on-scroll">
+          <strong>Inventário industrial</strong>
+          <p>Padroniza a rede e seus equipamentos.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="card product-doc-trial reveal-on-scroll">
+      <div class="product-doc-trial-layout">
+        <div class="product-doc-section-head">
+          <div class="product-doc-kicker">Teste por 30 dias</div>
+          <h2>Teste o produto real com um fluxo simples.</h2>
+          <p class="product-doc-section-subtitle">Acesso individual por usuário. Sem checkout nesta etapa.</p>
+        </div>
+        <div class="product-doc-trial-side">
+          <div class="product-doc-trial-path">
+            <div class="product-doc-trial-grid">
+              <article class="product-doc-trial-card reveal-on-scroll">
+                <strong>1. Crie conta ou entre</strong>
+              </article>
+              <article class="product-doc-trial-card reveal-on-scroll">
+                <strong>2. Ative o trial</strong>
+              </article>
+              <article class="product-doc-trial-card reveal-on-scroll">
+                <strong>3. Acesse os módulos</strong>
+              </article>
+            </div>
+          </div>
+          <div class="product-doc-actions is-trial">
+            {% if request.user.is_authenticated %}
+              {% if access_state == "trial_ativo" or access_state == "ativo" %}
+                <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
+              {% elif access_state == "expirado" or access_state == "bloqueado" %}
+                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+              {% else %}
+                <a class="btn btn-primary" href="{{ activate_url }}">Iniciar trial</a>
+              {% endif %}
+            {% else %}
+              <a class="btn btn-primary" href="{{ register_url }}">Criar conta</a>
+              <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card product-doc-final-cta reveal-on-scroll">
+      <div class="product-doc-final-copy">
+        <div class="product-doc-kicker">Próximo passo</div>
+        <h2>Organize rack e rede no mesmo fluxo técnico.</h2>
+        <p>Use o trial para validar com sua equipe uma documentação mais clara para racks, canais, equipamentos e rede.</p>
+      </div>
+      <div class="product-doc-final-action-panel">
+        <div class="product-doc-actions">
+          {% if request.user.is_authenticated %}
+            {% if access_state == "trial_ativo" or access_state == "ativo" %}
+              <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
+            {% elif access_state == "expirado" or access_state == "bloqueado" %}
+              <a class="btn btn-primary" href="{% url 'painel' %}">Voltar ao painel</a>
+            {% else %}
+              <a class="btn btn-primary" href="{{ activate_url }}">Iniciar teste</a>
+            {% endif %}
+          {% else %}
+            <a class="btn btn-primary" href="{{ register_url }}">Começar agora</a>
+          {% endif %}
+        </div>
+        {% if not request.user.is_authenticated %}
+          <a class="product-doc-inline-link" href="{{ login_url }}">Já tenho conta</a>
+        {% endif %}
+      </div>
+    </section>
   </section>
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  <script>
+    (() => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const reveals = document.querySelectorAll(".page-product-doc .reveal-on-scroll:not(.is-visible)");
+
+      if (reduceMotion) {
+        reveals.forEach((node) => node.classList.add("is-visible"));
+      } else if (reveals.length) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          });
+        }, {
+          threshold: 0.16,
+          rootMargin: "0px 0px -8% 0px"
+        });
+
+        reveals.forEach((node) => observer.observe(node));
+      }
+
+      const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+      const rackDemo = document.querySelector("[data-rack-demo]");
+      if (rackDemo) {
+        const rackTriggers = Array.from(rackDemo.querySelectorAll("[data-rack-module-trigger]"));
+        const rackPanelShell = rackDemo.querySelector("[data-rack-panel-shell]");
+        const rackPanel = rackDemo.querySelector("[data-rack-panel]");
+        const rackTitle = rackDemo.querySelector("[data-rack-active-title]");
+        const rackMeta = rackDemo.querySelector("[data-rack-active-meta]");
+        const rackChannelBody = rackDemo.querySelector("[data-rack-channel-body]");
+        const rackModules = {
+          ai08: {
+            title: "AI-08",
+            meta: "SLOT 01 · Tipo AI · 8 canais",
+            rows: [
+              ["Canal 1", "PT-101", "Pressão da linha", "AI"],
+              ["Canal 2", "TT-201", "Temperatura do tanque", "AI"],
+              ["Canal 3", "LT-301", "Nível do reservatório", "AI"]
+            ]
+          },
+          di16: {
+            title: "DI-16",
+            meta: "SLOT 02 · Tipo DI · 16 canais",
+            rows: [
+              ["Canal 1", "FC-01", "Fim de curso A", "DI"],
+              ["Canal 2", "SP-02", "Sensor de porta", "DI"],
+              ["Canal 3", "PR-03", "Presença no trilho", "DI"]
+            ]
+          },
+          do16: {
+            title: "DO-16",
+            meta: "SLOT 03 · Tipo DO · 16 canais",
+            rows: [
+              ["Canal 1", "SV-11", "Válvula solenóide", "DO"],
+              ["Canal 2", "KM-21", "Contato do motor", "DO"],
+              ["Canal 3", "RL-31", "Relé de alarme", "DO"]
+            ]
+          }
+        };
+
+        let activeRackId = rackTriggers.find((node) => node.classList.contains("is-active"))?.dataset.rackModuleTrigger || "ai08";
+        let rackAutoplay = null;
+        let rackUserInteracted = false;
+
+        const setRackAnchor = (trigger) => {
+          if (!trigger || !rackPanelShell) return;
+          const triggerRect = trigger.getBoundingClientRect();
+          const panelRect = rackPanelShell.getBoundingClientRect();
+          const anchor = triggerRect.left - panelRect.left + (triggerRect.width / 2);
+          rackPanelShell.style.setProperty("--product-doc-rack-anchor", `${anchor}px`);
+        };
+
+        const buildRackRows = (rows) => rows.map((row) => `
+          <div class="product-doc-rack-channel-row">
+            <span>${row[0]}</span>
+            <span>${row[1]}</span>
+            <span>${row[2]}</span>
+            <span>${row[3]}</span>
+          </div>
+        `).join("");
+
+        const renderRackModule = (moduleId, { animated = true } = {}) => {
+          const moduleData = rackModules[moduleId];
+          const trigger = rackTriggers.find((node) => node.dataset.rackModuleTrigger === moduleId);
+          if (!moduleData || !trigger) return;
+
+          activeRackId = moduleId;
+          rackTriggers.forEach((node) => {
+            const isActive = node === trigger;
+            node.classList.toggle("is-active", isActive);
+            node.setAttribute("aria-pressed", isActive ? "true" : "false");
+          });
+
+          trigger.classList.add("is-pressing");
+          window.setTimeout(() => trigger.classList.remove("is-pressing"), 170);
+          setRackAnchor(trigger);
+
+          const commit = () => {
+            rackTitle.textContent = moduleData.title;
+            rackMeta.textContent = moduleData.meta;
+            rackChannelBody.innerHTML = buildRackRows(moduleData.rows);
+          };
+
+          if (animated && !reduceMotion && rackPanel) {
+            rackPanel.classList.add("is-switching");
+            window.setTimeout(() => {
+              commit();
+              window.requestAnimationFrame(() => rackPanel.classList.remove("is-switching"));
+            }, 110);
+          } else {
+            commit();
+            if (rackPanel) rackPanel.classList.remove("is-switching");
+          }
+        };
+
+        const queueRackAutoplay = () => {
+          if (reduceMotion || rackUserInteracted || rackTriggers.length < 2) return;
+          window.clearTimeout(rackAutoplay);
+          rackAutoplay = window.setTimeout(() => {
+            const currentIndex = rackTriggers.findIndex((node) => node.dataset.rackModuleTrigger === activeRackId);
+            const nextTrigger = rackTriggers[(currentIndex + 1) % rackTriggers.length];
+            renderRackModule(nextTrigger.dataset.rackModuleTrigger);
+            queueRackAutoplay();
+          }, 3400);
+        };
+
+        rackTriggers.forEach((trigger) => {
+          trigger.addEventListener("click", () => {
+            rackUserInteracted = true;
+            window.clearTimeout(rackAutoplay);
+            renderRackModule(trigger.dataset.rackModuleTrigger);
+          });
+        });
+
+        window.addEventListener("resize", () => {
+          const activeTrigger = rackTriggers.find((node) => node.dataset.rackModuleTrigger === activeRackId);
+          setRackAnchor(activeTrigger);
+        });
+
+        renderRackModule(activeRackId, { animated: false });
+        queueRackAutoplay();
+      }
+
+      const searchDisplay = document.querySelector("[data-ip-search-display]");
+      const searchRows = Array.from(document.querySelectorAll("[data-ip-search-match]"));
+      if (!searchDisplay || reduceMotion) return;
+
+      const searchTerms = [
+        "PLC-01",
+        "192.168.0.10",
+        "REM1",
+        "Modbus",
+        "08:AF:2C:11",
+        "IHM-01"
+      ];
+
+      const findRowForTerm = (term) => {
+        const normalized = term.toLowerCase();
+        return searchRows.find((row) =>
+          (row.dataset.ipSearchMatch || "").toLowerCase().includes(normalized)
+        );
+      };
+
+      const highlightRow = (term) => {
+        const row = findRowForTerm(term);
+        searchRows.forEach((node) => node.classList.toggle("is-active", node === row));
+      };
+
+      const setSearchValue = (value) => {
+        searchDisplay.textContent = value || "\u00A0";
+      };
+
+      const runTyping = async () => {
+        let termIndex = 0;
+        while (true) {
+          const term = searchTerms[termIndex];
+          highlightRow(term);
+
+          for (let i = 0; i <= term.length; i += 1) {
+            setSearchValue(term.slice(0, i));
+            await wait(i === term.length ? 620 : 70);
+          }
+
+          for (let i = term.length; i >= 0; i -= 1) {
+            setSearchValue(term.slice(0, i));
+            await wait(i === 0 ? 220 : 42);
+          }
+
+          termIndex = (termIndex + 1) % searchTerms.length;
+        }
+      };
+
+      runTyping();
+    })();
+  </script>
 {% endblock %}
