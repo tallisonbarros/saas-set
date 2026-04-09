@@ -8840,6 +8840,18 @@ select:focus {
     0 28px 70px rgba(0, 0, 0, 0.2);
 }
 
+.product-doc-hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 92px;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(25, 30, 36, 0), rgba(13, 15, 18, 0.34) 72%, rgba(13, 15, 18, 0.58));
+}
+
 .page-product-doc .reveal-on-scroll {
   opacity: 0;
   transform: translateY(18px);
@@ -8917,6 +8929,76 @@ select:focus {
 
 .product-doc-hero-copy > :nth-child(6) {
   animation-delay: 430ms;
+}
+
+.product-doc-scroll-cue {
+  justify-self: center;
+  position: relative;
+  z-index: 2;
+  margin-top: -30px;
+  margin-bottom: -6px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(86, 98, 110, 0.2);
+  background: linear-gradient(180deg, rgba(29, 34, 40, 0.94), rgba(22, 26, 31, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.028),
+    0 14px 34px rgba(0, 0, 0, 0.16);
+  text-decoration: none;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+  animation: productDocScrollCueFloat 3.2s ease-in-out infinite;
+}
+
+.product-doc-scroll-cue:hover {
+  transform: translateY(-1px);
+  border-color: rgba(118, 130, 143, 0.28);
+  background: linear-gradient(180deg, rgba(32, 37, 43, 0.96), rgba(24, 28, 33, 0.98));
+}
+
+.product-doc-scroll-cue.is-hidden {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.product-doc-scroll-label {
+  color: #adb8c1;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.product-doc-scroll-track {
+  position: relative;
+  width: 18px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(108, 120, 132, 0.28);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.product-doc-scroll-dot {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(238, 197, 152, 0.92);
+  box-shadow: 0 0 10px rgba(235, 116, 33, 0.16);
+  transform: translateX(-50%);
+  animation: productDocScrollDot 1.7s ease-in-out infinite;
 }
 
 .product-doc-kicker,
@@ -10356,6 +10438,12 @@ select:focus {
     border-radius: 22px;
   }
 
+  .product-doc-scroll-cue {
+    margin-top: -20px;
+    margin-bottom: -2px;
+    padding: 9px 14px 11px;
+  }
+
   .product-doc-module-section {
     padding: 0;
     gap: 18px;
@@ -10446,6 +10534,8 @@ select:focus {
   .page-product-doc .reveal-on-scroll,
   .product-doc-hero-copy > *,
   .product-doc-proof-board,
+  .product-doc-scroll-cue,
+  .product-doc-scroll-dot,
   .product-doc-led,
   .product-doc-rack-rail::after,
   .product-doc-rack-card,
@@ -10463,6 +10553,35 @@ select:focus {
     transform: none !important;
     filter: none !important;
     opacity: 1 !important;
+  }
+}
+
+@keyframes productDocScrollCueFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes productDocScrollDot {
+  0% {
+    opacity: 0.25;
+    transform: translate(-50%, 0);
+  }
+  24% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  68% {
+    opacity: 0.85;
+    transform: translate(-50%, 11px);
+  }
+  100% {
+    opacity: 0.18;
+    transform: translate(-50%, 11px);
   }
 }
 

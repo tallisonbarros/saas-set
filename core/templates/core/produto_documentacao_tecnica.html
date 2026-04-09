@@ -88,7 +88,14 @@
       </div>
     </section>
 
-    <section class="card product-doc-gains-panel reveal-on-scroll">
+    <a class="product-doc-scroll-cue" href="#product-doc-next" data-scroll-cue>
+      <span class="product-doc-scroll-label">Role para explorar</span>
+      <span class="product-doc-scroll-track" aria-hidden="true">
+        <span class="product-doc-scroll-dot"></span>
+      </span>
+    </a>
+
+    <section id="product-doc-next" class="card product-doc-gains-panel reveal-on-scroll">
       <div class="product-doc-gains">
         <article class="product-doc-gain-card reveal-on-scroll">
           <strong>Consulta mais rápida</strong>
@@ -464,6 +471,20 @@
     (() => {
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const reveals = document.querySelectorAll(".page-product-doc .reveal-on-scroll:not(.is-visible)");
+      const scrollCue = document.querySelector("[data-scroll-cue]");
+
+      if (scrollCue) {
+        const syncScrollCue = () => {
+          scrollCue.classList.toggle("is-hidden", window.scrollY > 48);
+        };
+
+        syncScrollCue();
+        window.addEventListener("scroll", syncScrollCue, { passive: true });
+
+        scrollCue.addEventListener("click", () => {
+          scrollCue.classList.add("is-hidden");
+        });
+      }
 
       if (reduceMotion) {
         reveals.forEach((node) => node.classList.add("is-visible"));
