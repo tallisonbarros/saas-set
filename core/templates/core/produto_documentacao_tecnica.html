@@ -14,127 +14,127 @@
       <div class="product-doc-hero-grid">
         <div class="product-doc-hero-copy">
           <div class="product-doc-kicker">Produto técnico SET</div>
-          <h1 class="product-doc-title">Documentação técnica para racks, canais e rede industrial</h1>
+          <h1 class="product-doc-title">Localize rack, canal, tag e IP sem depender de planilhas paralelas.</h1>
           <p class="product-doc-subtitle">
-            Reúna IOs e Listas de IP em um fluxo técnico único para documentar estrutura de rack,
-            canais, equipamentos e rede com leitura mais clara no dia a dia.
+            Organize IOs e Listas de IP em uma base técnica viva para consultar equipamentos,
+            atualizar documentação e manter hardware, sinais e rede no mesmo contexto.
           </p>
           <p class="product-doc-value-line">
-            Um único produto para documentar hardware e rede com mais contexto técnico.
+            Menos retrabalho para revisar, atualizar e encontrar o dado certo no campo.
           </p>
-
-          <div class="product-doc-chip-row">
-            <span class="product-doc-chip">IOs</span>
-            <span class="product-doc-chip">Listas de IP</span>
-            <span class="product-doc-chip is-highlight">Teste por 30 dias</span>
-            <span class="product-doc-chip">Acesso individual</span>
-          </div>
-
-          <div class="product-doc-actions">
-            {% if request.user.is_authenticated %}
-              {% if access_state == "trial_ativo" or access_state == "ativo" %}
-                <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
-                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-              {% elif access_state == "expirado" or access_state == "bloqueado" %}
-                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-              {% else %}
-                <a class="btn btn-primary" href="{{ activate_url }}">Iniciar trial</a>
-                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-              {% endif %}
-            {% else %}
-              <a class="btn btn-primary" href="{{ register_url }}">Criar conta</a>
-              <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
-            {% endif %}
-          </div>
         </div>
 
         <div class="product-doc-hero-visual">
-          <article class="product-doc-proof-board">
+          <article class="product-doc-hero-action-panel">
             <div class="product-doc-board-head">
-              <span>Documentação técnica</span>
-              <span>IOs + IPs</span>
+              <span>Resultado operacional</span>
+              <span>Fluxo técnico único</span>
             </div>
-            <div class="product-doc-rack-slots">
-              <div class="product-doc-rack-slot is-ai">
-                <div class="product-doc-led is-green"></div>
-                <strong>AI-08</strong>
-                <span>Tipo AI</span>
-                <span>8 canais</span>
-              </div>
-              <div class="product-doc-rack-slot is-di">
-                <div class="product-doc-led is-amber"></div>
-                <strong>DI-16</strong>
-                <span>Tipo DI</span>
-                <span>16 canais</span>
-              </div>
-              <div class="product-doc-rack-slot is-empty">
-                <strong>Slot livre</strong>
-                <span>Selecione um módulo</span>
-              </div>
+
+            <div class="product-doc-hero-outcome-grid">
+              <article class="product-doc-hero-outcome-card is-primary">
+                <strong>Encontrar mais rápido</strong>
+                <p>Rack, slot, canal, tag, equipamento e IP no mesmo fluxo.</p>
+              </article>
+              <article class="product-doc-hero-outcome-card">
+                <strong>Atualizar sem refazer</strong>
+                <p>Edite dados técnicos sem reconstruir planilhas ou PDFs.</p>
+              </article>
+              <article class="product-doc-hero-outcome-card">
+                <strong>Evitar versões paralelas</strong>
+                <p>Menos Excel, print e anotação solta para manter.</p>
+              </article>
+              <article class="product-doc-hero-outcome-card">
+                <strong>Contexto técnico conectado</strong>
+                <p>Hardware, sinais, equipamentos e rede no mesmo registro.</p>
+              </article>
             </div>
-            <div class="product-doc-rack-rail"></div>
-            <div class="product-doc-proof-summary">
-              <div class="product-doc-proof-metric">
-                <strong>Racks e canais</strong>
-                <span>estrutura visual por slot e módulo</span>
-              </div>
-              <div class="product-doc-proof-metric">
-                <strong>Inventário de rede</strong>
-                <span>IP, equipamento, MAC e protocolo</span>
-              </div>
+
+            <div class="product-doc-chip-row product-doc-hero-meta-row">
+              <span class="product-doc-chip">IOs</span>
+              <span class="product-doc-chip">Listas de IP</span>
+              <span class="product-doc-chip">Acesso individual</span>
             </div>
+
+            <div class="product-doc-actions product-doc-hero-actions">
+              {% if request.user.is_authenticated %}
+                {% if access_state == "trial_ativo" or access_state == "ativo" %}
+                  <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
+                  <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+                {% elif access_state == "expirado" or access_state == "bloqueado" %}
+                  <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+                {% else %}
+                  <a class="btn btn-primary" href="{{ activate_url }}">Testar gratuitamente</a>
+                  <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+                {% endif %}
+              {% else %}
+                <a class="btn btn-primary" href="{{ register_url }}">Testar gratuitamente</a>
+                <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
+              {% endif %}
+            </div>
+
           </article>
         </div>
       </div>
     </section>
 
-    <a class="product-doc-scroll-cue" href="#product-doc-next" data-scroll-cue>
+    <a class="product-doc-scroll-cue" href="#product-doc-pain" data-scroll-cue>
       <span class="product-doc-scroll-label">Role para explorar</span>
       <span class="product-doc-scroll-track" aria-hidden="true">
         <span class="product-doc-scroll-dot"></span>
       </span>
     </a>
 
-    <section id="product-doc-next" class="card product-doc-gains-panel reveal-on-scroll">
-      <div class="product-doc-gains">
-        <article class="product-doc-gain-card reveal-on-scroll">
-          <strong>Consulta mais rápida</strong>
-          <p>Rack e rede no mesmo fluxo.</p>
+    <section class="product-doc-post-hero-meta reveal-on-scroll">
+      <div class="product-doc-post-hero-line">
+        <span>Rack, sinais, equipamentos e rede no mesmo contexto técnico</span>
+      </div>
+    </section>
+
+    <section id="product-doc-pain" class="product-doc-section product-doc-problem-section reveal-on-scroll">
+      <div class="product-doc-section-head">
+        <h2>Se IOs e IPs vivem em Excel, PDF, print e anotações soltas, a documentação envelhece rápido.</h2>
+        <p class="product-doc-section-subtitle">O problema não é só formato. É perder contexto, revisar em duplicidade e nunca ter certeza de qual versão ainda vale.</p>
+      </div>
+      <div class="product-doc-problem-grid">
+        <article class="product-doc-problem-card reveal-on-scroll">
+          <strong>Excel por fora</strong>
+          <p>Rack, slot e canal ficam em abas que ninguém sabe se ainda refletem o campo.</p>
         </article>
-        <article class="product-doc-gain-card reveal-on-scroll">
-          <strong>Menos planilhas paralelas</strong>
-          <p>Menos arquivos soltos para manter.</p>
+        <article class="product-doc-problem-card reveal-on-scroll">
+          <strong>PDF que envelhece</strong>
+          <p>O arquivo vira foto do passado e não acompanha ajuste, troca ou revisão de equipamento.</p>
         </article>
-        <article class="product-doc-gain-card reveal-on-scroll">
-          <strong>Mais contexto técnico</strong>
-          <p>Canais, equipamentos e IPs conectados.</p>
+        <article class="product-doc-problem-card reveal-on-scroll">
+          <strong>Print e anotação solta</strong>
+          <p>Parte da informação fica no celular, no caderno ou no grupo e some do contexto técnico.</p>
         </article>
-        <article class="product-doc-gain-card reveal-on-scroll">
-          <strong>Atualização mais prática</strong>
-          <p>Documentação mais fácil de revisar.</p>
+        <article class="product-doc-problem-card reveal-on-scroll">
+          <strong>Retrabalho para revisar</strong>
+          <p>Toda mudança exige caçar versão, copiar dado e validar de novo o que está certo.</p>
         </article>
       </div>
     </section>
 
-    <section class="product-doc-module-section reveal-on-scroll">
+    <section id="product-doc-modules" class="product-doc-module-section reveal-on-scroll">
       <div class="product-doc-module-copy">
         <div class="product-doc-kicker">Módulo IOs</div>
-        <h2>Documente racks e canais com leitura próxima do hardware real.</h2>
+        <h2>Encontre rack, slot e canal com leitura próxima do hardware real.</h2>
         <p class="product-doc-module-subtitle">
-          O módulo organiza o rack por slots, módulos e canais para consulta técnica mais clara.
+          Consulte a estrutura do rack e atualize tags, descrições e status sem depender de planilhas paralelas.
         </p>
         <div class="product-doc-module-benefits">
           <div class="product-doc-module-benefit">
-            <strong>Leitura visual do rack</strong>
-            <span>Estrutura por slot e módulo.</span>
+            <strong>Encontrar slot e módulo</strong>
+            <span>Veja rack, slot e canal sem procurar em abas separadas.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Documentação de canais</strong>
-            <span>Tag, descrição e status.</span>
+            <strong>Atualizar tag e descrição</strong>
+            <span>Edite tag, descrição e status no mesmo lugar.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Estrutura próxima do campo</strong>
-            <span>Leitura mais útil para manutenção.</span>
+            <strong>Consultar em campo</strong>
+            <span>Leve a leitura do hardware real para manutenção e comissionamento.</span>
           </div>
         </div>
         <div class="product-doc-module-flow">
@@ -149,7 +149,7 @@
         </div>
       </div>
 
-      <div class="product-doc-module-visual-shell">
+      <div class="product-doc-module-visual-shell is-rack-demo">
         <div class="product-doc-panel-caption">Leitura visual do rack</div>
         <div class="product-doc-rack-detail" data-rack-demo>
           <div class="product-doc-rack-chassis">
@@ -235,7 +235,7 @@
     </section>
 
     <section class="product-doc-module-section is-reverse reveal-on-scroll">
-      <div class="product-doc-module-visual-shell">
+      <div class="product-doc-module-visual-shell is-ip-demo">
         <div class="product-doc-panel-caption">Inventário de rede</div>
         <div class="product-doc-ip-panel">
           <div class="product-doc-ip-panel-top">
@@ -254,25 +254,25 @@
               <span>Protocolo</span>
             </div>
             <div class="product-doc-ip-table-row" data-ip-search-match="192.168.0.10 REM1 08:AF:2C:11 TCP/IP">
-              <span>192.168.0.10</span>
-              <span>REM1</span>
-              <span>Remota</span>
-              <span>08:AF:2C:11</span>
-              <span>TCP/IP</span>
+              <span data-ip-label="IP">192.168.0.10</span>
+              <span data-ip-label="Equipamento">REM1</span>
+              <span data-ip-label="Descrição">Remota</span>
+              <span data-ip-label="MAC">08:AF:2C:11</span>
+              <span data-ip-label="Protocolo">TCP/IP</span>
             </div>
             <div class="product-doc-ip-table-row" data-ip-search-match="192.168.0.11 PLC-01 Modbus">
-              <span>192.168.0.11</span>
-              <span>PLC-01</span>
-              <span>Controlador</span>
-              <span>08:AF:2C:12</span>
-              <span>Modbus</span>
+              <span data-ip-label="IP">192.168.0.11</span>
+              <span data-ip-label="Equipamento">PLC-01</span>
+              <span data-ip-label="Descrição">Controlador</span>
+              <span data-ip-label="MAC">08:AF:2C:12</span>
+              <span data-ip-label="Protocolo">Modbus</span>
             </div>
             <div class="product-doc-ip-table-row" data-ip-search-match="192.168.0.12 IHM-01 Profinet">
-              <span>192.168.0.12</span>
-              <span>IHM-01</span>
-              <span>Interface local</span>
-              <span>08:AF:2C:13</span>
-              <span>Profinet</span>
+              <span data-ip-label="IP">192.168.0.12</span>
+              <span data-ip-label="Equipamento">IHM-01</span>
+              <span data-ip-label="Descrição">Interface local</span>
+              <span data-ip-label="MAC">08:AF:2C:13</span>
+              <span data-ip-label="Protocolo">Profinet</span>
             </div>
           </div>
         </div>
@@ -280,22 +280,22 @@
 
       <div class="product-doc-module-copy">
         <div class="product-doc-kicker">Módulo Listas de IP</div>
-        <h2>Organize a rede com a mesma disciplina usada no rack.</h2>
+        <h2>Localize IP, equipamento, MAC e protocolo na mesma lógica do rack.</h2>
         <p class="product-doc-module-subtitle">
-          O módulo transforma a faixa de IP em inventário técnico para equipamentos e rede.
+          Transforme a faixa de IP em inventário técnico consultável, com dados de rede mais fáceis de localizar e revisar.
         </p>
         <div class="product-doc-module-benefits">
           <div class="product-doc-module-benefit">
-            <strong>Inventário centralizado</strong>
-            <span>Faixa e equipamentos no mesmo lugar.</span>
+            <strong>Localizar equipamento e IP</strong>
+            <span>Encontre faixa, IP e nome do equipamento com rapidez.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Menos perda de contexto</strong>
-            <span>MAC e protocolo ligados ao item certo.</span>
+            <strong>Atualizar MAC e protocolo</strong>
+            <span>Revise dados técnicos sem refazer o inventário.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Padronização da rede</strong>
-            <span>Estrutura mais clara para revisão.</span>
+            <strong>Evitar rede paralela</strong>
+            <span>Rede documentada no mesmo contexto do restante da planta.</span>
           </div>
         </div>
         <div class="product-doc-module-flow">
@@ -311,68 +311,34 @@
       </div>
     </section>
 
-    <section class="product-doc-section product-doc-problem-section reveal-on-scroll">
-      <div class="product-doc-section-head">
-        <div class="product-doc-kicker">Problema operacional</div>
-        <h2>Quando rack e rede vivem separados, a documentação perde valor rápido.</h2>
-        <p class="product-doc-section-subtitle">O problema não é falta de software. É perda de contexto técnico.</p>
-      </div>
-      <div class="card product-doc-problem-panel">
-        <div class="product-doc-problem-grid">
-          <article class="product-doc-problem-card reveal-on-scroll">
-            <strong>Rack disperso</strong>
-            <p>Slots e canais espalhados em arquivos sem leitura única.</p>
+    <div class="product-doc-linked-panels">
+      <section class="card product-doc-merge reveal-on-scroll">
+        <div class="product-doc-section-head">
+          <div class="product-doc-kicker">Por que os dois juntos</div>
+          <h2>O produto fecha o contexto técnico entre hardware e rede.</h2>
+          <p class="product-doc-section-subtitle">Não são dois módulos soltos. É uma documentação operacional única.</p>
+        </div>
+        <div class="product-doc-merge-bar">
+          <span>Centralização, rastreabilidade e atualização no mesmo fluxo técnico.</span>
+        </div>
+      </section>
+
+      <section class="card product-doc-solution product-doc-solution-linked reveal-on-scroll">
+        <div class="product-doc-solution-layout">
+          <article class="product-doc-solution-side">
+            <div class="product-doc-solution-label">IOs</div>
+            <strong>Rack, módulos e canais</strong>
           </article>
-          <article class="product-doc-problem-card reveal-on-scroll">
-            <strong>Rede paralela</strong>
-            <p>IPs e MACs ficam fora da documentação do equipamento.</p>
-          </article>
-          <article class="product-doc-problem-card reveal-on-scroll">
-            <strong>Atualização fraca</strong>
-            <p>A estrutura envelhece rápido e perde confiabilidade.</p>
+          <div class="product-doc-solution-bridge">
+            <span>Fluxo técnico único</span>
+          </div>
+          <article class="product-doc-solution-side">
+            <div class="product-doc-solution-label">Listas de IP</div>
+            <strong>Faixa, equipamento e protocolo</strong>
           </article>
         </div>
-      </div>
-    </section>
-
-    <section class="card product-doc-solution reveal-on-scroll">
-      <div class="product-doc-section-head">
-        <h2>IOs e Listas de IP no mesmo fluxo técnico.</h2>
-        <p class="product-doc-section-subtitle">Um lado documenta hardware e canais. O outro documenta rede e equipamentos.</p>
-      </div>
-      <div class="product-doc-solution-layout">
-        <article class="product-doc-solution-side">
-          <div class="product-doc-solution-label">IOs</div>
-          <strong>Rack, módulos e canais</strong>
-        </article>
-        <div class="product-doc-solution-bridge">
-          <span>Fluxo técnico único</span>
-        </div>
-        <article class="product-doc-solution-side">
-          <div class="product-doc-solution-label">Listas de IP</div>
-          <strong>Faixa, equipamento e protocolo</strong>
-        </article>
-      </div>
-    </section>
-
-    <section class="card product-doc-merge reveal-on-scroll">
-      <div class="product-doc-section-head">
-        <div class="product-doc-kicker">Por que os dois juntos</div>
-        <h2>O produto fecha o contexto técnico entre hardware e rede.</h2>
-        <p class="product-doc-section-subtitle">Não são dois módulos soltos. É uma documentação operacional única.</p>
-      </div>
-      <div class="product-doc-merge-grid">
-        <article class="product-doc-merge-card">
-          <strong>IOs documentam hardware e canais</strong>
-        </article>
-        <article class="product-doc-merge-card">
-          <strong>Listas de IP documentam rede e equipamentos</strong>
-        </article>
-      </div>
-      <div class="product-doc-merge-bar">
-        <span>Centralização, rastreabilidade e atualização no mesmo fluxo técnico.</span>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <section class="product-doc-scenarios reveal-on-scroll">
       <div class="product-doc-section-head">
@@ -426,10 +392,10 @@
               {% elif access_state == "expirado" or access_state == "bloqueado" %}
                 <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
               {% else %}
-                <a class="btn btn-primary" href="{{ activate_url }}">Iniciar trial</a>
+                <a class="btn btn-primary" href="{{ activate_url }}">Testar gratuitamente</a>
               {% endif %}
             {% else %}
-              <a class="btn btn-primary" href="{{ register_url }}">Criar conta</a>
+              <a class="btn btn-primary" href="{{ register_url }}">Testar gratuitamente</a>
               <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
             {% endif %}
           </div>
@@ -437,31 +403,6 @@
       </div>
     </section>
 
-    <section class="card product-doc-final-cta reveal-on-scroll">
-      <div class="product-doc-final-copy">
-        <div class="product-doc-kicker">Próximo passo</div>
-        <h2>Organize rack e rede no mesmo fluxo técnico.</h2>
-        <p>Use o trial para validar com sua equipe uma documentação mais clara para racks, canais, equipamentos e rede.</p>
-      </div>
-      <div class="product-doc-final-action-panel">
-        <div class="product-doc-actions">
-          {% if request.user.is_authenticated %}
-            {% if access_state == "trial_ativo" or access_state == "ativo" %}
-              <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
-            {% elif access_state == "expirado" or access_state == "bloqueado" %}
-              <a class="btn btn-primary" href="{% url 'painel' %}">Voltar ao painel</a>
-            {% else %}
-              <a class="btn btn-primary" href="{{ activate_url }}">Iniciar teste</a>
-            {% endif %}
-          {% else %}
-            <a class="btn btn-primary" href="{{ register_url }}">Começar agora</a>
-          {% endif %}
-        </div>
-        {% if not request.user.is_authenticated %}
-          <a class="product-doc-inline-link" href="{{ login_url }}">Já tenho conta</a>
-        {% endif %}
-      </div>
-    </section>
   </section>
 {% endblock %}
 

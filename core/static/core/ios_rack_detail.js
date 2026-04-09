@@ -123,7 +123,7 @@
     var isTested = !!commissioned;
     button.setAttribute("data-state", isTested ? "tested" : "pending");
     button.setAttribute("aria-pressed", isTested ? "true" : "false");
-    button.textContent = isTested ? "Testado" : "Testar";
+    button.textContent = "Comissionado";
     button.classList.toggle("is-tested", isTested);
     button.classList.toggle("is-pending", !isTested);
   }
@@ -178,6 +178,10 @@
   function clearSelectedCards() {
     moduleCards.forEach(function (card) {
       card.classList.remove("slot-selected");
+      var shell = card.closest(".rack-slot-shell");
+      if (shell) {
+        shell.classList.remove("slot-active");
+      }
     });
   }
 
@@ -205,16 +209,68 @@
     moduleCards.forEach(function (card) {
       if (String(card.dataset.moduleId) === String(moduleId)) {
         card.classList.add("slot-selected");
+        var shell = card.closest(".rack-slot-shell");
+        if (shell) {
+          shell.classList.add("slot-active");
+        }
         selectedCard = card;
       }
     });
     syncPanelDock(selectedCard);
   }
 
+  function syncModuleCardLed(moduleId) {
+    var info = moduleData[String(moduleId)];
+    if (!info || !Array.isArray(info.channels)) {
+      return;
+    }
+    info.all_canais_comissionados = info.channels.length > 0 && info.channels.every(function (channel) {
+      return !!channel.comissionado;
+    });
+    moduleCards.forEach(function (card) {
+      if (String(card.dataset.moduleId) !== String(moduleId)) {
+        return;
+      }
+      var led = card.querySelector(".slot-state-led");
+      if (!led) {
+        return;
+      }
+      led.classList.toggle("is-ok", info.all_canais_comissionados);
+      led.classList.toggle("is-pending", !info.all_canais_comissionados);
+      led.setAttribute("aria-label", info.all_canais_comissionados ? "Comissionado" : "Nao comissionado");
+    });
+  }
+
+  function syncModuleChannelDataFromRow(row) {
+    if (!row || !activeModuleId) {
+      return;
+    }
+    var info = moduleData[String(activeModuleId)];
+    if (!info || !Array.isArray(info.channels)) {
+      return;
+    }
+    var channelId = String(row.getAttribute("data-channel-id") || "");
+    var target = null;
+    info.channels.forEach(function (channel) {
+      if (String(channel.id) === channelId) {
+        target = channel;
+      }
+    });
+    if (!target) {
+      return;
+    }
+    target.tag = row.querySelector(".channel-tag-input").value || "";
+    target.descricao = row.querySelector(".channel-desc-input").value || "";
+    target.tipo_id = row.querySelector(".channel-type-select").value || "";
+    target.comissionado = isRowCommissioned(row);
+    syncModuleCardLed(activeModuleId);
+  }
+
   function postInlineSave(row) {
     if (!row || !activeModuleId) {
       return;
     }
+    syncModuleChannelDataFromRow(row);
     var data = new FormData();
     data.set("action", "inline_update_channel");
     data.set("module_id", activeModuleId);
@@ -357,6 +413,7 @@
         var willBeTested = button.getAttribute("data-state") !== "tested";
         updateStatusButton(button, willBeTested);
         markDirty(button);
+        syncModuleChannelDataFromRow(button.closest(".channel-row"));
         postInlineSave(button.closest(".channel-row"));
       });
     });
@@ -396,6 +453,7 @@
           body: data
         }).then(function () {
           dirtyRows.forEach(function (row) {
+            syncModuleChannelDataFromRow(row);
             row.removeAttribute("data-dirty");
             showRowToast(row, "Salvo");
           });
@@ -473,9 +531,10 @@
     }
     panelBody.innerHTML =
       "<div class=\"rack-module-toolbar\">" +
-        "<span class=\"rack-module-toolbar-pill\">SLOT " + escapeHtml(String(info.slot_pos).padStart(2, "0")) + "</span>" +
-        "<span class=\"rack-module-toolbar-pill\">" + escapeHtml(info.type_name || "-") + "</span>" +
-        "<span class=\"rack-module-toolbar-pill\">" + escapeHtml(info.channels.length) + " canais</span>" +
+        "<span class=\"rack-module-toolbar-slot\">Slot " + escapeHtml(String(info.slot_pos).padStart(2, "0")) + "</span>" +
+        "<span class=\"rack-module-toolbar-meta\">" + escapeHtml(info.type_name || "-") + "</span>" +
+        "<span class=\"rack-module-toolbar-dot\" aria-hidden=\"true\">&bull;</span>" +
+        "<span class=\"rack-module-toolbar-meta\">" + escapeHtml(info.channels.length) + " canais</span>" +
       "</div>" +
       "<form class=\"channel-form rack-module-channel-form\">" +
         "<div class=\"channel-row channel-row-head\" aria-hidden=\"true\">" +
@@ -491,7 +550,7 @@
             "<label class=\"field channel-field channel-field-tag\"><span>Tag</span><input type=\"text\" class=\"channel-tag-input\" value=\"" + escapeHtml(channel.tag) + "\" placeholder=\"TAG\"" + (canManage ? "" : " disabled") + "></label>" +
             "<label class=\"field channel-field channel-field-desc\"><span>Descricao</span><input type=\"text\" class=\"channel-desc-input\" value=\"" + escapeHtml(channel.descricao) + "\"" + (canManage ? "" : " disabled") + "></label>" +
             "<label class=\"field channel-field channel-field-type\"><span>Tipo</span><select class=\"channel-type-select\"" + (canManage ? "" : " disabled") + ">" + buildTypeOptions(channel.tipo_id) + "</select></label>" +
-            "<button class=\"channel-status-btn channel-field-status " + (channel.comissionado ? "is-tested" : "is-pending") + "\" type=\"button\" data-state=\"" + (channel.comissionado ? "tested" : "pending") + "\"" + (canManage ? "" : " disabled") + ">" + (channel.comissionado ? "Testado" : "Testar") + "</button>" +
+            "<button class=\"channel-status-btn channel-field-status " + (channel.comissionado ? "is-tested" : "is-pending") + "\" type=\"button\" data-state=\"" + (channel.comissionado ? "tested" : "pending") + "\"" + (canManage ? "" : " disabled") + ">Comissionado</button>" +
           "</div>";
         }).join("") +
         (canManage

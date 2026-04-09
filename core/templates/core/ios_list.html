@@ -162,11 +162,11 @@
             <div class="io-form-grid">
               <label class="field">
                 <span>Nome do rack</span>
-                <input type="text" name="nome" placeholder="Rack Principal" required data-ios-rack-autofocus>
+                <input type="text" name="nome" placeholder="Rack Principal" data-placeholder-base="Rack Principal" data-placeholder-examples="Rack Principal|Rack Secagem|Rack Moagem 01|Rack Utilidades" required data-ios-rack-autofocus>
               </label>
               <label class="field">
                 <span>Descricao</span>
-                <input type="text" name="descricao" placeholder="Linha 01 - Esteira">
+                <input type="text" name="descricao" placeholder="Linha 01 - Esteira" data-placeholder-base="Linha 01 - Esteira" data-placeholder-examples="Linha 01 - Esteira|Painel de campo da secagem|Distribuicao de sinais da moagem|Rack remoto da utilidades">
               </label>
               <label class="field">
                 <div class="field-row">
@@ -180,7 +180,7 @@
                     </div>
                   </details>
                 </div>
-                <select name="local" id="local-select">
+                <select name="local" id="local-select" data-select-base="Sem local" data-select-examples="Fabrica Alpha|Fabrica Beta|Industria Norte|Industria Sul">
                   <option value="">Sem local</option>
                   {% for local in locais %}
                     <option value="{{ local.id }}">{{ local.nome }}</option>
@@ -199,7 +199,7 @@
                     </div>
                   </details>
                 </div>
-                <select name="grupo" id="grupo-select">
+                <select name="grupo" id="grupo-select" data-select-base="Sem grupo" data-select-examples="Recebimento|Secagem|Utilidades|Expedicao">
                   <option value="">Sem grupo</option>
                   {% for grupo in grupos %}
                     <option value="{{ grupo.id }}">{{ grupo.nome }}</option>
@@ -208,7 +208,7 @@
               </label>
               <label class="field">
                 <span>ID_PLANTA</span>
-                <input type="text" name="id_planta" placeholder="PLANTA-001">
+                <input type="text" name="id_planta" placeholder="PLANTA-001" data-placeholder-base="PLANTA-001" data-placeholder-examples="PLANTA-001|SEC-01|MOE-02|UTIL-01">
               </label>
               <label class="field">
                 <span>Slots totais</span>
@@ -252,6 +252,7 @@
           modal.hidden = false;
           modal.classList.add("is-open");
           document.body.classList.add("radar-export-modal-open");
+          bindRackFieldExamples(modal);
           if (autofocusInput) {
             window.setTimeout(function () {
               autofocusInput.focus();
@@ -285,6 +286,182 @@
           box.textContent = message;
           box.className = "notice notice-" + (level || "info");
           box.style.display = "block";
+        }
+        function splitExamples(raw) {
+          return (raw || "")
+            .split("|")
+            .map(function (item) { return item.trim(); })
+            .filter(function (item) { return !!item; });
+        }
+        function ensureGhostElement(control) {
+          if (!control) {
+            return null;
+          }
+          var container = control.closest(".field, .rack-edit-field") || control.parentElement;
+          if (!container) {
+            return null;
+          }
+          container.classList.add("field-has-ghost-example");
+          var ghost = container.querySelector(".field-ghost-example[data-ghost-for='" + (control.name || control.id || "field") + "']");
+          if (!ghost) {
+            ghost = document.createElement("span");
+            ghost.className = "field-ghost-example";
+            ghost.setAttribute("data-ghost-for", control.name || control.id || "field");
+            container.appendChild(ghost);
+          }
+          return ghost;
+        }
+        function bindAnimatedPlaceholder(input) {
+          if (!input || input.dataset.exampleBound === "1" || (input.value || "").trim()) {
+            return;
+          }
+          input.dataset.exampleBound = "1";
+          var examples = splitExamples(input.getAttribute("data-placeholder-examples"));
+          if (!examples.length) {
+            return;
+          }
+          var base = input.getAttribute("data-placeholder-base") || input.getAttribute("placeholder") || "";
+          var ghost = ensureGhostElement(input);
+          if (!ghost) {
+            return;
+          }
+          var exampleIndex = 0;
+          var charIndex = 0;
+          var hold = 0;
+          var deleting = false;
+          var stopped = false;
+          var userInteracted = false;
+          input.placeholder = "";
+          ghost.textContent = "";
+          function stop() {
+            if (stopped) {
+              return;
+            }
+            stopped = true;
+            window.clearInterval(timer);
+            input.placeholder = base;
+            ghost.remove();
+          }
+          function isBlocked() {
+            return stopped || !!(input.value || "").trim() || userInteracted;
+          }
+          var timer = window.setInterval(function () {
+            if (isBlocked()) {
+              stop();
+              return;
+            }
+            var target = examples[exampleIndex % examples.length];
+            if (!deleting) {
+              if (charIndex < target.length) {
+                charIndex += 1;
+                ghost.textContent = target.slice(0, charIndex);
+                return;
+              }
+              if (hold < 14) {
+                hold += 1;
+                return;
+              }
+              deleting = true;
+              hold = 0;
+              return;
+            }
+            if (charIndex > 0) {
+              charIndex -= 1;
+              ghost.textContent = target.slice(0, charIndex);
+              return;
+            }
+            if (hold < 4) {
+              hold += 1;
+              return;
+            }
+            deleting = false;
+            hold = 0;
+            exampleIndex += 1;
+          }, 85);
+          ["mousedown", "pointerdown", "keydown", "input", "change"].forEach(function (eventName) {
+            input.addEventListener(eventName, function () {
+              userInteracted = true;
+              stop();
+            });
+          });
+        }
+        function bindAnimatedSelect(select) {
+          if (!select || select.dataset.exampleBound === "1" || select.value || !select.options.length) {
+            return;
+          }
+          select.dataset.exampleBound = "1";
+          var examples = splitExamples(select.getAttribute("data-select-examples"));
+          if (!examples.length) {
+            return;
+          }
+          var ghost = ensureGhostElement(select);
+          if (!ghost) {
+            return;
+          }
+          var exampleIndex = 0;
+          var charIndex = 0;
+          var hold = 0;
+          var deleting = false;
+          var stopped = false;
+          var userInteracted = false;
+          select.classList.add("ghost-select-active");
+          ghost.textContent = "";
+          function stop() {
+            if (stopped) {
+              return;
+            }
+            stopped = true;
+            window.clearInterval(timer);
+            select.classList.remove("ghost-select-active");
+            ghost.remove();
+          }
+          function isBlocked() {
+            return stopped || !!select.value || userInteracted;
+          }
+          var timer = window.setInterval(function () {
+            if (isBlocked()) {
+              stop();
+              return;
+            }
+            var target = examples[exampleIndex % examples.length];
+            if (!deleting) {
+              if (charIndex < target.length) {
+                charIndex += 1;
+                ghost.textContent = target.slice(0, charIndex);
+                return;
+              }
+              if (hold < 16) {
+                hold += 1;
+                return;
+              }
+              deleting = true;
+              hold = 0;
+              return;
+            }
+            if (charIndex > 0) {
+              charIndex -= 1;
+              ghost.textContent = target.slice(0, charIndex);
+              return;
+            }
+            if (hold < 4) {
+              hold += 1;
+              return;
+            }
+            deleting = false;
+            hold = 0;
+            exampleIndex += 1;
+          }, 95);
+          ["mousedown", "pointerdown", "keydown", "input", "change"].forEach(function (eventName) {
+            select.addEventListener(eventName, function () {
+              userInteracted = true;
+              stop();
+            });
+          });
+        }
+        function bindRackFieldExamples(scope) {
+          var root = scope || document;
+          Array.from(root.querySelectorAll("[data-placeholder-examples]")).forEach(bindAnimatedPlaceholder);
+          Array.from(root.querySelectorAll("[data-select-examples]")).forEach(bindAnimatedSelect);
         }
 
         function bindCadastro() {
