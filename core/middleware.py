@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth.models import User
+from django.shortcuts import render
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -110,3 +111,60 @@ class AdminAccessLogMiddleware:
         if first == "admin":
             return "admin"
         return first
+
+
+class PrettyForbiddenMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if not self._should_render_error_page(request, response):
+            return response
+        return render(
+            request,
+            "error_minimal.html",
+            self._error_page_context(response.status_code),
+            status=response.status_code,
+        )
+
+    def _should_render_error_page(self, request, response):
+        status_code = getattr(response, "status_code", None)
+        if status_code not in {403, 404}:
+            return False
+        path = request.path or ""
+        if path.startswith(("/static/", "/media/", "/admin/static/")):
+            return False
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return False
+        if getattr(response, "streaming", False):
+            return False
+        accept = (request.headers.get("Accept") or "").lower()
+        if accept and "text/html" not in accept and "*/*" not in accept:
+            return False
+        content_type = (response.get("Content-Type") or "").lower()
+        if "application/json" in content_type or "text/javascript" in content_type:
+            return False
+        return True
+
+    def _error_page_context(self, status_code):
+        pages = {
+            403: {
+                "status_code": "403",
+                "title": "Acesso restrito",
+                "message": "contate a set",
+            },
+            404: {
+                "status_code": "404",
+                "title": "Pagina indisponivel",
+                "message": "contate a set",
+            },
+        }
+        return pages.get(
+            status_code,
+            {
+                "status_code": str(status_code or ""),
+                "title": "Indisponivel",
+                "message": "contate a set",
+            },
+        )

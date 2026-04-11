@@ -209,6 +209,56 @@ class DevAdminPrivilegesTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class ForbiddenPagePresentationTests(TestCase):
+    def setUp(self):
+        self.client_http = Client()
+        self.user = User.objects.create_user(
+            username="forbidden-user@set.local",
+            email="forbidden-user@set.local",
+            password="123456",
+        )
+        self.perfil = PerfilUsuario.objects.create(
+            nome="Forbidden User",
+            email="forbidden-user@set.local",
+            usuario=self.user,
+        )
+
+    def test_html_forbidden_uses_discreet_custom_page(self):
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/admin-logs/")
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "contate a set", status_code=403)
+        self.assertContains(response, "Acesso restrito", status_code=403)
+
+    def test_html_not_found_uses_discreet_custom_page(self):
+        App.objects.create(
+            slug="appmilhaobla",
+            nome="App Milhao Bla",
+            ativo=False,
+        )
+        self.perfil.apps.add(App.objects.get(slug="appmilhaobla"))
+        self.client_http.force_login(self.user)
+        response = self.client_http.get("/apps/appmilhaobla/")
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "contate a set", status_code=404)
+        self.assertContains(response, "Pagina indisponivel", status_code=404)
+
+    def test_ajax_json_forbidden_keeps_json_payload(self):
+        App.objects.create(
+            slug="appmilhaobla",
+            nome="App Milhao Bla",
+            ativo=True,
+        )
+        self.client_http.force_login(self.user)
+        response = self.client_http.get(
+            "/apps/appmilhaobla/cards-data/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("application/json", response["Content-Type"])
+        self.assertEqual(response.json()["error"], "forbidden")
+
+
 class MaintenanceModeTests(TestCase):
     def setUp(self):
         self.client_http = Client()

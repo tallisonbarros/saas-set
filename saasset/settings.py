@@ -52,6 +52,7 @@ MIDDLEWARE = [
     'core.middleware.MaintenanceModeMiddleware',
     'core.middleware.AdminAccessLogMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'core.middleware.PrettyForbiddenMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
