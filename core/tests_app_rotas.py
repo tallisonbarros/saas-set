@@ -5,7 +5,7 @@ from django.utils import timezone
 
 import json
 
-from core.models import App, AppRotaConfig, AppRotasMap, IngestRecord, PerfilUsuario
+from core.models import App, AppRotaConfig, AppRotasMap, IngestRecord, PerfilUsuario, TipoPerfil
 
 
 class AppRotasTests(TestCase):
@@ -30,6 +30,19 @@ class AppRotasTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(reverse("app_rotas_dashboard"))
         self.assertEqual(response.status_code, 403)
+
+    def test_dev_can_access_dashboard_even_when_app_is_inactive(self):
+        tipo_dev = TipoPerfil.objects.filter(codigo__iexact="DEV").first()
+        if not tipo_dev:
+            tipo_dev = TipoPerfil.objects.create(nome="DEV", codigo="DEV")
+        self.perfil.tipos.add(tipo_dev)
+        self.perfil.apps.add(self.app)
+        self.app.ativo = False
+        self.app.save(update_fields=["ativo"])
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("app_rotas_dashboard"))
+        self.assertEqual(response.status_code, 200)
 
     def test_dashboard_renders_dynamic_route_with_destin_typo(self):
         self.perfil.apps.add(self.app)

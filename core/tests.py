@@ -148,6 +148,22 @@ class AccessControlAdminAndVisibilityTests(TestCase):
         self.assertContains(response, "BLA")
         self.assertNotContains(response, 'href="/financeiro/"')
 
+    def test_dev_keeps_inactive_dedicated_app_visible_in_painel(self):
+        app = App.objects.create(nome="BLA Oculto", slug="bla_oculto", ativo=False)
+        self.dev_perfil.apps.add(app)
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/painel/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BLA Oculto")
+
+    def test_dev_can_open_inactive_dedicated_app_home_when_assigned(self):
+        app = App.objects.create(nome="BLA Oculto", slug="bla_oculto", ativo=False)
+        self.dev_perfil.apps.add(app)
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/apps/bla_oculto/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BLA Oculto")
+
 
 class DevAdminPrivilegesTests(TestCase):
     def setUp(self):

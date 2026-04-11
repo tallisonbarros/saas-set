@@ -11,8 +11,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from core.models import AdminAccessLog, App, AppMilhaoBlaMuralDia, AppMilhaoBlaMuralDiaLeitura, IngestRecord
-from core.views import _get_cliente, _is_admin_user, _is_dev_user
+from core.models import AdminAccessLog, AppMilhaoBlaMuralDia, AppMilhaoBlaMuralDiaLeitura, IngestRecord
+from core.views import _get_app_by_slug_for_user, _is_dev_user, _user_has_app_access
 from .export_excel import build_milhao_excel_export
 
 
@@ -295,11 +295,8 @@ def _load_entries_for_app(app, *, limit=2000, start_date=None, end_date=None):
 
 
 def _get_app_if_allowed(request):
-    app = get_object_or_404(App, slug="appmilhaobla", ativo=True)
-    cliente = _get_cliente(request.user)
-    if _is_admin_user(request.user):
-        return app
-    if not cliente or not cliente.apps.filter(pk=app.pk).exists():
+    app = _get_app_by_slug_for_user("appmilhaobla", request.user)
+    if not _user_has_app_access(request.user, app):
         return None
     return app
 

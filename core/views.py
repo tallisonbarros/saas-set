@@ -416,6 +416,28 @@ def _is_dev_user(user):
     return cliente.tipos.filter(nome__iexact="DEV").exists()
 
 
+def _can_user_view_inactive_apps(user):
+    return _is_dev_user(user)
+
+
+def _filter_visible_apps_queryset(qs, user):
+    if _can_user_view_inactive_apps(user):
+        return qs
+    return qs.filter(ativo=True)
+
+
+def _get_app_by_slug_for_user(slug, user):
+    qs = _filter_visible_apps_queryset(App.objects.filter(slug=slug), user)
+    return get_object_or_404(qs)
+
+
+def _user_has_app_access(user, app):
+    if _is_admin_user(user):
+        return True
+    cliente = _get_cliente(user)
+    return bool(cliente) and cliente.apps.filter(pk=app.pk).exists()
+
+
 def _user_role(user):
     if _is_admin_user(user):
         return "ADMIN"
@@ -1623,9 +1645,9 @@ def painel(request):
         display_name = request.user.first_name or request.user.username
     role = _user_role(request.user)
     if _is_admin_user(request.user) and not cliente:
-        apps = App.objects.filter(ativo=True).order_by("nome")
+        apps = _filter_visible_apps_queryset(App.objects.all(), request.user).order_by("nome")
     elif cliente:
-        apps = cliente.apps.filter(ativo=True).order_by("nome")
+        apps = _filter_visible_apps_queryset(cliente.apps.all(), request.user).order_by("nome")
     else:
         apps = App.objects.none()
     module_signal_badges = _build_module_signal_badges(request.user, cliente)
@@ -2057,13 +2079,8 @@ def planta_conectada_redirect(request):
 
 @login_required
 def app_home(request, slug):
-    cliente = _get_cliente(request.user)
-    app = get_object_or_404(App, slug=slug, ativo=True)
-    if _is_admin_user(request.user):
-        allowed = True
-    else:
-        allowed = bool(cliente) and cliente.apps.filter(pk=app.pk).exists()
-    if not allowed:
+    app = _get_app_by_slug_for_user(slug, request.user)
+    if not _user_has_app_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
     if app.slug == "appmilhaobla":
         return redirect("app_milhao_bla_dashboard")

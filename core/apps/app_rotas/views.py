@@ -14,8 +14,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from core.models import App, AppRotaConfig, AppRotasMap, IngestRecord
-from core.views import _get_cliente, _is_admin_user
+from core.models import AppRotaConfig, AppRotasMap, IngestRecord
+from core.views import _get_app_by_slug_for_user, _user_has_app_access
 
 TAG_KEYS = ("Name", "TagName", "tagname", "tag", "nome_tag")
 VALUE_KEYS = ("Value", "value", "valor", "status")
@@ -50,15 +50,12 @@ def _empty_route_attrs():
     return {key: None for key in ROUTE_ATTR_KEYS}
 
 
-def _get_rotas_app():
-    return get_object_or_404(App, slug="approtas", ativo=True)
+def _get_rotas_app(user):
+    return _get_app_by_slug_for_user("approtas", user)
 
 
 def _has_access(user, app):
-    if _is_admin_user(user):
-        return True
-    cliente = _get_cliente(user)
-    return bool(cliente) and cliente.apps.filter(pk=app.pk).exists()
+    return _user_has_app_access(user, app)
 
 
 def _parse_query_datetime(value):
@@ -896,7 +893,7 @@ def _build_dashboard_payload(app, query_params):
 
 @login_required
 def dashboard(request):
-    app = _get_rotas_app()
+    app = _get_rotas_app(request.user)
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
     context = _build_dashboard_payload(app, request.GET)
@@ -907,7 +904,7 @@ def dashboard(request):
 
 @login_required
 def rota_detalhe(request, prefixo):
-    app = _get_rotas_app()
+    app = _get_rotas_app(request.user)
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
 
@@ -1146,7 +1143,7 @@ def rota_detalhe(request, prefixo):
 
 @login_required
 def mapeamentos(request):
-    app = _get_rotas_app()
+    app = _get_rotas_app(request.user)
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
 
@@ -1232,7 +1229,7 @@ def mapeamentos(request):
 
 @login_required
 def conexao(request):
-    app = _get_rotas_app()
+    app = _get_rotas_app(request.user)
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
 
@@ -1280,7 +1277,7 @@ def conexao(request):
 
 @login_required
 def dados(request):
-    app = _get_rotas_app()
+    app = _get_rotas_app(request.user)
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
 
@@ -1401,7 +1398,7 @@ def dados(request):
 
 @login_required
 def dados_registro(request, pk):
-    app = _get_rotas_app()
+    app = _get_rotas_app(request.user)
     if not _has_access(request.user, app):
         return HttpResponseForbidden("Sem permissao.")
 
@@ -1431,7 +1428,7 @@ def dados_registro(request, pk):
 def ordenar_rotas(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "method_not_allowed"}, status=405)
-    app = _get_rotas_app()
+    app = _get_rotas_app(request.user)
     if not _has_access(request.user, app):
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
     try:
