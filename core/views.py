@@ -4105,41 +4105,53 @@ def ios_import_create(request):
     raw_bytes = arquivo.read()
     arquivo.seek(0)
 
-    job = IOImportJob.objects.create(
-        created_by=request.user,
-        cliente=job_cliente,
-        target_rack=None,
-        requested_local=None,
-        requested_grupo=None,
-        requested_inventario=None,
-        requested_rack_name="",
-        requested_planta_code="",
-        mode=IOImportJob.Mode.CREATE_RACK,
-        original_filename=arquivo.name,
-        source_file=arquivo,
-        file_sha256=build_file_sha256(raw_bytes),
-    )
+    job = None
     try:
+        job = IOImportJob.objects.create(
+            created_by=request.user,
+            cliente=job_cliente,
+            target_rack=None,
+            requested_local=None,
+            requested_grupo=None,
+            requested_inventario=None,
+            requested_rack_name="",
+            requested_planta_code="",
+            mode=IOImportJob.Mode.CREATE_RACK,
+            original_filename=arquivo.name,
+            source_file=arquivo,
+            file_sha256=build_file_sha256(raw_bytes),
+        )
         _reprocess_io_import_job(job)
     except IOImportError as exc:
+        if not job:
+            logger.warning(
+                "IO import failed before job persistence with validation error",
+                extra={"user_id": request.user.id, "upload_name": arquivo.name},
+            )
+            if ajax_request:
+                return _json_error_response(str(exc), status=400)
+            return HttpResponse(str(exc), status=400)
         job.status = IOImportJob.Status.FAILED
         job.warnings = [str(exc)]
         job.save(update_fields=["status", "warnings", "updated_at"])
     except Exception as exc:
         logger.exception(
             "Unhandled IO import error while creating import job",
-            extra={"user_id": request.user.id, "job_id": job.id, "upload_name": arquivo.name},
+            extra={"user_id": request.user.id, "job_id": job.pk if job else None, "upload_name": arquivo.name},
         )
-        job.status = IOImportJob.Status.FAILED
-        job.warnings = [f"Falha interna ao analisar a planilha: {exc}"]
-        job.save(update_fields=["status", "warnings", "updated_at"])
+        if job:
+            job.status = IOImportJob.Status.FAILED
+            job.warnings = [f"Falha interna ao analisar a planilha: {exc}"]
+            job.save(update_fields=["status", "warnings", "updated_at"])
         if ajax_request:
             return _json_error_response(
                 "Falha interna ao analisar a planilha. Verifique o log do servidor.",
                 status=500,
-                job_id=job.pk,
+                job_id=job.pk if job else None,
             )
-        return redirect("ios_import_detail", pk=job.pk)
+        if job:
+            return redirect("ios_import_detail", pk=job.pk)
+        return HttpResponse("Falha interna ao criar a importacao.", status=500)
     redirect_url = reverse("ios_import_detail", kwargs={"pk": job.pk})
     if ajax_request:
         return JsonResponse({"ok": True, "redirect_url": redirect_url})

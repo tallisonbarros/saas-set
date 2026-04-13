@@ -1436,6 +1436,27 @@ class IOImportPipelineTests(TestCase):
         self.assertEqual(job.status, IOImportJob.Status.FAILED)
         self.assertTrue(any("boom" in warning.lower() for warning in (job.warnings or [])))
 
+    def test_import_ajax_job_creation_exception_returns_json_error(self):
+        upload = SimpleUploadedFile(
+            "PLANILHA DE IO UBS3 NUTRIEN - REM01 REV03.xlsx",
+            self._build_single_rack_slot_block_workbook(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        with patch("core.views.IOImportJob.objects.create", side_effect=RuntimeError("storage down")):
+            response = self.client_http.post(
+                "/ios/importacoes/nova/",
+                {
+                    "arquivo": upload,
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("application/json", response["Content-Type"])
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertIn("Falha interna", payload["message"])
+
     def test_import_admin_renders(self):
         admin_user = User.objects.create_superuser("io-admin", "io-admin@set.local", "123456")
         self.client_http.force_login(admin_user)
