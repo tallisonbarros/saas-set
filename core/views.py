@@ -933,6 +933,16 @@ def _io_import_can_manage(request, cliente):
     return bool(cliente or _is_admin_user(request.user))
 
 
+def _is_ajax_request(request):
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _json_error_response(message, status=400, **extra):
+    payload = {"ok": False, "message": message}
+    payload.update({key: value for key, value in extra.items() if value is not None})
+    return JsonResponse(payload, status=status)
+
+
 def _io_import_settings():
     settings_obj = IOImportSettings.load()
     if not settings_obj.header_prompt:
@@ -4064,21 +4074,32 @@ def ios_rack_io_list(request, pk):
 
 @login_required
 def ios_import_create(request):
+    ajax_request = _is_ajax_request(request)
     denied_response = _require_internal_module_access(request, "IOS")
     if denied_response:
+        if ajax_request:
+            return _json_error_response("Seu acesso atual nao permite importar planilhas de IO.", status=403)
         return denied_response
     if request.method != "POST":
+        if ajax_request:
+            return _json_error_response("Metodo nao permitido para esta operacao.", status=405)
         return HttpResponseNotAllowed(["POST"])
     cliente = _get_cliente(request.user)
     if not _io_import_can_manage(request, cliente):
+        if ajax_request:
+            return _json_error_response("Sem permissao para importar planilhas de IO.", status=403)
         return HttpResponseForbidden("Sem permissao.")
 
     arquivo = request.FILES.get("arquivo")
     if not arquivo:
+        if ajax_request:
+            return _json_error_response("Selecione um arquivo para enviar.", status=400)
         return HttpResponse("Arquivo obrigatorio.", status=400)
 
     job_cliente = cliente
     if not job_cliente:
+        if ajax_request:
+            return _json_error_response("Conta sem cliente associado para importar IO.", status=400)
         return HttpResponse("Conta sem cliente associado para importar IO.", status=400)
 
     raw_bytes = arquivo.read()
@@ -4104,8 +4125,23 @@ def ios_import_create(request):
         job.status = IOImportJob.Status.FAILED
         job.warnings = [str(exc)]
         job.save(update_fields=["status", "warnings", "updated_at"])
+    except Exception as exc:
+        logger.exception(
+            "Unhandled IO import error while creating import job",
+            extra={"user_id": request.user.id, "job_id": job.id, "upload_name": arquivo.name},
+        )
+        job.status = IOImportJob.Status.FAILED
+        job.warnings = [f"Falha interna ao analisar a planilha: {exc}"]
+        job.save(update_fields=["status", "warnings", "updated_at"])
+        if ajax_request:
+            return _json_error_response(
+                "Falha interna ao analisar a planilha. Verifique o log do servidor.",
+                status=500,
+                job_id=job.pk,
+            )
+        return redirect("ios_import_detail", pk=job.pk)
     redirect_url = reverse("ios_import_detail", kwargs={"pk": job.pk})
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+    if ajax_request:
         return JsonResponse({"ok": True, "redirect_url": redirect_url})
     return redirect("ios_import_detail", pk=job.pk)
 

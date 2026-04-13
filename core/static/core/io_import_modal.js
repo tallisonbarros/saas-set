@@ -220,8 +220,26 @@
       },
       body: new FormData(form)
     }).then(function (response) {
-      return response.json().catch(function () {
-        return { ok: false, message: "Resposta invalida do servidor." };
+      return response.text().then(function (rawText) {
+        var payload = null;
+        try {
+          payload = rawText ? JSON.parse(rawText) : null;
+        } catch (parseError) {
+          console.error("IO import returned non-JSON response", {
+            status: response.status,
+            contentType: response.headers.get("content-type"),
+            body: (rawText || "").slice(0, 2000)
+          });
+          throw new Error(
+            "O servidor retornou uma resposta inesperada (HTTP " +
+            response.status +
+            "). Verifique o log do Django ou a aba Network."
+          );
+        }
+        if (!response.ok) {
+          throw new Error((payload && payload.message) || ("Falha ao enviar a planilha (HTTP " + response.status + ")."));
+        }
+        return payload;
       });
     }).then(function (payload) {
       if (!payload || !payload.ok || !payload.redirect_url) {

@@ -10,8 +10,10 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
+from zipfile import BadZipFile
 
 from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 
 TYPE_ALIASES = {
@@ -454,7 +456,13 @@ def _read_csv_rows(raw_bytes, file_format):
 
 
 def _read_xlsx_rows(raw_bytes):
-    workbook = load_workbook(filename=BytesIO(raw_bytes), data_only=True, read_only=True)
+    try:
+        workbook = load_workbook(filename=BytesIO(raw_bytes), data_only=True, read_only=True)
+    except (BadZipFile, InvalidFileException, OSError, ValueError) as exc:
+        raise IOImportError(
+            "Nao foi possivel abrir a planilha Excel. Confirme que o arquivo nao esta corrompido "
+            "e que voce selecionou a planilha real, nao um arquivo temporario do Excel."
+        ) from exc
     sheets = []
     for worksheet in workbook.worksheets:
         rows = []
