@@ -86,6 +86,7 @@ urlpatterns = [
     path('ios/pesquisa/', views.ios_search, name="ios_search"),
     path('ios/importacoes/nova/', views.ios_import_create, name="ios_import_create"),
     path('ios/importacoes/admin/', views.ios_import_admin, name="ios_import_admin"),
+    path('ios/importacoes/<int:pk>/status/', views.ios_import_status, name="ios_import_status"),
     path('ios/importacoes/<int:pk>/', views.ios_import_detail, name="ios_import_detail"),
     path('ios/racks/novo/', views.ios_rack_new, name="ios_rack_new"),
     path('ios/racks/<int:pk>/', views.ios_rack_detail, name="ios_rack_detail"),

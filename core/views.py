@@ -5,6 +5,8 @@ import logging
 import os
 import ipaddress
 import re
+import subprocess
+import sys
 from pathlib import Path
 from io import BytesIO
 from datetime import date, datetime, timedelta
@@ -941,6 +943,18 @@ def _json_error_response(message, status=400, **extra):
     payload = {"ok": False, "message": message}
     payload.update({key: value for key, value in extra.items() if value is not None})
     return JsonResponse(payload, status=status)
+
+
+def _spawn_io_import_job_processor(job_id):
+    manage_py = Path(settings.BASE_DIR) / "manage.py"
+    env = os.environ.copy()
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    subprocess.Popen(
+        [sys.executable, str(manage_py), "process_io_import_job", str(job_id)],
+        cwd=str(settings.BASE_DIR),
+        env=env,
+        start_new_session=True,
+    )
 
 
 def _io_import_settings():
@@ -4106,6 +4120,7 @@ def ios_import_create(request):
     arquivo.seek(0)
 
     job = None
+    redirect_url = None
     try:
         job = IOImportJob.objects.create(
             created_by=request.user,
@@ -4121,6 +4136,17 @@ def ios_import_create(request):
             source_file=arquivo,
             file_sha256=build_file_sha256(raw_bytes),
         )
+        redirect_url = reverse("ios_import_detail", kwargs={"pk": job.pk})
+        if ajax_request:
+            _spawn_io_import_job_processor(job.pk)
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "job_id": job.pk,
+                    "status_url": reverse("ios_import_status", kwargs={"pk": job.pk}),
+                    "redirect_url": redirect_url,
+                }
+            )
         _reprocess_io_import_job(job)
     except IOImportError as exc:
         if not job:
@@ -4148,14 +4174,46 @@ def ios_import_create(request):
                 "Falha interna ao analisar a planilha. Verifique o log do servidor.",
                 status=500,
                 job_id=job.pk if job else None,
+                redirect_url=redirect_url,
             )
         if job:
             return redirect("ios_import_detail", pk=job.pk)
         return HttpResponse("Falha interna ao criar a importacao.", status=500)
-    redirect_url = reverse("ios_import_detail", kwargs={"pk": job.pk})
+    redirect_url = redirect_url or reverse("ios_import_detail", kwargs={"pk": job.pk})
     if ajax_request:
         return JsonResponse({"ok": True, "redirect_url": redirect_url})
     return redirect("ios_import_detail", pk=job.pk)
+
+
+@login_required
+def ios_import_status(request, pk):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return _json_error_response("Seu acesso atual nao permite consultar esta importacao.", status=403)
+    cliente = _get_cliente(request.user)
+    job = get_object_or_404(_build_io_import_job_queryset(request, cliente), pk=pk)
+    processing = job.status == IOImportJob.Status.UPLOADED
+    failed = job.status == IOImportJob.Status.FAILED
+    message = ""
+    if failed:
+        message = (job.warnings or [job.ai_error or "Falha ao processar a importacao."])[0]
+    elif processing:
+        message = "A planilha esta sendo analisada em segundo plano."
+    return JsonResponse(
+        {
+            "ok": True,
+            "job_id": job.pk,
+            "status": job.status,
+            "status_display": job.get_status_display(),
+            "processing": processing,
+            "complete": not processing,
+            "failed": failed,
+            "redirect_url": reverse("ios_import_detail", kwargs={"pk": job.pk}),
+            "message": message,
+            "warnings_count": len(job.warnings or []),
+            "ai_status": job.ai_status,
+        }
+    )
 
 
 @login_required
@@ -4234,6 +4292,7 @@ def ios_import_detail(request, pk):
     )
     pending_racks_count = sum(1 for rack in preview_racks if not rack.get("is_applied"))
     rows_preview = rows[:120]
+    status_url = reverse("ios_import_status", kwargs={"pk": job.pk})
     return render(
         request,
         "core/io_import_detail.html",
@@ -4249,6 +4308,7 @@ def ios_import_detail(request, pk):
             "total_rows_preview": len(rows_preview),
             "has_more_rows": len(rows) > len(rows_preview),
             "io_import_is_dev": _is_admin_user(request.user),
+            "status_url": status_url,
         },
     )
 

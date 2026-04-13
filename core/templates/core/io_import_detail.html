@@ -352,6 +352,72 @@
       .io-import-rack-footer .ios-rack-footer-strip {
         background: transparent;
       }
+      .io-import-processing-page {
+        position: relative;
+        overflow: hidden;
+        padding: 22px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 132, 38, 0.16);
+        background:
+          radial-gradient(circle at top, rgba(255, 132, 38, 0.16), transparent 40%),
+          linear-gradient(180deg, rgba(28, 20, 14, 0.96), rgba(18, 13, 9, 0.98));
+      }
+      .io-import-processing-page::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent 0%, rgba(255, 148, 72, 0.08) 50%, transparent 100%);
+        transform: translateX(-100%);
+        animation: io-import-page-scan 2.4s linear infinite;
+        pointer-events: none;
+      }
+      .io-import-processing-grid {
+        position: relative;
+        display: grid;
+        gap: 16px;
+        justify-items: center;
+        text-align: center;
+      }
+      .io-import-processing-kicker {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(255, 205, 168, 0.76);
+      }
+      .io-import-processing-orb {
+        width: 78px;
+        height: 78px;
+        border-radius: 999px;
+        position: relative;
+        background: radial-gradient(circle, rgba(255, 188, 121, 0.96), rgba(255, 117, 24, 0.46) 48%, rgba(40, 18, 6, 0.16) 72%, transparent 76%);
+        box-shadow: 0 0 34px rgba(255, 132, 38, 0.30);
+      }
+      .io-import-processing-orb::before {
+        content: "";
+        position: absolute;
+        inset: -10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 170, 94, 0.24);
+        animation: io-import-page-pulse 2s ease-out infinite;
+      }
+      .io-import-processing-title {
+        margin: 0;
+        font-size: 22px;
+      }
+      .io-import-processing-copy {
+        margin: 0;
+        max-width: 620px;
+        color: rgba(224, 237, 255, 0.76);
+      }
+      @keyframes io-import-page-scan {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(100%); }
+      }
+      @keyframes io-import-page-pulse {
+        0% { transform: scale(.88); opacity: .64; }
+        70% { transform: scale(1.15); opacity: 0; }
+        100% { transform: scale(1.15); opacity: 0; }
+      }
       @media (max-width: 920px) {
         .io-import-rack-header .ios-rack-topcard-head {
           gap: 10px;
@@ -423,6 +489,27 @@
       {% endif %}
     </section>
 
+    {% if job.status == 'UPLOADED' %}
+      <section
+        class="card io-import-processing-page"
+        data-io-import-processing-page
+        data-status-url="{{ status_url }}"
+      >
+        <div class="io-import-processing-grid">
+          <div class="io-import-processing-kicker">Analise de IA</div>
+          <div class="io-import-processing-orb" aria-hidden="true"></div>
+          <h2 class="io-import-processing-title">Processamento em segundo plano</h2>
+          <p class="io-import-processing-copy">
+            A planilha foi recebida e a importacao esta executando a leitura estrutural e a correlacao com IA fora da requisicao web.
+            Assim a analise pode terminar sem derrubar o preview, mesmo em arquivos maiores.
+          </p>
+          <div class="module-meta-row" style="justify-content:center; gap:8px;">
+            <span class="module-meta-pill">Status {{ job.get_status_display }}</span>
+            <span class="module-meta-pill">IA {{ job.get_ai_status_display }}</span>
+          </div>
+        </div>
+      </section>
+    {% else %}
     <section class="io-import-racks-flow" aria-label="Fluxo dos racks importados">
       {% if preview_racks %}
         <div class="io-import-flow-head">
@@ -606,6 +693,7 @@
         </section>
       {% endfor %}
     </section>
+    {% endif %}
 
     {% if sheet_summaries %}
       <section class="card compact-card">
@@ -669,4 +757,39 @@
   {{ block.super }}
   {{ preview_payload|json_script:"io-import-preview-payload" }}
   <script src="{% static 'core/io_import_preview.js' %}"></script>
+  {% if job.status == 'UPLOADED' %}
+    <script>
+      (function () {
+        var root = document.querySelector("[data-io-import-processing-page]");
+        if (!root) {
+          return;
+        }
+        var statusUrl = root.getAttribute("data-status-url");
+        if (!statusUrl) {
+          return;
+        }
+        function poll() {
+          fetch(statusUrl, {
+            method: "GET",
+            credentials: "same-origin",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          }).then(function (response) {
+            return response.json();
+          }).then(function (payload) {
+            if (!payload || !payload.ok) {
+              return;
+            }
+            if (payload.complete) {
+              window.location.href = payload.redirect_url || window.location.href;
+              return;
+            }
+            window.setTimeout(poll, 1800);
+          }).catch(function () {
+            window.setTimeout(poll, 3000);
+          });
+        }
+        window.setTimeout(poll, 1200);
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

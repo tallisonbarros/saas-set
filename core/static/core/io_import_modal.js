@@ -34,6 +34,7 @@
     preview: "Montando a preview operacional final"
   };
   var progressTimers = [];
+  var statusPollTimer = null;
   var currentProgress = 0;
   var isSubmitting = false;
 
@@ -42,6 +43,10 @@
       window.clearTimeout(timerId);
     });
     progressTimers = [];
+    if (statusPollTimer) {
+      window.clearTimeout(statusPollTimer);
+      statusPollTimer = null;
+    }
   }
 
   function setError(message) {
@@ -187,6 +192,72 @@
     }
   }
 
+  function keepProcessingAlive() {
+    if (currentProgress >= 94) {
+      return;
+    }
+    updateProgress(Math.min(currentProgress + 2, 94), "Aguardando conclusao da analise");
+    statusPollTimer = window.setTimeout(keepProcessingAlive, 1600);
+  }
+
+  function redirectToResult(url) {
+    finishProcessingView();
+    window.setTimeout(function () {
+      window.location.href = url;
+    }, 500);
+  }
+
+  function pollJobStatus(statusUrl, redirectUrl) {
+    function pollOnce() {
+      fetch(statusUrl, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest"
+        }
+      }).then(function (response) {
+        return response.text().then(function (rawText) {
+          var payload = null;
+          try {
+            payload = rawText ? JSON.parse(rawText) : null;
+          } catch (parseError) {
+            console.error("IO import status returned non-JSON response", {
+              status: response.status,
+              contentType: response.headers.get("content-type"),
+              body: (rawText || "").slice(0, 2000)
+            });
+            throw new Error("Nao foi possivel acompanhar o processamento da importacao.");
+          }
+          if (!response.ok) {
+            throw new Error((payload && payload.message) || ("Falha ao acompanhar a importacao (HTTP " + response.status + ")."));
+          }
+          return payload;
+        });
+      }).then(function (payload) {
+        if (!payload || !payload.ok) {
+          throw new Error((payload && payload.message) || "Nao foi possivel acompanhar a importacao.");
+        }
+        if (payload.complete) {
+          if (payload.failed && titleNode) {
+            titleNode.textContent = "Importacao finalizada com alertas";
+          }
+          if (payload.failed && copyNode) {
+            copyNode.textContent = payload.message || "A importacao terminou com alertas. Abrindo os detalhes para revisao.";
+          }
+          redirectToResult(payload.redirect_url || redirectUrl);
+          return;
+        }
+        statusPollTimer = window.setTimeout(pollOnce, 1800);
+      }).catch(function (error) {
+        resetProcessingView();
+        setError(error && error.message ? error.message : "Falha ao acompanhar a analise da planilha.");
+      });
+    }
+
+    keepProcessingAlive();
+    statusPollTimer = window.setTimeout(pollOnce, 900);
+  }
+
   openButtons.forEach(function (button) {
     button.addEventListener("click", openModal);
   });
@@ -245,10 +316,11 @@
       if (!payload || !payload.ok || !payload.redirect_url) {
         throw new Error((payload && payload.message) || "Nao foi possivel concluir a analise.");
       }
-      finishProcessingView();
-      window.setTimeout(function () {
-        window.location.href = payload.redirect_url;
-      }, 700);
+      if (payload.status_url) {
+        pollJobStatus(payload.status_url, payload.redirect_url);
+        return;
+      }
+      redirectToResult(payload.redirect_url);
     }).catch(function (error) {
       resetProcessingView();
       setError(error && error.message ? error.message : "Falha ao enviar a planilha para analise.");

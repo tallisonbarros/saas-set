@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
@@ -1359,19 +1360,25 @@ class IOImportPipelineTests(TestCase):
             self._build_single_rack_slot_block_workbook(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        response = self.client_http.post(
-            "/ios/importacoes/nova/",
-            {
-                "arquivo": upload,
-            },
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-        )
+        with patch("core.views._spawn_io_import_job_processor") as spawn_mock:
+            response = self.client_http.post(
+                "/ios/importacoes/nova/",
+                {
+                    "arquivo": upload,
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("application/json", response["Content-Type"])
         payload = response.json()
         self.assertTrue(payload["ok"])
         self.assertIn("/ios/importacoes/", payload["redirect_url"])
+        self.assertIn("/status/", payload["status_url"])
+        spawn_mock.assert_called_once()
+
+        job = IOImportJob.objects.latest("id")
+        self.assertEqual(job.status, IOImportJob.Status.UPLOADED)
 
     def test_import_ajax_without_file_returns_json_error(self):
         response = self.client_http.post(
@@ -1386,38 +1393,66 @@ class IOImportPipelineTests(TestCase):
         self.assertFalse(payload["ok"])
         self.assertIn("Selecione um arquivo", payload["message"])
 
-    def test_import_ajax_invalid_xlsx_returns_json_and_marks_job_failed(self):
-        upload = SimpleUploadedFile(
-            "bad.xlsx",
-            b"this-is-not-a-real-xlsx",
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        response = self.client_http.post(
-            "/ios/importacoes/nova/",
-            {
-                "arquivo": upload,
-            },
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("application/json", response["Content-Type"])
-        payload = response.json()
-        self.assertTrue(payload["ok"])
-
-        job = IOImportJob.objects.latest("id")
-        self.assertEqual(job.status, IOImportJob.Status.FAILED)
-        self.assertTrue(
-            any("planilha real" in warning.lower() or "temporario do excel" in warning.lower() for warning in (job.warnings or []))
-        )
-
-    def test_import_ajax_internal_exception_returns_json_error(self):
+    def test_import_ajax_status_endpoint_reports_processing(self):
         upload = SimpleUploadedFile(
             "PLANILHA DE IO UBS3 NUTRIEN - REM01 REV03.xlsx",
             self._build_single_rack_slot_block_workbook(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        with patch("core.views._reprocess_io_import_job", side_effect=RuntimeError("boom")):
+        with patch("core.views._spawn_io_import_job_processor"):
+            create_response = self.client_http.post(
+                "/ios/importacoes/nova/",
+                {
+                    "arquivo": upload,
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        payload = create_response.json()
+        response = self.client_http.get(payload["status_url"], HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/json", response["Content-Type"])
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        job = IOImportJob.objects.latest("id")
+        self.assertEqual(payload["job_id"], job.pk)
+        self.assertTrue(payload["processing"])
+        self.assertFalse(payload["complete"])
+        self.assertEqual(payload["status"], IOImportJob.Status.UPLOADED)
+
+    def test_background_command_invalid_xlsx_marks_job_failed(self):
+        upload = SimpleUploadedFile(
+            "bad.xlsx",
+            b"this-is-not-a-real-xlsx",
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        job = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="bad.xlsx",
+            source_file=upload,
+            file_sha256=build_file_sha256(b"this-is-not-a-real-xlsx"),
+            mode=IOImportJob.Mode.CREATE_RACK,
+        )
+        with self.assertRaises(Exception):
+            call_command("process_io_import_job", str(job.pk))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, IOImportJob.Status.FAILED)
+        self.assertTrue(
+            any(
+                "planilha real" in warning.lower() or "segundo plano" in warning.lower()
+                for warning in (job.warnings or [])
+            )
+        )
+
+    def test_import_ajax_spawn_exception_returns_json_error(self):
+        upload = SimpleUploadedFile(
+            "PLANILHA DE IO UBS3 NUTRIEN - REM01 REV03.xlsx",
+            self._build_single_rack_slot_block_workbook(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        with patch("core.views._spawn_io_import_job_processor", side_effect=RuntimeError("spawn down")):
             response = self.client_http.post(
                 "/ios/importacoes/nova/",
                 {
@@ -1431,10 +1466,6 @@ class IOImportPipelineTests(TestCase):
         payload = response.json()
         self.assertFalse(payload["ok"])
         self.assertIn("Falha interna", payload["message"])
-
-        job = IOImportJob.objects.latest("id")
-        self.assertEqual(job.status, IOImportJob.Status.FAILED)
-        self.assertTrue(any("boom" in warning.lower() for warning in (job.warnings or [])))
 
     def test_import_ajax_job_creation_exception_returns_json_error(self):
         upload = SimpleUploadedFile(
