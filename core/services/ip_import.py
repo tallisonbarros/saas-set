@@ -2,8 +2,10 @@ import csv
 import hashlib
 import ipaddress
 import json
+import os
 import re
 import socket
+import time
 import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -15,6 +17,11 @@ from urllib import request as urlrequest
 from openpyxl import load_workbook
 
 from core.models import ListaIP, ListaIPID, ListaIPItem
+
+
+DEFAULT_AI_REQUEST_TIMEOUT_SECONDS = 10.0
+DEFAULT_AI_TOTAL_BUDGET_SECONDS = 16.0
+DEFAULT_AI_MAX_SHEETS_PER_JOB = 2
 
 
 HEADER_ALIASES = {
@@ -99,6 +106,40 @@ def _cell_to_text(value):
     if not text:
         return ""
     return re.sub(r"\s+", " ", text)
+
+
+def _read_positive_float_env(name, default):
+    raw_value = str(os.environ.get(name, "")).strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = float(raw_value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _read_positive_int_env(name, default):
+    raw_value = str(os.environ.get(name, "")).strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _ai_request_timeout_seconds():
+    return _read_positive_float_env("IP_IMPORT_AI_TIMEOUT_SECONDS", DEFAULT_AI_REQUEST_TIMEOUT_SECONDS)
+
+
+def _ai_total_budget_seconds():
+    return _read_positive_float_env("IP_IMPORT_AI_TOTAL_BUDGET_SECONDS", DEFAULT_AI_TOTAL_BUDGET_SECONDS)
+
+
+def _ai_max_sheets_per_job():
+    return _read_positive_int_env("IP_IMPORT_AI_MAX_SHEETS_PER_JOB", DEFAULT_AI_MAX_SHEETS_PER_JOB)
 
 
 def _compact_token(value):
@@ -548,7 +589,7 @@ def _extract_response_text(response_payload):
     return ""
 
 
-def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, user_prompt):
+def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, user_prompt, request_timeout_seconds=None):
     if not settings_obj.enabled:
         raise IPImportError("Agente de importacao desativado.")
     if settings_obj.provider != settings_obj.Provider.OPENAI:
@@ -585,8 +626,9 @@ def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, use
             "Content-Type": "application/json",
         },
     )
+    request_timeout_seconds = request_timeout_seconds or _ai_request_timeout_seconds()
     try:
-        with urlrequest.urlopen(http_request, timeout=40) as response:
+        with urlrequest.urlopen(http_request, timeout=request_timeout_seconds) as response:
             response_payload = json.loads(response.read().decode("utf-8"))
     except urlerror.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -594,7 +636,7 @@ def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, use
     except urlerror.URLError as exc:
         raise IPImportError(f"Falha na chamada do agente: {exc.reason}")
     except (TimeoutError, socket.timeout):
-        raise IPImportError("Falha na chamada do agente: timeout apos 40s.")
+        raise IPImportError(f"Falha na chamada do agente: timeout apos {request_timeout_seconds:.1f}s.")
     except OSError as exc:
         raise IPImportError(f"Falha na chamada do agente: {exc}")
 
@@ -607,7 +649,7 @@ def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, use
         raise IPImportError(f"O agente retornou JSON invalido: {exc}")
 
 
-def run_ai_analysis(settings_obj, parsed, normalized_rows):
+def run_ai_analysis(settings_obj, parsed, normalized_rows, request_timeout_seconds=None):
     sample_rows = []
     for row in normalized_rows[: min(len(normalized_rows), settings_obj.max_rows_for_ai)]:
         sample_rows.append(
@@ -674,6 +716,7 @@ def run_ai_analysis(settings_obj, parsed, normalized_rows):
         schema=schema,
         system_prompt=f"{settings_obj.header_prompt}\n\n{settings_obj.grouping_prompt}",
         user_prompt=user_prompt,
+        request_timeout_seconds=request_timeout_seconds,
     )
 
 
@@ -695,7 +738,12 @@ def reprocess_import_job(job, settings_obj=None):
     ai_errors = []
     ai_model = settings_obj.model if settings_obj and settings_obj.enabled else ""
     ai_success = 0
+    ai_attempts = 0
     processed_sheets = []
+    ai_started_at = time.monotonic()
+    ai_request_timeout = _ai_request_timeout_seconds()
+    ai_total_budget = _ai_total_budget_seconds()
+    ai_max_sheets = _ai_max_sheets_per_job()
 
     for parsed in parsed_sheets:
         try:
@@ -716,13 +764,30 @@ def reprocess_import_job(job, settings_obj=None):
 
         sheet_ai_payload = {}
         if settings_obj and settings_obj.enabled:
-            try:
-                sheet_ai_payload = run_ai_analysis(settings_obj=settings_obj, parsed=parsed, normalized_rows=sheet_rows)
-                sheet_rows, sheet_map, sheet_warnings = normalize_rows(parsed=parsed, ai_result=sheet_ai_payload)
-                ai_success += 1
-            except IPImportError as exc:
-                ai_errors.append(_build_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
-                sheet_warnings.append(str(exc))
+            remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
+            if ai_attempts >= ai_max_sheets:
+                sheet_warnings.append(
+                    "Analise com IA pulada nesta aba para respeitar o limite operacional da importacao web."
+                )
+            elif remaining_budget <= 1:
+                sheet_warnings.append(
+                    "Analise com IA pulada nesta aba porque o tempo maximo da importacao web foi atingido."
+                )
+            else:
+                request_timeout_seconds = min(ai_request_timeout, remaining_budget)
+                try:
+                    ai_attempts += 1
+                    sheet_ai_payload = run_ai_analysis(
+                        settings_obj=settings_obj,
+                        parsed=parsed,
+                        normalized_rows=sheet_rows,
+                        request_timeout_seconds=request_timeout_seconds,
+                    )
+                    sheet_rows, sheet_map, sheet_warnings = normalize_rows(parsed=parsed, ai_result=sheet_ai_payload)
+                    ai_success += 1
+                except IPImportError as exc:
+                    ai_errors.append(_build_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
+                    sheet_warnings.append(str(exc))
 
         normalized_rows.extend(sheet_rows)
         effective_map[parsed.sheet_name] = sheet_map
