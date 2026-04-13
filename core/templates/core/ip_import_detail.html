@@ -1,0 +1,181 @@
+{% extends "core/base.html" %}
+
+{% block title %}Preview da Importacao de IPs{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'listas_ip_list' %}">Listas de IP</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'listas_ip_import_admin' %}">Importacao IP</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ job.original_filename }}</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="ios-ops-shell">
+    <section class="io-card" style="padding: 18px 22px 16px;">
+      <div class="ios-ops-topbar" style="margin: 0 0 10px;">
+        <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Navegacao da importacao">
+          <a class="hud-menu-pill" href="{% url 'listas_ip_list' %}">Listas de IP</a>
+          {% if request.user.is_staff or request.user.is_superuser or ip_import_is_dev %}
+            <a class="hud-menu-pill" href="{% url 'listas_ip_import_admin' %}">Modulo administrativo</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="page-hud" style="padding: 0; background: transparent; border: 0; box-shadow: none;">
+        <div class="hud-top">
+          <div class="hud-title">Preview da Importacao de IPs</div>
+          <div class="hud-pill">{{ job.get_status_display }}</div>
+        </div>
+        <div class="page-hud-head">
+          <div>
+            <h1 class="page-title" style="margin: 0;">{{ job.original_filename }}</h1>
+          </div>
+        </div>
+        <div class="module-meta-row" style="margin-top: 8px;">
+          <span class="module-meta-pill">Listas {{ proposal.summary.lists|default:0 }}</span>
+          <span class="module-meta-pill">IPs {{ proposal.summary.items|default:0 }}</span>
+          <span class="module-meta-pill">Linhas {{ job.rows_parsed }}</span>
+          {% if job.sheet_name %}
+            <span class="module-meta-pill">{{ job.sheet_name }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {% if preview_lists %}
+      <section class="stack" style="gap: 18px;">
+        {% for item in preview_lists %}
+          <section class="io-card" style="padding: 18px 20px;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+              <div style="min-width: 0; flex: 1 1 460px;">
+                {% if item.source_sheets %}
+                  <div class="module-meta-row" style="margin-bottom: 8px;">
+                    {% for sheet_name in item.source_sheets %}
+                      <span class="module-meta-pill">{{ sheet_name }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <h2 class="io-title" style="margin: 0;">{{ item.name }}</h2>
+                <p class="muted" style="margin: 8px 0 0;">{{ item.description }}</p>
+                <div class="module-meta-row" style="margin-top: 12px;">
+                  <span class="module-meta-pill">Faixa {{ item.faixa_inicio }} - {{ item.faixa_fim }}</span>
+                  <span class="module-meta-pill">IPs {{ item.total_ips }}</span>
+                  <span class="module-meta-pill">Equipamentos {{ item.filled_devices }}</span>
+                  {% if item.id_listaip %}
+                    <span class="module-meta-pill">ID_LISTAIP {{ item.id_listaip }}</span>
+                  {% endif %}
+                  {% if item.protocolo_padrao %}
+                    <span class="module-meta-pill">Protocolo {{ item.protocolo_padrao }}</span>
+                  {% endif %}
+                  {% if item.is_sparse %}
+                    <span class="module-meta-pill">Faixa nao contigua</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div style="display: grid; gap: 8px; justify-items: end;">
+                {% if item.is_applied %}
+                  <a class="btn btn-outline btn-compact" href="{% url 'listas_ip_list' %}">Abrir modulo de IPs</a>
+                  <button class="btn btn-primary btn-compact" type="button" disabled>Lista criada no seu modulo</button>
+                {% else %}
+                  <form method="post" style="display: flex; justify-content: flex-end;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="apply_import_list">
+                    <input type="hidden" name="list_key" value="{{ item.key }}">
+                    <button class="btn btn-primary btn-compact" type="submit">Aprovar e Aplicar</button>
+                  </form>
+                {% endif %}
+                <p class="muted" style="margin: 0; max-width: 260px; text-align: right; font-size: 12px;">
+                  Voce pode editar essa lista depois dentro do modulo, se precisar.
+                </p>
+              </div>
+            </div>
+
+            <div class="table-wrap" style="margin-top: 16px;">
+              <table class="table ip-list-table">
+                <thead>
+                  <tr>
+                    <th>IP</th>
+                    <th>Equipamento</th>
+                    <th>Descricao</th>
+                    <th>MAC</th>
+                    <th>Protocolo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in item.items %}
+                    <tr>
+                      <td>{{ row.ip }}</td>
+                      <td>{{ row.device_name|default:"-" }}</td>
+                      <td>{{ row.description|default:"-" }}</td>
+                      <td>{{ row.mac|default:"-" }}</td>
+                      <td>{{ row.protocol|default:"-" }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if item.extra_items > 0 %}
+              <p class="muted" style="margin: 10px 0 0;">+ {{ item.extra_items }} IP(s) adicionais preservados na aplicacao.</p>
+            {% endif %}
+          </section>
+        {% endfor %}
+      </section>
+    {% else %}
+      <section class="io-card ios-empty-state io-center">
+        <div class="ios-empty-icon">!</div>
+        <h2 class="ios-empty-title">Nenhuma lista sugerida</h2>
+        <p class="muted">A importacao ainda nao conseguiu montar uma preview visual das listas.</p>
+      </section>
+    {% endif %}
+
+    {% if sheet_summaries %}
+      <section class="card compact-card">
+        <details>
+          <summary style="display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none;">
+            <span class="panel-title" style="margin:0;">Guias processadas</span>
+            <span class="admin-token is-neutral">{{ sheet_summaries|length }} guia{{ sheet_summaries|length|pluralize }}</span>
+          </summary>
+          <div class="admin-list" style="margin-top: 12px;">
+            {% for sheet in sheet_summaries %}
+              <article class="admin-list-row">
+                <div class="admin-list-row-main">
+                  <div class="admin-list-title">{{ sheet.sheet_name }}</div>
+                  <div class="admin-list-meta">
+                    {% if sheet.header_row_index %}
+                      <span class="admin-token is-neutral">Header {{ sheet.header_row_index }}</span>
+                    {% endif %}
+                    <span class="admin-token is-neutral">Linhas {{ sheet.rows_parsed }}/{{ sheet.rows_total }}</span>
+                    {% if sheet.skipped %}
+                      <span class="admin-token is-warning">Ignorada</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </details>
+      </section>
+    {% endif %}
+
+    {% if ip_import_is_dev and job.warnings %}
+      <section class="card compact-card">
+        <details>
+          <summary style="display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none;">
+            <span class="panel-title" style="margin:0;">Warnings</span>
+            <span class="admin-token is-warning">{{ job.warnings|length }}</span>
+          </summary>
+          <div class="stack" style="margin-top: 12px;">
+            {% for warning in job.warnings %}
+              <div class="notice notice-warning">{{ warning }}</div>
+            {% endfor %}
+          </div>
+        </details>
+      </section>
+    {% endif %}
+  </section>
+{% endblock %}

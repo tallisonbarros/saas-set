@@ -52,6 +52,9 @@
         <a class="hud-menu-pill" href="{% url 'ios_search' %}">Pesquisa de I/Os</a>
         <a class="hud-menu-pill" href="{% url 'ios_rack_io_list' rack.id %}">Ver lista completa</a>
         <a class="hud-menu-pill" href="{% url 'ios_rack_io_list' rack.id %}?format=pdf">Exportar PDF</a>
+        {% if io_import_can_upload %}
+          <button class="hud-menu-pill" type="button" data-io-import-open>Importar planilha</button>
+        {% endif %}
         {% if can_manage %}
           <a class="hud-menu-pill ios-hud-menu-primary" href="#" data-rack-edit-open>Editar rack</a>
         {% endif %}
@@ -318,12 +321,16 @@
       </article>
     </section>
   </section>
+  {% include "core/partials/io_import_modal.html" %}
 
 {% endblock %}
 
 {% block scripts %}
   {{ block.super }}
   {{ module_channels|json_script:"rack-module-channels" }}
+  {% if io_import_can_upload %}
+    <script src="{% static 'core/io_import_modal.js' %}"></script>
+  {% endif %}
   <script>
     (function () {
       function getCookie(name) {

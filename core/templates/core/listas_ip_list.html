@@ -14,9 +14,17 @@
 {% block content %}
   <section class="ios-ops-shell">
     <div class="ios-ops-topbar">
-      {% if can_manage and listas %}
+      {% if can_manage or ip_import_can_upload or ip_import_is_admin %}
         <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Acoes de lista">
-          <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ip-list-create-open>Nova lista</button>
+          {% if ip_import_is_admin %}
+            <a class="hud-menu-pill" href="{% url 'listas_ip_import_admin' %}">Modulo administrativo</a>
+          {% endif %}
+          {% if ip_import_can_upload %}
+            <button class="hud-menu-pill" type="button" data-ip-import-open>Importar planilha</button>
+          {% endif %}
+          {% if can_manage %}
+            <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ip-list-create-open>Nova lista</button>
+          {% endif %}
         </div>
       {% endif %}
     </div>
@@ -62,9 +70,24 @@
           <div class="ios-empty-icon">+</div>
           <h2 class="ios-empty-title">Nenhuma lista cadastrada</h2>
           <p class="muted">Crie a primeira lista para começar a organizar os IPs da rede.</p>
-          {% if can_manage %}
-            <div class="form-actions" style="justify-content: center;">
-              <button class="btn btn-primary" type="button" data-ip-list-create-open>+ Criar primeira lista</button>
+          {% if can_manage or ip_import_can_upload %}
+            <div class="stack" style="align-items: center; gap: 12px;">
+              {% if can_manage %}
+                <div class="form-actions" style="justify-content: center;">
+                  <button class="btn btn-primary" type="button" data-ip-list-create-open>+ Criar primeira lista</button>
+                </div>
+              {% endif %}
+              {% if ip_import_can_upload %}
+                <button
+                  class="btn btn-outline"
+                  type="button"
+                  data-ip-import-open
+                  style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.1; padding-top: 10px; padding-bottom: 10px;"
+                >
+                  <span>Importar planilha existente</span>
+                  <span style="font-size: 11px; opacity: 0.68; font-weight: 500;">analise e geracao por IA</span>
+                </button>
+              {% endif %}
             </div>
           {% endif %}
         </section>
@@ -153,5 +176,13 @@
         });
       })();
     </script>
+  {% endif %}
+  {% include "core/partials/ip_import_modal.html" %}
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  {% if ip_import_can_upload %}
+    <script src="{% static 'core/ip_import_modal.js' %}"></script>
   {% endif %}
 {% endblock %}

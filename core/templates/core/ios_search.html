@@ -48,6 +48,9 @@
       <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Menu do modulo">
         <a class="hud-menu-pill" href="{% url 'ios_list' %}">Meus Racks</a>
         <a class="hud-menu-pill" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
+        {% if io_import_can_upload %}
+          <button class="hud-menu-pill" type="button" data-io-import-open>Importar planilha</button>
+        {% endif %}
         {% if can_manage %}
           <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ios-rack-open>Novo rack</button>
         {% endif %}
@@ -254,10 +257,14 @@
       </section>
     </div>
   {% endif %}
+  {% include "core/partials/io_import_modal.html" %}
 {% endblock %}
 
 {% block scripts %}
   {{ block.super }}
+  {% if io_import_can_upload %}
+    <script src="{% static 'core/io_import_modal.js' %}"></script>
+  {% endif %}
   <script>
     (function () {
       var modal = document.getElementById("ios-rack-modal");

@@ -48,6 +48,9 @@
       <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Menu do modulo">
         <a class="hud-menu-pill" href="{% url 'ios_search' %}">Pesquisa de I/Os</a>
         <a class="hud-menu-pill" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
+        {% if io_import_can_upload %}
+          <button class="hud-menu-pill" type="button" data-io-import-open>Importar planilha</button>
+        {% endif %}
         {% if can_manage %}
           <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ios-rack-open>Novo rack</button>
         {% endif %}
@@ -139,8 +142,21 @@
         <h2 class="ios-empty-title">Nenhum rack cadastrado</h2>
         <p class="muted">Crie o primeiro rack para começar a montar os I/Os.</p>
         {% if can_manage %}
-          <div class="form-actions" style="justify-content: center;">
-            <button class="btn btn-primary" type="button" data-ios-rack-open>+ Criar primeiro rack</button>
+          <div class="stack" style="align-items: center; gap: 12px;">
+            <div class="form-actions" style="justify-content: center;">
+              <button class="btn btn-primary" type="button" data-ios-rack-open>+ Criar primeiro rack</button>
+            </div>
+            {% if io_import_can_upload %}
+              <button
+                class="btn btn-outline"
+                type="button"
+                data-io-import-open
+                style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.1; padding-top: 10px; padding-bottom: 10px;"
+              >
+                <span>Importar planilha existente</span>
+                <span style="font-size: 11px; opacity: 0.68; font-weight: 500;">analise e geracao por IA</span>
+              </button>
+            {% endif %}
           </div>
         {% endif %}
       </section>
@@ -233,6 +249,7 @@
       </section>
     </div>
   {% endif %}
+  {% include "core/partials/io_import_modal.html" %}
 {% endblock %}
 
 {% block scripts %}
@@ -594,5 +611,8 @@
         bindGrupo();
       })();
     </script>
+  {% endif %}
+  {% if io_import_can_upload %}
+    <script src="{% static 'core/io_import_modal.js' %}"></script>
   {% endif %}
 {% endblock %}

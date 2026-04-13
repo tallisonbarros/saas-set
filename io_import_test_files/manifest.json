@@ -1,0 +1,231 @@
+{
+  "package_name": "industrial_io_import_test_files",
+  "generated_on": "2026-04-12",
+  "seed": 20260412,
+  "canonical_logical_points": 120,
+  "io_distribution": {
+    "DI": 40,
+    "DO": 32,
+    "AI": 28,
+    "AO": 12,
+    "SPARE": 8
+  },
+  "files": [
+    {
+      "file_name": "00_canonical_io.csv",
+      "description": "Base canônica em CSV com todos os campos de normalização.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR",
+        "technical"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "00_canonical_io.xlsx",
+      "description": "Base canônica em Excel com todos os campos de validação.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR",
+        "technical"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "01_io_flat_ptbr.xlsx",
+      "description": "Planilha limpa em PT-BR com colunas explícitas de hardware, sinal e processo.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "02_io_flat_english.xlsx",
+      "description": "Lista linear em inglês com ordem de colunas diferente e abreviações mistas.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "en"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "03_io_compact_location.xlsx",
+      "description": "Formato compacto com localização combinada e guias auxiliares de índice e racks.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "en",
+        "technical"
+      ],
+      "multi_sheet": true,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": true,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "04_io_grouped_by_module.xlsx",
+      "description": "Layout agrupado por módulo com múltiplos racks na mesma guia de dados e abas auxiliares.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR"
+      ],
+      "multi_sheet": true,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": true,
+      "contains_noise_rows": true,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "05_io_multisheet_by_panel.xlsx",
+      "description": "Workbook com capa, legenda e uma aba de dados para cada painel.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR"
+      ],
+      "multi_sheet": true,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "06_io_two_header_levels.xlsx",
+      "description": "Planilha com título, revisão, cabeçalhos em dois níveis e guias auxiliares de revisão/legenda.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR"
+      ],
+      "multi_sheet": true,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": true,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": true,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "07_io_noisy_export.xlsx",
+      "description": "Exportação bagunçada com linhas de observação, colunas extras, espaços supérfluos e guia auxiliar.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "en",
+        "technical"
+      ],
+      "multi_sheet": true,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": true,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "08_io_decimal_comma_ptbr.xlsx",
+      "description": "Formato PT-BR com vírgula decimal e ranges tratados como texto regional.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": true
+    },
+    {
+      "file_name": "09_io_minimal_headers.xlsx",
+      "description": "Exportação de cabeçalhos curtos e pouco amigáveis, porém consistente.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "technical"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "10_io_mixed_real_world.xlsx",
+      "description": "Planilha de campo com bloco de revisão e dados distribuídos em guias não óbvias, cada uma com múltiplos racks.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "en",
+        "pt-BR",
+        "technical"
+      ],
+      "multi_sheet": true,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": true,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": true,
+      "contains_noise_rows": true,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "README.md",
+      "description": "Documentação do pacote gerado.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "pt-BR"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": false,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    },
+    {
+      "file_name": "generate_io_test_files.py",
+      "description": "Script Python reprodutível que gera todos os artefatos localmente.",
+      "expected_logical_points": 120,
+      "header_languages": [
+        "technical"
+      ],
+      "multi_sheet": false,
+      "multi_rack": true,
+      "multi_racks_in_single_sheet": false,
+      "multi_level_header": false,
+      "combined_rack_slot_channel": false,
+      "contains_noise_rows": false,
+      "contains_decimal_comma": false
+    }
+  ]
+}

@@ -1247,3 +1247,284 @@ class SystemConfiguration(models.Model):
 
     def __str__(self):
         return "Configuracoes do sistema"
+
+
+class IOImportSettings(models.Model):
+    class Provider(models.TextChoices):
+        OPENAI = "OPENAI", "OpenAI"
+
+    DEFAULT_API_BASE_URL = "https://api.openai.com/v1"
+    DEFAULT_MODEL = "gpt-5-mini"
+
+    enabled = models.BooleanField(default=False)
+    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.OPENAI)
+    api_key = models.CharField(max_length=255, blank=True, default="")
+    api_base_url = models.CharField(max_length=255, blank=True, default=DEFAULT_API_BASE_URL)
+    model = models.CharField(max_length=120, blank=True, default=DEFAULT_MODEL)
+    reasoning_effort = models.CharField(max_length=20, blank=True, default="medium")
+    max_rows_for_ai = models.PositiveIntegerField(default=150)
+    header_prompt = models.TextField(blank=True, default="")
+    grouping_prompt = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="io_import_settings_updates",
+    )
+
+    class Meta:
+        verbose_name = "Configuracao de importacao IO"
+        verbose_name_plural = "Configuracoes de importacao IO"
+
+    @classmethod
+    def load(cls):
+        config, _ = cls.objects.get_or_create(pk=1)
+        return config
+
+    @property
+    def masked_api_key(self):
+        value = (self.api_key or "").strip()
+        if len(value) <= 8:
+            return "*" * len(value)
+        return f"{value[:4]}...{value[-4:]}"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.api_base_url = (self.api_base_url or "").strip() or self.DEFAULT_API_BASE_URL
+        self.model = (self.model or "").strip() or self.DEFAULT_MODEL
+        self.reasoning_effort = (self.reasoning_effort or "").strip() or "medium"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Configuracao de importacao IO"
+
+
+class IOImportJob(models.Model):
+    class Status(models.TextChoices):
+        UPLOADED = "UPLOADED", "Upload recebido"
+        REVIEW = "REVIEW", "Pronto para revisao"
+        APPLIED = "APPLIED", "Aplicado"
+        FAILED = "FAILED", "Falhou"
+
+    class Mode(models.TextChoices):
+        CREATE_RACK = "CREATE_RACK", "Criar rack novo"
+        MERGE_RACK = "MERGE_RACK", "Preencher rack existente"
+
+    class FileFormat(models.TextChoices):
+        XLSX = "xlsx", "Excel"
+        CSV = "csv", "CSV"
+        TSV = "tsv", "TSV"
+        UNKNOWN = "unknown", "Desconhecido"
+
+    class AIStatus(models.TextChoices):
+        SKIPPED = "SKIPPED", "Nao executado"
+        SUCCESS = "SUCCESS", "Concluido"
+        FAILED = "FAILED", "Falhou"
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="io_import_jobs",
+    )
+    cliente = models.ForeignKey(
+        "PerfilUsuario",
+        on_delete=models.CASCADE,
+        related_name="io_import_jobs",
+        null=True,
+        blank=True,
+    )
+    target_rack = models.ForeignKey(
+        "RackIO",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="import_jobs_target",
+    )
+    applied_rack = models.ForeignKey(
+        "RackIO",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="import_jobs_applied",
+    )
+    requested_local = models.ForeignKey(
+        "LocalRackIO",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="io_import_jobs",
+    )
+    requested_grupo = models.ForeignKey(
+        "GrupoRackIO",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="io_import_jobs",
+    )
+    requested_inventario = models.ForeignKey(
+        "Inventario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="io_import_jobs",
+    )
+    requested_rack_name = models.CharField(max_length=120, blank=True, default="")
+    requested_planta_code = models.CharField(max_length=40, blank=True, default="")
+    mode = models.CharField(max_length=20, choices=Mode.choices, default=Mode.CREATE_RACK)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPLOADED)
+    file_format = models.CharField(max_length=20, choices=FileFormat.choices, default=FileFormat.UNKNOWN)
+    source_file = models.FileField(upload_to="io/imports/")
+    original_filename = models.CharField(max_length=255)
+    file_sha256 = models.CharField(max_length=64, blank=True, default="")
+    sheet_name = models.CharField(max_length=120, blank=True, default="")
+    header_row_index = models.PositiveIntegerField(null=True, blank=True)
+    rows_total = models.PositiveIntegerField(default=0)
+    rows_parsed = models.PositiveIntegerField(default=0)
+    ai_status = models.CharField(max_length=20, choices=AIStatus.choices, default=AIStatus.SKIPPED)
+    ai_model = models.CharField(max_length=120, blank=True, default="")
+    ai_error = models.TextField(blank=True, default="")
+    column_map = models.JSONField(default=dict, blank=True)
+    extracted_payload = models.JSONField(default=dict, blank=True)
+    proposal_payload = models.JSONField(default=dict, blank=True)
+    ai_payload = models.JSONField(default=dict, blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+    apply_log = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["ai_status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.original_filename} - {self.get_status_display()}"
+
+
+class IPImportSettings(models.Model):
+    class Provider(models.TextChoices):
+        OPENAI = "OPENAI", "OpenAI"
+
+    DEFAULT_API_BASE_URL = "https://api.openai.com/v1"
+    DEFAULT_MODEL = "gpt-5-mini"
+
+    enabled = models.BooleanField(default=False)
+    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.OPENAI)
+    api_key = models.CharField(max_length=255, blank=True, default="")
+    api_base_url = models.CharField(max_length=255, blank=True, default=DEFAULT_API_BASE_URL)
+    model = models.CharField(max_length=120, blank=True, default=DEFAULT_MODEL)
+    reasoning_effort = models.CharField(max_length=20, blank=True, default="medium")
+    max_rows_for_ai = models.PositiveIntegerField(default=180)
+    header_prompt = models.TextField(blank=True, default="")
+    grouping_prompt = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ip_import_settings_updates",
+    )
+
+    class Meta:
+        verbose_name = "Configuracao de importacao IP"
+        verbose_name_plural = "Configuracoes de importacao IP"
+
+    @classmethod
+    def load(cls):
+        config, _ = cls.objects.get_or_create(pk=1)
+        return config
+
+    @property
+    def masked_api_key(self):
+        value = (self.api_key or "").strip()
+        if len(value) <= 8:
+            return "*" * len(value)
+        return f"{value[:4]}...{value[-4:]}"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.api_base_url = (self.api_base_url or "").strip() or self.DEFAULT_API_BASE_URL
+        self.model = (self.model or "").strip() or self.DEFAULT_MODEL
+        self.reasoning_effort = (self.reasoning_effort or "").strip() or "medium"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Configuracao de importacao IP"
+
+
+class IPImportJob(models.Model):
+    class Status(models.TextChoices):
+        UPLOADED = "UPLOADED", "Upload recebido"
+        REVIEW = "REVIEW", "Pronto para revisao"
+        APPLIED = "APPLIED", "Aplicado"
+        FAILED = "FAILED", "Falhou"
+
+    class FileFormat(models.TextChoices):
+        XLSX = "xlsx", "Excel"
+        CSV = "csv", "CSV"
+        TSV = "tsv", "TSV"
+        UNKNOWN = "unknown", "Desconhecido"
+
+    class AIStatus(models.TextChoices):
+        SKIPPED = "SKIPPED", "Nao executado"
+        SUCCESS = "SUCCESS", "Concluido"
+        FAILED = "FAILED", "Falhou"
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ip_import_jobs",
+    )
+    cliente = models.ForeignKey(
+        "PerfilUsuario",
+        on_delete=models.CASCADE,
+        related_name="ip_import_jobs",
+        null=True,
+        blank=True,
+    )
+    applied_lista = models.ForeignKey(
+        "ListaIP",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="import_jobs_applied",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPLOADED)
+    file_format = models.CharField(max_length=20, choices=FileFormat.choices, default=FileFormat.UNKNOWN)
+    source_file = models.FileField(upload_to="ip/imports/")
+    original_filename = models.CharField(max_length=255)
+    file_sha256 = models.CharField(max_length=64, blank=True, default="")
+    sheet_name = models.CharField(max_length=120, blank=True, default="")
+    header_row_index = models.PositiveIntegerField(null=True, blank=True)
+    rows_total = models.PositiveIntegerField(default=0)
+    rows_parsed = models.PositiveIntegerField(default=0)
+    ai_status = models.CharField(max_length=20, choices=AIStatus.choices, default=AIStatus.SKIPPED)
+    ai_model = models.CharField(max_length=120, blank=True, default="")
+    ai_error = models.TextField(blank=True, default="")
+    column_map = models.JSONField(default=dict, blank=True)
+    extracted_payload = models.JSONField(default=dict, blank=True)
+    proposal_payload = models.JSONField(default=dict, blank=True)
+    ai_payload = models.JSONField(default=dict, blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+    apply_log = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["ai_status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.original_filename} - {self.get_status_display()}"

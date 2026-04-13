@@ -1,0 +1,163 @@
+{% extends "core/base.html" %}
+
+{% block title %}Importacao IP{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'listas_ip_list' %}">Listas de IP</a>
+    <span class="crumb-sep">/</span>
+    <span>Importacao IP</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card stack admin-shell">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Administracao</div>
+        <div class="hud-pill">Importacao IP</div>
+      </div>
+      <div class="page-hud-head">
+        <div class="page-hud-main">
+          <div class="page-kicker">Pipeline exclusivo</div>
+          <h1 class="page-title">Importacao de planilhas de IP</h1>
+          <p class="page-subtitle">Configure o agente, acompanhe jobs e reprocesse propostas de IP sem misturar com o cadastro manual do modulo.</p>
+        </div>
+      </div>
+      <div class="hud-meta">Esta area controla apenas o pipeline de importacao de planilhas de IP.</div>
+    </div>
+
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
+
+    <div class="admin-metric-grid">
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Agente</div>
+        <div class="admin-metric-value">{% if settings_obj.enabled %}Ligado{% else %}Desligado{% endif %}</div>
+        <div class="admin-metric-note">{{ settings_obj.provider }} · {{ settings_obj.model }}</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Jobs recentes</div>
+        <div class="admin-metric-value">{{ jobs|length }}</div>
+        <div class="admin-metric-note">Ultimos uploads monitorados.</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">API key</div>
+        <div class="admin-metric-value">{% if settings_obj.api_key %}Configurada{% else %}Vazia{% endif %}</div>
+        <div class="admin-metric-note">{{ settings_obj.masked_api_key|default:"-" }}</div>
+      </div>
+    </div>
+
+    <div class="admin-main-grid">
+      <aside class="admin-sidebar">
+        <div class="card compact-card admin-subcard">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Configuracao do agente</h2>
+            <p class="admin-section-note">V1 usa parser deterministico. V2 usa o agente para melhorar mapeamento de colunas e agrupamento automatico das listas.</p>
+          </div>
+          <form method="post" class="stack" style="margin-top: 12px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_settings">
+            <label class="checkbox-item">
+              <input type="checkbox" name="enabled" {% if settings_obj.enabled %}checked{% endif %}>
+              Ativar agente de importacao
+            </label>
+            <div class="admin-form-grid two-col">
+              <label class="field">
+                <span>Provider</span>
+                <select name="provider">
+                  {% for value, label in settings_obj.Provider.choices %}
+                    <option value="{{ value }}" {% if settings_obj.provider == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <span>Modelo</span>
+                <input type="text" name="model" value="{{ settings_obj.model }}" placeholder="gpt-5-mini">
+              </label>
+              <label class="field">
+                <span>API base URL</span>
+                <input type="text" name="api_base_url" value="{{ settings_obj.api_base_url }}">
+              </label>
+              <label class="field">
+                <span>Reasoning effort</span>
+                <select name="reasoning_effort">
+                  <option value="none" {% if settings_obj.reasoning_effort == "none" %}selected{% endif %}>none</option>
+                  <option value="minimal" {% if settings_obj.reasoning_effort == "minimal" %}selected{% endif %}>minimal</option>
+                  <option value="low" {% if settings_obj.reasoning_effort == "low" %}selected{% endif %}>low</option>
+                  <option value="medium" {% if settings_obj.reasoning_effort == "medium" %}selected{% endif %}>medium</option>
+                  <option value="high" {% if settings_obj.reasoning_effort == "high" %}selected{% endif %}>high</option>
+                  <option value="xhigh" {% if settings_obj.reasoning_effort == "xhigh" %}selected{% endif %}>xhigh</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Max rows para AI</span>
+                <input type="number" min="20" max="500" name="max_rows_for_ai" value="{{ settings_obj.max_rows_for_ai }}">
+              </label>
+              <label class="field">
+                <span>API key</span>
+                <input type="password" name="api_key" value="" placeholder="{% if settings_obj.api_key %}Manter chave atual{% else %}sk-...{% endif %}">
+              </label>
+            </div>
+            <label class="field">
+              <span>Prompt de cabecalho</span>
+              <textarea name="header_prompt" rows="5">{{ settings_obj.header_prompt }}</textarea>
+            </label>
+            <label class="field">
+              <span>Prompt de agrupamento</span>
+              <textarea name="grouping_prompt" rows="5">{{ settings_obj.grouping_prompt }}</textarea>
+            </label>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Salvar configuracao</button>
+            </div>
+          </form>
+        </div>
+      </aside>
+
+      <div class="admin-switcher">
+        <div class="card compact-card admin-context-shell">
+          <section class="admin-context-panel is-active">
+            <div class="admin-title-row">
+              <div class="admin-title-stack">
+                <h2 class="admin-section-title">Jobs recentes</h2>
+                <p class="admin-section-note">Cada upload gera um job isolado com preview, warnings e proposta de listas.</p>
+              </div>
+            </div>
+            <div class="admin-list">
+              {% for job in jobs %}
+                <article class="admin-list-row">
+                  <div class="admin-list-row-main">
+                    <div class="admin-list-title">
+                      <a class="hud-link" href="{% url 'listas_ip_import_detail' job.id %}">{{ job.original_filename }}</a>
+                    </div>
+                    <div class="admin-list-meta">
+                      <span class="admin-token is-neutral">{{ job.get_status_display }}</span>
+                      <span class="admin-token is-neutral">AI: {{ job.get_ai_status_display }}</span>
+                      <span class="admin-token is-neutral">{{ job.created_at|date:"d/m/Y H:i" }}</span>
+                      {% if job.applied_lista %}
+                        <span class="admin-token is-success">Lista {{ job.applied_lista.nome }}</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div class="page-actions">
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="reanalyze_job">
+                      <input type="hidden" name="job_id" value="{{ job.id }}">
+                      <button class="btn btn-outline btn-compact" type="submit">Reprocessar</button>
+                    </form>
+                  </div>
+                </article>
+              {% empty %}
+                <p class="muted">Nenhum job de importacao encontrado.</p>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

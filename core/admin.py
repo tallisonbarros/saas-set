@@ -11,6 +11,8 @@ from .models import (
     Caderno,
     CentroCusto,
     AdminAccessLog,
+    IPImportJob,
+    IPImportSettings,
     PerfilUsuario,
     Inventario,
     InventarioID,
@@ -34,6 +36,8 @@ from .models import (
     TipoAtivo,
     App,
     AcessoProdutoUsuario,
+    IOImportJob,
+    IOImportSettings,
     ProdutoPlataforma,
     SystemConfiguration,
 )
@@ -194,6 +198,40 @@ class SystemConfigurationAdmin(admin.ModelAdmin):
         if SystemConfiguration.objects.exists():
             return False
         return super().has_add_permission(request)
+
+
+@admin.register(IOImportSettings)
+class IOImportSettingsAdmin(admin.ModelAdmin):
+    list_display = ("enabled", "provider", "model", "reasoning_effort", "updated_at", "updated_by")
+
+    def has_add_permission(self, request):
+        if IOImportSettings.objects.exists():
+            return False
+        return super().has_add_permission(request)
+
+
+@admin.register(IOImportJob)
+class IOImportJobAdmin(admin.ModelAdmin):
+    list_display = ("original_filename", "cliente", "mode", "status", "ai_status", "created_at")
+    search_fields = ("original_filename", "requested_rack_name", "cliente__nome")
+    list_filter = ("status", "ai_status", "mode", "file_format")
+
+
+@admin.register(IPImportSettings)
+class IPImportSettingsAdmin(admin.ModelAdmin):
+    list_display = ("enabled", "provider", "model", "reasoning_effort", "updated_at", "updated_by")
+
+    def has_add_permission(self, request):
+        if IPImportSettings.objects.exists():
+            return False
+        return super().has_add_permission(request)
+
+
+@admin.register(IPImportJob)
+class IPImportJobAdmin(admin.ModelAdmin):
+    list_display = ("original_filename", "cliente", "status", "ai_status", "created_at")
+    search_fields = ("original_filename", "cliente__nome")
+    list_filter = ("status", "ai_status", "file_format")
 
 
 @admin.register(PlantaIO)

@@ -48,10 +48,20 @@
 
     <div class="io-layout ip-list-detail-layout">
       <section class="io-card io-wide ip-list-panel" id="ips">
-        <div class="io-card-head">
-          <div>
+        <div class="ip-list-panel-head">
+          <div class="ip-list-panel-copy">
+            <span class="ios-group-chip ip-list-head-chip">Malha tecnica</span>
             <h2 class="io-title">IPs da lista</h2>
-            <p class="muted">Atualize nome do equipamento, MAC e protocolo.</p>
+            <p class="muted">Atualize nome do equipamento, descricao, MAC e protocolo diretamente na grade abaixo.</p>
+          </div>
+          <div class="ip-list-panel-meta">
+            <span class="module-meta-pill">Exibindo {{ items|length }} IPs</span>
+            {% if search_term %}
+              <span class="module-meta-pill">Filtro ativo</span>
+            {% endif %}
+            {% if can_manage %}
+              <span class="module-meta-pill">Edicao direta</span>
+            {% endif %}
           </div>
         </div>
         <form class="io-search-form ip-list-search-form" method="get">
@@ -72,70 +82,91 @@
             <form method="post" id="ips-bulk-form">
               {% csrf_token %}
               <input type="hidden" name="action" value="bulk_update_items">
-              <div class="form-actions ip-list-table-actions">
-                <button class="btn btn-ghost btn-compact ip-list-save-btn" type="submit">Salvar alteracoes</button>
+              <div class="ip-list-table-toolbar">
+                <div class="ip-list-table-toolbar-copy">
+                  <span class="ip-list-toolbar-kicker">Revisao operacional</span>
+                  <p>Edite em linha, cole blocos quando precisar e use Enter para salvar rapidamente uma linha.</p>
+                </div>
+                <div class="form-actions ip-list-table-actions">
+                  <button class="btn btn-ghost btn-compact ip-list-save-btn" type="submit">Salvar alteracoes</button>
+                </div>
               </div>
               <table class="table ip-list-table">
+                <colgroup>
+                  <col class="ip-list-col-ip">
+                  <col class="ip-list-col-device">
+                  <col class="ip-list-col-description">
+                  <col class="ip-list-col-mac">
+                  <col class="ip-list-col-protocol">
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>IP</th>
-                    <th>Nome do equipamento</th>
-                    <th>Descricao</th>
-                    <th>MAC</th>
-                    <th>Protocolo</th>
+                    <th scope="col">IP</th>
+                    <th scope="col">Nome do equipamento</th>
+                    <th scope="col">Descricao</th>
+                    <th scope="col">MAC</th>
+                    <th scope="col">Protocolo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {% for item in items %}
                     <tr>
-                      <td>{{ item.ip }}</td>
+                      <td><span class="ip-list-mono-chip">{{ item.ip }}</span></td>
                       <td>
-                        <input
-                          type="text"
-                          name="nome_equipamento_{{ item.id }}"
-                          value="{{ item.nome_equipamento }}"
-                          placeholder="Equipamento"
-                          class="equipamento-input{% if item.nome_equipamento and item.nome_equipamento|upper in nomes_repetidos %} field-dup{% endif %}"
-                          data-dup-key="{{ item.nome_equipamento|default:''|upper }}"
-                          data-dup-type="nome"
-                          data-item-id="{{ item.id }}"
-                          data-col="0"
-                        >
+                        <div class="ip-list-input-shell">
+                          <input
+                            type="text"
+                            name="nome_equipamento_{{ item.id }}"
+                            value="{{ item.nome_equipamento }}"
+                            placeholder="Equipamento"
+                            class="equipamento-input{% if item.nome_equipamento and item.nome_equipamento|upper in nomes_repetidos %} field-dup{% endif %}"
+                            data-dup-key="{{ item.nome_equipamento|default:''|upper }}"
+                            data-dup-type="nome"
+                            data-item-id="{{ item.id }}"
+                            data-col="0"
+                          >
+                        </div>
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          name="descricao_{{ item.id }}"
-                          value="{{ item.descricao }}"
-                          placeholder="Descricao"
-                          class="descricao-input"
-                          data-item-id="{{ item.id }}"
-                          data-col="1"
-                        >
+                        <div class="ip-list-input-shell">
+                          <input
+                            type="text"
+                            name="descricao_{{ item.id }}"
+                            value="{{ item.descricao }}"
+                            placeholder="Descricao"
+                            class="descricao-input"
+                            data-item-id="{{ item.id }}"
+                            data-col="1"
+                          >
+                        </div>
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          name="mac_{{ item.id }}"
-                          value="{{ item.mac }}"
-                          placeholder="00:11:22:33:44:55"
-                          class="mac-input{% if item.mac and item.mac|upper in macs_repetidos %} field-dup{% endif %}"
-                          data-dup-key="{{ item.mac|default:''|upper }}"
-                          data-dup-type="mac"
-                          data-item-id="{{ item.id }}"
-                          data-col="2"
-                        >
+                        <div class="ip-list-input-shell ip-list-input-shell-mono">
+                          <input
+                            type="text"
+                            name="mac_{{ item.id }}"
+                            value="{{ item.mac }}"
+                            placeholder="00:11:22:33:44:55"
+                            class="mac-input{% if item.mac and item.mac|upper in macs_repetidos %} field-dup{% endif %}"
+                            data-dup-key="{{ item.mac|default:''|upper }}"
+                            data-dup-type="mac"
+                            data-item-id="{{ item.id }}"
+                            data-col="2"
+                          >
+                        </div>
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          name="protocolo_{{ item.id }}"
-                          value="{{ item.protocolo }}"
-                          placeholder="Modbus TCP"
-                          class="protocolo-input"
-                          data-item-id="{{ item.id }}"
-                          data-col="3"
-                        >
+                        <div class="ip-list-input-shell">
+                          <input
+                            type="text"
+                            name="protocolo_{{ item.id }}"
+                            value="{{ item.protocolo }}"
+                            placeholder="Modbus TCP"
+                            class="protocolo-input"
+                            data-item-id="{{ item.id }}"
+                            data-col="3"
+                          >
+                        </div>
                       </td>
                     </tr>
                   {% empty %}
@@ -148,23 +179,30 @@
             </form>
           {% else %}
             <table class="table ip-list-table">
+              <colgroup>
+                <col class="ip-list-col-ip">
+                <col class="ip-list-col-device">
+                <col class="ip-list-col-description">
+                <col class="ip-list-col-mac">
+                <col class="ip-list-col-protocol">
+              </colgroup>
               <thead>
                 <tr>
-                  <th>IP</th>
-                  <th>Nome do equipamento</th>
-                  <th>Descricao</th>
-                  <th>MAC</th>
-                  <th>Protocolo</th>
+                  <th scope="col">IP</th>
+                  <th scope="col">Nome do equipamento</th>
+                  <th scope="col">Descricao</th>
+                  <th scope="col">MAC</th>
+                  <th scope="col">Protocolo</th>
                 </tr>
               </thead>
               <tbody>
                 {% for item in items %}
                   <tr>
-                    <td>{{ item.ip }}</td>
-                    <td>{{ item.nome_equipamento|default:"-" }}</td>
-                    <td>{{ item.descricao|default:"-" }}</td>
-                    <td>{{ item.mac|default:"-" }}</td>
-                    <td>{{ item.protocolo|default:"-" }}</td>
+                    <td><span class="ip-list-mono-chip">{{ item.ip }}</span></td>
+                    <td><span class="ip-list-cell-text">{{ item.nome_equipamento|default:"-" }}</span></td>
+                    <td><span class="ip-list-cell-text">{{ item.descricao|default:"-" }}</span></td>
+                    <td><span class="ip-list-cell-text ip-list-cell-text-mono">{{ item.mac|default:"-" }}</span></td>
+                    <td><span class="ip-list-cell-tag">{{ item.protocolo|default:"-" }}</span></td>
                   </tr>
                 {% empty %}
                   <tr>

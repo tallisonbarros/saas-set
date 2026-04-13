@@ -42,6 +42,8 @@ from .models import (
     Compra,
     CompraItem,
     GrupoRackIO,
+    IPImportJob,
+    IPImportSettings,
     LocalRackIO,
     ModuloIO,
     ModuloAcesso,
@@ -57,6 +59,8 @@ from .models import (
     IngestRecord,
     IngestErrorLog,
     IngestRule,
+    IOImportJob,
+    IOImportSettings,
     AdminAccessLog,
     ProdutoPlataforma,
     SystemConfiguration,
@@ -82,6 +86,23 @@ from .models import (
     Ativo,
     AtivoItem,
     TipoAtivo,
+)
+from .services.io_import import (
+    DEFAULT_GROUPING_PROMPT,
+    DEFAULT_HEADER_PROMPT,
+    IOImportError,
+    apply_import_job,
+    build_file_sha256,
+    reprocess_import_job,
+    serialize_module_catalog,
+)
+from .services.ip_import import (
+    DEFAULT_GROUPING_PROMPT as DEFAULT_IP_HEADER_GROUPING_PROMPT,
+    DEFAULT_HEADER_PROMPT as DEFAULT_IP_HEADER_PROMPT,
+    IPImportError,
+    apply_import_job as apply_ip_import_job,
+    build_file_sha256 as build_ip_file_sha256,
+    reprocess_import_job as reprocess_ip_import_job,
 )
 from .access_control import (
     TRIAL_DURATION_DAYS,
@@ -901,6 +922,286 @@ def _ios_build_module_channels_summary(module_editor_data, channel_types_data):
             for channel in module_info.get("channels", [])
         ]
     return payload
+
+
+def _io_import_module_catalog(cliente):
+    modules_qs = ModuloIO.objects.filter(Q(cliente=cliente) | Q(is_default=True)).select_related("tipo_base")
+    return modules_qs.order_by("modelo", "id")
+
+
+def _io_import_can_manage(request, cliente):
+    return bool(cliente or _is_admin_user(request.user))
+
+
+def _io_import_settings():
+    settings_obj = IOImportSettings.load()
+    if not settings_obj.header_prompt:
+        settings_obj.header_prompt = DEFAULT_HEADER_PROMPT
+    if not settings_obj.grouping_prompt:
+        settings_obj.grouping_prompt = DEFAULT_GROUPING_PROMPT
+    return settings_obj
+
+
+def _ip_import_can_manage(request, cliente):
+    return bool(cliente or _is_admin_user(request.user))
+
+
+def _ip_import_settings():
+    settings_obj = IPImportSettings.load()
+    if not settings_obj.header_prompt:
+        settings_obj.header_prompt = DEFAULT_IP_HEADER_PROMPT
+    if not settings_obj.grouping_prompt:
+        settings_obj.grouping_prompt = DEFAULT_IP_HEADER_GROUPING_PROMPT
+    return settings_obj
+
+
+def _build_ip_import_job_queryset(request, cliente):
+    queryset = IPImportJob.objects.select_related("cliente", "created_by", "applied_lista")
+    if _is_admin_user(request.user) and not cliente:
+        return queryset
+    if not cliente:
+        return queryset.none()
+    return queryset.filter(cliente=cliente)
+
+
+def _reprocess_ip_import_job(job):
+    settings_obj = _ip_import_settings()
+    result = reprocess_ip_import_job(job=job, settings_obj=settings_obj)
+    job.file_format = result["file_format"]
+    job.sheet_name = result["sheet_name"]
+    job.header_row_index = result["header_row_index"]
+    job.rows_total = result["rows_total"]
+    job.rows_parsed = result["rows_parsed"]
+    job.column_map = result["column_map"]
+    job.extracted_payload = {"rows": result["normalized_rows"], "sheets": result.get("sheet_summaries") or []}
+    job.proposal_payload = result["proposal"]
+    job.warnings = result["warnings"]
+    job.ai_status = result["ai_status"]
+    job.ai_payload = result["ai_payload"]
+    job.ai_error = result["ai_error"]
+    job.ai_model = result["ai_model"]
+    job.status = IPImportJob.Status.FAILED if result["proposal"].get("conflicts") else IPImportJob.Status.REVIEW
+    job.save(
+        update_fields=[
+            "file_format",
+            "sheet_name",
+            "header_row_index",
+            "rows_total",
+            "rows_parsed",
+            "column_map",
+            "extracted_payload",
+            "proposal_payload",
+            "warnings",
+            "ai_status",
+            "ai_payload",
+            "ai_error",
+            "ai_model",
+            "status",
+            "updated_at",
+        ]
+    )
+    return job
+
+
+def _build_ip_import_preview_lists(proposal, applied_list_key_map=None):
+    preview_lists = []
+    applied_list_key_map = dict(applied_list_key_map or {})
+    for list_index, list_payload in enumerate((proposal or {}).get("lists") or [], start=1):
+        list_key = str(list_payload.get("list_key") or f"list_{list_index}")
+        applied_lista_id = applied_list_key_map.get(list_key)
+        items = list_payload.get("preview_items") or []
+        preview_lists.append(
+            {
+                "key": list_key,
+                "name": list_payload.get("name") or f"Lista {list_index}",
+                "description": list_payload.get("description") or "Preview da importacao com os enderecos sugeridos pela analise.",
+                "id_listaip": list_payload.get("id_listaip") or "",
+                "faixa_inicio": list_payload.get("faixa_inicio") or "-",
+                "faixa_fim": list_payload.get("faixa_fim") or "-",
+                "protocolo_padrao": list_payload.get("protocolo_padrao") or "",
+                "total_ips": int(list_payload.get("total_ips") or len(list_payload.get("items") or [])),
+                "filled_devices": int(list_payload.get("filled_devices") or 0),
+                "source_sheets": list_payload.get("source_sheets") or [],
+                "is_sparse": bool(list_payload.get("is_sparse")),
+                "items": items,
+                "extra_items": max(int(list_payload.get("total_ips") or len(list_payload.get("items") or [])) - len(items), 0),
+                "is_applied": bool(applied_lista_id),
+                "applied_lista_id": applied_lista_id,
+            }
+        )
+    return preview_lists
+
+
+def _build_io_import_preview_racks(proposal, applied_rack_key_map=None):
+    preview_racks = []
+    preview_payload = {}
+    applied_rack_key_map = dict(applied_rack_key_map or {})
+    for rack_index, rack_payload in enumerate((proposal or {}).get("racks") or [], start=1):
+        rack_key = str(rack_payload.get("rack_key") or f"rack_{rack_index}")
+        applied_rack_id = applied_rack_key_map.get(rack_key)
+        modules = rack_payload.get("modules") or []
+        slots_total = max(int(rack_payload.get("slots_total") or len(modules) or 1), 1)
+        module_by_slot = {}
+        canais_disponiveis_map = {}
+        module_data = {}
+
+        for module_index, module in enumerate(modules, start=1):
+            slot_index = int(module.get("slot_index") or module_index)
+            module_id = f"preview_{rack_key}_{slot_index}"
+            module_type = (module.get("module_type") or "-").strip() or "-"
+            channel_capacity = int(module.get("channel_capacity") or len(module.get("channels") or []))
+            filled_channels = 0
+            channel_summary = []
+            for channel in module.get("channels") or []:
+                tag = (channel.get("tag") or "").strip()
+                channel_type = (channel.get("type") or module_type or "-").strip() or "-"
+                if tag:
+                    filled_channels += 1
+                channel_summary.append(
+                    {
+                        "canal": f"{int(channel.get('index') or 0):02d}",
+                        "tag": tag or "-",
+                        "tipo": channel_type,
+                        "descricao": (channel.get("description") or "").strip() or "-",
+                    }
+                )
+                if not tag:
+                    canais_disponiveis_map[channel_type] = canais_disponiveis_map.get(channel_type, 0) + 1
+
+            module_info = {
+                "id": module_id,
+                "slot_pos": slot_index,
+                "display_name": module.get("module_model_name") or "Modulo nao resolvido",
+                "model_name": module.get("module_model_name") or "Modulo nao resolvido",
+                "type_name": module_type,
+                "brand": "",
+                "channels": channel_summary,
+                "channel_capacity": channel_capacity,
+                "source": module.get("source") or "-",
+                "filled_channels": filled_channels,
+                "all_canais_comissionados": False,
+            }
+            module_by_slot[slot_index] = module_info
+            module_data[module_id] = module_info
+
+        slots = []
+        ocupados = 0
+        for slot_index in range(1, slots_total + 1):
+            modulo = module_by_slot.get(slot_index)
+            if modulo:
+                ocupados += 1
+            slots.append(
+                {
+                    "posicao": slot_index,
+                    "modulo": {
+                        "id": modulo["id"],
+                        "all_canais_comissionados": modulo["all_canais_comissionados"],
+                        "modulo_modelo": {
+                            "modelo": modulo["model_name"],
+                            "nome": modulo["display_name"],
+                            "marca": modulo["brand"],
+                            "quantidade_canais": modulo["channel_capacity"],
+                            "tipo_base": {"nome": modulo["type_name"]},
+                        },
+                    }
+                    if modulo
+                    else None,
+                }
+            )
+
+        preview_racks.append(
+            {
+                "key": rack_key,
+                "name": rack_payload.get("name") or f"Rack {rack_index}",
+                "descricao": f"Preview da importacao com {len(modules)} modulo(s) proposto(s).",
+                "slots_total": slots_total,
+                "ocupados": ocupados,
+                "slots_livres": max(slots_total - ocupados, 0),
+                "canais_disponiveis": [
+                    {"tipo": tipo, "total": total}
+                    for tipo, total in sorted(canais_disponiveis_map.items(), key=lambda item: item[0])
+                ],
+                "slots": slots,
+                "selected_module_id": "",
+                "source_sheets": rack_payload.get("source_sheets") or [],
+                "summary": rack_payload.get("summary") or {},
+                "is_applied": bool(applied_rack_id),
+                "applied_rack_id": applied_rack_id,
+            }
+        )
+        preview_payload[rack_key] = module_data
+    return preview_racks, preview_payload
+
+
+def _io_import_upload_context(request, cliente, target_rack=None):
+    racks = _ios_racks_queryset(request.user, cliente).order_by("nome")
+    inventarios = _ios_inventarios_queryset(request.user, cliente).order_by("nome")
+    locais, grupos = _ios_locais_grupos(cliente)
+    return {
+        "io_import_can_upload": _io_import_can_manage(request, cliente),
+        "io_import_racks": racks,
+        "io_import_inventarios": inventarios,
+        "io_import_locais": locais,
+        "io_import_grupos": grupos,
+        "io_import_default_target_rack": target_rack,
+    }
+
+
+def _build_io_import_job_queryset(request, cliente):
+    queryset = IOImportJob.objects.select_related(
+        "cliente",
+        "created_by",
+        "target_rack",
+        "applied_rack",
+        "requested_local",
+        "requested_grupo",
+        "requested_inventario",
+    )
+    if _is_admin_user(request.user):
+        return queryset
+    if not cliente:
+        return queryset.none()
+    return queryset.filter(cliente=cliente)
+
+
+def _reprocess_io_import_job(job):
+    settings_obj = _io_import_settings()
+    module_catalog = serialize_module_catalog(_io_import_module_catalog(job.cliente))
+    result = reprocess_import_job(job=job, module_catalog=module_catalog, settings_obj=settings_obj)
+    job.file_format = result["file_format"]
+    job.sheet_name = result["sheet_name"]
+    job.header_row_index = result["header_row_index"]
+    job.rows_total = result["rows_total"]
+    job.rows_parsed = result["rows_parsed"]
+    job.column_map = result["column_map"]
+    job.extracted_payload = {"rows": result["normalized_rows"], "sheets": result.get("sheet_summaries") or []}
+    job.proposal_payload = result["proposal"]
+    job.warnings = result["warnings"]
+    job.ai_status = result["ai_status"]
+    job.ai_payload = result["ai_payload"]
+    job.ai_error = result["ai_error"]
+    job.ai_model = result["ai_model"]
+    job.status = IOImportJob.Status.FAILED if result["proposal"].get("conflicts") else IOImportJob.Status.REVIEW
+    job.save(
+        update_fields=[
+            "file_format",
+            "sheet_name",
+            "header_row_index",
+            "rows_total",
+            "rows_parsed",
+            "column_map",
+            "extracted_payload",
+            "proposal_payload",
+            "warnings",
+            "ai_status",
+            "ai_payload",
+            "ai_error",
+            "ai_model",
+            "status",
+            "updated_at",
+        ]
+    )
+    return job
 
 
 def _ip_range_values(start, end, limit=2048):
@@ -2529,6 +2830,7 @@ def ios_list(request):
             "inventarios": inventarios_qs.order_by("nome"),
             "locais": locais,
             "grupos": grupos,
+            **_io_import_upload_context(request, cliente),
         },
     )
 
@@ -2658,6 +2960,7 @@ def ios_search(request):
             "grupo_filter": grupo_filter,
             "search_results": search_results,
             "search_count": search_count,
+            **_io_import_upload_context(request, cliente),
         },
     )
 
@@ -3202,6 +3505,7 @@ def ios_rack_detail(request, pk):
             "module_editor_data": module_editor_data,
             "module_channels": module_channels,
             "selected_module_id": selected_module_id,
+            **_io_import_upload_context(request, cliente, target_rack=rack),
         },
     )
 
@@ -3754,6 +4058,196 @@ def ios_rack_io_list(request, pk):
         {
             "rack": rack,
             "canais": canais,
+        },
+    )
+
+
+@login_required
+def ios_import_create(request):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    cliente = _get_cliente(request.user)
+    if not _io_import_can_manage(request, cliente):
+        return HttpResponseForbidden("Sem permissao.")
+
+    arquivo = request.FILES.get("arquivo")
+    if not arquivo:
+        return HttpResponse("Arquivo obrigatorio.", status=400)
+
+    job_cliente = cliente
+    if not job_cliente:
+        return HttpResponse("Conta sem cliente associado para importar IO.", status=400)
+
+    raw_bytes = arquivo.read()
+    arquivo.seek(0)
+
+    job = IOImportJob.objects.create(
+        created_by=request.user,
+        cliente=job_cliente,
+        target_rack=None,
+        requested_local=None,
+        requested_grupo=None,
+        requested_inventario=None,
+        requested_rack_name="",
+        requested_planta_code="",
+        mode=IOImportJob.Mode.CREATE_RACK,
+        original_filename=arquivo.name,
+        source_file=arquivo,
+        file_sha256=build_file_sha256(raw_bytes),
+    )
+    try:
+        _reprocess_io_import_job(job)
+    except IOImportError as exc:
+        job.status = IOImportJob.Status.FAILED
+        job.warnings = [str(exc)]
+        job.save(update_fields=["status", "warnings", "updated_at"])
+    redirect_url = reverse("ios_import_detail", kwargs={"pk": job.pk})
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "redirect_url": redirect_url})
+    return redirect("ios_import_detail", pk=job.pk)
+
+
+@login_required
+def ios_import_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "IOS")
+    if denied_response:
+        return denied_response
+    cliente = _get_cliente(request.user)
+    job = get_object_or_404(_build_io_import_job_queryset(request, cliente), pk=pk)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "reanalyze":
+            _reprocess_io_import_job(job)
+            return redirect("ios_import_detail", pk=job.pk)
+        if action == "apply_import_rack":
+            rack_key = (request.POST.get("rack_key") or "").strip()
+            if not rack_key:
+                warnings = list(job.warnings or [])
+                warnings.append("Nenhum rack foi selecionado para aplicacao.")
+                job.warnings = warnings
+                job.save(update_fields=["warnings", "updated_at"])
+                return redirect("ios_import_detail", pk=job.pk)
+            try:
+                apply_import_job(
+                    job=job,
+                    user=request.user,
+                    rack_model=RackIO,
+                    rack_slot_model=RackSlotIO,
+                    rack_module_model=ModuloRackIO,
+                    channel_model=CanalRackIO,
+                    module_qs=_io_import_module_catalog(job.cliente),
+                    plant_model=PlantaIO,
+                    selected_rack_keys=[rack_key],
+                )
+                return redirect("ios_import_detail", pk=job.pk)
+            except IOImportError as exc:
+                warnings = list(job.warnings or [])
+                warnings.append(str(exc))
+                job.warnings = warnings
+                job.save(update_fields=["warnings", "updated_at"])
+                return redirect("ios_import_detail", pk=job.pk)
+        if action == "apply_import":
+            try:
+                applied_racks = apply_import_job(
+                    job=job,
+                    user=request.user,
+                    rack_model=RackIO,
+                    rack_slot_model=RackSlotIO,
+                    rack_module_model=ModuloRackIO,
+                    channel_model=CanalRackIO,
+                    module_qs=_io_import_module_catalog(job.cliente),
+                    plant_model=PlantaIO,
+                )
+                if len(applied_racks) == 1:
+                    return redirect("ios_rack_detail", pk=applied_racks[0].pk)
+                return redirect("ios_import_detail", pk=job.pk)
+            except IOImportError as exc:
+                warnings = list(job.warnings or [])
+                warnings.append(str(exc))
+                job.warnings = warnings
+                job.status = IOImportJob.Status.FAILED
+                job.save(update_fields=["warnings", "status", "updated_at"])
+                return redirect("ios_import_detail", pk=job.pk)
+
+    proposal = job.proposal_payload or {}
+    extracted = job.extracted_payload or {}
+    rows = extracted.get("rows") or []
+    sheet_summaries = extracted.get("sheets") or []
+    applied_rack_key_map = dict((job.apply_log or {}).get("applied_rack_keys") or {})
+    applied_rack_ids = list((job.apply_log or {}).get("applied_rack_ids") or [])
+    applied_racks = list(RackIO.objects.filter(id__in=applied_rack_ids)) if applied_rack_ids else []
+    preview_racks, preview_payload = _build_io_import_preview_racks(
+        proposal,
+        applied_rack_key_map=applied_rack_key_map,
+    )
+    pending_racks_count = sum(1 for rack in preview_racks if not rack.get("is_applied"))
+    rows_preview = rows[:120]
+    return render(
+        request,
+        "core/io_import_detail.html",
+        {
+            "job": job,
+            "proposal": proposal,
+            "sheet_summaries": sheet_summaries,
+            "applied_racks": applied_racks,
+            "preview_racks": preview_racks,
+            "preview_payload": preview_payload,
+            "pending_racks_count": pending_racks_count,
+            "rows_preview": rows_preview,
+            "total_rows_preview": len(rows_preview),
+            "has_more_rows": len(rows) > len(rows_preview),
+            "io_import_is_dev": _is_admin_user(request.user),
+        },
+    )
+
+
+@login_required
+def ios_import_admin(request):
+    if not _is_admin_user(request.user):
+        return HttpResponseForbidden("Sem permissao.")
+    message = None
+    settings_obj = _io_import_settings()
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "save_settings":
+            settings_obj.enabled = request.POST.get("enabled") == "on"
+            provider = request.POST.get("provider", IOImportSettings.Provider.OPENAI)
+            if provider in dict(IOImportSettings.Provider.choices):
+                settings_obj.provider = provider
+            api_key = request.POST.get("api_key", "").strip()
+            if api_key:
+                settings_obj.api_key = api_key
+            settings_obj.api_base_url = request.POST.get("api_base_url", "").strip()
+            settings_obj.model = request.POST.get("model", "").strip()
+            settings_obj.reasoning_effort = request.POST.get("reasoning_effort", "").strip() or "medium"
+            try:
+                settings_obj.max_rows_for_ai = max(20, min(int(request.POST.get("max_rows_for_ai", "150")), 500))
+            except (TypeError, ValueError):
+                settings_obj.max_rows_for_ai = 150
+            settings_obj.header_prompt = request.POST.get("header_prompt", "").strip() or DEFAULT_HEADER_PROMPT
+            settings_obj.grouping_prompt = request.POST.get("grouping_prompt", "").strip() or DEFAULT_GROUPING_PROMPT
+            settings_obj.updated_by = request.user
+            settings_obj.save()
+            message = "Configuracoes de importacao atualizadas."
+        elif action == "reanalyze_job":
+            job_id = request.POST.get("job_id")
+            job = IOImportJob.objects.filter(pk=job_id).first()
+            if job:
+                _reprocess_io_import_job(job)
+                return redirect("ios_import_admin")
+
+    jobs = IOImportJob.objects.select_related("cliente", "created_by", "target_rack", "applied_rack").order_by("-created_at")[:30]
+    return render(
+        request,
+        "core/io_import_admin.html",
+        {
+            "message": message,
+            "settings_obj": settings_obj,
+            "jobs": jobs,
         },
     )
 
@@ -4398,6 +4892,161 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
 
 
 @login_required
+def listas_ip_import_create(request):
+    denied_response = _require_internal_module_access(request, "LISTA_IP")
+    if denied_response:
+        return denied_response
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    cliente = _get_cliente(request.user)
+    if not _ip_import_can_manage(request, cliente):
+        return HttpResponseForbidden("Sem permissao.")
+
+    arquivo = request.FILES.get("arquivo")
+    if not arquivo:
+        return HttpResponse("Arquivo obrigatorio.", status=400)
+
+    job_cliente = cliente
+    if not job_cliente:
+        return HttpResponse("Conta sem cliente associado para importar listas de IP.", status=400)
+
+    raw_bytes = arquivo.read()
+    arquivo.seek(0)
+
+    job = IPImportJob.objects.create(
+        created_by=request.user,
+        cliente=job_cliente,
+        original_filename=arquivo.name,
+        source_file=arquivo,
+        file_sha256=build_ip_file_sha256(raw_bytes),
+    )
+    try:
+        _reprocess_ip_import_job(job)
+    except IPImportError as exc:
+        job.status = IPImportJob.Status.FAILED
+        job.warnings = [str(exc)]
+        job.save(update_fields=["status", "warnings", "updated_at"])
+
+    redirect_url = reverse("listas_ip_import_detail", kwargs={"pk": job.pk})
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "redirect_url": redirect_url})
+    return redirect("listas_ip_import_detail", pk=job.pk)
+
+
+@login_required
+def listas_ip_import_detail(request, pk):
+    denied_response = _require_internal_module_access(request, "LISTA_IP")
+    if denied_response:
+        return denied_response
+    cliente = _get_cliente(request.user)
+    job = get_object_or_404(_build_ip_import_job_queryset(request, cliente), pk=pk)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "reanalyze":
+            _reprocess_ip_import_job(job)
+            return redirect("listas_ip_import_detail", pk=job.pk)
+        if action == "apply_import_list":
+            list_key = (request.POST.get("list_key") or "").strip()
+            if not list_key:
+                warnings = list(job.warnings or [])
+                warnings.append("Nenhuma lista foi selecionada para aplicacao.")
+                job.warnings = warnings
+                job.save(update_fields=["warnings", "updated_at"])
+                return redirect("listas_ip_import_detail", pk=job.pk)
+            try:
+                apply_ip_import_job(job=job, user=request.user, selected_list_keys=[list_key])
+                return redirect("listas_ip_import_detail", pk=job.pk)
+            except IPImportError as exc:
+                warnings = list(job.warnings or [])
+                warnings.append(str(exc))
+                job.warnings = warnings
+                job.save(update_fields=["warnings", "updated_at"])
+                return redirect("listas_ip_import_detail", pk=job.pk)
+        if action == "apply_import":
+            try:
+                apply_ip_import_job(job=job, user=request.user)
+                return redirect("listas_ip_import_detail", pk=job.pk)
+            except IPImportError as exc:
+                warnings = list(job.warnings or [])
+                warnings.append(str(exc))
+                job.warnings = warnings
+                job.status = IPImportJob.Status.FAILED
+                job.save(update_fields=["warnings", "status", "updated_at"])
+                return redirect("listas_ip_import_detail", pk=job.pk)
+
+    proposal = job.proposal_payload or {}
+    extracted = job.extracted_payload or {}
+    sheet_summaries = extracted.get("sheets") or []
+    applied_list_key_map = dict((job.apply_log or {}).get("applied_list_keys") or {})
+    applied_list_ids = list((job.apply_log or {}).get("applied_list_ids") or [])
+    applied_lists = list(ListaIP.objects.filter(id__in=applied_list_ids)) if applied_list_ids else []
+    preview_lists = _build_ip_import_preview_lists(proposal, applied_list_key_map=applied_list_key_map)
+    pending_lists_count = sum(1 for item in preview_lists if not item.get("is_applied"))
+
+    return render(
+        request,
+        "core/ip_import_detail.html",
+        {
+            "job": job,
+            "proposal": proposal,
+            "sheet_summaries": sheet_summaries,
+            "preview_lists": preview_lists,
+            "pending_lists_count": pending_lists_count,
+            "applied_lists": applied_lists,
+            "ip_import_is_dev": _is_dev_user(request.user),
+        },
+    )
+
+
+@login_required
+def listas_ip_import_admin(request):
+    if not _is_admin_user(request.user):
+        return HttpResponseForbidden("Sem permissao.")
+    message = None
+    settings_obj = _ip_import_settings()
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "save_settings":
+            settings_obj.enabled = request.POST.get("enabled") == "on"
+            provider = request.POST.get("provider", IPImportSettings.Provider.OPENAI)
+            if provider in dict(IPImportSettings.Provider.choices):
+                settings_obj.provider = provider
+            api_key = request.POST.get("api_key", "").strip()
+            if api_key:
+                settings_obj.api_key = api_key
+            settings_obj.api_base_url = request.POST.get("api_base_url", "").strip()
+            settings_obj.model = request.POST.get("model", "").strip()
+            settings_obj.reasoning_effort = request.POST.get("reasoning_effort", "").strip() or "medium"
+            try:
+                settings_obj.max_rows_for_ai = max(20, min(int(request.POST.get("max_rows_for_ai", "180")), 500))
+            except (TypeError, ValueError):
+                settings_obj.max_rows_for_ai = 180
+            settings_obj.header_prompt = request.POST.get("header_prompt", "").strip() or DEFAULT_IP_HEADER_PROMPT
+            settings_obj.grouping_prompt = request.POST.get("grouping_prompt", "").strip() or DEFAULT_IP_HEADER_GROUPING_PROMPT
+            settings_obj.updated_by = request.user
+            settings_obj.save()
+            message = "Configuracoes de importacao atualizadas."
+        elif action == "reanalyze_job":
+            job_id = request.POST.get("job_id")
+            job = IPImportJob.objects.filter(pk=job_id).first()
+            if job:
+                _reprocess_ip_import_job(job)
+                return redirect("listas_ip_import_admin")
+
+    jobs = IPImportJob.objects.select_related("cliente", "created_by", "applied_lista").order_by("-created_at")[:30]
+    return render(
+        request,
+        "core/ip_import_admin.html",
+        {
+            "message": message,
+            "settings_obj": settings_obj,
+            "jobs": jobs,
+        },
+    )
+
+
+@login_required
 def listas_ip_list(request):
     denied_response = _require_internal_module_access(request, "LISTA_IP")
     if denied_response:
@@ -4459,6 +5108,8 @@ def listas_ip_list(request):
             "can_manage": can_manage,
             "message": message,
             "message_level": message_level,
+            "ip_import_can_upload": _ip_import_can_manage(request, cliente),
+            "ip_import_is_admin": _is_admin_user(request.user),
         },
     )
 

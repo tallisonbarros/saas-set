@@ -1,0 +1,672 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Preview da Importacao de IOs{% endblock %}
+{% block body_class %}page page-ios{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'ios_list' %}">IOs</a>
+    <span class="crumb-sep">/</span>
+    <a href="{% url 'ios_import_admin' %}">Preview da Importacao de IOs</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ job.original_filename }}</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="ios-ops-shell">
+    <style>
+      .io-import-overview-card {
+        padding: 10px 4px 4px;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+      }
+      .io-import-overview-card .page-hud {
+        padding: 0 !important;
+        gap: 10px;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+      .io-import-overview-card .page-hud::before,
+      .io-import-overview-card .page-hud::after {
+        display: none !important;
+      }
+      .io-import-overview-card .hud-top,
+      .io-import-overview-card .page-hud-head,
+      .io-import-overview-card .module-meta-row {
+        padding-left: 0;
+        padding-right: 0;
+      }
+      .io-import-overview-card .hud-top {
+        gap: 8px !important;
+      }
+      .io-import-overview-card .hud-title {
+        opacity: 0.56 !important;
+      }
+      .io-import-overview-card .hud-pill {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.82);
+      }
+      .io-import-overview-title {
+        font-size: 15px;
+        line-height: 1.18;
+        margin: 0;
+        color: rgba(255, 255, 255, 0.9);
+        letter-spacing: -0.01em;
+      }
+      .io-import-overview-card .page-hud-head {
+        gap: 8px !important;
+      }
+      .io-import-overview-card .module-meta-row {
+        gap: 6px !important;
+        margin-top: 2px;
+      }
+      .io-import-overview-card .module-meta-pill {
+        padding: 4px 9px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.74);
+        background: rgba(255, 255, 255, 0.022);
+        border-color: rgba(255, 255, 255, 0.045);
+      }
+      .io-import-overview-subtitle {
+        margin: 8px 0 0;
+        max-width: 760px;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.68);
+      }
+      .io-import-racks-flow {
+        display: grid;
+        gap: 22px;
+        padding-top: 6px;
+      }
+      .io-import-flow-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 0 0 2px;
+      }
+      .io-import-flow-title {
+        margin: 0;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.56);
+      }
+      .io-import-flow-copy {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.62);
+      }
+      .io-import-rack-section {
+        position: relative;
+        padding: 18px 18px 16px 24px;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.048);
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.03), transparent 38%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.01));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.03),
+          0 18px 38px rgba(0, 0, 0, 0.16);
+      }
+      .io-import-rack-section.is-alt {
+        background:
+          radial-gradient(circle at top left, rgba(255, 180, 120, 0.055), transparent 34%),
+          linear-gradient(180deg, rgba(255, 146, 64, 0.032), rgba(255, 255, 255, 0.012));
+        border-color: rgba(255, 146, 64, 0.1);
+      }
+      .io-import-rack-separator {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .io-import-rack-separator::before,
+      .io-import-rack-separator::after {
+        content: "";
+        height: 1px;
+        flex: 1 1 auto;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      }
+      .io-import-rack-section.is-alt .io-import-rack-separator::before,
+      .io-import-rack-section.is-alt .io-import-rack-separator::after {
+        background: linear-gradient(90deg, transparent, rgba(255, 146, 64, 0.17), transparent);
+      }
+      .io-import-rack-separator-label {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.48);
+        white-space: nowrap;
+      }
+      .io-import-rack-section.is-alt .io-import-rack-separator-label {
+        color: rgba(255, 202, 165, 0.68);
+      }
+      .io-import-rack-top {
+        display: grid;
+        gap: 0;
+        margin-bottom: 8px;
+      }
+      .io-import-rack-header .ios-rack-topcard-head {
+        gap: 12px;
+        padding: 4px 2px 10px;
+        align-items: start;
+      }
+      .io-import-rack-header .ios-rack-context {
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .io-import-rack-header .ios-rack-context-pill {
+        padding: 5px 10px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+      }
+      .io-import-rack-header .ios-rack-page-title {
+        margin: 0;
+        font-size: clamp(22px, 3vw, 34px);
+        line-height: 0.98;
+        letter-spacing: -0.03em;
+      }
+      .io-import-rack-header .ios-rack-page-subtitle {
+        margin: 6px 0 0;
+        font-size: 11px;
+        line-height: 1.35;
+        color: rgba(255, 255, 255, 0.56);
+      }
+      .io-import-rack-header .ios-rack-availability {
+        min-width: 270px;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        border: 0;
+      }
+      .io-import-rack-header .ios-rack-availability-label {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        opacity: 0.58;
+        margin-bottom: 6px;
+      }
+      .io-import-rack-header .ios-rack-availability .module-meta-row {
+        gap: 6px;
+      }
+      .io-import-rack-header .ios-rack-availability .module-meta-pill {
+        padding: 5px 10px;
+        font-size: 10px;
+      }
+      .io-import-rack-header-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 2px 2px;
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .io-import-review-copy {
+        min-width: 0;
+      }
+      .io-import-review-text {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.34;
+        color: rgba(255, 255, 255, 0.62);
+      }
+      .io-import-rack-actions-box {
+        display: grid;
+        gap: 0;
+        justify-items: end;
+        padding-left: 14px;
+        border-left: 1px solid rgba(255, 255, 255, 0.045);
+      }
+      .io-import-rack-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin: 0;
+      }
+      .io-import-rack-actions-note {
+        margin: 6px 0 0;
+        max-width: 250px;
+        font-size: 10px;
+        line-height: 1.35;
+        text-align: right;
+        color: rgba(255, 255, 255, 0.46);
+      }
+      .io-import-rack-apply-form {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .io-import-rack-apply-btn {
+        min-width: 154px;
+        min-height: 38px;
+        padding-inline: 16px;
+        font-size: 12px;
+        letter-spacing: 0.03em;
+      }
+      .io-import-rack-apply-btn.is-applied {
+        background: rgba(255, 146, 64, 0.14);
+        border-color: rgba(255, 146, 64, 0.3);
+        color: rgba(255, 226, 203, 0.96);
+        cursor: default;
+        box-shadow: none;
+      }
+      .io-import-rack-open-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 11px;
+      }
+      .io-import-leave-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(4, 7, 11, 0.68);
+        backdrop-filter: blur(8px);
+      }
+      .io-import-leave-modal.is-open {
+        display: flex;
+      }
+      .io-import-leave-card {
+        width: min(100%, 420px);
+        padding: 18px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: linear-gradient(180deg, rgba(24, 30, 38, 0.98), rgba(18, 23, 30, 0.98));
+        box-shadow: 0 26px 60px rgba(0, 0, 0, 0.34);
+      }
+      .io-import-leave-kicker {
+        margin: 0 0 10px;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(255, 173, 110, 0.82);
+      }
+      .io-import-leave-title {
+        margin: 0;
+        font-size: 21px;
+        line-height: 1.1;
+      }
+      .io-import-leave-copy {
+        margin: 10px 0 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .io-import-leave-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 18px;
+      }
+      .io-import-slot-stage {
+        display: grid;
+        gap: 12px;
+        padding: 12px 0 10px;
+        border-radius: 0;
+        border: 0;
+        background: transparent;
+      }
+      .io-import-slot-stage .rack-carousel {
+        padding: 2px 2px 0;
+      }
+      .io-import-slot-stage .proposal-grid {
+        gap: 12px;
+      }
+      .io-import-slot-stage .rack-slot-shell {
+        padding-bottom: 2px;
+      }
+      .io-import-slot-stage .proposal-card {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.024), rgba(255, 255, 255, 0.014));
+        border-color: rgba(255, 255, 255, 0.05);
+      }
+      .io-import-slot-stage .slot-empty {
+        opacity: 0.82;
+      }
+      .io-import-slot-stage .rack-module-note,
+      .io-import-slot-stage .rack-module-panel {
+        margin: 0;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.045);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+      }
+      .io-import-rack-footer {
+        margin-top: 2px;
+        border-top: 1px solid rgba(255, 255, 255, 0.045);
+        padding-top: 10px;
+      }
+      .io-import-rack-footer .ios-rack-footer-strip {
+        background: transparent;
+      }
+      @media (max-width: 920px) {
+        .io-import-rack-header .ios-rack-topcard-head {
+          gap: 10px;
+          padding: 2px 0 8px;
+        }
+        .io-import-rack-header .ios-rack-availability {
+          min-width: 0;
+          width: 100%;
+        }
+        .io-import-flow-head {
+          padding-left: 0;
+        }
+        .io-import-rack-header-bottom {
+          grid-template-columns: 1fr;
+          align-items: start;
+          flex-direction: column;
+          padding: 10px 0 2px;
+        }
+        .io-import-rack-actions-box {
+          width: 100%;
+          justify-items: start;
+          padding-left: 0;
+          border-left: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.045);
+          padding-top: 10px;
+        }
+        .io-import-rack-actions {
+          width: 100%;
+          justify-content: flex-start;
+        }
+        .io-import-rack-actions-note {
+          max-width: none;
+          text-align: left;
+        }
+      }
+    </style>
+
+    <section class="card stack io-import-overview-card">
+      <div class="page-hud">
+        <div class="hud-top" style="align-items: center; gap: 10px;">
+          <div class="hud-title" style="font-size: 12px; letter-spacing: .08em; opacity: .7;">Preview da Importacao de IOs</div>
+          <div class="hud-pill">{{ job.get_status_display }}</div>
+        </div>
+        <div class="page-hud-head" style="align-items: start; gap: 12px;">
+          <div class="page-hud-main">
+            <h1 class="page-title io-import-overview-title">{{ job.original_filename }}</h1>
+          </div>
+        </div>
+        <div class="module-meta-row" style="gap: 8px;">
+          <span class="module-meta-pill">Racks {{ proposal.summary.racks|default:1 }}</span>
+          <span class="module-meta-pill">Slots {{ proposal.summary.slots|default:"-" }}</span>
+          <span class="module-meta-pill">Modulos {{ proposal.summary.modules|default:0 }}</span>
+          <span class="module-meta-pill">Linhas {{ proposal.summary.rows|default:0 }}</span>
+        </div>
+      </div>
+
+      {% if proposal.conflicts %}
+        <div class="card compact-card">
+          <div class="panel-title">Conflitos</div>
+          <div class="stack" style="margin-top: 12px;">
+            {% for conflict in proposal.conflicts %}
+              <div class="notice notice-warning">
+                {% if conflict.rack_name %}{{ conflict.rack_name }}{% endif %}
+                {% if conflict.slot_index %} &middot; Slot {{ conflict.slot_index }}{% endif %}: {{ conflict.message }}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="io-import-racks-flow" aria-label="Fluxo dos racks importados">
+      {% if preview_racks %}
+        <div class="io-import-flow-head">
+          <div>
+            <p class="io-import-flow-title">Sequencia dos racks importados</p>
+          </div>
+        </div>
+      {% endif %}
+
+      {% for rack in preview_racks %}
+        <section class="stack io-import-rack-section {% cycle '' 'is-alt' %}" data-import-preview-root data-rack-key="{{ rack.key }}" data-selected-module-id="{{ rack.selected_module_id }}">
+          <div class="io-import-rack-separator" aria-hidden="true">
+            <span class="io-import-rack-separator-label">Rack {{ forloop.counter|stringformat:"02d" }} de {{ preview_racks|length|stringformat:"02d" }}</span>
+          </div>
+
+          <div class="io-import-rack-top">
+            <section class="io-import-rack-header">
+              <div class="ios-rack-topcard-head">
+                <div class="ios-rack-topcard-copy">
+                  {% if rack.source_sheets %}
+                    <div class="ios-rack-context">
+                      {% for sheet_name in rack.source_sheets %}
+                        <span class="ios-rack-context-pill">{{ sheet_name }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  <h2 class="page-title ios-rack-page-title">{{ rack.name }}</h2>
+                  <p class="page-subtitle ios-rack-page-subtitle">{{ rack.descricao }}</p>
+                </div>
+                <div class="ios-rack-availability">
+                  <div class="ios-rack-availability-label">Canais disponiveis</div>
+                  {% if rack.canais_disponiveis %}
+                    <div class="module-meta-row">
+                      {% for item in rack.canais_disponiveis %}
+                        <span class="module-meta-pill">{{ item.tipo }} {{ item.total|stringformat:"02d" }}</span>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="muted">Sem canais disponiveis.</div>
+                  {% endif %}
+                </div>
+              </div>
+              {% if not proposal.conflicts %}
+                <div class="io-import-rack-header-bottom" aria-label="Aprovacao do rack">
+                  <div class="io-import-review-copy">
+                    {% if rack.is_applied %}
+                      <p class="io-import-review-text">Rack ja criado no modulo de IOs. O preview abaixo permanece como referencia da estrutura aplicada.</p>
+                    {% else %}
+                      <p class="io-import-review-text">Revise os slots abaixo e aplique este rack se a composicao estiver correta.</p>
+                    {% endif %}
+                  </div>
+                  <div class="io-import-rack-actions-box">
+                    <div class="io-import-rack-actions">
+                      {% if rack.is_applied %}
+                        <a
+                          class="btn btn-outline btn-compact io-import-rack-open-link"
+                          href="{% url 'ios_list' %}"
+                          data-open-io-module
+                          data-pending-racks="{{ pending_racks_count }}"
+                        >Abrir modulo de IOs</a>
+                        <button class="btn btn-primary btn-compact io-import-rack-apply-btn is-applied" type="button" disabled>Rack criado no seu modulo</button>
+                      {% else %}
+                        <form method="post" class="io-import-rack-apply-form">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="apply_import_rack">
+                          <input type="hidden" name="rack_key" value="{{ rack.key }}">
+                          <button class="btn btn-primary btn-compact io-import-rack-apply-btn" type="submit">Aprovar e Aplicar</button>
+                        </form>
+                      {% endif %}
+                    </div>
+                    {% if rack.is_applied %}
+                      <p class="io-import-rack-actions-note">Se precisar, voce ainda pode ajustar esse rack depois dentro do modulo.</p>
+                    {% else %}
+                      <p class="io-import-rack-actions-note">Voce pode ajustar esse rack depois dentro do modulo, se precisar.</p>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endif %}
+            </section>
+          </div>
+
+          <section class="io-import-slot-stage" aria-label="Preview tecnico do rack">
+            <div class="rack-carousel">
+              <div class="proposal-grid rack-grid rack-carousel-track" data-preview-track>
+                {% for slot in rack.slots %}
+                  <div class="rack-slot-shell">
+                    <div class="rack-slot-label-out">Slot {{ slot.posicao|stringformat:"02d" }}</div>
+                    <article class="proposal-card slot-card {% if slot.modulo %}slot-filled js-import-preview-card{% else %}slot-empty{% endif %}"
+                      {% if slot.modulo %}
+                        data-module-id="{{ slot.modulo.id }}"
+                        data-module-title="{{ slot.modulo.modulo_modelo.modelo|default:slot.modulo.modulo_modelo.nome }}"
+                        data-module-subtitle="{{ rack.name }}"
+                        data-module-type="{{ slot.modulo.modulo_modelo.tipo_base.nome }}"
+                      {% endif %}
+                    >
+                      <div class="proposal-head">
+                        <div>
+                          {% if slot.modulo %}
+                            <div class="proposal-title">{{ slot.modulo.modulo_modelo.modelo|default:slot.modulo.modulo_modelo.nome }}</div>
+                          {% else %}
+                            <div class="proposal-title">Slot livre</div>
+                          {% endif %}
+                        </div>
+                        {% if slot.modulo %}
+                          <div class="slot-card-actions">
+                            <div class="module-meta">
+                              <span class="slot-state-led {% if slot.modulo.all_canais_comissionados %}is-ok{% else %}is-pending{% endif %}"></span>
+                            </div>
+                          </div>
+                        {% endif %}
+                      </div>
+                      {% if slot.modulo %}
+                        <div class="slot-actions">
+                          <span class="slot-hint">Tipo {{ slot.modulo.modulo_modelo.tipo_base.nome }}</span>
+                          <span class="slot-hint">{{ slot.modulo.modulo_modelo.quantidade_canais }} canais</span>
+                        </div>
+                      {% else %}
+                        <div class="slot-actions">
+                          <span class="slot-hint">Sem modulo proposto</span>
+                        </div>
+                      {% endif %}
+                    </article>
+                  </div>
+                {% endfor %}
+              </div>
+              <div class="rack-scroll-ui" data-preview-scroll-ui aria-hidden="true">
+                <span class="rack-scroll-ball" data-preview-scroll-ball>&lt;&gt;</span>
+              </div>
+            </div>
+
+            <section class="io-card rack-module-note" data-preview-note>
+              <p class="muted">Clique em um modulo do rack para ver os canais previstos.</p>
+            </section>
+
+            <section class="io-card rack-module-panel is-hidden" data-preview-panel>
+              <div class="stack" style="gap: 10px;" data-preview-panel-body>
+                <div>
+                  <div class="io-title" data-preview-panel-title>Nenhum modulo selecionado</div>
+                  <p class="muted" data-preview-panel-subtitle>Selecione um modulo acima para abrir os canais.</p>
+                </div>
+                <div class="module-meta-row" data-preview-panel-meta></div>
+              </div>
+              <div class="rack-module-empty is-hidden" data-preview-empty style="display:none;">Sem canais previstos neste modulo.</div>
+              <div class="rack-channel-list is-hidden" data-preview-list style="display:none;">
+                <div class="rack-channel-row rack-channel-head">
+                  <span>Canal</span>
+                  <span>Tag</span>
+                  <span>Tipo</span>
+                </div>
+                <div data-preview-rows></div>
+              </div>
+            </section>
+          </section>
+
+          <div class="io-import-rack-footer">
+            <section class="ios-rack-footer-strip" aria-label="Resumo do rack">
+              <article class="ios-rack-footer-item">
+                <span class="ios-rack-footer-label">Slots totais</span>
+                <strong class="ios-rack-footer-value">{{ rack.slots_total }}</strong>
+              </article>
+              <article class="ios-rack-footer-item">
+                <span class="ios-rack-footer-label">Slots ocupados</span>
+                <strong class="ios-rack-footer-value">{{ rack.ocupados }}</strong>
+              </article>
+              <article class="ios-rack-footer-item">
+                <span class="ios-rack-footer-label">Slots livres</span>
+                <strong class="ios-rack-footer-value">{{ rack.slots_livres }}</strong>
+              </article>
+              <article class="ios-rack-footer-item">
+                <span class="ios-rack-footer-label">Modulos</span>
+                <strong class="ios-rack-footer-value">{{ rack.summary.modules|default:0 }}</strong>
+              </article>
+            </section>
+          </div>
+        </section>
+      {% empty %}
+        <section class="io-card ios-empty-state io-center">
+          <div class="ios-empty-icon">!</div>
+          <h2 class="ios-empty-title">Nenhum rack sugerido</h2>
+          <p class="muted">A importacao ainda nao conseguiu montar uma preview visual do rack.</p>
+        </section>
+      {% endfor %}
+    </section>
+
+    {% if sheet_summaries %}
+      <section class="card compact-card">
+        <details>
+          <summary style="display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none;">
+            <span class="panel-title" style="margin:0;">Guias processadas</span>
+            <span class="admin-token is-neutral">{{ sheet_summaries|length }} guia{{ sheet_summaries|length|pluralize }}</span>
+          </summary>
+          <div class="admin-list" style="margin-top: 12px;">
+            {% for sheet in sheet_summaries %}
+              <article class="admin-list-row">
+                <div class="admin-list-row-main">
+                  <div class="admin-list-title">{{ sheet.sheet_name }}</div>
+                  <div class="admin-list-meta">
+                    <span class="admin-token is-neutral">Layout {{ sheet.layout }}</span>
+                    <span class="admin-token is-neutral">Header {{ sheet.header_row_index|default:"-" }}</span>
+                    <span class="admin-token is-neutral">Linhas {{ sheet.rows_parsed }}/{{ sheet.rows_total }}</span>
+                    {% if sheet.skipped %}
+                      <span class="admin-token is-neutral">Ignorada</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </details>
+      </section>
+    {% endif %}
+
+    {% if io_import_is_dev and job.warnings %}
+      <section class="card compact-card">
+        <details>
+          <summary style="display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none;">
+            <span class="panel-title" style="margin:0;">Warnings</span>
+            <span class="admin-token is-neutral">{{ job.warnings|length }} warning{{ job.warnings|length|pluralize }}</span>
+          </summary>
+          <div class="stack" style="margin-top: 12px;">
+            {% for warning in job.warnings %}
+              <div class="notice notice-warning">{{ warning }}</div>
+            {% endfor %}
+          </div>
+        </details>
+      </section>
+    {% endif %}
+
+    <div class="io-import-leave-modal" data-io-import-leave-modal aria-hidden="true">
+      <div class="io-import-leave-card" role="dialog" aria-modal="true" aria-labelledby="io-import-leave-title">
+        <p class="io-import-leave-kicker">Revisao em aberto</p>
+        <h2 class="io-import-leave-title" id="io-import-leave-title">Voce ainda possui racks para revisar.</h2>
+        <p class="io-import-leave-copy" data-io-import-leave-copy>Deseja continuar para o modulo de IOs agora?</p>
+        <div class="io-import-leave-actions">
+          <button type="button" class="btn btn-outline btn-compact" data-io-import-leave-cancel>Continuar revisando</button>
+          <a href="{% url 'ios_list' %}" class="btn btn-primary btn-compact" data-io-import-leave-confirm>Ir para o modulo</a>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  {{ preview_payload|json_script:"io-import-preview-payload" }}
+  <script src="{% static 'core/io_import_preview.js' %}"></script>
+{% endblock %}

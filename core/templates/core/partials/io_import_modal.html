@@ -1,0 +1,210 @@
+{% if io_import_can_upload %}
+  <div class="radar-export-modal" id="io-import-modal" hidden>
+    <div class="radar-export-modal-backdrop" data-io-import-close></div>
+    <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="io-import-modal-title" data-io-import-dialog>
+      <header class="radar-export-modal-head" data-io-import-head>
+        <h2 id="io-import-modal-title">Importar planilha de IO</h2>
+        <button class="btn btn-outline btn-compact" type="button" data-io-import-close>Fechar</button>
+      </header>
+      <div class="radar-export-modal-body" data-io-import-body>
+        <style>
+          #io-import-modal.is-processing [data-io-import-head] { display: none; }
+          #io-import-modal.is-processing [data-io-import-body] {
+            padding: 20px;
+            background: transparent;
+          }
+          #io-import-modal.is-processing [data-io-import-dialog] {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            max-width: 700px;
+          }
+          #io-import-modal.is-processing .io-import-flow { gap: 0; }
+          .io-import-flow { display: grid; gap: 16px; }
+          .io-import-error { display: none; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(208,75,59,.28); background: rgba(208,75,59,.08); color: #f6c3bc; }
+          .io-import-error.is-visible { display: block; }
+          .io-import-form[hidden] { display: none !important; }
+          .io-import-processing[hidden] { display: none !important; }
+          .io-import-processing {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 132, 38, 0.18);
+            background:
+              radial-gradient(circle at top, rgba(255, 132, 38, 0.20), transparent 42%),
+              linear-gradient(180deg, rgba(28, 20, 14, 0.98), rgba(18, 13, 9, 0.99));
+            padding: 22px;
+          }
+          #io-import-modal.is-processing .io-import-processing {
+            border-radius: 28px;
+          }
+          .io-import-processing::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+              linear-gradient(90deg, transparent 0%, rgba(255, 148, 72, 0.08) 50%, transparent 100%);
+            transform: translateX(-100%);
+            animation: io-import-scan 2.2s linear infinite;
+            pointer-events: none;
+          }
+          .io-import-processing-grid { position: relative; display: grid; gap: 18px; }
+          .io-import-processing-hero { display: grid; gap: 10px; justify-items: center; text-align: center; }
+          .io-import-processing-kicker {
+            font-size: 11px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(255, 205, 168, 0.76);
+          }
+          .io-import-processing-orb {
+            width: 82px;
+            height: 82px;
+            border-radius: 999px;
+            position: relative;
+            background: radial-gradient(circle, rgba(255, 188, 121, 0.96), rgba(255, 117, 24, 0.46) 48%, rgba(40, 18, 6, 0.16) 72%, transparent 76%);
+            box-shadow: 0 0 34px rgba(255, 132, 38, 0.30);
+          }
+          .io-import-processing-orb::before,
+          .io-import-processing-orb::after {
+            content: "";
+            position: absolute;
+            inset: -10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 170, 94, 0.24);
+          }
+          .io-import-processing-orb::before { animation: io-import-pulse 2s ease-out infinite; }
+          .io-import-processing-orb::after {
+            inset: 8px;
+            border-color: rgba(255, 170, 94, 0.14);
+            animation: io-import-pulse 2s ease-out infinite 0.6s;
+          }
+          .io-import-processing-title { margin: 0; font-size: 20px; }
+          .io-import-processing-copy { margin: 0; color: rgba(224, 237, 255, 0.76); }
+          .io-import-progress {
+            position: relative;
+            height: 10px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 148, 72, 0.14);
+          }
+          .io-import-progress-bar {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #ff8a2f 0%, #ffb062 55%, #ffd0a1 100%);
+            box-shadow: 0 0 24px rgba(255, 132, 38, 0.28);
+            transition: width .35s ease;
+          }
+          .io-import-progress-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 12px;
+            color: rgba(255, 220, 196, 0.74);
+          }
+          .io-import-steps { display: grid; gap: 10px; }
+          .io-import-step {
+            display: grid;
+            grid-template-columns: 18px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 11px 13px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 148, 72, 0.10);
+          }
+          .io-import-step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.24);
+            box-shadow: 0 0 0 0 rgba(255, 132, 38, 0.0);
+            transition: all .25s ease;
+          }
+          .io-import-step-title { font-weight: 600; color: #edf8ff; }
+          .io-import-step-status { font-size: 12px; color: rgba(255, 220, 196, 0.72); }
+          .io-import-step.is-active {
+            border-color: rgba(255, 170, 94, 0.26);
+            background: rgba(255, 132, 38, 0.08);
+          }
+          .io-import-step.is-active .io-import-step-dot {
+            background: #ffb66f;
+            box-shadow: 0 0 0 6px rgba(255, 132, 38, 0.14);
+          }
+          .io-import-step.is-done .io-import-step-dot { background: #65f0bf; }
+          .io-import-step.is-done .io-import-step-status { color: rgba(101, 240, 191, 0.82); }
+          @keyframes io-import-scan {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(100%); }
+          }
+          @keyframes io-import-pulse {
+            0% { transform: scale(.88); opacity: .64; }
+            70% { transform: scale(1.15); opacity: 0; }
+            100% { transform: scale(1.15); opacity: 0; }
+          }
+        </style>
+        <div class="io-import-flow" data-io-import-flow>
+          <div class="io-import-error" data-io-import-error></div>
+          <form class="io-form io-import-form" method="post" action="{% url 'ios_import_create' %}" enctype="multipart/form-data" data-io-import-form>
+            {% csrf_token %}
+            <div class="io-form-grid">
+              <label class="field">
+                <span>Arquivo</span>
+                <input type="file" name="arquivo" accept=".xlsx,.xlsm,.csv,.tsv" required>
+              </label>
+            </div>
+            <p class="muted" style="margin-top: 10px;">
+              A importacao so recebe o arquivo. O pipeline analisa a planilha, monta a preview dos racks sugeridos e, depois da aplicacao, qualquer ajuste fino e feito diretamente por rack dentro do modulo.
+            </p>
+            <footer class="radar-export-modal-foot">
+              <button class="btn btn-primary" type="submit" data-io-import-submit>Enviar para analise</button>
+            </footer>
+          </form>
+
+          <section class="io-import-processing" data-io-import-processing hidden>
+            <div class="io-import-processing-grid">
+              <div class="io-import-processing-hero">
+                <div class="io-import-processing-kicker">Analise de IA</div>
+                <div class="io-import-processing-orb" aria-hidden="true"></div>
+                <h3 class="io-import-processing-title" data-io-import-title>Analisando planilha</h3>
+                <p class="io-import-processing-copy" data-io-import-copy>O arquivo foi recebido e o motor de importacao esta montando a estrutura dos racks sugeridos.</p>
+              </div>
+
+              <div class="io-import-progress" aria-hidden="true">
+                <div class="io-import-progress-bar" data-io-import-progress-bar></div>
+              </div>
+              <div class="io-import-progress-meta">
+                <span data-io-import-progress-label>Preparando upload</span>
+                <span data-io-import-progress-value>0%</span>
+              </div>
+
+              <div class="io-import-steps">
+                <article class="io-import-step" data-io-import-step="upload">
+                  <span class="io-import-step-dot" aria-hidden="true"></span>
+                  <div class="io-import-step-title">Arquivo enviado</div>
+                  <div class="io-import-step-status" data-io-import-step-status="upload">Aguardando</div>
+                </article>
+                <article class="io-import-step" data-io-import-step="parse">
+                  <span class="io-import-step-dot" aria-hidden="true"></span>
+                  <div class="io-import-step-title">Lendo estrutura da planilha</div>
+                  <div class="io-import-step-status" data-io-import-step-status="parse">Aguardando</div>
+                </article>
+                <article class="io-import-step" data-io-import-step="ai">
+                  <span class="io-import-step-dot" aria-hidden="true"></span>
+                  <div class="io-import-step-title">Analisando com IA</div>
+                  <div class="io-import-step-status" data-io-import-step-status="ai">Aguardando</div>
+                </article>
+                <article class="io-import-step" data-io-import-step="preview">
+                  <span class="io-import-step-dot" aria-hidden="true"></span>
+                  <div class="io-import-step-title">Gerando preview operacional</div>
+                  <div class="io-import-step-status" data-io-import-step-status="preview">Aguardando</div>
+                </article>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+{% endif %}
