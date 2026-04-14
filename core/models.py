@@ -148,6 +148,181 @@ class AcessoProdutoUsuario(models.Model):
         return f"{self.usuario} - {self.produto} ({self.status})"
 
 
+class PlanoComercial(models.Model):
+    class Codigo(models.TextChoices):
+        STARTER = "STARTER", "Starter"
+        PROFESSIONAL = "PROFESSIONAL", "Professional"
+
+    produto = models.ForeignKey(
+        ProdutoPlataforma,
+        on_delete=models.CASCADE,
+        related_name="planos",
+    )
+    codigo = models.CharField(max_length=40, choices=Codigo.choices)
+    nome = models.CharField(max_length=120)
+    descricao = models.TextField(blank=True)
+    ativo = models.BooleanField(default=True)
+    is_free = models.BooleanField(default=False)
+    ordem = models.PositiveSmallIntegerField(default=0)
+    rack_limit_simultaneous = models.PositiveIntegerField(null=True, blank=True)
+    preco_mensal = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    preco_anual = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    provider_plan_code_mensal = models.CharField(max_length=120, blank=True, default="")
+    provider_plan_code_anual = models.CharField(max_length=120, blank=True, default="")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["produto__nome", "ordem", "nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["produto", "codigo"], name="unique_plano_comercial_produto_codigo"),
+        ]
+
+    def __str__(self):
+        return f"{self.produto.nome} - {self.nome}"
+
+
+class AssinaturaUsuario(models.Model):
+    class Provider(models.TextChoices):
+        INTERNAL = "INTERNAL", "Interno"
+        MERCADO_PAGO = "MERCADO_PAGO", "Mercado Pago"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pendente"
+        ACTIVE = "ACTIVE", "Ativa"
+        PAST_DUE = "PAST_DUE", "Em atraso"
+        CANCELED = "CANCELED", "Cancelada"
+        EXPIRED = "EXPIRED", "Expirada"
+        TRIALING = "TRIALING", "Em trial"
+
+    class BillingInterval(models.TextChoices):
+        MONTHLY = "MONTHLY", "Mensal"
+        YEARLY = "YEARLY", "Anual"
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="assinaturas",
+    )
+    produto = models.ForeignKey(
+        ProdutoPlataforma,
+        on_delete=models.CASCADE,
+        related_name="assinaturas",
+    )
+    plano = models.ForeignKey(
+        PlanoComercial,
+        on_delete=models.PROTECT,
+        related_name="assinaturas",
+    )
+    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.INTERNAL)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    billing_interval = models.CharField(
+        max_length=20,
+        choices=BillingInterval.choices,
+        default=BillingInterval.MONTHLY,
+    )
+    auto_renew = models.BooleanField(default=True)
+    preco_ciclo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    moeda = models.CharField(max_length=12, blank=True, default="BRL")
+    current_period_start = models.DateTimeField(null=True, blank=True)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    provider_customer_id = models.CharField(max_length=120, blank=True, default="")
+    provider_subscription_id = models.CharField(max_length=120, blank=True, default="")
+    provider_plan_id = models.CharField(max_length=120, blank=True, default="")
+    external_reference = models.CharField(max_length=120, blank=True, default="")
+    checkout_url = models.TextField(blank=True, default="")
+    observacao = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["status", "updated_at"]),
+            models.Index(fields=["provider", "provider_subscription_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} - {self.plano.nome} ({self.status})"
+
+
+class ConfiguracaoPagamento(models.Model):
+    class Provider(models.TextChoices):
+        MERCADO_PAGO = "MERCADO_PAGO", "Mercado Pago"
+
+    trial_duration_days = models.PositiveIntegerField(default=30)
+    enabled = models.BooleanField(default=False)
+    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.MERCADO_PAGO)
+    sandbox_mode = models.BooleanField(default=True)
+    mercado_pago_public_key = models.CharField(max_length=255, blank=True, default="")
+    mercado_pago_access_token = models.CharField(max_length=255, blank=True, default="")
+    mercado_pago_webhook_secret = models.CharField(max_length=255, blank=True, default="")
+    checkout_success_url = models.CharField(max_length=255, blank=True, default="")
+    checkout_failure_url = models.CharField(max_length=255, blank=True, default="")
+    checkout_pending_url = models.CharField(max_length=255, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payment_configuration_updates",
+    )
+
+    class Meta:
+        verbose_name = "Configuracao de pagamento"
+        verbose_name_plural = "Configuracoes de pagamento"
+
+    @classmethod
+    def load(cls):
+        config, _ = cls.objects.get_or_create(pk=1)
+        return config
+
+    @property
+    def masked_access_token(self):
+        value = (self.mercado_pago_access_token or "").strip()
+        if len(value) <= 8:
+            return "*" * len(value)
+        return f"{value[:4]}...{value[-4:]}"
+
+    @property
+    def masked_public_key(self):
+        value = (self.mercado_pago_public_key or "").strip()
+        if len(value) <= 8:
+            return "*" * len(value)
+        return f"{value[:4]}...{value[-4:]}"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.trial_duration_days = max(1, min(int(self.trial_duration_days or 30), 120))
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Configuracao de pagamento"
+
+
+class EventoPagamentoWebhook(models.Model):
+    provider = models.CharField(max_length=20, choices=ConfiguracaoPagamento.Provider.choices)
+    external_id = models.CharField(max_length=120)
+    event_type = models.CharField(max_length=120, blank=True, default="")
+    raw_payload = models.JSONField(default=dict, blank=True)
+    processed = models.BooleanField(default=False)
+    processing_error = models.TextField(blank=True, default="")
+    received_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-received_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["provider", "external_id"], name="unique_pagamento_webhook_event"),
+        ]
+
+    def __str__(self):
+        return f"{self.provider} - {self.external_id}"
+
+
 class Caderno(models.Model):
     nome = models.CharField(max_length=80)
     criador = models.ForeignKey(
@@ -1391,6 +1566,7 @@ class IOImportJob(models.Model):
     extracted_payload = models.JSONField(default=dict, blank=True)
     proposal_payload = models.JSONField(default=dict, blank=True)
     ai_payload = models.JSONField(default=dict, blank=True)
+    progress_payload = models.JSONField(default=dict, blank=True)
     warnings = models.JSONField(default=list, blank=True)
     apply_log = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1405,6 +1581,40 @@ class IOImportJob(models.Model):
 
     def __str__(self):
         return f"{self.original_filename} - {self.get_status_display()}"
+
+
+class IOImportAICache(models.Model):
+    class Stage(models.TextChoices):
+        WORKBOOK = "WORKBOOK", "Analise do workbook"
+        SHEET = "SHEET", "Analise da guia"
+
+    stage = models.CharField(max_length=20, choices=Stage.choices)
+    fingerprint = models.CharField(max_length=64)
+    file_sha256 = models.CharField(max_length=64, blank=True, default="")
+    sheet_name = models.CharField(max_length=120, blank=True, default="")
+    provider = models.CharField(max_length=20, blank=True, default="")
+    model = models.CharField(max_length=120, blank=True, default="")
+    settings_fingerprint = models.CharField(max_length=64, blank=True, default="")
+    response_payload = models.JSONField(default=dict, blank=True)
+    payload_meta = models.JSONField(default=dict, blank=True)
+    hits = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["stage", "fingerprint"], name="unique_io_import_ai_cache_stage_fingerprint"),
+        ]
+        indexes = [
+            models.Index(fields=["stage", "file_sha256", "updated_at"]),
+            models.Index(fields=["last_used_at"]),
+        ]
+
+    def __str__(self):
+        label = self.sheet_name or self.file_sha256 or self.fingerprint[:12]
+        return f"{self.stage} - {label}"
 
 
 class IPImportSettings(models.Model):

@@ -7,73 +7,65 @@
 {% block content %}
   <section class="product-doc-shell">
     {% if message %}
-      <div class="notice notice-{{ message_level }}">{{ message }}</div>
+      <div class="notice notice-{{ message_level|default:'info' }}">{{ message }}</div>
     {% endif %}
 
     <section class="card product-doc-hero reveal-on-scroll is-visible">
       <div class="product-doc-hero-grid">
         <div class="product-doc-hero-copy">
-          <div class="product-doc-kicker">Produto técnico SET</div>
-          <h1 class="product-doc-title">Localize rack, canal, tag e IP sem depender de planilhas paralelas.</h1>
-          <p class="product-doc-subtitle">
-            Organize IOs e Listas de IP em uma base técnica viva para consultar equipamentos,
-            atualizar documentação e manter hardware, sinais e rede no mesmo contexto.
-          </p>
-          <p class="product-doc-value-line">
-            Menos retrabalho para revisar, atualizar e encontrar o dado certo no campo.
-          </p>
-        </div>
-
-        <div class="product-doc-hero-visual">
-          <article class="product-doc-hero-action-panel">
-            <div class="product-doc-board-head">
-              <span>Resultado operacional</span>
-              <span>Fluxo técnico único</span>
+          <h1 class="product-doc-title">Importe sua planilha. Revise a estrutura antes de aplicar.</h1>
+          <p class="product-doc-hero-support">Menos recadastro. Mais clareza para começar pela sua planilha ou seguir criando um novo rack do zero.</p>
+          <div class="product-doc-journey-frame product-doc-hero-journey" data-journey-flow>
+            <div class="product-doc-journey-strip">
+              <article class="product-doc-journey-node" data-journey-node>
+                <div class="product-doc-journey-node-badge">01</div>
+                <div class="product-doc-journey-node-meta">
+                  <small>Entrada</small>
+                  <strong>Envie a planilha</strong>
+                </div>
+                <p>Use a base atual, sem recadastrar do zero.</p>
+              </article>
+              <article class="product-doc-journey-node" data-journey-node>
+                <div class="product-doc-journey-node-badge">02</div>
+                <div class="product-doc-journey-node-meta">
+                  <small>Análise</small>
+                  <strong>A IA interpreta a base</strong>
+                </div>
+                <p>Colunas, sinais e grupos são correlacionados.</p>
+              </article>
+              <article class="product-doc-journey-node" data-journey-node>
+                <div class="product-doc-journey-node-badge">03</div>
+                <div class="product-doc-journey-node-meta">
+                  <small>Prévia</small>
+                  <strong>Revise o preview</strong>
+                </div>
+                <p>Veja a estrutura antes de aplicar.</p>
+              </article>
+              <article class="product-doc-journey-node" data-journey-node>
+                <div class="product-doc-journey-node-badge">04</div>
+                <div class="product-doc-journey-node-meta">
+                  <small>Aplicação</small>
+                  <strong>Aplique no módulo</strong>
+                </div>
+                <p>Finalize os ajustes no módulo.</p>
+              </article>
             </div>
-
-            <div class="product-doc-hero-outcome-grid">
-              <article class="product-doc-hero-outcome-card is-primary">
-                <strong>Encontrar mais rápido</strong>
-                <p>Rack, slot, canal, tag, equipamento e IP no mesmo fluxo.</p>
-              </article>
-              <article class="product-doc-hero-outcome-card">
-                <strong>Atualizar sem refazer</strong>
-                <p>Edite dados técnicos sem reconstruir planilhas ou PDFs.</p>
-              </article>
-              <article class="product-doc-hero-outcome-card">
-                <strong>Evitar versões paralelas</strong>
-                <p>Menos Excel, print e anotação solta para manter.</p>
-              </article>
-              <article class="product-doc-hero-outcome-card">
-                <strong>Contexto técnico conectado</strong>
-                <p>Hardware, sinais, equipamentos e rede no mesmo registro.</p>
-              </article>
-            </div>
-
-            <div class="product-doc-chip-row product-doc-hero-meta-row">
-              <span class="product-doc-chip">IOs</span>
-              <span class="product-doc-chip">Listas de IP</span>
-              <span class="product-doc-chip">Acesso individual</span>
-            </div>
-
-            <div class="product-doc-actions product-doc-hero-actions">
-              {% if request.user.is_authenticated %}
-                {% if access_state == "trial_ativo" or access_state == "ativo" %}
-                  <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
-                  <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-                {% elif access_state == "expirado" or access_state == "bloqueado" %}
-                  <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-                {% else %}
-                  <a class="btn btn-primary" href="{{ activate_url }}">Testar gratuitamente</a>
-                  <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
-                {% endif %}
+          </div>
+          <div class="product-doc-actions product-doc-hero-cta-row">
+            {% if request.user.is_authenticated %}
+              {% if entitlement.has_access %}
+                <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
+              {% elif access_state == "disponivel" %}
+                <a class="btn btn-primary" href="{{ activate_url }}">Testar com planilha</a>
               {% else %}
-                <a class="btn btn-primary" href="{{ register_url }}">Testar gratuitamente</a>
-                <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
+                <a class="btn btn-primary" href="{{ plans_url }}">Ver planos</a>
               {% endif %}
-            </div>
-
-          </article>
+              <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+            {% else %}
+              <a class="btn btn-primary" href="{{ register_url }}">Testar com planilha</a>
+              <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
+            {% endif %}
+          </div>
         </div>
       </div>
     </section>
@@ -85,67 +77,45 @@
       </span>
     </a>
 
-    <section class="product-doc-post-hero-meta reveal-on-scroll">
-      <div class="product-doc-post-hero-line">
-        <span>Rack, sinais, equipamentos e rede no mesmo contexto técnico</span>
-      </div>
-    </section>
-
     <section id="product-doc-pain" class="product-doc-section product-doc-problem-section reveal-on-scroll">
       <div class="product-doc-section-head">
-        <h2>Se IOs e IPs vivem em Excel, PDF, print e anotações soltas, a documentação envelhece rápido.</h2>
-        <p class="product-doc-section-subtitle">O problema não é só formato. É perder contexto, revisar em duplicidade e nunca ter certeza de qual versão ainda vale.</p>
+        <h2>O problema não é só manter. É gastar tempo organizando o que já existe.</h2>
+        <p class="product-doc-section-subtitle">
+          Quando IOs e IPs ficam entre Excel, PDF, print e anotação solta, revisar vira retrabalho.
+        </p>
       </div>
       <div class="product-doc-problem-grid">
         <article class="product-doc-problem-card reveal-on-scroll">
-          <strong>Excel por fora</strong>
-          <p>Rack, slot e canal ficam em abas que ninguém sabe se ainda refletem o campo.</p>
+          <strong>Base espalhada e revisão duplicada</strong>
+          <p>Informação repartida em arquivos e registros paralelos, sem uma leitura confiável.</p>
         </article>
         <article class="product-doc-problem-card reveal-on-scroll">
-          <strong>PDF que envelhece</strong>
-          <p>O arquivo vira foto do passado e não acompanha ajuste, troca ou revisão de equipamento.</p>
-        </article>
-        <article class="product-doc-problem-card reveal-on-scroll">
-          <strong>Print e anotação solta</strong>
-          <p>Parte da informação fica no celular, no caderno ou no grupo e some do contexto técnico.</p>
-        </article>
-        <article class="product-doc-problem-card reveal-on-scroll">
-          <strong>Retrabalho para revisar</strong>
-          <p>Toda mudança exige caçar versão, copiar dado e validar de novo o que está certo.</p>
+          <strong>Recadastro lento e aplicação insegura</strong>
+          <p>Sem uma prévia clara, organizar e aplicar a estrutura exige mais tempo e mais conferência.</p>
         </article>
       </div>
     </section>
 
     <section id="product-doc-modules" class="product-doc-module-section reveal-on-scroll">
       <div class="product-doc-module-copy">
-        <div class="product-doc-kicker">Módulo IOs</div>
-        <h2>Encontre rack, slot e canal com leitura próxima do hardware real.</h2>
+        <div class="product-doc-kicker">Módulo IO</div>
+        <h2>Depois da importação, revise rack, slot, módulo e canal com leitura próxima do hardware.</h2>
         <p class="product-doc-module-subtitle">
-          Consulte a estrutura do rack e atualize tags, descrições e status sem depender de planilhas paralelas.
+          O preview acelera a entrada. No módulo de IO, a revisão segue no contexto certo do rack, com criação e ajuste direto quando necessário.
         </p>
         <div class="product-doc-module-benefits">
           <div class="product-doc-module-benefit">
-            <strong>Encontrar slot e módulo</strong>
-            <span>Veja rack, slot e canal sem procurar em abas separadas.</span>
+            <strong>Leitura por rack e slot</strong>
+            <span>Leitura próxima do hardware.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Atualizar tag e descrição</strong>
-            <span>Edite tag, descrição e status no mesmo lugar.</span>
+            <strong>Tags e descrições no mesmo fluxo</strong>
+            <span>Canal, tag e descrição no mesmo fluxo.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Consultar em campo</strong>
-            <span>Leve a leitura do hardware real para manutenção e comissionamento.</span>
+            <strong>Ajuste fino no módulo</strong>
+            <span>Validação, criação e ajuste no próprio fluxo.</span>
           </div>
-        </div>
-        <div class="product-doc-module-flow">
-          <div class="product-doc-flow-label">Fluxo de uso</div>
-          <ol class="product-doc-flow-list">
-            <li>Criar rack</li>
-            <li>Definir slots</li>
-            <li>Instalar módulos</li>
-            <li>Documentar canais</li>
-            <li>Consultar rack</li>
-          </ol>
         </div>
       </div>
 
@@ -163,6 +133,7 @@
               <button type="button" class="product-doc-rack-card is-ai is-active" data-rack-module-trigger="ai08" aria-pressed="true">
                 <div class="product-doc-led is-green"></div>
                 <div class="product-doc-rack-card-copy">
+                  <em class="product-doc-rack-card-slot">Slot 01</em>
                   <strong>AI-08</strong>
                   <span>Tipo AI</span>
                   <span>8 canais</span>
@@ -171,6 +142,7 @@
               <button type="button" class="product-doc-rack-card is-di" data-rack-module-trigger="di16" aria-pressed="false">
                 <div class="product-doc-led is-amber"></div>
                 <div class="product-doc-rack-card-copy">
+                  <em class="product-doc-rack-card-slot">Slot 02</em>
                   <strong>DI-16</strong>
                   <span>Tipo DI</span>
                   <span>16 canais</span>
@@ -179,6 +151,7 @@
               <button type="button" class="product-doc-rack-card is-do" data-rack-module-trigger="do16" aria-pressed="false">
                 <div class="product-doc-led is-amber"></div>
                 <div class="product-doc-rack-card-copy">
+                  <em class="product-doc-rack-card-slot">Slot 03</em>
                   <strong>DO-16</strong>
                   <span>Tipo DO</span>
                   <span>16 canais</span>
@@ -186,6 +159,7 @@
               </button>
               <div class="product-doc-rack-card is-empty" aria-hidden="true">
                 <div class="product-doc-rack-card-copy">
+                  <em class="product-doc-rack-card-slot">Slot 04</em>
                   <strong>Slot livre</strong>
                   <span>Selecione</span>
                   <span>um módulo</span>
@@ -279,130 +253,60 @@
       </div>
 
       <div class="product-doc-module-copy">
-        <div class="product-doc-kicker">Módulo Listas de IP</div>
-        <h2>Localize IP, equipamento, MAC e protocolo na mesma lógica do rack.</h2>
+        <div class="product-doc-kicker">Módulo IP</div>
+        <h2>A mesma lógica continua para rede, equipamentos e endereçamento.</h2>
         <p class="product-doc-module-subtitle">
-          Transforme a faixa de IP em inventário técnico consultável, com dados de rede mais fáceis de localizar e revisar.
+          A base importada também segue para a rede. Quando fizer mais sentido, o inventário continua direto no módulo.
         </p>
         <div class="product-doc-module-benefits">
           <div class="product-doc-module-benefit">
-            <strong>Localizar equipamento e IP</strong>
-            <span>Encontre faixa, IP e nome do equipamento com rapidez.</span>
+            <strong>Inventário mais consultável</strong>
+            <span>IP, equipamento e faixa no mesmo inventário.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Atualizar MAC e protocolo</strong>
-            <span>Revise dados técnicos sem refazer o inventário.</span>
+            <strong>Revisão de rede no mesmo fluxo</strong>
+            <span>Rede conectada ao restante da base técnica.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Evitar rede paralela</strong>
-            <span>Rede documentada no mesmo contexto do restante da planta.</span>
+            <strong>Continuidade após a entrada</strong>
+            <span>Importado ou iniciado no módulo, o inventário segue no mesmo fluxo.</span>
           </div>
-        </div>
-        <div class="product-doc-module-flow">
-          <div class="product-doc-flow-label">Fluxo de uso</div>
-          <ol class="product-doc-flow-list">
-            <li>Criar faixa</li>
-            <li>Gerar IPs</li>
-            <li>Pesquisar itens</li>
-            <li>Editar dados</li>
-            <li>Manter inventário</li>
-          </ol>
         </div>
       </div>
     </section>
 
-    <div class="product-doc-linked-panels">
-      <section class="card product-doc-merge reveal-on-scroll">
-        <div class="product-doc-section-head">
-          <div class="product-doc-kicker">Por que os dois juntos</div>
-          <h2>O produto fecha o contexto técnico entre hardware e rede.</h2>
-          <p class="product-doc-section-subtitle">Não são dois módulos soltos. É uma documentação operacional única.</p>
+    <section class="product-doc-final-cta reveal-on-scroll">
+      <div class="product-doc-final-copy">
+        <h2>Comece pela planilha que já existe ou crie um novo rack manualmente.</h2>
+        <p>Importe quando a base já estiver pronta, revise antes de aplicar e continue o trabalho no fluxo certo.</p>
+        <div class="product-doc-final-signal-row" aria-label="Resumo de valor">
+          <span class="product-doc-final-signal">Sem recadastro do zero</span>
+          <span class="product-doc-final-signal">Prévia antes da aplicação</span>
+          <span class="product-doc-final-signal">Continuidade direta no módulo</span>
         </div>
-        <div class="product-doc-merge-bar">
-          <span>Centralização, rastreabilidade e atualização no mesmo fluxo técnico.</span>
-        </div>
-      </section>
-
-      <section class="card product-doc-solution product-doc-solution-linked reveal-on-scroll">
-        <div class="product-doc-solution-layout">
-          <article class="product-doc-solution-side">
-            <div class="product-doc-solution-label">IOs</div>
-            <strong>Rack, módulos e canais</strong>
-          </article>
-          <div class="product-doc-solution-bridge">
-            <span>Fluxo técnico único</span>
-          </div>
-          <article class="product-doc-solution-side">
-            <div class="product-doc-solution-label">Listas de IP</div>
-            <strong>Faixa, equipamento e protocolo</strong>
-          </article>
-        </div>
-      </section>
-    </div>
-
-    <section class="product-doc-scenarios reveal-on-scroll">
-      <div class="product-doc-section-head">
-        <h2>Onde o produto faz sentido no dia a dia.</h2>
       </div>
-      <div class="product-doc-scenario-grid">
-        <article class="product-doc-scenario-card reveal-on-scroll">
-          <strong>Comissionamento</strong>
-          <p>Apoia testes e validação em campo.</p>
-        </article>
-        <article class="product-doc-scenario-card reveal-on-scroll">
-          <strong>Manutenção</strong>
-          <p>Facilita consulta técnica e revisão.</p>
-        </article>
-        <article class="product-doc-scenario-card reveal-on-scroll">
-          <strong>Revisão técnica</strong>
-          <p>Ajuda a manter a documentação atualizada.</p>
-        </article>
-        <article class="product-doc-scenario-card reveal-on-scroll">
-          <strong>Inventário industrial</strong>
-          <p>Padroniza a rede e seus equipamentos.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="card product-doc-trial reveal-on-scroll">
-      <div class="product-doc-trial-layout">
-        <div class="product-doc-section-head">
-          <div class="product-doc-kicker">Teste por 30 dias</div>
-          <h2>Teste o produto real com um fluxo simples.</h2>
-          <p class="product-doc-section-subtitle">Acesso individual por usuário. Sem checkout nesta etapa.</p>
-        </div>
-        <div class="product-doc-trial-side">
-          <div class="product-doc-trial-path">
-            <div class="product-doc-trial-grid">
-              <article class="product-doc-trial-card reveal-on-scroll">
-                <strong>1. Crie conta ou entre</strong>
-              </article>
-              <article class="product-doc-trial-card reveal-on-scroll">
-                <strong>2. Ative o trial</strong>
-              </article>
-              <article class="product-doc-trial-card reveal-on-scroll">
-                <strong>3. Acesse os módulos</strong>
-              </article>
-            </div>
-          </div>
-          <div class="product-doc-actions is-trial">
+      <div class="product-doc-final-actions">
+        <div class="product-doc-final-action-panel">
+          <strong>Entre pela planilha ou pelo módulo</strong>
+          <span class="product-doc-final-action-copy">Importação assistida quando houver base pronta, com liberdade para montar e ajustar direto no fluxo.</span>
+          <div class="product-doc-actions">
             {% if request.user.is_authenticated %}
-              {% if access_state == "trial_ativo" or access_state == "ativo" %}
+              {% if entitlement.has_access %}
                 <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
-              {% elif access_state == "expirado" or access_state == "bloqueado" %}
-                <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
+              {% elif access_state == "disponivel" %}
+                <a class="btn btn-primary" href="{{ activate_url }}">Testar com planilha</a>
               {% else %}
-                <a class="btn btn-primary" href="{{ activate_url }}">Testar gratuitamente</a>
+                <a class="btn btn-primary" href="{{ plans_url }}">Ver planos</a>
               {% endif %}
+              <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
             {% else %}
-              <a class="btn btn-primary" href="{{ register_url }}">Testar gratuitamente</a>
+              <a class="btn btn-primary" href="{{ register_url }}">Testar com planilha</a>
               <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
             {% endif %}
           </div>
         </div>
       </div>
     </section>
-
   </section>
 {% endblock %}
 
@@ -412,20 +316,6 @@
     (() => {
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const reveals = document.querySelectorAll(".page-product-doc .reveal-on-scroll:not(.is-visible)");
-      const scrollCue = document.querySelector("[data-scroll-cue]");
-
-      if (scrollCue) {
-        const syncScrollCue = () => {
-          scrollCue.classList.toggle("is-hidden", window.scrollY > 48);
-        };
-
-        syncScrollCue();
-        window.addEventListener("scroll", syncScrollCue, { passive: true });
-
-        scrollCue.addEventListener("click", () => {
-          scrollCue.classList.add("is-hidden");
-        });
-      }
 
       if (reduceMotion) {
         reveals.forEach((node) => node.classList.add("is-visible"));
@@ -444,11 +334,62 @@
         reveals.forEach((node) => observer.observe(node));
       }
 
+      const scrollCue = document.querySelector("[data-scroll-cue]");
+      if (scrollCue) {
+        const syncScrollCue = () => {
+          scrollCue.classList.toggle("is-hidden", window.scrollY > 48);
+        };
+
+        syncScrollCue();
+        window.addEventListener("scroll", syncScrollCue, { passive: true });
+
+        scrollCue.addEventListener("click", () => {
+          scrollCue.classList.add("is-hidden");
+        });
+      }
+
+      const stageGroups = document.querySelectorAll("[data-stage-group]");
+      stageGroups.forEach((group) => {
+        const stages = Array.from(group.querySelectorAll("[data-import-stage]"));
+        if (!stages.length) return;
+        let activeIndex = 0;
+        window.setInterval(() => {
+          stages[activeIndex].classList.remove("is-active");
+          activeIndex = (activeIndex + 1) % stages.length;
+          stages[activeIndex].classList.add("is-active");
+        }, 2200);
+      });
+
+      const journeyFlow = document.querySelector("[data-journey-flow]");
+      if (journeyFlow) {
+        const nodes = Array.from(journeyFlow.querySelectorAll("[data-journey-node]"));
+        const progressPositions = ["4%", "34%", "64%", "92%"];
+
+        const syncJourneyFlow = (index) => {
+          nodes.forEach((node, nodeIndex) => {
+            node.classList.toggle("is-flow", nodeIndex === index);
+          });
+          const progress = progressPositions[index] || progressPositions[0];
+          journeyFlow.style.setProperty("--product-doc-journey-progress", progress);
+        };
+
+        syncJourneyFlow(0);
+
+        if (!reduceMotion && nodes.length > 1) {
+          let journeyIndex = 0;
+          window.setInterval(() => {
+            journeyIndex = (journeyIndex + 1) % nodes.length;
+            syncJourneyFlow(journeyIndex);
+          }, 2400);
+        }
+      }
+
       const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
       const rackDemo = document.querySelector("[data-rack-demo]");
       if (rackDemo) {
         const rackTriggers = Array.from(rackDemo.querySelectorAll("[data-rack-module-trigger]"));
+        const rackTrack = rackDemo.querySelector(".product-doc-rack-detail-grid");
         const rackPanelShell = rackDemo.querySelector("[data-rack-panel-shell]");
         const rackPanel = rackDemo.querySelector("[data-rack-panel]");
         const rackTitle = rackDemo.querySelector("[data-rack-active-title]");
@@ -477,7 +418,7 @@
             title: "DO-16",
             meta: "SLOT 03 · Tipo DO · 16 canais",
             rows: [
-              ["Canal 1", "SV-11", "Válvula solenóide", "DO"],
+              ["Canal 1", "SV-11", "Válvula solenoide", "DO"],
               ["Canal 2", "KM-21", "Contato do motor", "DO"],
               ["Canal 3", "RL-31", "Relé de alarme", "DO"]
             ]
@@ -537,6 +478,16 @@
             commit();
             if (rackPanel) rackPanel.classList.remove("is-switching");
           }
+
+          if (window.matchMedia("(max-width: 640px)").matches) {
+            if (rackTrack) {
+              const targetLeft = trigger.offsetLeft - ((rackTrack.clientWidth - trigger.clientWidth) / 2);
+              rackTrack.scrollTo({
+                left: Math.max(0, targetLeft),
+                behavior: animated && !reduceMotion ? "smooth" : "auto"
+              });
+            }
+          }
         };
 
         const queueRackAutoplay = () => {
@@ -562,6 +513,13 @@
           const activeTrigger = rackTriggers.find((node) => node.dataset.rackModuleTrigger === activeRackId);
           setRackAnchor(activeTrigger);
         });
+
+        if (rackTrack) {
+          rackTrack.addEventListener("scroll", () => {
+            const activeTrigger = rackTriggers.find((node) => node.dataset.rackModuleTrigger === activeRackId);
+            setRackAnchor(activeTrigger);
+          }, { passive: true });
+        }
 
         renderRackModule(activeRackId, { animated: false });
         queueRackAutoplay();

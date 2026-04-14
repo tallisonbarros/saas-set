@@ -16,14 +16,20 @@
 {% block content %}
   <div class="radar-export-modal is-open" id="ios-rack-new-modal">
     <a class="radar-export-modal-backdrop" href="{% url 'ios_list' %}" aria-label="Fechar"></a>
-    <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ios-rack-new-title">
-      <header class="radar-export-modal-head">
-        <h2 id="ios-rack-new-title">Novo rack</h2>
-        <a class="btn btn-outline btn-compact" href="{% url 'ios_list' %}">Fechar</a>
-      </header>
-      <div class="radar-export-modal-body">
-        {% if can_manage %}
-          <form class="io-form" method="post">
+      <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ios-rack-new-title">
+        <header class="radar-export-modal-head">
+          <h2 id="ios-rack-new-title">Novo rack</h2>
+          <a class="btn btn-outline btn-compact" href="{% url 'ios_list' %}">Fechar</a>
+        </header>
+        <div class="radar-export-modal-body">
+          {% if commercial_status.plan_badge.visible %}
+            <div class="notice notice-{{ commercial_status.plan_badge.tone }} io-commercial-notice">{{ commercial_status.plan_badge.label }}</div>
+          {% endif %}
+          {% if message %}
+            <div class="notice notice-{{ message_level }}">{{ message }}</div>
+          {% endif %}
+          {% if can_manage %}
+            <form class="io-form" method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="create_rack">
             <div class="io-form-grid">

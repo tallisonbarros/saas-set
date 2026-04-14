@@ -39,10 +39,13 @@ from .models import (
     CanalRackIO,
     CategoriaCompra,
     Caderno,
+    ConfiguracaoPagamento,
     CentroCusto,
     PerfilUsuario,
     Compra,
     CompraItem,
+    AssinaturaUsuario,
+    EventoPagamentoWebhook,
     GrupoRackIO,
     IPImportJob,
     IPImportSettings,
@@ -64,6 +67,7 @@ from .models import (
     IOImportJob,
     IOImportSettings,
     AdminAccessLog,
+    PlanoComercial,
     ProdutoPlataforma,
     SystemConfiguration,
     Radar,
@@ -88,6 +92,16 @@ from .models import (
     Ativo,
     AtivoItem,
     TipoAtivo,
+)
+from .services.billing import (
+    DOCUMENTATION_PRODUCT_CODE,
+    activate_starter_plan,
+    activate_trial,
+    count_user_racks,
+    ensure_billing_catalog,
+    payment_config,
+    resolve_entitlement,
+    start_professional_checkout,
 )
 from .services.io_import import (
     DEFAULT_GROUPING_PROMPT,
@@ -151,6 +165,9 @@ def _build_module_signal_badges(user, cliente):
         ios_count = 0
         listas_ip_count = 0
         radar_count = 0
+    documentation_entitlement = resolve_entitlement(user, DOCUMENTATION_PRODUCT_CODE)
+    commercial_badge_label = documentation_entitlement.get("badge_label") or ""
+    commercial_badge_tone = documentation_entitlement.get("badge_tone") or "info"
     badges = {
         "propostas": {
             "count": propostas_aprovar_count,
@@ -164,6 +181,8 @@ def _build_module_signal_badges(user, cliente):
             "visible": ios_count > 0,
             "label": f"{ios_count} rack{'s' if ios_count != 1 else ''}",
             "tone": "info",
+            "commercial_label": commercial_badge_label,
+            "commercial_tone": commercial_badge_tone,
         },
         "inventarios": {"count": 0, "visible": False, "label": "", "tone": "info"},
         "listas_ip": {
@@ -171,6 +190,8 @@ def _build_module_signal_badges(user, cliente):
             "visible": listas_ip_count > 0,
             "label": f"{listas_ip_count} lista{'s' if listas_ip_count != 1 else ''}",
             "tone": "info",
+            "commercial_label": commercial_badge_label,
+            "commercial_tone": commercial_badge_tone,
         },
         "radar": {
             "count": radar_count,
@@ -507,19 +528,96 @@ def _get_safe_next_url(request, fallback="painel"):
 
 
 def _documentacao_tecnica_product():
-    produto, _ = ProdutoPlataforma.objects.get_or_create(
-        codigo="DOCUMENTACAO_TECNICA",
-        defaults={
-            "nome": "Documentacao tecnica",
-            "descricao": "Acesso conjunto aos modulos de IOs e Listas de IP.",
-            "ativo": True,
-        },
+    try:
+        return ensure_billing_catalog()
+    except DatabaseError:
+        return None
+
+
+def _documentacao_tecnica_entitlement_fallback():
+    return {
+        "product": None,
+        "starter_plan": None,
+        "professional_plan": None,
+        "subscription": None,
+        "access": None,
+        "current_plan": None,
+        "status": "disponivel",
+        "has_access": False,
+        "requires_plan_selection": False,
+        "trial_days_remaining": None,
+        "rack_count": 0,
+        "starter_limit": 0,
+        "starter_available": True,
+        "starter_excess": 0,
+        "badge_label": "",
+        "badge_tone": "info",
+        "legacy_manual_access": False,
+    }
+
+
+def _resolve_documentacao_entitlement_safe(user):
+    try:
+        return resolve_entitlement(user, DOCUMENTATION_PRODUCT_CODE)
+    except DatabaseError:
+        return _documentacao_tecnica_entitlement_fallback()
+
+
+def _redirect_documentacao_tecnica_billing_unavailable(next_url=None):
+    query = {}
+    if next_url:
+        query["next"] = next_url
+    response = redirect(
+        f"{reverse('produto_documentacao_tecnica')}{f'?{urlencode(query)}' if query else ''}"
     )
-    return produto
+    response.set_cookie(
+        "product_checkout_notice",
+        "Recursos comerciais indisponiveis neste ambiente atual.",
+        max_age=20,
+    )
+    return response
 
 
 def _documentacao_tecnica_entry_url():
     return reverse("ios_list")
+
+
+def _platform_plans_url(next_url=None, state=None):
+    query = {}
+    if next_url:
+        query["next"] = next_url
+    if state:
+        query["state"] = state
+    return f"{reverse('produtos_planos')}{f'?{urlencode(query)}' if query else ''}"
+
+
+def _documentacao_tecnica_plans_url(next_url=None, state=None):
+    return _platform_plans_url(next_url=next_url, state=state)
+
+
+def _payment_checkout_default_urls(request):
+    return {
+        "success": request.build_absolute_uri(reverse("pagamento_checkout_sucesso")),
+        "failure": request.build_absolute_uri(reverse("pagamento_checkout_falha")),
+        "pending": request.build_absolute_uri(reverse("pagamento_checkout_pendente")),
+    }
+
+
+def _ensure_payment_checkout_urls(request, settings_obj):
+    defaults = _payment_checkout_default_urls(request)
+    updated_fields = []
+    if not (settings_obj.checkout_success_url or "").strip():
+        settings_obj.checkout_success_url = defaults["success"]
+        updated_fields.append("checkout_success_url")
+    if not (settings_obj.checkout_failure_url or "").strip():
+        settings_obj.checkout_failure_url = defaults["failure"]
+        updated_fields.append("checkout_failure_url")
+    if not (settings_obj.checkout_pending_url or "").strip():
+        settings_obj.checkout_pending_url = defaults["pending"]
+        updated_fields.append("checkout_pending_url")
+    if updated_fields:
+        settings_obj.save(update_fields=updated_fields + ["updated_at"])
+    return defaults
 
 
 def _parse_local_date_boundary(value, end=False):
@@ -538,20 +636,21 @@ def _parse_local_date_boundary(value, end=False):
 
 
 def _user_documentacao_access_state(user):
-    product_code = "DOCUMENTACAO_TECNICA"
-    if user_has_product_access(user, product_code):
-        access = get_user_product_access(user, product_code)
-        if access and access.status == AcessoProdutoUsuario.Status.TRIAL_ATIVO:
-            return "trial_ativo", access
-        return "ativo", access
-    access = get_user_product_access(user, product_code)
-    if not access:
-        return "disponivel", None
-    if access.status == AcessoProdutoUsuario.Status.EXPIRADO:
-        return "expirado", access
-    if access.status == AcessoProdutoUsuario.Status.BLOQUEADO:
-        return "bloqueado", access
-    return "disponivel", access
+    entitlement = _resolve_documentacao_entitlement_safe(user)
+    subscription = entitlement.get("subscription")
+    access = entitlement.get("access")
+    status_map = {
+        "trial_active": "trial_ativo",
+        "plan_active": "ativo",
+        "legacy_active": "ativo",
+        "trial_expired": "expirado",
+        "blocked": "bloqueado",
+        "starter_blocked_by_usage": "starter_bloqueado",
+        "requires_plan_selection": "disponivel",
+        "admin_access": "ativo",
+        "anonymous": "disponivel",
+    }
+    return status_map.get(entitlement.get("status"), "disponivel"), subscription or access
 
 
 def _build_product_access_rows(user):
@@ -569,14 +668,55 @@ def _build_product_access_rows(user):
 def _require_internal_module_access(request, module_code):
     product_code = resolve_commercial_product_code(module_code)
     if product_code:
-        if user_has_product_access(request.user, product_code):
+        entitlement = resolve_entitlement(request.user, product_code)
+        if entitlement.get("has_access"):
             return None
         state, _ = _user_documentacao_access_state(request.user)
-        query = urlencode({"state": state, "next": request.path})
-        return redirect(f"{reverse('produto_documentacao_tecnica')}?{query}")
+        return redirect(_documentacao_tecnica_plans_url(next_url=request.path, state=state))
     if can_access_internal_module(request.user, module_code):
         return None
     return HttpResponseForbidden("Sem permissao.")
+
+
+def _documentacao_tecnica_plan_badge(user):
+    entitlement = resolve_entitlement(user, DOCUMENTATION_PRODUCT_CODE)
+    label = entitlement.get("badge_label") or ""
+    if not label:
+        return {"visible": False, "label": "", "tone": "info"}
+    return {
+        "visible": True,
+        "label": label,
+        "tone": entitlement.get("badge_tone") or "info",
+    }
+
+
+def _documentacao_tecnica_status_context(user):
+    entitlement = resolve_entitlement(user, DOCUMENTATION_PRODUCT_CODE)
+    return {
+        "entitlement": entitlement,
+        "plan_badge": _documentacao_tecnica_plan_badge(user),
+    }
+
+
+def _starter_limit_error_message(user, product_code=DOCUMENTATION_PRODUCT_CODE):
+    entitlement = resolve_entitlement(user, product_code)
+    return (
+        f"O plano Iniciante permite ate {entitlement['starter_limit']} racks simultaneos. "
+        f"Sua conta possui {entitlement['rack_count']} racks. "
+        "Exclua racks para liberar este plano ou siga com o Profissional."
+    )
+
+
+def _can_create_more_racks(user, increment=1, product_code=DOCUMENTATION_PRODUCT_CODE):
+    entitlement = resolve_entitlement(user, product_code)
+    if not entitlement.get("has_access"):
+        return False, "Escolha um plano para continuar usando o modulo."
+    current_plan = entitlement.get("current_plan")
+    if current_plan and current_plan.codigo == PlanoComercial.Codigo.STARTER:
+        limit = entitlement["starter_limit"]
+        if entitlement["rack_count"] + increment > limit:
+            return False, _starter_limit_error_message(user, product_code=product_code)
+    return True, ""
 
 
 def _create_grupo_payload(request, cliente):
@@ -945,6 +1085,73 @@ def _json_error_response(message, status=400, **extra):
     return JsonResponse(payload, status=status)
 
 
+def _io_import_user_message(user, detailed_message, generic_message=None):
+    if _is_dev_user(user):
+        return detailed_message
+    return generic_message or "Nao foi possivel concluir a importacao de IO. Revise o arquivo e tente novamente."
+
+
+def _initial_io_import_progress_payload(filename=""):
+    return {
+        "stage": "upload",
+        "percent": 4,
+        "title": "Arquivo recebido",
+        "message": (
+            f"{filename} foi recebido e a analise da planilha esta sendo iniciada."
+            if filename
+            else "O arquivo foi recebido e a analise da planilha esta sendo iniciada."
+        ),
+        "progress_label": "Arquivo recebido",
+        "snapshots": [],
+        "sheets_total": 0,
+        "sheets_processed": 0,
+    }
+
+
+def _failed_io_import_progress_payload(message, existing_payload=None):
+    payload = dict(existing_payload or {})
+    payload.update(
+        {
+            "stage": payload.get("stage") or "preview",
+            "title": "Analise interrompida",
+            "message": "A analise nao conseguiu ser concluida. Revise o arquivo e tente novamente.",
+        }
+    )
+    payload["failed"] = True
+    return payload
+
+
+def _save_io_import_progress(job, payload):
+    progress_payload = dict(payload or {})
+    IOImportJob.objects.filter(pk=job.pk).update(progress_payload=progress_payload, updated_at=timezone.now())
+    job.progress_payload = progress_payload
+    return progress_payload
+
+
+def _build_io_import_status_progress(job):
+    payload = dict(job.progress_payload or {})
+    if not payload:
+        payload = _initial_io_import_progress_payload(job.original_filename)
+    stage = (payload.get("stage") or "upload").lower()
+    percent = max(0, min(int(payload.get("percent") or 0), 100))
+    stage_order = ["upload", "parse", "ai", "preview"]
+    current_index = stage_order.index(stage) if stage in stage_order else 0
+    steps = {}
+    for index, step_name in enumerate(stage_order):
+        if job.status in {IOImportJob.Status.REVIEW, IOImportJob.Status.APPLIED}:
+            state = "done"
+        elif job.status == IOImportJob.Status.FAILED:
+            state = "done" if index < current_index else "active" if index == current_index else "idle"
+        else:
+            state = "done" if index < current_index else "active" if index == current_index else "idle"
+        steps[step_name] = state
+    payload["stage"] = stage
+    payload["percent"] = percent
+    payload["steps"] = steps
+    payload["snapshots"] = list(payload.get("snapshots") or [])[:3]
+    return payload
+
+
 def _spawn_io_import_job_processor(job_id):
     manage_py = Path(settings.BASE_DIR) / "manage.py"
     env = os.environ.copy()
@@ -955,6 +1162,24 @@ def _spawn_io_import_job_processor(job_id):
         env=env,
         start_new_session=True,
     )
+
+
+def _spawn_io_import_job_processor_safe(job_id):
+    try:
+        _spawn_io_import_job_processor(job_id)
+    except Exception as exc:
+        logger.exception("Failed to spawn IO import background processor", extra={"job_id": job_id})
+        job = IOImportJob.objects.filter(pk=job_id).first()
+        if not job:
+            return
+        job.status = IOImportJob.Status.FAILED
+        job.ai_status = IOImportJob.AIStatus.FAILED
+        job.ai_error = str(exc)
+        warnings = list(job.warnings or [])
+        warnings.append(f"Falha interna ao iniciar o processamento em segundo plano: {exc}")
+        job.warnings = warnings
+        job.progress_payload = _failed_io_import_progress_payload(str(exc), job.progress_payload)
+        job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
 
 
 def _io_import_settings():
@@ -1191,7 +1416,25 @@ def _build_io_import_job_queryset(request, cliente):
 def _reprocess_io_import_job(job):
     settings_obj = _io_import_settings()
     module_catalog = serialize_module_catalog(_io_import_module_catalog(job.cliente))
-    result = reprocess_import_job(job=job, module_catalog=module_catalog, settings_obj=settings_obj)
+    _save_io_import_progress(
+        job,
+        {
+            "stage": "parse",
+            "percent": 10,
+            "title": "Leitura estrutural iniciada",
+            "message": "A planilha foi aberta e as guias da importacao estao sendo organizadas.",
+            "progress_label": "Leitura estrutural",
+            "snapshots": [],
+            "sheets_total": 0,
+            "sheets_processed": 0,
+        },
+    )
+    result = reprocess_import_job(
+        job=job,
+        module_catalog=module_catalog,
+        settings_obj=settings_obj,
+        progress_callback=lambda payload: _save_io_import_progress(job, payload),
+    )
     job.file_format = result["file_format"]
     job.sheet_name = result["sheet_name"]
     job.header_row_index = result["header_row_index"]
@@ -1203,6 +1446,7 @@ def _reprocess_io_import_job(job):
     job.warnings = result["warnings"]
     job.ai_status = result["ai_status"]
     job.ai_payload = result["ai_payload"]
+    job.progress_payload = result.get("progress_payload") or job.progress_payload
     job.ai_error = result["ai_error"]
     job.ai_model = result["ai_model"]
     job.status = IOImportJob.Status.FAILED if result["proposal"].get("conflicts") else IOImportJob.Status.REVIEW
@@ -1216,12 +1460,13 @@ def _reprocess_io_import_job(job):
             "column_map",
             "extracted_payload",
             "proposal_payload",
-            "warnings",
-            "ai_status",
-            "ai_payload",
-            "ai_error",
-            "ai_model",
-            "status",
+              "warnings",
+              "ai_status",
+              "ai_payload",
+              "progress_payload",
+              "ai_error",
+              "ai_model",
+              "status",
             "updated_at",
         ]
     )
@@ -2671,6 +2916,7 @@ def produto_documentacao_tecnica(request):
     state = (request.GET.get("state") or "").strip().lower()
     requested_next = _get_safe_next_url(request, fallback="ios_list")
     entry_url = _documentacao_tecnica_entry_url()
+    plans_url = _documentacao_tecnica_plans_url(next_url=requested_next, state=state or None)
     activate_url = reverse("produto_documentacao_tecnica_ativar")
     if requested_next:
         activate_url = f"{activate_url}?{urlencode({'next': requested_next})}"
@@ -2679,21 +2925,34 @@ def produto_documentacao_tecnica(request):
 
     access_state = "disponivel"
     access = None
+    entitlement = _resolve_documentacao_entitlement_safe(request.user if request.user.is_authenticated else None)
     if request.user.is_authenticated:
         access_state, access = _user_documentacao_access_state(request.user)
         if not state:
-            state = access_state
+            state = {
+                "starter_bloqueado": "starter_bloqueado",
+            }.get(access_state, access_state)
     state = state or "disponivel"
+
+    if state in {"required", "expirado", "bloqueado", "starter_bloqueado"}:
+        return redirect(_documentacao_tecnica_plans_url(next_url=requested_next, state=state))
 
     message = None
     message_level = "info"
+    checkout_notice = (request.COOKIES.get("product_checkout_notice") or "").strip()
     if state == "required":
         message = "Ative o trial para liberar IOs e Listas de IP."
     elif state == "expirado":
-        message = "Seu trial de 30 dias terminou. Entre em contato para liberar o produto novamente."
+        message = "Seu trial terminou. Escolha um plano para continuar usando IOs e Listas de IP."
         message_level = "warning"
     elif state == "bloqueado":
         message = "Seu acesso a este produto esta bloqueado no momento."
+        message_level = "warning"
+    elif state == "starter_bloqueado":
+        message = _starter_limit_error_message(request.user)
+        message_level = "warning"
+    if checkout_notice:
+        message = checkout_notice
         message_level = "warning"
 
     return render(
@@ -2703,7 +2962,9 @@ def produto_documentacao_tecnica(request):
             "produto": produto,
             "access": access,
             "access_state": access_state,
+            "entitlement": entitlement,
             "entry_url": entry_url,
+            "plans_url": plans_url,
             "activate_url": activate_url,
             "login_url": login_url,
             "register_url": register_url,
@@ -2714,33 +2975,197 @@ def produto_documentacao_tecnica(request):
     )
 
 
-@login_required
-def produto_documentacao_tecnica_ativar(request):
+def produto_documentacao_tecnica_planos(request):
     produto = _documentacao_tecnica_product()
-    entry_url = _get_safe_next_url(request, fallback="ios_list")
-    access_state, access = _user_documentacao_access_state(request.user)
-    if access_state in {"trial_ativo", "ativo"}:
-        return redirect(entry_url)
-    if access_state in {"expirado", "bloqueado"}:
-        query = urlencode({"state": access_state})
-        return redirect(f"{reverse('produto_documentacao_tecnica')}?{query}")
+    state = (request.GET.get("state") or "").strip().lower()
+    requested_next = _get_safe_next_url(request, fallback="ios_list")
+    entry_url = _documentacao_tecnica_entry_url()
+    activate_url = reverse("produto_documentacao_tecnica_ativar")
+    if requested_next:
+        activate_url = f"{activate_url}?{urlencode({'next': requested_next})}"
+    login_url = f"{reverse('login')}?{urlencode({'next': activate_url})}"
+    register_url = f"{reverse('register')}?{urlencode({'next': activate_url})}"
 
-    now = timezone.now()
-    trial_end = now + timedelta(days=TRIAL_DURATION_DAYS)
-    AcessoProdutoUsuario.objects.update_or_create(
-        usuario=request.user,
-        produto=produto,
-        defaults={
-            "origem": AcessoProdutoUsuario.Origem.TRIAL,
-            "status": AcessoProdutoUsuario.Status.TRIAL_ATIVO,
-            "trial_inicio": now,
-            "trial_fim": trial_end,
-            "acesso_inicio": now,
-            "acesso_fim": None,
-            "observacao": "Trial iniciado pela landing de Documentacao tecnica.",
+    access_state = "disponivel"
+    access = None
+    entitlement = _resolve_documentacao_entitlement_safe(request.user if request.user.is_authenticated else None)
+    if request.user.is_authenticated:
+        access_state, access = _user_documentacao_access_state(request.user)
+        if not state:
+            state = {
+                "starter_bloqueado": "starter_bloqueado",
+            }.get(access_state, access_state)
+    state = state or "disponivel"
+
+    message = None
+    message_level = "info"
+    checkout_notice = (request.COOKIES.get("product_checkout_notice") or "").strip()
+    if state == "required":
+        message = "Ative o trial para liberar IOs e Listas de IP."
+    elif state == "expirado":
+        message = "Seu trial terminou. Escolha um plano para continuar usando IOs e Listas de IP."
+        message_level = "warning"
+    elif state == "bloqueado":
+        message = "Seu acesso a este produto esta bloqueado no momento."
+        message_level = "warning"
+    elif state == "starter_bloqueado":
+        message = _starter_limit_error_message(request.user)
+        message_level = "warning"
+    if checkout_notice:
+        message = checkout_notice
+        message_level = "warning"
+
+    return render(
+        request,
+        "core/produto_documentacao_tecnica_planos.html",
+        {
+            "produto": produto,
+            "access": access,
+            "access_state": access_state,
+            "entitlement": entitlement,
+            "entry_url": entry_url,
+            "landing_url": reverse("produto_documentacao_tecnica"),
+            "activate_url": activate_url,
+            "login_url": login_url,
+            "register_url": register_url,
+            "requested_next": requested_next,
+            "message": message,
+            "message_level": message_level,
         },
     )
+
+
+def produto_documentacao_tecnica_planos_legacy(request):
+    requested_next = _get_safe_next_url(request, fallback="ios_list")
+    state = (request.GET.get("state") or "").strip().lower() or None
+    return redirect(_platform_plans_url(next_url=requested_next, state=state))
+
+
+@login_required
+def produto_documentacao_tecnica_ativar(request):
+    entry_url = _get_safe_next_url(request, fallback="ios_list")
+    if not _documentacao_tecnica_product():
+        return _redirect_documentacao_tecnica_billing_unavailable(entry_url)
+    access_state, _ = _user_documentacao_access_state(request.user)
+    if access_state in {"trial_ativo", "ativo"}:
+        return redirect(entry_url)
+    if access_state in {"expirado", "bloqueado", "starter_bloqueado"}:
+        return redirect(_documentacao_tecnica_plans_url(next_url=entry_url, state=access_state))
+    activate_trial(request.user, DOCUMENTATION_PRODUCT_CODE)
     return redirect(entry_url)
+
+
+@login_required
+@require_POST
+def produto_documentacao_tecnica_ativar_starter(request):
+    next_url = _get_safe_next_url(request, fallback="ios_list")
+    if not _documentacao_tecnica_product():
+        return _redirect_documentacao_tecnica_billing_unavailable(next_url)
+    subscription, error = activate_starter_plan(request.user, DOCUMENTATION_PRODUCT_CODE)
+    if error:
+        return redirect(_documentacao_tecnica_plans_url(next_url=next_url, state="starter_bloqueado"))
+    if subscription:
+        return redirect(next_url)
+    return redirect("produtos_planos")
+
+
+@login_required
+@require_POST
+def produto_documentacao_tecnica_checkout_professional(request):
+    next_url = _get_safe_next_url(request, fallback="ios_list")
+    if not _documentacao_tecnica_product():
+        return _redirect_documentacao_tecnica_billing_unavailable(next_url)
+    interval = (request.POST.get("interval") or request.GET.get("interval") or AssinaturaUsuario.BillingInterval.MONTHLY).strip().upper()
+    if interval not in AssinaturaUsuario.BillingInterval.values:
+        interval = AssinaturaUsuario.BillingInterval.MONTHLY
+    subscription, error = start_professional_checkout(
+        request.user,
+        billing_interval=interval,
+        product_code=DOCUMENTATION_PRODUCT_CODE,
+    )
+    if error:
+        response = redirect(_documentacao_tecnica_plans_url(next_url=next_url, state="expirado"))
+        response.set_cookie("product_checkout_notice", error, max_age=20)
+        return response
+    if subscription and subscription.checkout_url:
+        return redirect(subscription.checkout_url)
+    response = redirect(_documentacao_tecnica_plans_url(next_url=next_url, state="expirado"))
+    response.set_cookie(
+        "product_checkout_notice",
+        "Assinatura profissional iniciada. Finalize o checkout quando a integracao estiver habilitada.",
+        max_age=20,
+    )
+    return response
+
+
+@csrf_exempt
+def mercado_pago_webhook(request):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    payload = {}
+    try:
+        payload = json.loads((request.body or b"{}").decode("utf-8"))
+    except (TypeError, ValueError, UnicodeDecodeError):
+        payload = {}
+    external_id = str(payload.get("id") or payload.get("data", {}).get("id") or timezone.now().timestamp()).strip()
+    event_type = str(payload.get("type") or payload.get("action") or "unknown").strip()
+    event, created = EventoPagamentoWebhook.objects.get_or_create(
+        provider=ConfiguracaoPagamento.Provider.MERCADO_PAGO,
+        external_id=external_id,
+        defaults={
+            "event_type": event_type,
+            "raw_payload": payload,
+            "processed": False,
+        },
+    )
+    if not created:
+        event.event_type = event_type or event.event_type
+        event.raw_payload = payload
+        event.save(update_fields=["event_type", "raw_payload"])
+    event.processed = True
+    event.processed_at = timezone.now()
+    event.processing_error = ""
+    event.save(update_fields=["processed", "processed_at", "processing_error"])
+    return JsonResponse({"ok": True})
+
+
+def pagamento_checkout_sucesso(request):
+    return render(
+        request,
+        "core/pagamento_checkout_status.html",
+        {
+            "status_code": "sucesso",
+            "status_title": "Pagamento confirmado",
+            "status_message": "Sua assinatura foi confirmada com sucesso. Se a conciliacao automatica ainda estiver em processamento, aguarde alguns instantes e tente abrir os modulos novamente.",
+            "status_note": "Se o acesso nao refletir de imediato, o webhook ou a sincronizacao do provider ainda pode estar finalizando a atualizacao.",
+        },
+    )
+
+
+def pagamento_checkout_falha(request):
+    return render(
+        request,
+        "core/pagamento_checkout_status.html",
+        {
+            "status_code": "falha",
+            "status_title": "Pagamento nao concluido",
+            "status_message": "O checkout retornou uma falha ou cancelamento. Voce pode revisar os dados do pagamento e tentar novamente quando quiser.",
+            "status_note": "Nenhuma liberacao adicional sera aplicada enquanto a cobranca nao for confirmada pelo provider.",
+        },
+    )
+
+
+def pagamento_checkout_pendente(request):
+    return render(
+        request,
+        "core/pagamento_checkout_status.html",
+        {
+            "status_code": "pendente",
+            "status_title": "Pagamento em analise",
+            "status_message": "O provider informou que a cobranca ainda esta pendente. Isso pode acontecer em meios de pagamento que dependem de confirmacao posterior.",
+            "status_note": "Assim que houver confirmacao, a assinatura podera ser atualizada automaticamente pelo webhook.",
+        },
+    )
 
 
 @login_required
@@ -2755,6 +3180,7 @@ def ios_list(request):
     inventarios_qs = _ios_inventarios_queryset(request.user, cliente)
     locais, grupos = _ios_locais_grupos(cliente)
     message = None
+    message_level = "info"
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_rack":
@@ -2774,32 +3200,38 @@ def ios_list(request):
             if slots_total is not None:
                 slots_total = max(1, min(60, slots_total))
             if nome and slots_total:
-                planta = None
-                if id_planta_raw:
-                    planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
-                inventario = None
-                if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
-                    inventario = inventarios_qs.filter(pk=inventario_id).first()
-                local = None
-                if local_id and cliente:
-                    local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
-                grupo = None
-                if grupo_id and cliente:
-                    grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
-                rack = RackIO.objects.create(
-                    cliente=cliente,
-                    nome=nome,
-                    descricao=descricao,
-                    local=local,
-                    grupo=grupo,
-                    id_planta=planta,
-                    inventario=inventario,
-                    slots_total=slots_total,
-                )
-                slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
-                RackSlotIO.objects.bulk_create(slots)
-                return redirect("ios_rack_detail", pk=rack.pk)
-            return redirect("ios_list")
+                allowed, quota_message = _can_create_more_racks(request.user, increment=1)
+                if not allowed:
+                    message = quota_message
+                    message_level = "warning"
+                else:
+                    planta = None
+                    if id_planta_raw:
+                        planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
+                    inventario = None
+                    if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
+                        inventario = inventarios_qs.filter(pk=inventario_id).first()
+                    local = None
+                    if local_id and cliente:
+                        local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
+                    grupo = None
+                    if grupo_id and cliente:
+                        grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
+                    rack = RackIO.objects.create(
+                        cliente=cliente,
+                        nome=nome,
+                        descricao=descricao,
+                        local=local,
+                        grupo=grupo,
+                        id_planta=planta,
+                        inventario=inventario,
+                        slots_total=slots_total,
+                    )
+                    slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
+                    RackSlotIO.objects.bulk_create(slots)
+                    return redirect("ios_rack_detail", pk=rack.pk)
+            elif not message:
+                return redirect("ios_list")
         if action == "create_local":
             if not cliente:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -2854,6 +3286,10 @@ def ios_list(request):
             "inventarios": inventarios_qs.order_by("nome"),
             "locais": locais,
             "grupos": grupos,
+            "message": message,
+            "message_level": message_level,
+            "commercial_status": _documentacao_tecnica_status_context(request.user),
+            "commercial_plans_url": _documentacao_tecnica_plans_url(next_url=request.path),
             **_io_import_upload_context(request, cliente),
         },
     )
@@ -2869,6 +3305,8 @@ def ios_search(request):
         return HttpResponseForbidden("Sem cadastro de cliente.")
 
     inventarios_qs = _ios_inventarios_queryset(request.user, cliente)
+    message = None
+    message_level = "info"
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "create_rack":
@@ -2888,32 +3326,38 @@ def ios_search(request):
             if slots_total is not None:
                 slots_total = max(1, min(60, slots_total))
             if nome and slots_total:
-                planta = None
-                if id_planta_raw:
-                    planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
-                inventario = None
-                if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
-                    inventario = inventarios_qs.filter(pk=inventario_id).first()
-                local = None
-                if local_id and cliente:
-                    local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
-                grupo = None
-                if grupo_id and cliente:
-                    grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
-                rack = RackIO.objects.create(
-                    cliente=cliente,
-                    nome=nome,
-                    descricao=descricao,
-                    local=local,
-                    grupo=grupo,
-                    id_planta=planta,
-                    inventario=inventario,
-                    slots_total=slots_total,
-                )
-                slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
-                RackSlotIO.objects.bulk_create(slots)
-                return redirect("ios_rack_detail", pk=rack.pk)
-            return redirect("ios_search")
+                allowed, quota_message = _can_create_more_racks(request.user, increment=1)
+                if not allowed:
+                    message = quota_message
+                    message_level = "warning"
+                else:
+                    planta = None
+                    if id_planta_raw:
+                        planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
+                    inventario = None
+                    if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
+                        inventario = inventarios_qs.filter(pk=inventario_id).first()
+                    local = None
+                    if local_id and cliente:
+                        local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
+                    grupo = None
+                    if grupo_id and cliente:
+                        grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
+                    rack = RackIO.objects.create(
+                        cliente=cliente,
+                        nome=nome,
+                        descricao=descricao,
+                        local=local,
+                        grupo=grupo,
+                        id_planta=planta,
+                        inventario=inventario,
+                        slots_total=slots_total,
+                    )
+                    slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
+                    RackSlotIO.objects.bulk_create(slots)
+                    return redirect("ios_rack_detail", pk=rack.pk)
+            elif not message:
+                return redirect("ios_search")
         if action == "create_local":
             if not cliente:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -2984,6 +3428,9 @@ def ios_search(request):
             "grupo_filter": grupo_filter,
             "search_results": search_results,
             "search_count": search_count,
+            "message": message,
+            "message_level": message_level,
+            "commercial_status": _documentacao_tecnica_status_context(request.user),
             **_io_import_upload_context(request, cliente),
         },
     )
@@ -3000,6 +3447,8 @@ def ios_rack_new(request):
 
     inventarios_qs = _ios_inventarios_queryset(request.user, cliente)
     locais, grupos = _ios_locais_grupos(cliente)
+    message = None
+    message_level = "info"
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -3020,31 +3469,36 @@ def ios_rack_new(request):
             if slots_total is not None:
                 slots_total = max(1, min(60, slots_total))
             if nome and slots_total:
-                planta = None
-                if id_planta_raw:
-                    planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
-                inventario = None
-                if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
-                    inventario = inventarios_qs.filter(pk=inventario_id).first()
-                local = None
-                if local_id and cliente:
-                    local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
-                grupo = None
-                if grupo_id and cliente:
-                    grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
-                rack = RackIO.objects.create(
-                    cliente=cliente,
-                    nome=nome,
-                    descricao=descricao,
-                    local=local,
-                    grupo=grupo,
-                    id_planta=planta,
-                    inventario=inventario,
-                    slots_total=slots_total,
-                )
-                slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
-                RackSlotIO.objects.bulk_create(slots)
-                return redirect("ios_rack_detail", pk=rack.pk)
+                allowed, quota_message = _can_create_more_racks(request.user, increment=1)
+                if not allowed:
+                    message = quota_message
+                    message_level = "warning"
+                else:
+                    planta = None
+                    if id_planta_raw:
+                        planta, _ = PlantaIO.objects.get_or_create(codigo=id_planta_raw.upper())
+                    inventario = None
+                    if inventario_id and inventarios_qs.filter(pk=inventario_id).exists():
+                        inventario = inventarios_qs.filter(pk=inventario_id).first()
+                    local = None
+                    if local_id and cliente:
+                        local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
+                    grupo = None
+                    if grupo_id and cliente:
+                        grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
+                    rack = RackIO.objects.create(
+                        cliente=cliente,
+                        nome=nome,
+                        descricao=descricao,
+                        local=local,
+                        grupo=grupo,
+                        id_planta=planta,
+                        inventario=inventario,
+                        slots_total=slots_total,
+                    )
+                    slots = [RackSlotIO(rack=rack, posicao=index) for index in range(1, slots_total + 1)]
+                    RackSlotIO.objects.bulk_create(slots)
+                    return redirect("ios_rack_detail", pk=rack.pk)
         if action == "create_local":
             if not cliente:
                 return HttpResponseForbidden("Sem cadastro de cliente.")
@@ -3087,6 +3541,9 @@ def ios_rack_new(request):
             "inventarios": inventarios_qs.order_by("nome"),
             "locais": locais,
             "grupos": grupos,
+            "message": message,
+            "message_level": message_level,
+            "commercial_status": _documentacao_tecnica_status_context(request.user),
         },
     )
 
@@ -4092,7 +4549,14 @@ def ios_import_create(request):
     denied_response = _require_internal_module_access(request, "IOS")
     if denied_response:
         if ajax_request:
-            return _json_error_response("Seu acesso atual nao permite importar planilhas de IO.", status=403)
+            return _json_error_response(
+                _io_import_user_message(
+                    request.user,
+                    "Seu acesso atual nao permite importar planilhas de IO.",
+                    "Seu acesso atual nao permite usar a importacao de IO.",
+                ),
+                status=403,
+            )
         return denied_response
     if request.method != "POST":
         if ajax_request:
@@ -4101,7 +4565,14 @@ def ios_import_create(request):
     cliente = _get_cliente(request.user)
     if not _io_import_can_manage(request, cliente):
         if ajax_request:
-            return _json_error_response("Sem permissao para importar planilhas de IO.", status=403)
+            return _json_error_response(
+                _io_import_user_message(
+                    request.user,
+                    "Sem permissao para importar planilhas de IO.",
+                    "Voce nao possui permissao para usar a importacao de IO.",
+                ),
+                status=403,
+            )
         return HttpResponseForbidden("Sem permissao.")
 
     arquivo = request.FILES.get("arquivo")
@@ -4135,10 +4606,11 @@ def ios_import_create(request):
             original_filename=arquivo.name,
             source_file=arquivo,
             file_sha256=build_file_sha256(raw_bytes),
+            progress_payload=_initial_io_import_progress_payload(arquivo.name),
         )
         redirect_url = reverse("ios_import_detail", kwargs={"pk": job.pk})
         if ajax_request:
-            _spawn_io_import_job_processor(job.pk)
+            transaction.on_commit(lambda job_id=job.pk: _spawn_io_import_job_processor_safe(job_id))
             return JsonResponse(
                 {
                     "ok": True,
@@ -4155,11 +4627,21 @@ def ios_import_create(request):
                 extra={"user_id": request.user.id, "upload_name": arquivo.name},
             )
             if ajax_request:
-                return _json_error_response(str(exc), status=400)
+                return _json_error_response(
+                    _io_import_user_message(
+                        request.user,
+                        str(exc),
+                        "Nao foi possivel analisar o arquivo enviado. Revise o arquivo e tente novamente.",
+                    ),
+                    status=400,
+                )
             return HttpResponse(str(exc), status=400)
         job.status = IOImportJob.Status.FAILED
+        job.ai_status = IOImportJob.AIStatus.FAILED
+        job.ai_error = str(exc)
         job.warnings = [str(exc)]
-        job.save(update_fields=["status", "warnings", "updated_at"])
+        job.progress_payload = _failed_io_import_progress_payload(str(exc), job.progress_payload)
+        job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
     except Exception as exc:
         logger.exception(
             "Unhandled IO import error while creating import job",
@@ -4167,11 +4649,18 @@ def ios_import_create(request):
         )
         if job:
             job.status = IOImportJob.Status.FAILED
+            job.ai_status = IOImportJob.AIStatus.FAILED
+            job.ai_error = str(exc)
             job.warnings = [f"Falha interna ao analisar a planilha: {exc}"]
-            job.save(update_fields=["status", "warnings", "updated_at"])
+            job.progress_payload = _failed_io_import_progress_payload(str(exc), job.progress_payload)
+            job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
         if ajax_request:
             return _json_error_response(
-                "Falha interna ao analisar a planilha. Verifique o log do servidor.",
+                _io_import_user_message(
+                    request.user,
+                    "Falha interna ao analisar a planilha. Verifique o log do servidor.",
+                    "Nao foi possivel concluir a analise da planilha agora. Tente novamente em instantes.",
+                ),
                 status=500,
                 job_id=job.pk if job else None,
                 redirect_url=redirect_url,
@@ -4195,10 +4684,19 @@ def ios_import_status(request, pk):
     processing = job.status == IOImportJob.Status.UPLOADED
     failed = job.status == IOImportJob.Status.FAILED
     message = ""
+    progress = _build_io_import_status_progress(job)
+    if failed and not _is_dev_user(request.user):
+        progress["title"] = "Analise interrompida"
+        progress["message"] = "Nao foi possivel concluir a analise da planilha. Revise o arquivo e tente novamente."
     if failed:
-        message = (job.warnings or [job.ai_error or "Falha ao processar a importacao."])[0]
+        technical_message = (job.warnings or [job.ai_error or "Falha ao processar a importacao."])[0]
+        message = _io_import_user_message(
+            request.user,
+            technical_message,
+            "Nao foi possivel concluir a analise da planilha. Revise o arquivo e tente novamente.",
+        )
     elif processing:
-        message = "A planilha esta sendo analisada em segundo plano."
+        message = progress.get("message") or "A planilha esta sendo analisada em segundo plano."
     return JsonResponse(
         {
             "ok": True,
@@ -4210,8 +4708,9 @@ def ios_import_status(request, pk):
             "failed": failed,
             "redirect_url": reverse("ios_import_detail", kwargs={"pk": job.pk}),
             "message": message,
-            "warnings_count": len(job.warnings or []),
-            "ai_status": job.ai_status,
+            "warnings_count": len(job.warnings or []) if _is_dev_user(request.user) else 0,
+            "ai_status": job.ai_status if _is_dev_user(request.user) else "",
+            "progress": progress,
         }
     )
 
@@ -4237,6 +4736,15 @@ def ios_import_detail(request, pk):
                 job.warnings = warnings
                 job.save(update_fields=["warnings", "updated_at"])
                 return redirect("ios_import_detail", pk=job.pk)
+            applied_rack_key_map = dict((job.apply_log or {}).get("applied_rack_keys") or {})
+            increment = 0 if rack_key in applied_rack_key_map else 1
+            allowed, quota_message = _can_create_more_racks(request.user, increment=increment)
+            if not allowed:
+                warnings = list(job.warnings or [])
+                warnings.append(quota_message)
+                job.warnings = warnings
+                job.save(update_fields=["warnings", "updated_at"])
+                return redirect("ios_import_detail", pk=job.pk)
             try:
                 apply_import_job(
                     job=job,
@@ -4257,6 +4765,18 @@ def ios_import_detail(request, pk):
                 job.save(update_fields=["warnings", "updated_at"])
                 return redirect("ios_import_detail", pk=job.pk)
         if action == "apply_import":
+            preview_racks, _preview_payload = _build_io_import_preview_racks(
+                job.proposal_payload or {},
+                applied_rack_key_map=dict((job.apply_log or {}).get("applied_rack_keys") or {}),
+            )
+            pending_count = sum(1 for rack in preview_racks if not rack.get("is_applied"))
+            allowed, quota_message = _can_create_more_racks(request.user, increment=pending_count)
+            if not allowed:
+                warnings = list(job.warnings or [])
+                warnings.append(quota_message)
+                job.warnings = warnings
+                job.save(update_fields=["warnings", "updated_at"])
+                return redirect("ios_import_detail", pk=job.pk)
             try:
                 applied_racks = apply_import_job(
                     job=job,
@@ -4293,6 +4813,13 @@ def ios_import_detail(request, pk):
     pending_racks_count = sum(1 for rack in preview_racks if not rack.get("is_applied"))
     rows_preview = rows[:120]
     status_url = reverse("ios_import_status", kwargs={"pk": job.pk})
+    user_facing_failure_message = ""
+    if job.status == IOImportJob.Status.FAILED:
+        user_facing_failure_message = _io_import_user_message(
+            request.user,
+            (job.warnings or [job.ai_error or "Falha ao processar a importacao."])[0],
+            "Nao foi possivel concluir a analise da planilha. Revise o arquivo e tente novamente. Se o problema continuar, contate o suporte.",
+        )
     return render(
         request,
         "core/io_import_detail.html",
@@ -4307,8 +4834,9 @@ def ios_import_detail(request, pk):
             "rows_preview": rows_preview,
             "total_rows_preview": len(rows_preview),
             "has_more_rows": len(rows) > len(rows_preview),
-            "io_import_is_dev": _is_admin_user(request.user),
+            "io_import_is_dev": _is_dev_user(request.user),
             "status_url": status_url,
+            "user_facing_failure_message": user_facing_failure_message,
         },
     )
 
@@ -5218,6 +5746,7 @@ def listas_ip_list(request):
             "message_level": message_level,
             "ip_import_can_upload": _ip_import_can_manage(request, cliente),
             "ip_import_is_admin": _is_admin_user(request.user),
+            "commercial_status": _documentacao_tecnica_status_context(request.user),
         },
     )
 
@@ -9377,6 +9906,7 @@ def modulos_acesso_gerenciar(request):
 def produtos_gerenciar(request):
     if not _is_admin_user(request.user):
         return HttpResponseForbidden("Sem permissao.")
+    ensure_billing_catalog()
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
@@ -9438,6 +9968,87 @@ def produtos_gerenciar(request):
             "products": products,
             "total_product_accesses": total_product_accesses,
             "message": message,
+        },
+    )
+
+
+@login_required
+def pagamentos_planos_gerenciar(request):
+    if not _is_admin_user(request.user):
+        return HttpResponseForbidden("Sem permissao.")
+    product = ensure_billing_catalog()
+    settings_obj = payment_config()
+    provider_defaults = _ensure_payment_checkout_urls(request, settings_obj)
+    message = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "update_payment_config":
+            settings_obj.enabled = request.POST.get("enabled") == "on"
+            settings_obj.sandbox_mode = request.POST.get("sandbox_mode") == "on"
+            settings_obj.mercado_pago_public_key = (request.POST.get("mercado_pago_public_key") or "").strip()
+            access_token = (request.POST.get("mercado_pago_access_token") or "").strip()
+            webhook_secret = (request.POST.get("mercado_pago_webhook_secret") or "").strip()
+            if access_token:
+                settings_obj.mercado_pago_access_token = access_token
+            if webhook_secret:
+                settings_obj.mercado_pago_webhook_secret = webhook_secret
+            settings_obj.checkout_success_url = (request.POST.get("checkout_success_url") or "").strip() or provider_defaults["success"]
+            settings_obj.checkout_failure_url = (request.POST.get("checkout_failure_url") or "").strip() or provider_defaults["failure"]
+            settings_obj.checkout_pending_url = (request.POST.get("checkout_pending_url") or "").strip() or provider_defaults["pending"]
+            try:
+                settings_obj.trial_duration_days = max(1, min(int(request.POST.get("trial_duration_days") or "30"), 120))
+            except (TypeError, ValueError):
+                settings_obj.trial_duration_days = 30
+            settings_obj.updated_by = request.user
+            settings_obj.save()
+            return redirect("pagamentos_planos_gerenciar")
+        if action == "update_plan":
+            plan = get_object_or_404(PlanoComercial, pk=request.POST.get("plan_id"), produto=product)
+            plan.nome = (request.POST.get("nome") or "").strip() or plan.nome
+            plan.descricao = (request.POST.get("descricao") or "").strip()
+            plan.ativo = request.POST.get("ativo") == "on"
+            plan.is_free = request.POST.get("is_free") == "on"
+            try:
+                plan.ordem = max(0, min(int(request.POST.get("ordem") or plan.ordem), 999))
+            except (TypeError, ValueError):
+                pass
+            rack_limit_raw = (request.POST.get("rack_limit_simultaneous") or "").strip()
+            if rack_limit_raw:
+                try:
+                    plan.rack_limit_simultaneous = max(1, min(int(rack_limit_raw), 999))
+                except (TypeError, ValueError):
+                    pass
+            else:
+                plan.rack_limit_simultaneous = None
+            for field_name in ("preco_mensal", "preco_anual"):
+                raw = (request.POST.get(field_name) or "").replace(",", ".").strip()
+                try:
+                    setattr(plan, field_name, Decimal(raw) if raw else None)
+                except (InvalidOperation, ValueError):
+                    setattr(plan, field_name, None)
+            plan.provider_plan_code_mensal = (request.POST.get("provider_plan_code_mensal") or "").strip()
+            plan.provider_plan_code_anual = (request.POST.get("provider_plan_code_anual") or "").strip()
+            plan.save()
+            return redirect("pagamentos_planos_gerenciar")
+
+    plans = list(PlanoComercial.objects.filter(produto=product).order_by("ordem", "nome"))
+    subscriptions = list(
+        AssinaturaUsuario.objects.select_related("usuario", "plano")
+        .filter(produto=product)
+        .order_by("-updated_at", "-created_at")[:40]
+    )
+    webhook_events = list(EventoPagamentoWebhook.objects.order_by("-received_at")[:25])
+    return render(
+        request,
+        "core/billing_admin.html",
+        {
+            "message": message,
+            "product": product,
+            "settings_obj": settings_obj,
+            "provider_defaults": provider_defaults,
+            "plans": plans,
+            "subscriptions": subscriptions,
+            "webhook_events": webhook_events,
         },
     )
 

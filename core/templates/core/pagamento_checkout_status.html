@@ -1,0 +1,57 @@
+{% extends "core/base.html" %}
+
+{% block title %}Status do pagamento{% endblock %}
+
+{% block content %}
+  <section class="card stack admin-shell" style="max-width: 840px; margin: 32px auto;">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Checkout interno</div>
+        <div class="hud-pill">
+          {% if status_code == "sucesso" %}
+            Confirmado
+          {% elif status_code == "falha" %}
+            Falha
+          {% else %}
+            Pendente
+          {% endif %}
+        </div>
+      </div>
+      <div class="page-hud-head">
+        <div class="page-hud-main">
+          <div class="page-kicker">Retorno do provider</div>
+          <h1 class="page-title">{{ status_title }}</h1>
+          <p class="page-subtitle">{{ status_message }}</p>
+        </div>
+      </div>
+      {% if status_note %}
+        <div class="hud-meta">{{ status_note }}</div>
+      {% endif %}
+    </div>
+
+    <div class="admin-reference-grid">
+      <article class="admin-reference-item">
+        <div class="admin-title-stack">
+          <strong>Proximo passo</strong>
+          <span class="muted">
+            {% if status_code == "sucesso" %}
+              Volte para os modulos e valide se a liberacao comercial ja foi refletida.
+            {% elif status_code == "falha" %}
+              Revise a cobranca e tente novamente quando quiser.
+            {% else %}
+              Aguarde a confirmacao final do provider antes de considerar a assinatura ativa.
+            {% endif %}
+          </span>
+        </div>
+        <div class="form-actions" style="margin-top: 16px;">
+          <a class="btn btn-primary" href="{% url 'produto_documentacao_tecnica' %}">Voltar aos planos</a>
+          {% if request.user.is_authenticated %}
+            <a class="btn btn-ghost" href="{% url 'painel' %}">Ir ao painel</a>
+          {% else %}
+            <a class="btn btn-ghost" href="{% url 'home' %}">Ir para a home</a>
+          {% endif %}
+        </div>
+      </article>
+    </div>
+  </section>
+{% endblock %}

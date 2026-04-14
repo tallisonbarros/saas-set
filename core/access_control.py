@@ -127,6 +127,11 @@ def user_has_product_access(user, product_code):
         return False
     if is_admin_user(user):
         return True
+    normalized = normalize_access_code(product_code)
+    if normalized == "DOCUMENTACAO_TECNICA":
+        from .services.billing import resolve_entitlement
+
+        return bool(resolve_entitlement(user, normalized).get("has_access"))
     access = get_user_product_access(user, product_code)
     if not access:
         return False

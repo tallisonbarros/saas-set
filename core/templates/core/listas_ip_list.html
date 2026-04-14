@@ -29,6 +29,9 @@
       {% endif %}
     </div>
 
+    {% if commercial_status.plan_badge.visible %}
+      <div class="notice notice-{{ commercial_status.plan_badge.tone }} io-commercial-notice">{{ commercial_status.plan_badge.label }}</div>
+    {% endif %}
     {% if message %}
       <div class="notice notice-{{ message_level }}">{{ message }}</div>
     {% endif %}

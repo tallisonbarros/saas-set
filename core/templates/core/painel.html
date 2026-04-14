@@ -59,7 +59,7 @@
             <div class="muted">Compras, gastos e controle por periodo.</div>
           </a>
         {% endif %}
-        {% if "IOS" in visible_internal_modules %}
+        {% if "IOS" in visible_internal_modules or request.user.is_authenticated %}
           <a class="panel-card" href="{% url 'ios_list' %}" style="--delay: 0.15s;">
             <div class="panel-card-top">
               <div class="panel-title">
@@ -71,6 +71,9 @@
               {% include "core/partials/module_signal_badge.html" with badge=module_signal_badges.ios %}
             </div>
             <div class="muted">Crie, revise e mantenha IOs atualizados.</div>
+            {% if module_signal_badges.ios.commercial_label %}
+              <div class="panel-card-commercial panel-card-commercial-{{ module_signal_badges.ios.commercial_tone|default:'info' }}">{{ module_signal_badges.ios.commercial_label }}</div>
+            {% endif %}
           </a>
         {% endif %}
         {% if "INVENTARIO" in visible_internal_modules %}
@@ -86,7 +89,7 @@
             <div class="muted">Catalogo de motores, valvulas e equipamentos.</div>
           </a>
         {% endif %}
-        {% if "LISTA_IP" in visible_internal_modules %}
+        {% if "LISTA_IP" in visible_internal_modules or request.user.is_authenticated %}
           <a class="panel-card" href="{% url 'listas_ip_list' %}" style="--delay: 0.2s;">
             <div class="panel-card-top">
               <div class="panel-title">
@@ -99,6 +102,9 @@
               {% include "core/partials/module_signal_badge.html" with badge=module_signal_badges.listas_ip %}
             </div>
             <div class="muted">Controle de rede e acesso por projeto.</div>
+            {% if module_signal_badges.listas_ip.commercial_label %}
+              <div class="panel-card-commercial panel-card-commercial-{{ module_signal_badges.listas_ip.commercial_tone|default:'info' }}">{{ module_signal_badges.listas_ip.commercial_label }}</div>
+            {% endif %}
           </a>
         {% endif %}
         {% if "RADAR" in visible_internal_modules %}
@@ -285,6 +291,18 @@
               </div>
             </div>
             <div class="muted">Produtos comerciais, trial e catalogo de acesso pago.</div>
+          </a>
+          <a class="panel-card" href="{% url 'pagamentos_planos_gerenciar' %}" style="--delay: 0.285s;">
+            <div class="panel-card-top">
+              <div class="panel-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"></rect>
+                  <path d="M8 10h8M8 14h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+                Pagamentos e Planos
+              </div>
+            </div>
+            <div class="muted">Trial, planos, provider e eventos de cobranca.</div>
           </a>
           {% if is_dev_user %}
             <a class="panel-card" href="{% url 'colaboradores_gerenciar' %}" style="--delay: 0.29s;">

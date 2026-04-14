@@ -57,6 +57,16 @@
       </div>
     </div>
 
+    {% if commercial_status.plan_badge.visible %}
+      <div class="notice notice-{{ commercial_status.plan_badge.tone }} io-commercial-notice">
+        <span>{{ commercial_status.plan_badge.label }}</span>
+        <a class="io-commercial-notice-link" href="{{ commercial_plans_url }}">Ver planos</a>
+      </div>
+    {% endif %}
+    {% if message %}
+      <div class="notice notice-{{ message_level }}">{{ message }}</div>
+    {% endif %}
+
     {% if rack_groups %}
       <div class="ios-local-stack">
         {% for group in rack_groups %}

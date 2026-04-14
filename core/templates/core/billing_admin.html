@@ -1,0 +1,269 @@
+{% extends "core/base.html" %}
+
+{% block title %}Pagamentos e Planos{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="page-crumbs" aria-label="Breadcrumb">
+    <a href="{% url 'painel' %}">Painel</a>
+    <span class="crumb-sep">/</span>
+    <span>Pagamentos e Planos</span>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <section class="card stack admin-shell">
+    <div class="page-hud">
+      <div class="hud-top">
+        <div class="hud-title">Administracao</div>
+        <div class="hud-pill">Billing</div>
+      </div>
+      <div class="page-hud-head">
+        <div class="page-hud-main">
+          <div class="page-kicker">Comercial e cobranca</div>
+          <h1 class="page-title">Pagamentos e Planos</h1>
+          <p class="page-subtitle">Gerencie provider, trial, planos, assinaturas e eventos do fluxo comercial sem misturar com ACL ou catalogo tecnico.</p>
+        </div>
+      </div>
+      <div class="hud-meta">Produto monitorado: {{ product.nome }}</div>
+    </div>
+
+    {% if message %}
+      <p class="muted">{{ message }}</p>
+    {% endif %}
+
+    <div class="admin-metric-grid">
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Provider</div>
+        <div class="admin-metric-value">{{ settings_obj.get_provider_display }}</div>
+        <div class="admin-metric-note">{% if settings_obj.enabled %}Ligado{% else %}Desligado{% endif %} · {% if settings_obj.sandbox_mode %}Sandbox{% else %}Producao{% endif %}</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Trial</div>
+        <div class="admin-metric-value">{{ settings_obj.trial_duration_days }}</div>
+        <div class="admin-metric-note">dias de liberacao total</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Assinaturas</div>
+        <div class="admin-metric-value">{{ subscriptions|length }}</div>
+        <div class="admin-metric-note">ultimas contas monitoradas</div>
+      </div>
+      <div class="admin-metric-card">
+        <div class="admin-metric-label">Webhooks</div>
+        <div class="admin-metric-value">{{ webhook_events|length }}</div>
+        <div class="admin-metric-note">eventos recentes recebidos</div>
+      </div>
+    </div>
+
+    <section class="card compact-card admin-subcard admin-provider-section">
+      <div class="admin-title-stack">
+        <h2 class="admin-section-title">Configuracao do provider</h2>
+        <p class="admin-section-note">Credenciais e parametros do checkout interno com foco no Mercado Pago.</p>
+      </div>
+      <p class="muted">
+        As URLs de retorno abaixo ja apontam para paginas padrao do proprio sistema. Se voce nao informar nada,
+        elas sao preenchidas automaticamente com base no dominio atual.
+      </p>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_payment_config">
+        <div class="admin-provider-topbar">
+          <label class="checkbox-item">
+            <input type="checkbox" name="enabled" {% if settings_obj.enabled %}checked{% endif %}>
+            Habilitar cobranca
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" name="sandbox_mode" {% if settings_obj.sandbox_mode %}checked{% endif %}>
+            Usar sandbox
+          </label>
+        </div>
+        <div class="admin-form-grid admin-provider-grid">
+          <label class="field">
+            <span>Trial em dias</span>
+            <input type="number" min="1" max="120" name="trial_duration_days" value="{{ settings_obj.trial_duration_days }}">
+          </label>
+          <label class="field">
+            <span>Public key</span>
+            <input type="text" name="mercado_pago_public_key" value="{{ settings_obj.mercado_pago_public_key }}" placeholder="APP_USR-...">
+          </label>
+          <label class="field">
+            <span>Access token</span>
+            <input type="password" name="mercado_pago_access_token" value="" placeholder="{% if settings_obj.mercado_pago_access_token %}{{ settings_obj.masked_access_token }}{% else %}APP_USR-...{% endif %}">
+          </label>
+          <label class="field">
+            <span>Webhook secret</span>
+            <input type="password" name="mercado_pago_webhook_secret" value="" placeholder="assinatura do webhook">
+          </label>
+          <label class="field admin-provider-field-wide">
+            <span>URL sucesso</span>
+            <input type="text" name="checkout_success_url" value="{{ settings_obj.checkout_success_url }}" placeholder="https://.../sucesso">
+          </label>
+          <label class="field admin-provider-field-wide">
+            <span>URL falha</span>
+            <input type="text" name="checkout_failure_url" value="{{ settings_obj.checkout_failure_url }}" placeholder="https://.../falha">
+          </label>
+          <label class="field admin-provider-field-wide">
+            <span>URL pendente</span>
+            <input type="text" name="checkout_pending_url" value="{{ settings_obj.checkout_pending_url }}" placeholder="https://.../pendente">
+          </label>
+        </div>
+        <div class="admin-list">
+          <article class="admin-list-row">
+            <div class="admin-list-row-main">
+              <div class="admin-list-title">URLs padrao do ambiente</div>
+              <div class="admin-list-meta">
+                <span class="admin-token is-neutral">Sucesso: {{ provider_defaults.success }}</span>
+                <span class="admin-token is-neutral">Falha: {{ provider_defaults.failure }}</span>
+                <span class="admin-token is-neutral">Pendente: {{ provider_defaults.pending }}</span>
+              </div>
+            </div>
+          </article>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Salvar configuracao</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card compact-card admin-subcard">
+      <div class="admin-title-row">
+        <div class="admin-title-stack">
+          <h2 class="admin-section-title">Planos do produto</h2>
+          <p class="admin-section-note">Starter e Professional ficam separados do catalogo de produto para manter regra comercial isolada.</p>
+        </div>
+        <div class="admin-token is-neutral">Arraste horizontalmente para revisar os cards</div>
+      </div>
+
+      <div class="admin-carousel-shell">
+        <div class="admin-plan-carousel">
+          {% for plan in plans %}
+            <article class="admin-reference-item admin-plan-slide">
+              <form method="post" class="stack">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_plan">
+                <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                <div class="admin-title-row">
+                  <div class="admin-title-stack">
+                    <strong>{{ plan.codigo }}</strong>
+                    <span class="muted">{{ plan.nome }}</span>
+                  </div>
+                  <div class="admin-token-row">
+                    {% if plan.ativo %}
+                      <span class="admin-token is-success">Ativo</span>
+                    {% else %}
+                      <span class="admin-token is-neutral">Inativo</span>
+                    {% endif %}
+                    {% if plan.is_free %}
+                      <span class="admin-token is-neutral">Gratuito</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="admin-form-grid two-col">
+                  <label class="field">
+                    <span>Nome</span>
+                    <input type="text" name="nome" value="{{ plan.nome }}">
+                  </label>
+                  <label class="field">
+                    <span>Ordem</span>
+                    <input type="number" min="0" max="999" name="ordem" value="{{ plan.ordem }}">
+                  </label>
+                  <label class="field" style="grid-column: 1 / -1;">
+                    <span>Descricao</span>
+                    <input type="text" name="descricao" value="{{ plan.descricao }}">
+                  </label>
+                  <label class="field">
+                    <span>Limite de racks</span>
+                    <input type="number" min="1" max="999" name="rack_limit_simultaneous" value="{{ plan.rack_limit_simultaneous|default:'' }}" placeholder="vazio = ilimitado">
+                  </label>
+                  <label class="field">
+                    <span>Preco mensal</span>
+                    <input type="text" name="preco_mensal" value="{{ plan.preco_mensal|default:'' }}">
+                  </label>
+                  <label class="field">
+                    <span>Preco anual</span>
+                    <input type="text" name="preco_anual" value="{{ plan.preco_anual|default:'' }}">
+                  </label>
+                  <label class="field">
+                    <span>Provider plan mensal</span>
+                    <input type="text" name="provider_plan_code_mensal" value="{{ plan.provider_plan_code_mensal }}">
+                  </label>
+                  <label class="field">
+                    <span>Provider plan anual</span>
+                    <input type="text" name="provider_plan_code_anual" value="{{ plan.provider_plan_code_anual }}">
+                  </label>
+                </div>
+                <div class="checkbox-grid">
+                  <label class="checkbox-item">
+                    <input type="checkbox" name="ativo" {% if plan.ativo %}checked{% endif %}>
+                    Plano ativo
+                  </label>
+                  <label class="checkbox-item">
+                    <input type="checkbox" name="is_free" {% if plan.is_free %}checked{% endif %}>
+                    Plano gratuito
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" type="submit">Salvar plano</button>
+                </div>
+              </form>
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="card compact-card admin-context-shell">
+      <section class="admin-context-panel is-active stack">
+        <div class="admin-title-row">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Assinaturas recentes</h2>
+            <p class="admin-section-note">Visao operacional do estado comercial por usuario.</p>
+          </div>
+        </div>
+        <div class="admin-list">
+          {% for subscription in subscriptions %}
+            <article class="admin-list-row">
+              <div class="admin-list-row-main">
+                <div class="admin-list-title">{{ subscription.usuario.username }}</div>
+                <div class="admin-list-meta">
+                  <span class="admin-token is-neutral">{{ subscription.plano.nome }}</span>
+                  <span class="admin-token is-neutral">{{ subscription.get_status_display }}</span>
+                  <span class="admin-token is-neutral">{{ subscription.get_billing_interval_display }}</span>
+                  <span class="admin-token is-neutral">{{ subscription.updated_at|date:"d/m/Y H:i" }}</span>
+                </div>
+              </div>
+            </article>
+          {% empty %}
+            <p class="muted">Nenhuma assinatura registrada ainda.</p>
+          {% endfor %}
+        </div>
+
+        <div class="admin-title-row">
+          <div class="admin-title-stack">
+            <h2 class="admin-section-title">Eventos de webhook</h2>
+            <p class="admin-section-note">Historico recebido do provider para auditoria e depuracao.</p>
+          </div>
+        </div>
+        <div class="admin-list">
+          {% for event in webhook_events %}
+            <article class="admin-list-row">
+              <div class="admin-list-row-main">
+                <div class="admin-list-title">{{ event.external_id }}</div>
+                <div class="admin-list-meta">
+                  <span class="admin-token is-neutral">{{ event.event_type|default:"sem tipo" }}</span>
+                  <span class="admin-token is-neutral">{{ event.received_at|date:"d/m/Y H:i" }}</span>
+                  {% if event.processed %}
+                    <span class="admin-token is-success">Processado</span>
+                  {% else %}
+                    <span class="admin-token is-warn">Pendente</span>
+                  {% endif %}
+                </div>
+              </div>
+            </article>
+          {% empty %}
+            <p class="muted">Nenhum webhook recebido ainda.</p>
+          {% endfor %}
+        </div>
+      </section>
+    </section>
+  </section>
+{% endblock %}

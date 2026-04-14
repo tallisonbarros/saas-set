@@ -21,28 +21,21 @@
   var progressBar = modal ? modal.querySelector("[data-io-import-progress-bar]") : null;
   var progressLabel = modal ? modal.querySelector("[data-io-import-progress-label]") : null;
   var progressValue = modal ? modal.querySelector("[data-io-import-progress-value]") : null;
+  var sheetMeta = modal ? modal.querySelector("[data-io-import-sheet-meta]") : null;
+  var currentSheetNode = modal ? modal.querySelector("[data-io-import-current-sheet]") : null;
+  var sheetCountNode = modal ? modal.querySelector("[data-io-import-sheet-count]") : null;
+  var livePreview = modal ? modal.querySelector("[data-io-import-live-preview]") : null;
+  var livePreviewGrid = modal ? modal.querySelector("[data-io-import-live-preview-grid]") : null;
 
   if (!modal || !form || !openButtons.length) {
     return;
   }
 
   var stepOrder = ["upload", "parse", "ai", "preview"];
-  var stepText = {
-    upload: "Arquivo recebido",
-    parse: "Lendo a estrutura e localizando os sinais",
-    ai: "IA correlacionando tipos, modulos e racks sugeridos",
-    preview: "Montando a preview operacional final"
-  };
-  var progressTimers = [];
   var statusPollTimer = null;
-  var currentProgress = 0;
   var isSubmitting = false;
 
   function clearTimers() {
-    progressTimers.forEach(function (timerId) {
-      window.clearTimeout(timerId);
-    });
-    progressTimers = [];
     if (statusPollTimer) {
       window.clearTimeout(statusPollTimer);
       statusPollTimer = null;
@@ -71,7 +64,7 @@
   }
 
   function updateProgress(value, label) {
-    currentProgress = Math.max(0, Math.min(100, value));
+    var currentProgress = Math.max(0, Math.min(100, value));
     if (progressBar) {
       progressBar.style.width = currentProgress + "%";
     }
@@ -83,6 +76,88 @@
     }
   }
 
+  function setSnapshots(items) {
+    if (!livePreview || !livePreviewGrid) {
+      return;
+    }
+    var snapshots = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!snapshots.length) {
+      livePreview.hidden = true;
+      livePreviewGrid.classList.remove("is-static");
+      livePreviewGrid.innerHTML = "";
+      return;
+    }
+
+    var labels = snapshots.map(function (snapshot) {
+      return snapshot.rack_name || "Rack em analise";
+    }).filter(Boolean);
+    var uniqueLabels = Array.from(new Set(labels));
+    var itemsHtml = uniqueLabels.map(function (label) {
+      return '<span class="io-import-live-preview-item">' + label + "</span>";
+    }).join("");
+
+    livePreview.hidden = false;
+    if (uniqueLabels.join(" · ").length <= 56) {
+      livePreviewGrid.classList.add("is-static");
+      livePreviewGrid.innerHTML = itemsHtml;
+      return;
+    }
+    livePreviewGrid.classList.remove("is-static");
+    livePreviewGrid.innerHTML = itemsHtml + itemsHtml;
+  }
+
+  function setSheetMeta(currentSheet, processed, total, currentIndex) {
+    if (!sheetMeta || !currentSheetNode || !sheetCountNode) {
+      return;
+    }
+    var hasSheet = !!currentSheet;
+    var hasCount = total > 0;
+    if (!hasSheet && !hasCount) {
+      sheetMeta.classList.remove("is-visible");
+      currentSheetNode.textContent = "";
+      sheetCountNode.textContent = "";
+      return;
+    }
+    sheetMeta.classList.add("is-visible");
+    currentSheetNode.textContent = currentSheet || "Preparando leitura";
+    if (!hasCount) {
+      sheetCountNode.textContent = "";
+      return;
+    }
+    var visibleIndex = currentIndex || processed || 0;
+    sheetCountNode.textContent = "Guias " + visibleIndex + "/" + total;
+  }
+
+  function renderProgressPayload(progress) {
+    var payload = progress || {};
+    var progressLabelText = payload.progress_label;
+    if (!progressLabelText) {
+      progressLabelText = payload.current_sheet && payload.sheets_total
+        ? ("Guia " + (payload.current_sheet_index || payload.sheets_processed || 0) + " de " + payload.sheets_total)
+        : (payload.title || "Processando importacao");
+    }
+    updateProgress(payload.percent || 0, progressLabelText);
+    if (titleNode && payload.title) {
+      titleNode.textContent = payload.title;
+    }
+    if (copyNode && payload.message) {
+      copyNode.textContent = payload.message;
+    }
+    var steps = payload.steps || {};
+    stepOrder.forEach(function (stepName) {
+      var state = steps[stepName] || "idle";
+      var label = state === "done" ? "Concluido" : state === "active" ? "Em processamento" : "Aguardando";
+      setStepState(stepName, state, label);
+    });
+    setSheetMeta(
+      payload.current_sheet || "",
+      payload.sheets_processed || 0,
+      payload.sheets_total || 0,
+      payload.current_sheet_index || 0
+    );
+    setSnapshots(payload.snapshots || []);
+  }
+
   function resetProcessingView() {
     clearTimers();
     isSubmitting = false;
@@ -92,15 +167,17 @@
       setStepState(stepName, "idle", "Aguardando");
     });
     if (titleNode) {
-      titleNode.textContent = "Analisando planilha";
+      titleNode.textContent = "Analisando a planilha";
     }
     if (copyNode) {
-      copyNode.textContent = "O arquivo foi recebido e o motor de importacao esta montando a estrutura dos racks sugeridos.";
+      copyNode.textContent = "O arquivo foi recebido e a estrutura da importacao esta sendo organizada para revisao.";
     }
     if (processing) {
       processing.hidden = true;
       processing.style.display = "none";
     }
+    setSheetMeta("", 0, 0);
+    setSnapshots([]);
     form.hidden = false;
     form.style.display = "";
     if (submitButton) {
@@ -139,43 +216,16 @@
     if (submitButton) {
       submitButton.disabled = true;
     }
-    updateProgress(6, "Arquivo enviado");
-    setStepState("upload", "active", "Recebendo arquivo");
-
-    progressTimers.push(window.setTimeout(function () {
-      setStepState("upload", "done", "Concluido");
-      setStepState("parse", "active", "Em processamento");
-      updateProgress(28, "Lendo estrutura da planilha");
-    }, 450));
-
-    progressTimers.push(window.setTimeout(function () {
-      setStepState("parse", "done", "Concluido");
-      setStepState("ai", "active", "Em processamento");
-      updateProgress(58, "Analisando com IA");
-      if (titleNode) {
-        titleNode.textContent = "Processamento inteligente em andamento";
-      }
-      if (copyNode) {
-        copyNode.textContent = "A IA esta correlacionando colunas, sinais, agrupamentos fisicos e sugestoes de rack para gerar a preview.";
-      }
-    }, 1500));
-
-    progressTimers.push(window.setTimeout(function () {
-      setStepState("ai", "active", "Refinando sugestoes");
-      updateProgress(76, "Consolidando sugestoes");
-    }, 3600));
-
-    progressTimers.push(window.setTimeout(function () {
-      setStepState("ai", "done", "Concluido");
-      setStepState("preview", "active", "Em processamento");
-      updateProgress(90, "Gerando preview operacional");
-      if (titleNode) {
-        titleNode.textContent = "Quase pronto";
-      }
-      if (copyNode) {
-        copyNode.textContent = "A estrutura final esta sendo organizada para abrir a preview dos racks sugeridos.";
-      }
-    }, 6200));
+    renderProgressPayload({
+      stage: "upload",
+      percent: 6,
+      title: "Arquivo recebido",
+      message: "O arquivo foi recebido e a leitura inicial da planilha esta comecando.",
+      steps: { upload: "active", parse: "idle", ai: "idle", preview: "idle" },
+      snapshots: [],
+      sheets_total: 0,
+      sheets_processed: 0
+    });
   }
 
   function finishProcessingView() {
@@ -188,16 +238,8 @@
       titleNode.textContent = "Analise concluida";
     }
     if (copyNode) {
-      copyNode.textContent = "A preview foi gerada. Abrindo o resultado da importacao.";
+      copyNode.textContent = "A previa foi gerada. Abrindo o resultado da importacao.";
     }
-  }
-
-  function keepProcessingAlive() {
-    if (currentProgress >= 94) {
-      return;
-    }
-    updateProgress(Math.min(currentProgress + 2, 94), "Aguardando conclusao da analise");
-    statusPollTimer = window.setTimeout(keepProcessingAlive, 1600);
   }
 
   function redirectToResult(url) {
@@ -226,10 +268,10 @@
               contentType: response.headers.get("content-type"),
               body: (rawText || "").slice(0, 2000)
             });
-            throw new Error("Nao foi possivel acompanhar o processamento da importacao.");
+            throw new Error("Nao foi possivel acompanhar a analise da planilha neste momento.");
           }
           if (!response.ok) {
-            throw new Error((payload && payload.message) || ("Falha ao acompanhar a importacao (HTTP " + response.status + ")."));
+            throw new Error((payload && payload.message) || "Falha ao acompanhar a importacao.");
           }
           return payload;
         });
@@ -237,12 +279,15 @@
         if (!payload || !payload.ok) {
           throw new Error((payload && payload.message) || "Nao foi possivel acompanhar a importacao.");
         }
+        if (payload.progress) {
+          renderProgressPayload(payload.progress);
+        }
         if (payload.complete) {
           if (payload.failed && titleNode) {
-            titleNode.textContent = "Importacao finalizada com alertas";
+            titleNode.textContent = "Analise interrompida";
           }
           if (payload.failed && copyNode) {
-            copyNode.textContent = payload.message || "A importacao terminou com alertas. Abrindo os detalhes para revisao.";
+            copyNode.textContent = payload.message || "A analise nao conseguiu ser concluida. Abrindo os detalhes para revisao.";
           }
           redirectToResult(payload.redirect_url || redirectUrl);
           return;
@@ -254,7 +299,6 @@
       });
     }
 
-    keepProcessingAlive();
     statusPollTimer = window.setTimeout(pollOnce, 900);
   }
 
@@ -301,14 +345,10 @@
             contentType: response.headers.get("content-type"),
             body: (rawText || "").slice(0, 2000)
           });
-          throw new Error(
-            "O servidor retornou uma resposta inesperada (HTTP " +
-            response.status +
-            "). Verifique o log do Django ou a aba Network."
-          );
+          throw new Error("O servidor nao conseguiu iniciar a analise agora. Tente novamente em instantes.");
         }
         if (!response.ok) {
-          throw new Error((payload && payload.message) || ("Falha ao enviar a planilha (HTTP " + response.status + ")."));
+          throw new Error((payload && payload.message) || "Falha ao enviar a planilha.");
         }
         return payload;
       });

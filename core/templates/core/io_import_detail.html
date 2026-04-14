@@ -487,6 +487,12 @@
           </div>
         </div>
       {% endif %}
+
+      {% if job.status == 'FAILED' and user_facing_failure_message %}
+        <div class="card compact-card">
+          <div class="notice notice-warning">{{ user_facing_failure_message }}</div>
+        </div>
+      {% endif %}
     </section>
 
     {% if job.status == 'UPLOADED' %}

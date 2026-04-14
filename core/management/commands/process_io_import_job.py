@@ -3,7 +3,7 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 
 from core.models import IOImportJob
-from core.views import _reprocess_io_import_job
+from core.views import _failed_io_import_progress_payload, _reprocess_io_import_job
 
 
 logger = logging.getLogger(__name__)
@@ -28,10 +28,13 @@ class Command(BaseCommand):
         except Exception as exc:
             logger.exception("IO import background job failed", extra={"job_id": job.pk})
             job.status = IOImportJob.Status.FAILED
+            job.ai_status = IOImportJob.AIStatus.FAILED
+            job.ai_error = str(exc)
             warnings = list(job.warnings or [])
             warnings.append(f"Falha interna durante o processamento em segundo plano: {exc}")
             job.warnings = warnings
-            job.save(update_fields=["status", "warnings", "updated_at"])
+            job.progress_payload = _failed_io_import_progress_payload(str(exc), job.progress_payload)
+            job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
             raise CommandError(f"Falha ao processar job {job.pk}: {exc}") from exc
 
         job.refresh_from_db(fields=["status", "ai_status", "rows_parsed"])

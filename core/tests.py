@@ -15,15 +15,20 @@ from openpyxl import Workbook
 from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_visual_flags
 from core.access_control import has_tipo_code, normalize_access_code
 from core.models import (
+    AcessoProdutoUsuario,
     App,
+    AssinaturaUsuario,
+    ConfiguracaoPagamento,
     GrupoRackIO,
     IPImportJob,
     IPImportSettings,
+    IOImportAICache,
     IOImportJob,
     IOImportSettings,
     ListaIP,
     ListaIPItem,
     PerfilUsuario,
+    PlanoComercial,
     IngestRecord,
     CanalRackIO,
     LocalRackIO,
@@ -48,13 +53,17 @@ from core.models import (
     TipoCanalIO,
     TipoPerfil,
 )
+from core.services.billing import DOCUMENTATION_PRODUCT_CODE, activate_starter_plan, activate_trial, ensure_billing_catalog
 from core.services.io_import import (
+    _call_openai_responses,
+    ParsedSpreadsheet,
     apply_import_job,
     build_file_sha256,
     build_import_proposal,
     normalize_rows,
     parse_workbook,
     reprocess_import_job,
+    run_ai_analysis,
     serialize_module_catalog,
 )
 from core.services.ip_import import apply_import_job as apply_ip_import_job
@@ -192,6 +201,126 @@ class AccessControlAdminAndVisibilityTests(TestCase):
         response = self.client_http.get("/apps/bla_oculto/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "BLA Oculto")
+
+
+class BillingAndPlanFlowTests(TestCase):
+    def setUp(self):
+        ensure_billing_catalog()
+        self.client_http = Client()
+        self.user = User.objects.create_user(
+            username="billing-user@set.local",
+            email="billing-user@set.local",
+            password="123456",
+        )
+        self.perfil = PerfilUsuario.objects.create(
+            nome="Billing User",
+            email="billing-user@set.local",
+            usuario=self.user,
+        )
+        self.client_http.force_login(self.user)
+
+    def _create_rack(self, name):
+        rack = RackIO.objects.create(
+            cliente=self.perfil,
+            nome=name,
+            descricao="Teste",
+            slots_total=4,
+        )
+        RackSlotIO.objects.bulk_create([RackSlotIO(rack=rack, posicao=index) for index in range(1, 5)])
+        return rack
+
+    def test_trial_activation_enables_module_access(self):
+        response = self.client_http.post("/produtos/documentacao-tecnica/ativar/", {"next": "/ios/"})
+        self.assertEqual(response.status_code, 302)
+        access = AcessoProdutoUsuario.objects.get(usuario=self.user, produto__codigo=DOCUMENTATION_PRODUCT_CODE)
+        self.assertEqual(access.status, AcessoProdutoUsuario.Status.TRIAL_ATIVO)
+        response = self.client_http.get("/ios/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_expired_trial_redirects_to_plan_selection(self):
+        product = ensure_billing_catalog()
+        AcessoProdutoUsuario.objects.create(
+            usuario=self.user,
+            produto=product,
+            origem=AcessoProdutoUsuario.Origem.TRIAL,
+            status=AcessoProdutoUsuario.Status.EXPIRADO,
+        )
+        response = self.client_http.get("/ios/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/produtos/planos/", response["Location"])
+
+    def test_starter_plan_activation_is_available_with_three_or_fewer_racks(self):
+        self._create_rack("Rack 01")
+        self._create_rack("Rack 02")
+        subscription, error = activate_starter_plan(self.user, DOCUMENTATION_PRODUCT_CODE)
+        self.assertIsNotNone(subscription)
+        self.assertEqual(error, "")
+        self.assertEqual(subscription.plano.codigo, PlanoComercial.Codigo.STARTER)
+        self.assertEqual(subscription.status, AssinaturaUsuario.Status.ACTIVE)
+
+    def test_starter_plan_is_blocked_with_more_than_three_racks(self):
+        for index in range(1, 5):
+            self._create_rack(f"Rack {index:02d}")
+        subscription, error = activate_starter_plan(self.user, DOCUMENTATION_PRODUCT_CODE)
+        self.assertIsNone(subscription)
+        self.assertIn("3 racks", error)
+        response = self.client_http.get("/produtos/planos/?state=starter_bloqueado")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Plano Iniciante")
+
+    def test_starter_over_limit_redirects_module_to_plan_page(self):
+        for index in range(1, 5):
+            self._create_rack(f"Rack {index:02d}")
+        starter = PlanoComercial.objects.get(produto__codigo=DOCUMENTATION_PRODUCT_CODE, codigo=PlanoComercial.Codigo.STARTER)
+        product = ensure_billing_catalog()
+        AssinaturaUsuario.objects.create(
+            usuario=self.user,
+            produto=product,
+            plano=starter,
+            provider=AssinaturaUsuario.Provider.INTERNAL,
+            status=AssinaturaUsuario.Status.ACTIVE,
+            billing_interval=AssinaturaUsuario.BillingInterval.MONTHLY,
+            auto_renew=True,
+        )
+        AcessoProdutoUsuario.objects.create(
+            usuario=self.user,
+            produto=product,
+            origem=AcessoProdutoUsuario.Origem.INTERNO,
+            status=AcessoProdutoUsuario.Status.ATIVO,
+        )
+        response = self.client_http.get("/ios/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/produtos/planos/", response["Location"])
+
+    def test_billing_admin_page_is_available_for_dev(self):
+        dev_type = TipoPerfil.objects.get(codigo="DEV")
+        admin_user = User.objects.create_user(username="billing-dev@set.local", email="billing-dev@set.local", password="123456")
+        admin_profile = PerfilUsuario.objects.create(nome="Billing Dev", email="billing-dev@set.local", usuario=admin_user)
+        admin_profile.tipos.add(dev_type)
+        self.client_http.force_login(admin_user)
+        response = self.client_http.get("/pagamentos-planos/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pagamentos e Planos")
+        self.assertContains(response, "/pagamentos/checkout/sucesso/")
+        self.assertContains(response, "/pagamentos/checkout/falha/")
+        self.assertContains(response, "/pagamentos/checkout/pendente/")
+
+    def test_checkout_status_pages_are_available(self):
+        for url, expected in (
+            ("/pagamentos/checkout/sucesso/", "Pagamento confirmado"),
+            ("/pagamentos/checkout/falha/", "Pagamento nao concluido"),
+            ("/pagamentos/checkout/pendente/", "Pagamento em analise"),
+        ):
+            response = self.client_http.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, expected)
+
+    def test_plans_page_is_separate_from_landing(self):
+        response = self.client_http.get("/produtos/planos/?next=/ios/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ver pagina do produto")
+        self.assertContains(response, "Ative um plano da plataforma para continuar usando os produtos liberados na sua conta.")
+        self.assertContains(response, "Plano Iniciante")
 
 
 class DevAdminPrivilegesTests(TestCase):
@@ -1323,6 +1452,48 @@ class IOImportPipelineTests(TestCase):
         workbook.save(payload)
         return payload.getvalue()
 
+    def _build_slot_block_with_internal_point_titles_workbook(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "AENTR"
+        for row in [
+            ["", "", "Milhao Ingredients", "", "", "", "", ""],
+            ["", "", "CPU CONTROLOGIX 1756-L73 192.100.3.1", "", "", "", "", ""],
+            ["", "", "LISTA DE IO", "", "", "", "", ""],
+            ["", "", "SLOT 01 1746-IB32", "", "", "", "", ""],
+            ["", "", "IO", "Local", "Min", "Max", "TAG 's", "DESCRICAO"],
+            ["", "", "DI.0", "", "0", "1", "M21VR59_FB", "Feedback 59"],
+            ["", "", "DI.1", "", "0", "1", "M21VR30_FB", "Feedback 30"],
+            ["", "", "AO2-M21RE5-CAMPO", "", "", "", "", ""],
+            ["", "", "SLOT 02 1746-NO4I", "", "", "", "", ""],
+            ["", "", "IO", "Local", "Min", "Max", "TAG 's", "DESCRICAO"],
+            ["", "", "AO.0", "", "0", "100", "M21RE5", "Comando analogico"],
+            ["", "", "AO5-V20MV3-OUT", "", "", "", "", ""],
+            ["", "", "SLOT 03 1746-OB32", "", "", "", "", ""],
+            ["", "", "IO", "Local", "Min", "Max", "TAG 's", "DESCRICAO"],
+            ["", "", "DO.0", "", "0", "1", "V20MV3_CMD", "Comando valvula"],
+        ]:
+            sheet.append(row)
+        payload = BytesIO()
+        workbook.save(payload)
+        return payload.getvalue()
+
+    def _build_ai_first_obscure_workbook(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Raw Export"
+        for row in [
+            ["Projeto X", "", "", ""],
+            ["REFX", "NARRATIVE", "HARDWAREPATH", "SIGCLASS"],
+            ["P101_RUN_FB", "Feedback bomba 101", "PNL-PRC-01 / Rack 1 / Slot 02 / DI.00", "DI"],
+            ["P101_START_CMD", "Comando partida bomba 101", "PNL-PRC-01 / Rack 1 / Slot 03 / DQ.01", "DO"],
+        ]:
+            sheet.append(row)
+
+        payload = BytesIO()
+        workbook.save(payload)
+        return payload.getvalue()
+
     def test_import_csv_creates_review_job(self):
         upload = SimpleUploadedFile(
             "lista.csv",
@@ -1361,13 +1532,14 @@ class IOImportPipelineTests(TestCase):
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         with patch("core.views._spawn_io_import_job_processor") as spawn_mock:
-            response = self.client_http.post(
-                "/ios/importacoes/nova/",
-                {
-                    "arquivo": upload,
-                },
-                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client_http.post(
+                    "/ios/importacoes/nova/",
+                    {
+                        "arquivo": upload,
+                    },
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("application/json", response["Content-Type"])
@@ -1379,6 +1551,8 @@ class IOImportPipelineTests(TestCase):
 
         job = IOImportJob.objects.latest("id")
         self.assertEqual(job.status, IOImportJob.Status.UPLOADED)
+        self.assertEqual((job.progress_payload or {}).get("stage"), "upload")
+        self.assertGreater((job.progress_payload or {}).get("percent", 0), 0)
 
     def test_import_ajax_without_file_returns_json_error(self):
         response = self.client_http.post(
@@ -1400,13 +1574,14 @@ class IOImportPipelineTests(TestCase):
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         with patch("core.views._spawn_io_import_job_processor"):
-            create_response = self.client_http.post(
-                "/ios/importacoes/nova/",
-                {
-                    "arquivo": upload,
-                },
-                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-            )
+            with self.captureOnCommitCallbacks(execute=False):
+                create_response = self.client_http.post(
+                    "/ios/importacoes/nova/",
+                    {
+                        "arquivo": upload,
+                    },
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
 
         payload = create_response.json()
         response = self.client_http.get(payload["status_url"], HTTP_X_REQUESTED_WITH="XMLHttpRequest")
@@ -1419,6 +1594,10 @@ class IOImportPipelineTests(TestCase):
         self.assertTrue(payload["processing"])
         self.assertFalse(payload["complete"])
         self.assertEqual(payload["status"], IOImportJob.Status.UPLOADED)
+        self.assertIn("progress", payload)
+        self.assertEqual(payload["progress"]["stage"], "upload")
+        self.assertIn("steps", payload["progress"])
+        self.assertEqual(payload["progress"]["steps"]["upload"], "active")
 
     def test_background_command_invalid_xlsx_marks_job_failed(self):
         upload = SimpleUploadedFile(
@@ -1439,12 +1618,54 @@ class IOImportPipelineTests(TestCase):
 
         job.refresh_from_db()
         self.assertEqual(job.status, IOImportJob.Status.FAILED)
+        self.assertTrue((job.progress_payload or {}).get("failed"))
         self.assertTrue(
             any(
                 "planilha real" in warning.lower() or "segundo plano" in warning.lower()
                 for warning in (job.warnings or [])
             )
         )
+
+    def test_status_endpoint_returns_real_progress_snapshots(self):
+        job = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="lista.xlsx",
+            source_file=SimpleUploadedFile("lista.xlsx", self._build_single_rack_slot_block_workbook()),
+            file_sha256=build_file_sha256(b"abc"),
+            mode=IOImportJob.Mode.CREATE_RACK,
+            status=IOImportJob.Status.UPLOADED,
+            progress_payload={
+                "stage": "ai",
+                "percent": 62,
+                "title": "Correlacionando sinais",
+                "message": "Guia REM01 consolidada. 24 linhas uteis acumuladas ate agora.",
+                "current_sheet": "REM01",
+                "sheets_total": 2,
+                "sheets_processed": 1,
+                "snapshots": [
+                    {
+                        "rack_key": "REM01",
+                        "rack_name": "REM01",
+                        "slots_count": 2,
+                        "channels_count": 24,
+                        "type_summary": ["DI 16", "DO 08"],
+                        "sample_tags": ["DI_001", "DI_002"],
+                    }
+                ],
+            },
+        )
+        response = self.client_http.get(f"/ios/importacoes/{job.pk}/status/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["progress"]["stage"], "ai")
+        self.assertEqual(payload["progress"]["percent"], 62)
+        self.assertEqual(payload["progress"]["current_sheet"], "REM01")
+        self.assertEqual(len(payload["progress"]["snapshots"]), 1)
+        self.assertEqual(payload["progress"]["snapshots"][0]["rack_name"], "REM01")
+        self.assertEqual(payload["progress"]["steps"]["upload"], "done")
+        self.assertEqual(payload["progress"]["steps"]["ai"], "active")
 
     def test_import_ajax_spawn_exception_returns_json_error(self):
         upload = SimpleUploadedFile(
@@ -1453,19 +1674,24 @@ class IOImportPipelineTests(TestCase):
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         with patch("core.views._spawn_io_import_job_processor", side_effect=RuntimeError("spawn down")):
-            response = self.client_http.post(
-                "/ios/importacoes/nova/",
-                {
-                    "arquivo": upload,
-                },
-                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client_http.post(
+                    "/ios/importacoes/nova/",
+                    {
+                        "arquivo": upload,
+                    },
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
 
-        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 200)
         self.assertIn("application/json", response["Content-Type"])
         payload = response.json()
-        self.assertFalse(payload["ok"])
-        self.assertIn("Falha interna", payload["message"])
+        self.assertTrue(payload["ok"])
+        job = IOImportJob.objects.latest("id")
+        self.assertEqual(job.status, IOImportJob.Status.FAILED)
+        self.assertEqual(job.ai_status, IOImportJob.AIStatus.FAILED)
+        self.assertIn("spawn down", job.ai_error)
+        self.assertTrue((job.progress_payload or {}).get("failed"))
 
     def test_import_ajax_job_creation_exception_returns_json_error(self):
         upload = SimpleUploadedFile(
@@ -1487,6 +1713,49 @@ class IOImportPipelineTests(TestCase):
         payload = response.json()
         self.assertFalse(payload["ok"])
         self.assertIn("Falha interna", payload["message"])
+
+    def test_status_endpoint_hides_technical_failure_from_non_dev(self):
+        job = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="lista.xlsx",
+            source_file=SimpleUploadedFile("lista.xlsx", self._build_single_rack_slot_block_workbook()),
+            file_sha256=build_file_sha256(b"abc"),
+            mode=IOImportJob.Mode.CREATE_RACK,
+            status=IOImportJob.Status.FAILED,
+            warnings=["Falha tecnica: timeout apos 25s na chamada do agente."],
+            ai_status=IOImportJob.AIStatus.FAILED,
+        )
+        with patch("core.views._is_dev_user", return_value=False):
+            response = self.client_http.get(f"/ios/importacoes/{job.pk}/status/", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["failed"])
+        self.assertNotIn("timeout", payload["message"].lower())
+        self.assertEqual(payload["warnings_count"], 0)
+        self.assertEqual(payload["ai_status"], "")
+
+    def test_detail_hides_technical_warning_from_non_dev(self):
+        job = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="lista.xlsx",
+            source_file=SimpleUploadedFile("lista.xlsx", self._build_single_rack_slot_block_workbook()),
+            file_sha256=build_file_sha256(b"abc"),
+            mode=IOImportJob.Mode.CREATE_RACK,
+            status=IOImportJob.Status.FAILED,
+            warnings=["Falha tecnica: timeout apos 25s na chamada do agente."],
+            ai_status=IOImportJob.AIStatus.FAILED,
+        )
+        with patch("core.views._is_dev_user", return_value=False):
+            response = self.client_http.get(f"/ios/importacoes/{job.pk}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nao foi possivel concluir a analise da planilha")
+        self.assertNotContains(response, "timeout apos 25s")
+        self.assertNotContains(response, "Warnings")
 
     def test_import_admin_renders(self):
         admin_user = User.objects.create_superuser("io-admin", "io-admin@set.local", "123456")
@@ -1534,7 +1803,7 @@ class IOImportPipelineTests(TestCase):
         self.assertEqual([module["slot_index"] for module in proposal["modules"]], [1, 2])
         self.assertEqual([module["module_type"] for module in proposal["modules"]], ["DI", "DO"])
 
-    def test_import_timeout_do_agente_nao_quebra_pipeline(self):
+    def test_import_timeout_do_agente_interrompe_pipeline_ai_first(self):
         settings_obj = IOImportSettings.load()
         settings_obj.enabled = True
         settings_obj.api_key = "test-key"
@@ -1561,12 +1830,661 @@ class IOImportPipelineTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
         job = IOImportJob.objects.latest("id")
-        self.assertEqual(job.status, IOImportJob.Status.REVIEW)
+        self.assertEqual(job.status, IOImportJob.Status.FAILED)
         self.assertEqual(job.ai_status, IOImportJob.AIStatus.FAILED)
         self.assertIn("timeout", job.ai_error.lower())
-        self.assertGreater(job.rows_parsed, 0)
-        self.assertEqual(job.proposal_payload["summary"]["with_conflicts"], 0)
         self.assertTrue(any("timeout" in warning.lower() for warning in (job.warnings or [])))
+
+    def test_call_openai_responses_polls_background_response_until_completed(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        requested = []
+        queued_payload = {"id": "resp_123", "status": "queued", "output": []}
+        running_payload = {"id": "resp_123", "status": "in_progress", "output": []}
+        completed_payload = {
+            "id": "resp_123",
+            "status": "completed",
+            "output": [
+                {
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": json.dumps({"result": "ok"}),
+                        }
+                    ]
+                }
+            ],
+        }
+        responses = [queued_payload, running_payload, completed_payload]
+
+        class _FakeHTTPResponse:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def read(self):
+                return json.dumps(self.payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            requested.append(
+                {
+                    "url": request.full_url,
+                    "method": request.get_method(),
+                    "timeout": timeout,
+                    "data": request.data,
+                }
+            )
+            return _FakeHTTPResponse(responses[len(requested) - 1])
+
+        with patch("core.services.io_import.urlrequest.urlopen", side_effect=fake_urlopen), patch(
+            "core.services.io_import.time.sleep"
+        ):
+            result = _call_openai_responses(
+                settings_obj=settings_obj,
+                schema_name="io_sheet_semantic_analysis",
+                schema={"type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"], "additionalProperties": False},
+                system_prompt="system",
+                user_prompt="{}",
+                request_timeout_seconds=300,
+            )
+
+        self.assertEqual(result, {"result": "ok"})
+        self.assertEqual([item["method"] for item in requested], ["POST", "GET", "GET"])
+        post_payload = json.loads(requested[0]["data"].decode("utf-8"))
+        self.assertTrue(post_payload["background"])
+        self.assertTrue(post_payload["store"])
+        self.assertEqual(post_payload["metadata"]["schema_name"], "io_sheet_semantic_analysis")
+
+    def test_call_openai_responses_retries_polling_same_response_instead_of_resubmitting(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        requested = []
+
+        class _FakeHTTPResponse:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def read(self):
+                return json.dumps(self.payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            requested.append({"url": request.full_url, "method": request.get_method()})
+            if len(requested) == 1:
+                return _FakeHTTPResponse({"id": "resp_retry", "status": "queued", "output": []})
+            if len(requested) == 2:
+                raise TimeoutError("timed out")
+            return _FakeHTTPResponse(
+                {
+                    "id": "resp_retry",
+                    "status": "completed",
+                    "output": [{"content": [{"type": "output_text", "text": json.dumps({"result": "ok"})}]}],
+                }
+            )
+
+        with patch("core.services.io_import.urlrequest.urlopen", side_effect=fake_urlopen), patch(
+            "core.services.io_import.time.sleep"
+        ):
+            result = _call_openai_responses(
+                settings_obj=settings_obj,
+                schema_name="io_sheet_semantic_analysis",
+                schema={"type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"], "additionalProperties": False},
+                system_prompt="system",
+                user_prompt="{}",
+                request_timeout_seconds=300,
+            )
+
+        self.assertEqual(result, {"result": "ok"})
+        self.assertEqual(sum(1 for item in requested if item["method"] == "POST"), 1)
+        self.assertEqual(sum(1 for item in requested if item["method"] == "GET"), 2)
+        self.assertTrue(all(item["url"].endswith("/responses/resp_retry") for item in requested[1:]))
+
+    def test_reprocess_import_job_ai_first_can_drive_semantic_parse_from_raw_rows(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        raw_bytes = self._build_ai_first_obscure_workbook()
+        job = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="raw-export.xlsx",
+            source_file=SimpleUploadedFile(
+                "raw-export.xlsx",
+                raw_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            file_sha256=build_file_sha256(raw_bytes),
+            mode=IOImportJob.Mode.CREATE_RACK,
+        )
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        parsed = parse_workbook(raw_bytes=raw_bytes, original_filename="raw-export.xlsx")[0]
+        with self.assertRaises(Exception):
+            normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=None)
+
+        sheet_payload = {
+            "sheet_role": "data",
+            "skip_sheet": False,
+            "layout_hint": "tabular",
+            "rack_name": "PNL-PRC-01 - Rack 01",
+            "column_map": {
+                "panel": {"header": "", "confidence": 0, "mode": "fill"},
+                "rack": {"header": "", "confidence": 0, "mode": "fill"},
+                "slot": {"header": "", "confidence": 0, "mode": "fill"},
+                "module_model": {"header": "", "confidence": 0, "mode": "fill"},
+                "channel": {"header": "", "confidence": 0, "mode": "fill"},
+                "tag": {"header": "", "confidence": 0, "mode": "fill"},
+                "description": {"header": "", "confidence": 0, "mode": "fill"},
+                "type": {"header": "", "confidence": 0, "mode": "fill"},
+            },
+            "logical_points": [
+                {
+                    "source_row": 3,
+                    "panel": "PNL-PRC-01",
+                    "rack": "Rack 01",
+                    "slot": "02",
+                    "module_model": "DI-16",
+                    "channel": "DI.00",
+                    "tag": "P101_RUN_FB",
+                    "description": "Feedback bomba 101",
+                    "type": "DI",
+                    "confidence": 97,
+                },
+                {
+                    "source_row": 4,
+                    "panel": "PNL-PRC-01",
+                    "rack": "Rack 01",
+                    "slot": "03",
+                    "module_model": "DO-16",
+                    "channel": "DQ.01",
+                    "tag": "P101_START_CMD",
+                    "description": "Comando partida bomba 101",
+                    "type": "DO",
+                    "confidence": 97,
+                },
+            ],
+            "row_hints": [
+                {
+                    "source_row": 1,
+                    "row_kind": "noise",
+                    "panel": "",
+                    "rack": "",
+                    "slot": "",
+                    "module_model": "",
+                    "channel": "",
+                    "tag": "",
+                    "description": "",
+                    "type": "",
+                    "confidence": 90,
+                },
+                {
+                    "source_row": 2,
+                    "row_kind": "subheader",
+                    "panel": "",
+                    "rack": "",
+                    "slot": "",
+                    "module_model": "",
+                    "channel": "",
+                    "tag": "",
+                    "description": "",
+                    "type": "",
+                    "confidence": 95,
+                },
+            ],
+            "warnings": [],
+            "notes": "ok",
+        }
+
+        with patch("core.services.io_import._call_openai_responses", side_effect=[sheet_payload]):
+            result = reprocess_import_job(job=job, module_catalog=module_catalog, settings_obj=settings_obj)
+
+        self.assertEqual(result["ai_status"], IOImportJob.AIStatus.SUCCESS)
+        self.assertEqual(result["rows_parsed"], 2)
+        self.assertEqual(result["proposal"]["summary"]["racks"], 1)
+        self.assertEqual(result["proposal"]["summary"]["modules"], 2)
+        self.assertEqual(result["proposal"]["summary"]["with_conflicts"], 0)
+        self.assertEqual(result["proposal"]["rack"]["name"], "PNL-PRC-01 - Rack 01")
+        self.assertIn("workbook", result["ai_payload"])
+        self.assertEqual(result["normalized_rows"][0]["field_sources"]["tag"], "ai")
+        self.assertEqual([module["module_type"] for module in result["proposal"]["modules"]], ["DI", "DO"])
+
+    def test_reprocess_import_job_single_sheet_fast_path_uses_sparse_ai_guidance(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        raw_bytes = self._build_ai_first_obscure_workbook()
+        job = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="raw-export.xlsx",
+            source_file=SimpleUploadedFile(
+                "raw-export.xlsx",
+                raw_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            file_sha256=build_file_sha256(raw_bytes),
+            mode=IOImportJob.Mode.CREATE_RACK,
+        )
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+
+        sparse_sheet_payload = {
+            "sheet_role": "data",
+            "skip_sheet": False,
+            "layout_hint": "tabular",
+            "rack_name": "PNL-PRC-01 - Rack 01",
+            "column_map": {
+                "panel": {"header": "", "confidence": 0, "mode": "fill"},
+                "rack": {"header": "", "confidence": 0, "mode": "fill"},
+                "slot": {"header": "", "confidence": 0, "mode": "fill"},
+                "module_model": {"header": "", "confidence": 0, "mode": "fill"},
+                "channel": {"header": "", "confidence": 0, "mode": "fill"},
+                "location": {"header": "HARDWAREPATH", "confidence": 96, "mode": "fill"},
+                "tag": {"header": "REFX", "confidence": 96, "mode": "fill"},
+                "description": {"header": "NARRATIVE", "confidence": 96, "mode": "fill"},
+                "type": {"header": "SIGCLASS", "confidence": 96, "mode": "fill"},
+            },
+            "row_hints": [],
+            "warnings": [],
+            "notes": "sparse-guidance",
+        }
+
+        with patch("core.services.io_import._call_openai_responses", side_effect=[sparse_sheet_payload]) as mocked:
+            result = reprocess_import_job(job=job, module_catalog=module_catalog, settings_obj=settings_obj)
+
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(result["ai_status"], IOImportJob.AIStatus.SUCCESS)
+        self.assertEqual(result["rows_parsed"], 2)
+        self.assertEqual(result["proposal"]["summary"]["racks"], 1)
+        self.assertEqual(result["proposal"]["rack"]["name"], "PNL-PRC-01 - Rack 01")
+        self.assertEqual([module["module_type"] for module in result["proposal"]["modules"]], ["DI", "DO"])
+
+    def test_reprocess_import_job_reuses_ai_cache_for_identical_file(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        raw_bytes = self._build_ai_first_obscure_workbook()
+        job_one = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="raw-export.xlsx",
+            source_file=SimpleUploadedFile(
+                "raw-export.xlsx",
+                raw_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            file_sha256=build_file_sha256(raw_bytes),
+            mode=IOImportJob.Mode.CREATE_RACK,
+        )
+        job_two = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="raw-export.xlsx",
+            source_file=SimpleUploadedFile(
+                "raw-export.xlsx",
+                raw_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            file_sha256=build_file_sha256(raw_bytes),
+            mode=IOImportJob.Mode.CREATE_RACK,
+        )
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        sheet_payload = {
+            "sheet_role": "data",
+            "skip_sheet": False,
+            "layout_hint": "tabular",
+            "rack_name": "PNL-PRC-01 - Rack 01",
+            "column_map": {
+                "panel": {"header": "", "confidence": 0, "mode": "fill"},
+                "rack": {"header": "", "confidence": 0, "mode": "fill"},
+                "slot": {"header": "", "confidence": 0, "mode": "fill"},
+                "module_model": {"header": "", "confidence": 0, "mode": "fill"},
+                "channel": {"header": "", "confidence": 0, "mode": "fill"},
+                "tag": {"header": "", "confidence": 0, "mode": "fill"},
+                "description": {"header": "", "confidence": 0, "mode": "fill"},
+                "type": {"header": "", "confidence": 0, "mode": "fill"},
+            },
+            "logical_points": [
+                {
+                    "source_row": 3,
+                    "panel": "PNL-PRC-01",
+                    "rack": "Rack 01",
+                    "slot": "02",
+                    "module_model": "DI-16",
+                    "channel": "DI.00",
+                    "tag": "P101_RUN_FB",
+                    "description": "Feedback bomba 101",
+                    "type": "DI",
+                    "confidence": 97,
+                },
+                {
+                    "source_row": 4,
+                    "panel": "PNL-PRC-01",
+                    "rack": "Rack 01",
+                    "slot": "03",
+                    "module_model": "DO-16",
+                    "channel": "DQ.01",
+                    "tag": "P101_START_CMD",
+                    "description": "Comando partida bomba 101",
+                    "type": "DO",
+                    "confidence": 97,
+                },
+            ],
+            "row_hints": [],
+            "warnings": [],
+            "notes": "ok",
+        }
+
+        with patch("core.services.io_import._call_openai_responses", side_effect=[sheet_payload]) as mocked:
+            result_one = reprocess_import_job(job=job_one, module_catalog=module_catalog, settings_obj=settings_obj)
+            result_two = reprocess_import_job(job=job_two, module_catalog=module_catalog, settings_obj=settings_obj)
+
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(result_one["rows_parsed"], 2)
+        self.assertEqual(result_two["rows_parsed"], 2)
+        self.assertEqual(IOImportAICache.objects.count(), 1)
+        self.assertTrue(IOImportAICache.objects.filter(stage=IOImportAICache.Stage.SHEET).exists())
+
+    def test_reprocess_import_job_does_not_reuse_ai_cache_for_updated_file(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        raw_bytes_one = self._build_ai_first_obscure_workbook()
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Raw Export"
+        for row in [
+            ["Projeto X", "", "", ""],
+            ["REFX", "NARRATIVE", "HARDWAREPATH", "SIGCLASS"],
+            ["P201_RUN_FB", "Feedback bomba 201", "PNL-PRC-02 / Rack 1 / Slot 02 / DI.00", "DI"],
+            ["P201_START_CMD", "Comando partida bomba 201", "PNL-PRC-02 / Rack 1 / Slot 03 / DQ.01", "DO"],
+        ]:
+            sheet.append(row)
+        payload = BytesIO()
+        workbook.save(payload)
+        raw_bytes_two = payload.getvalue()
+
+        job_one = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="raw-export.xlsx",
+            source_file=SimpleUploadedFile("raw-export.xlsx", raw_bytes_one, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            file_sha256=build_file_sha256(raw_bytes_one),
+            mode=IOImportJob.Mode.CREATE_RACK,
+        )
+        job_two = IOImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="raw-export.xlsx",
+            source_file=SimpleUploadedFile("raw-export.xlsx", raw_bytes_two, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            file_sha256=build_file_sha256(raw_bytes_two),
+            mode=IOImportJob.Mode.CREATE_RACK,
+        )
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        sheet_payload_one = {
+            "sheet_role": "data",
+            "skip_sheet": False,
+            "layout_hint": "tabular",
+            "rack_name": "PNL-PRC-01 - Rack 01",
+            "column_map": {key: {"header": "", "confidence": 0, "mode": "fill"} for key in ("panel", "rack", "slot", "module_model", "channel", "tag", "description", "type")},
+            "logical_points": [
+                {"source_row": 3, "panel": "PNL-PRC-01", "rack": "Rack 01", "slot": "02", "module_model": "DI-16", "channel": "DI.00", "tag": "P101_RUN_FB", "description": "Feedback bomba 101", "type": "DI", "confidence": 97},
+                {"source_row": 4, "panel": "PNL-PRC-01", "rack": "Rack 01", "slot": "03", "module_model": "DO-16", "channel": "DQ.01", "tag": "P101_START_CMD", "description": "Comando partida bomba 101", "type": "DO", "confidence": 97},
+            ],
+            "row_hints": [],
+            "warnings": [],
+            "notes": "ok",
+        }
+        sheet_payload_two = {
+            "sheet_role": "data",
+            "skip_sheet": False,
+            "layout_hint": "tabular",
+            "rack_name": "PNL-PRC-02 - Rack 01",
+            "column_map": {key: {"header": "", "confidence": 0, "mode": "fill"} for key in ("panel", "rack", "slot", "module_model", "channel", "tag", "description", "type")},
+            "logical_points": [
+                {"source_row": 3, "panel": "PNL-PRC-02", "rack": "Rack 01", "slot": "02", "module_model": "DI-16", "channel": "DI.00", "tag": "P201_RUN_FB", "description": "Feedback bomba 201", "type": "DI", "confidence": 97},
+                {"source_row": 4, "panel": "PNL-PRC-02", "rack": "Rack 01", "slot": "03", "module_model": "DO-16", "channel": "DQ.01", "tag": "P201_START_CMD", "description": "Comando partida bomba 201", "type": "DO", "confidence": 97},
+            ],
+            "row_hints": [],
+            "warnings": [],
+            "notes": "ok",
+        }
+
+        with patch(
+            "core.services.io_import._call_openai_responses",
+            side_effect=[sheet_payload_one, sheet_payload_two],
+        ) as mocked:
+            result_one = reprocess_import_job(job=job_one, module_catalog=module_catalog, settings_obj=settings_obj)
+            result_two = reprocess_import_job(job=job_two, module_catalog=module_catalog, settings_obj=settings_obj)
+
+        self.assertEqual(mocked.call_count, 2)
+        self.assertEqual(result_one["proposal"]["rack"]["name"], "PNL-PRC-01 - Rack 01")
+        self.assertEqual(result_two["proposal"]["rack"]["name"], "PNL-PRC-02 - Rack 01")
+
+    def test_run_ai_analysis_sends_compact_contextual_module_catalog(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        parsed = ParsedSpreadsheet(
+            file_format="xlsx",
+            sheet_name="REM01",
+            header_row_index=0,
+            rows_total=3,
+            headers=["TAG", "DESC", "CH", "POS"],
+            raw_rows=[
+                ["TAG", "DESC", "CH", "POS"],
+                ["P101_RUN_FB", "Feedback bomba 101", "DI.00", "Slot 02"],
+                ["P101_START_CMD", "Comando partida bomba 101", "DQ.01", "Slot 03"],
+            ],
+            column_map={},
+            warnings=[],
+            layout="tabular",
+        )
+        module_catalog = []
+        for index in range(1, 31):
+            module_catalog.append(
+                {
+                    "id": index,
+                    "modelo": f"DI-{index}",
+                    "marca": "SIMATIC",
+                    "tipo": "DI",
+                    "quantidade_canais": 16 if index % 2 else 32,
+                }
+            )
+        for index in range(31, 61):
+            module_catalog.append(
+                {
+                    "id": index,
+                    "modelo": f"DO-{index}",
+                    "marca": "SIMATIC",
+                    "tipo": "DO",
+                    "quantidade_canais": 16 if index % 2 else 32,
+                }
+            )
+
+        captured_payloads = []
+
+        def fake_call(**kwargs):
+            captured_payloads.append(json.loads(kwargs["user_prompt"]))
+            return {
+                "sheet_role": "data",
+                "skip_sheet": False,
+                "layout_hint": "tabular",
+                "rack_name": "REM01",
+                "column_map": {key: {"header": "", "confidence": 0, "mode": "fill"} for key in ("panel", "rack", "slot", "module_model", "channel", "tag", "description", "type")},
+                "logical_points": [],
+                "row_hints": [],
+                "warnings": [],
+                "notes": "ok",
+            }
+
+        with patch("core.services.io_import._call_openai_responses", side_effect=fake_call):
+            run_ai_analysis(
+                settings_obj=settings_obj,
+                parsed=parsed,
+                normalized_rows=[],
+                module_catalog=module_catalog,
+                file_sha256="abc123",
+                workbook_plan={"layout_hint": "tabular"},
+                request_timeout_seconds=10,
+                total_sheets=4,
+            )
+
+        self.assertEqual(len(captured_payloads), 1)
+        payload = captured_payloads[0]
+        self.assertLess(len(payload["module_catalog"]), len(module_catalog))
+        self.assertLessEqual(len(payload["module_catalog"]), 18)
+        self.assertIn("module_catalog_stats", payload)
+        self.assertTrue(all("id" not in item for item in payload["module_catalog"]))
+
+    def test_normalize_rows_ai_can_enrich_row_structure_with_confidence(self):
+        parsed = ParsedSpreadsheet(
+            file_format="xlsx",
+            sheet_name="Painel IA",
+            header_row_index=0,
+            rows_total=2,
+            headers=["SIG", "OBS", "POS", "CH", "CLASS"],
+            raw_rows=[
+                ["SIG", "OBS", "POS", "CH", "CLASS"],
+                ["MTR_FB_01", "Feedback do motor", "Slot 07", "DI.03", "AO"],
+            ],
+            column_map={
+                "tag": {"index": 0, "header": "SIG", "confidence": 80, "source": "heuristic"},
+                "description": {"index": 1, "header": "OBS", "confidence": 80, "source": "heuristic"},
+            },
+            warnings=[],
+            layout="tabular",
+        )
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        ai_result = {
+            "rack_name": "REM-IA-01",
+            "column_map": {
+                "panel": {"header": "", "confidence": 0, "mode": "fill"},
+                "rack": {"header": "", "confidence": 0, "mode": "fill"},
+                "slot": {"header": "POS", "confidence": 95, "mode": "fill"},
+                "module_model": {"header": "", "confidence": 0, "mode": "fill"},
+                "channel": {"header": "CH", "confidence": 95, "mode": "fill"},
+                "tag": {"header": "SIG", "confidence": 90, "mode": "fill"},
+                "description": {"header": "OBS", "confidence": 90, "mode": "fill"},
+                "type": {"header": "CLASS", "confidence": 95, "mode": "override"},
+            },
+            "row_hints": [
+                {
+                    "source_row": 2,
+                    "row_kind": "data",
+                    "panel": "PNL-IA-01",
+                    "rack": "Rack 02",
+                    "slot": "Slot 07",
+                    "module_model": "DI-16",
+                    "channel": "DI.03",
+                    "tag": "MTR_FB_01",
+                    "description": "Feedback do motor",
+                    "type": "DI",
+                    "confidence": 96,
+                }
+            ],
+            "warnings": [],
+            "notes": "ok",
+        }
+
+        rows, active_map, warnings = normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=ai_result)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(active_map["slot"]["header"], "POS")
+        self.assertEqual(active_map["channel"]["header"], "CH")
+        self.assertEqual(rows[0]["panel_raw"], "PNL-IA-01")
+        self.assertEqual(rows[0]["rack_raw"], "Rack 02")
+        self.assertEqual(rows[0]["slot_index"], 7)
+        self.assertEqual(rows[0]["channel_index"], 4)
+        self.assertEqual(rows[0]["module_raw"], "DI-16")
+        self.assertEqual(rows[0]["type"], "DI")
+        self.assertEqual(rows[0]["field_sources"]["type"], "ai")
+        self.assertFalse(warnings)
+
+    def test_normalize_rows_structural_validation_adjusts_type_to_catalog(self):
+        parsed = ParsedSpreadsheet(
+            file_format="xlsx",
+            sheet_name="Painel Catalogo",
+            header_row_index=0,
+            rows_total=2,
+            headers=["TAG", "DESC", "MODULO", "SLOT", "CHANNEL"],
+            raw_rows=[
+                ["TAG", "DESC", "MODULO", "SLOT", "CHANNEL"],
+                ["XIC_001", "Contato auxiliar", "DI-16", "1", "1"],
+            ],
+            column_map={
+                "tag": {"index": 0, "header": "TAG", "confidence": 90, "source": "heuristic"},
+                "description": {"index": 1, "header": "DESC", "confidence": 90, "source": "heuristic"},
+                "module_model": {"index": 2, "header": "MODULO", "confidence": 90, "source": "heuristic"},
+                "slot": {"index": 3, "header": "SLOT", "confidence": 90, "source": "heuristic"},
+                "channel": {"index": 4, "header": "CHANNEL", "confidence": 90, "source": "heuristic"},
+            },
+            warnings=[],
+            layout="tabular",
+        )
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        ai_result = {
+            "rack_name": "REM-IA-02",
+            "column_map": {
+                "panel": {"header": "", "confidence": 0, "mode": "fill"},
+                "rack": {"header": "", "confidence": 0, "mode": "fill"},
+                "slot": {"header": "SLOT", "confidence": 95, "mode": "fill"},
+                "module_model": {"header": "MODULO", "confidence": 95, "mode": "fill"},
+                "channel": {"header": "CHANNEL", "confidence": 95, "mode": "fill"},
+                "tag": {"header": "TAG", "confidence": 95, "mode": "fill"},
+                "description": {"header": "DESC", "confidence": 95, "mode": "fill"},
+                "type": {"header": "", "confidence": 0, "mode": "fill"},
+            },
+            "row_hints": [
+                {
+                    "source_row": 2,
+                    "row_kind": "data",
+                    "panel": "",
+                    "rack": "",
+                    "slot": "1",
+                    "module_model": "DI-16",
+                    "channel": "1",
+                    "tag": "XIC_001",
+                    "description": "Contato auxiliar",
+                    "type": "AO",
+                    "confidence": 98,
+                }
+            ],
+            "warnings": [],
+            "notes": "conflict",
+        }
+
+        rows, _, warnings = normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=ai_result)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["module_raw"], "DI-16")
+        self.assertEqual(rows[0]["type"], "DI")
+        self.assertIn("tipo_ajustado_pelo_catalogo", rows[0]["issues"])
+        self.assertTrue(any("conflito com o modulo" in warning.lower() for warning in warnings))
 
     def test_import_multisheet_builds_multi_rack_proposal(self):
         upload = SimpleUploadedFile(
@@ -1620,6 +2538,162 @@ class IOImportPipelineTests(TestCase):
         self.assertEqual(job.proposal_payload["summary"]["racks"], 2)
         self.assertEqual(sorted(rack["name"] for rack in job.proposal_payload["racks"]), ["REM01", "UBS3"])
         self.assertEqual(sorted({row["resolved_rack_name"] for row in job.extracted_payload["rows"]}), ["REM01", "UBS3"])
+
+    def test_slot_block_sheet_ignores_internal_point_titles_as_new_racks(self):
+        upload = SimpleUploadedFile(
+            "aentr.xlsx",
+            self._build_slot_block_with_internal_point_titles_workbook(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response = self.client_http.post(
+            "/ios/importacoes/nova/",
+            {
+                "arquivo": upload,
+                "requested_local": str(self.local.id),
+                "requested_grupo": str(self.grupo.id),
+                "requested_planta_code": self.planta.codigo,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        job = IOImportJob.objects.latest("id")
+        self.assertEqual(job.status, IOImportJob.Status.REVIEW)
+        self.assertEqual(job.proposal_payload["summary"]["racks"], 1)
+        self.assertEqual(job.proposal_payload["racks"][0]["name"].upper(), "AENTR")
+        rack_names = [rack["name"] for rack in job.proposal_payload["racks"]]
+        self.assertNotIn("CPU CONTROLOGIX 1756-L73 192.100.3.1", rack_names)
+        self.assertNotIn("AO2-M21RE5-CAMPO", rack_names)
+        self.assertNotIn("AO5-V20MV3-OUT", rack_names)
+
+    def test_build_import_proposal_merges_spurious_interface_alias_into_dominant_rack(self):
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        normalized_rows = []
+        for channel_index in range(1, 5):
+            normalized_rows.append(
+                {
+                    "source_sheet": "UBS3-ET200SP",
+                    "source_row": channel_index,
+                    "panel_raw": "",
+                    "rack_raw": "UBS3-ET200SP",
+                    "slot_raw": "SLOT 01",
+                    "slot_index": 1,
+                    "module_raw": "SIMATIC ET 200SP IM 155-6PN - 64 I/O",
+                    "channel_raw": f"DI.{channel_index - 1}",
+                    "channel_index": channel_index,
+                    "location_raw": "",
+                    "tag": f"HEAD_{channel_index:02d}",
+                    "description": f"Cabeca {channel_index:02d}",
+                    "type": "DI",
+                    "issues": [],
+                }
+            )
+        for channel_index in range(1, 17):
+            normalized_rows.append(
+                {
+                    "source_sheet": "UBS3-ET200SP",
+                    "source_row": 100 + channel_index,
+                    "panel_raw": "",
+                    "rack_raw": "",
+                    "slot_raw": "SLOT 02",
+                    "slot_index": 2,
+                    "module_raw": "6ES7131-6BH01-0BA0",
+                    "channel_raw": f"DI.{channel_index - 1}",
+                    "channel_index": channel_index,
+                    "location_raw": "",
+                    "tag": f"UBS3_FB_{channel_index:02d}",
+                    "description": f"Feedback UBS3 {channel_index:02d}",
+                    "type": "DI",
+                    "issues": [],
+                }
+            )
+
+        proposal = build_import_proposal(
+            original_filename="PLANILHA DE IO UBS3 NUTRIEN 05042025.xlsx",
+            normalized_rows=normalized_rows,
+            module_catalog=module_catalog,
+        )
+
+        self.assertEqual(proposal["summary"]["racks"], 1)
+        self.assertEqual(proposal["rack"]["name"], "UBS3")
+        self.assertEqual(len(proposal["racks"][0]["modules"]), 2)
+        self.assertEqual(
+            {row["resolved_rack_name"] for row in normalized_rows},
+            {"UBS3"},
+        )
+
+    def test_build_import_proposal_merges_tiny_sheet_alias_group_that_duplicates_existing_module(self):
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        normalized_rows = []
+        for channel_index in range(1, 3):
+            normalized_rows.append(
+                {
+                    "source_sheet": "UBS3-ET200SP",
+                    "source_row": channel_index,
+                    "panel_raw": "",
+                    "rack_raw": "UBS3-ET200SP",
+                    "slot_raw": "SLOT 02",
+                    "slot_index": 2,
+                    "module_raw": "6ES7131-6BH01-0BA0 (16 DI)",
+                    "channel_raw": f"DI.{channel_index - 1}",
+                    "channel_index": channel_index,
+                    "location_raw": "",
+                    "tag": f"FB_ELE{channel_index:02d}",
+                    "description": "",
+                    "type": "DI",
+                    "issues": [],
+                }
+            )
+        for channel_index in range(1, 17):
+            normalized_rows.append(
+                {
+                    "source_sheet": "UBS3-ET200SP",
+                    "source_row": 100 + channel_index,
+                    "panel_raw": "",
+                    "rack_raw": "",
+                    "slot_raw": "SLOT 02",
+                    "slot_index": 2,
+                    "module_raw": "6ES7131-6BH01-0BA0 (16 DI)",
+                    "channel_raw": f"DI.{channel_index - 1}",
+                    "channel_index": channel_index,
+                    "location_raw": "",
+                    "tag": f"UBS3_FB_{channel_index:02d}",
+                    "description": f"Feedback UBS3 {channel_index:02d}",
+                    "type": "DI",
+                    "issues": [],
+                }
+            )
+        for channel_index in range(1, 17):
+            normalized_rows.append(
+                {
+                    "source_sheet": "UBS3-ET200SP",
+                    "source_row": 200 + channel_index,
+                    "panel_raw": "",
+                    "rack_raw": "",
+                    "slot_raw": "SLOT 03",
+                    "slot_index": 3,
+                    "module_raw": "6ES7132-6BH01-0BA0 (16 DO)",
+                    "channel_raw": f"DO.{channel_index - 1}",
+                    "channel_index": channel_index,
+                    "location_raw": "",
+                    "tag": f"CMD_ELE{channel_index:02d}",
+                    "description": f"Comando UBS3 {channel_index:02d}",
+                    "type": "DO",
+                    "issues": [],
+                }
+            )
+
+        proposal = build_import_proposal(
+            original_filename="PLANILHA DE IO UBS3 NUTRIEN 05042025.xlsx",
+            normalized_rows=normalized_rows,
+            module_catalog=module_catalog,
+        )
+
+        self.assertEqual(proposal["summary"]["racks"], 1)
+        self.assertEqual(proposal["rack"]["name"], "UBS3")
+        self.assertEqual(
+            {row["resolved_rack_name"] for row in normalized_rows},
+            {"UBS3"},
+        )
 
     def test_apply_import_multirack_creates_multiple_racks(self):
         upload = SimpleUploadedFile(
@@ -1929,6 +3003,47 @@ class IOImportPipelineTests(TestCase):
 
                 for rack_name, expected_sheets in expected_payload["sheet_assertions"].items():
                     self.assertEqual(rack_map[rack_name]["source_sheets"], expected_sheets)
+
+    def test_all_fixture_files_keep_channel_type_consistent_with_module_type(self):
+        module_catalog = serialize_module_catalog(ModuloIO.objects.select_related("tipo_base").all())
+        files = sorted(
+            path
+            for path in self.FIXTURES_DIR.iterdir()
+            if path.is_file()
+            and path.suffix.lower() in {".xlsx", ".csv", ".tsv"}
+            and path.name[:2].isdigit()
+        )
+
+        for path in files:
+            with self.subTest(file_name=path.name):
+                parsed_sheets = parse_workbook(raw_bytes=path.read_bytes(), original_filename=path.name)
+                normalized_rows = []
+                for parsed in parsed_sheets:
+                    sheet_rows, _, _ = normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=None)
+                    normalized_rows.extend(sheet_rows)
+
+                proposal = build_import_proposal(
+                    original_filename=path.name,
+                    normalized_rows=normalized_rows,
+                    module_catalog=module_catalog,
+                )
+
+                for rack in proposal["racks"]:
+                    for module in rack["modules"]:
+                        module_type = module.get("module_type")
+                        self.assertIn(module_type, {"DI", "DO", "AI", "AO"})
+                        for channel in module.get("channels") or []:
+                            if not channel.get("source_row"):
+                                continue
+                            self.assertEqual(
+                                channel.get("type"),
+                                module_type,
+                                msg=(
+                                    f"{path.name} gerou divergencia no rack {rack['name']} "
+                                    f"slot {module['slot_index']} canal {channel['index']}: "
+                                    f"modulo={module_type} canal={channel.get('type')}"
+                                ),
+                            )
 
     def test_apply_import_creates_custom_modules_when_catalog_has_gap(self):
         raw_bytes = (

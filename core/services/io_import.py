@@ -6,8 +6,10 @@ import re
 import socket
 import time
 import unicodedata
-from collections import defaultdict
+import uuid
+from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from urllib import error as urlerror
@@ -111,13 +113,21 @@ DEFAULT_HEADER_PROMPT = (
 )
 
 DEFAULT_GROUPING_PROMPT = (
-    "Given normalized IO rows, suggest rack name, slot grouping, module models, channel ordering, and warnings. "
-    "Do not invent unsupported fields. Respect explicit slot and channel values when present."
+    "Given the raw worksheet context plus the preliminary normalized IO rows, act as the main interpreter of the sheet. "
+    "Suggest reliable column mappings, classify noisy rows, and enrich each logical IO row with rack, slot, module model, "
+    "channel, tag, description, and type when the structure supports it. Respect explicit engineering evidence when present, "
+    "and only override the preliminary interpretation when confidence is high."
 )
 
-DEFAULT_AI_REQUEST_TIMEOUT_SECONDS = 25.0
-DEFAULT_AI_TOTAL_BUDGET_SECONDS = 180.0
-DEFAULT_AI_MAX_SHEETS_PER_JOB = 24
+DEFAULT_AI_REQUEST_TIMEOUT_SECONDS = 180.0
+DEFAULT_AI_TOTAL_BUDGET_SECONDS = 7200.0
+DEFAULT_AI_MAX_SHEETS_PER_JOB = 96
+DEFAULT_AI_OVERRIDE_CONFIDENCE = 70
+DEFAULT_AI_MAX_RAW_ROWS_PER_SHEET = 220
+DEFAULT_AI_MAX_RETRIES = 2
+DEFAULT_AI_CACHE_MAX_ENTRIES = 240
+DEFAULT_AI_CACHE_MAX_AGE_DAYS = 21
+IO_IMPORT_AI_CACHE_VERSION = "v1"
 
 
 class IOImportError(Exception):
@@ -268,6 +278,49 @@ def _ai_total_budget_seconds():
 
 def _ai_max_sheets_per_job():
     return _read_positive_int_env("IO_IMPORT_AI_MAX_SHEETS_PER_JOB", DEFAULT_AI_MAX_SHEETS_PER_JOB)
+
+
+def _ai_override_confidence_threshold():
+    threshold = _read_positive_int_env("IO_IMPORT_AI_OVERRIDE_CONFIDENCE", DEFAULT_AI_OVERRIDE_CONFIDENCE)
+    return max(1, min(threshold, 100))
+
+
+def _ai_max_raw_rows_per_sheet():
+    return _read_positive_int_env("IO_IMPORT_AI_MAX_RAW_ROWS_PER_SHEET", DEFAULT_AI_MAX_RAW_ROWS_PER_SHEET)
+
+
+def _ai_max_retries():
+    return _read_positive_int_env("IO_IMPORT_AI_MAX_RETRIES", DEFAULT_AI_MAX_RETRIES)
+
+
+def _ai_cache_max_entries():
+    return _read_positive_int_env("IO_IMPORT_AI_CACHE_MAX_ENTRIES", DEFAULT_AI_CACHE_MAX_ENTRIES)
+
+
+def _ai_cache_max_age_days():
+    return _read_positive_int_env("IO_IMPORT_AI_CACHE_MAX_AGE_DAYS", DEFAULT_AI_CACHE_MAX_AGE_DAYS)
+
+
+def _effective_ai_sheet_row_limit(settings_obj, total_sheets):
+    base_limit = max(24, int(getattr(settings_obj, "max_rows_for_ai", 150) or 150))
+    if total_sheets >= 16:
+        return min(base_limit, 72)
+    if total_sheets >= 10:
+        return min(base_limit, 96)
+    if total_sheets >= 6:
+        return min(base_limit, 120)
+    return base_limit
+
+
+def _effective_workbook_context_limit(total_sheets):
+    base_limit = _ai_max_raw_rows_per_sheet()
+    if total_sheets >= 16:
+        return min(base_limit, 24)
+    if total_sheets >= 10:
+        return min(base_limit, 32)
+    if total_sheets >= 6:
+        return min(base_limit, 48)
+    return min(base_limit, 80)
 
 
 def normalize_tag(value):
@@ -667,6 +720,16 @@ def _parse_rack_section_title(row):
         "SHEET",
     ]
     if any(marker in upper_text for marker in generic_markers):
+        return ""
+
+    # Single-cell point labels inside analog blocks must not split the rack.
+    if re.match(r"^(AI|AO|DI|DO)\s*[.\-_]?\s*\d+\b", upper_text):
+        return ""
+
+    # Hardware/controller banners with explicit IP are metadata, not a new rack.
+    if re.search(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", upper_text) and any(
+        marker in upper_text for marker in ("CPU", "CONTROLOGIX", "1756-", "1746-", "1734-", "1794-")
+    ):
         return ""
 
     tokens = _tokenize_identifier(upper_text)
@@ -1205,6 +1268,755 @@ def _normalize_channel_index(value):
     return _normalize_int(value)
 
 
+def _normalize_ai_confidence(value, default=0):
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(parsed, 100))
+
+
+def _normalize_ai_mode(value):
+    return "override" if _ascii_upper(value) == "OVERRIDE" else "fill"
+
+
+def _normalize_ai_row_kind(value):
+    normalized = _cell_to_text(value).strip().lower()
+    if normalized in {"section", "subheader", "noise"}:
+        return normalized
+    return "data"
+
+
+def _sample_raw_rows_for_ai(parsed, limit=18):
+    if not parsed.raw_rows:
+        return []
+    selected_indexes = []
+    header_start = max(0, parsed.header_row_index - 3)
+    header_end = min(len(parsed.raw_rows), parsed.header_row_index + 5)
+    selected_indexes.extend(range(header_start, header_end))
+
+    body_indexes = [
+        index
+        for index in range(parsed.header_row_index + 1, len(parsed.raw_rows))
+        if _non_empty_cells(parsed.raw_rows[index]) > 0
+    ]
+    if body_indexes:
+        sample_positions = []
+        head_count = min(6, len(body_indexes))
+        sample_positions.extend(body_indexes[:head_count])
+        if len(body_indexes) > head_count:
+            middle_index = body_indexes[len(body_indexes) // 2]
+            sample_positions.append(middle_index)
+        tail_indexes = body_indexes[max(len(body_indexes) - 4, head_count) :]
+        sample_positions.extend(tail_indexes)
+        selected_indexes.extend(sample_positions)
+
+    sampled_rows = []
+    for index in sorted(set(selected_indexes))[:limit]:
+        sampled_rows.append(_raw_row_payload(index + 1, parsed.raw_rows[index], headers=parsed.headers, max_cells=12))
+    return sampled_rows
+
+
+def _compact_header_key(header, fallback_index):
+    token = _compact_token(header)
+    return token[:24] if token else f"C{fallback_index + 1}"
+
+
+def _compact_cell_value_for_ai(value, max_len=84):
+    text = _cell_to_text(value)
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 3].rstrip() + "..."
+
+
+def _raw_row_payload(row_number, row, headers=None, max_cells=12):
+    entries = []
+    for index, cell in enumerate(list(row)):
+        text = _compact_cell_value_for_ai(cell)
+        if not text:
+            continue
+        label = _compact_header_key(headers[index] if headers and index < len(headers) else "", index)
+        entries.append(f"{label}={text}")
+        if len(entries) >= max_cells:
+            break
+    return {
+        "row_number": row_number,
+        "entries": entries,
+    }
+
+
+def _effective_ai_max_cells_for_sheet(parsed):
+    layout = _cell_to_text(getattr(parsed, "layout", "")).lower()
+    if layout == "slot_blocks":
+        return 10
+    if layout == "tabular":
+        return 12
+    return 14
+
+
+def _select_raw_row_indexes_for_ai(parsed, max_rows=None):
+    max_rows = max_rows or _ai_max_raw_rows_per_sheet()
+    rows = parsed.raw_rows or []
+    if len(rows) <= max_rows:
+        return list(range(len(rows)))
+
+    selected = set()
+    header_start = max(0, parsed.header_row_index - 4)
+    header_end = min(len(rows), parsed.header_row_index + 6)
+    selected.update(range(header_start, header_end))
+
+    if parsed.layout == "slot_blocks":
+        for index, row in enumerate(rows):
+            if _parse_rack_section_title(row) or _parse_slot_block_title(row) or _parse_module_section_title(row):
+                start = max(0, index - 1)
+                end = min(len(rows), index + 5)
+                selected.update(range(start, end))
+        non_empty_indexes = [index for index, row in enumerate(rows) if _non_empty_cells(row) > 0]
+        if non_empty_indexes:
+            selected.update(non_empty_indexes[: min(18, len(non_empty_indexes))])
+            selected.update(non_empty_indexes[max(0, len(non_empty_indexes) - 12) :])
+            if len(non_empty_indexes) > 30:
+                chunk = max(1, len(non_empty_indexes) // 6)
+                for position in range(chunk, len(non_empty_indexes), chunk):
+                    selected.add(non_empty_indexes[min(position, len(non_empty_indexes) - 1)])
+        ordered = sorted(selected)
+        if len(ordered) > max_rows:
+            ordered = ordered[:max_rows]
+        return ordered
+
+    non_empty_indexes = [index for index, row in enumerate(rows) if _non_empty_cells(row) > 0]
+    if non_empty_indexes:
+        selected.update(non_empty_indexes[: min(30, len(non_empty_indexes))])
+        selected.update(non_empty_indexes[max(0, len(non_empty_indexes) - 20) :])
+
+        if len(non_empty_indexes) > 40:
+            chunk = max(1, len(non_empty_indexes) // 8)
+            for position in range(chunk, len(non_empty_indexes), chunk):
+                selected.add(non_empty_indexes[min(position, len(non_empty_indexes) - 1)])
+
+    for index, row in enumerate(rows):
+        if _parse_rack_section_title(row) or _parse_slot_block_title(row) or _parse_module_section_title(row):
+            start = max(0, index - 2)
+            end = min(len(rows), index + 6)
+            selected.update(range(start, end))
+
+    ordered = sorted(selected)
+    if len(ordered) > max_rows:
+        trimmed = ordered[: max_rows // 2]
+        remaining = ordered[max_rows // 2 :]
+        step = max(1, len(remaining) // max(1, max_rows - len(trimmed)))
+        trimmed.extend(remaining[::step][: max_rows - len(trimmed)])
+        ordered = sorted(set(trimmed))
+    return ordered[:max_rows]
+
+
+def _build_raw_rows_payload(parsed, max_rows=None, max_cells=24):
+    max_cells = min(max_cells, _effective_ai_max_cells_for_sheet(parsed))
+    indexes = _select_raw_row_indexes_for_ai(parsed, max_rows=max_rows)
+    return [
+        _raw_row_payload(index + 1, parsed.raw_rows[index], headers=parsed.headers, max_cells=max_cells)
+        for index in indexes
+    ]
+
+
+def _sheet_signal_bundle(parsed):
+    sample_text = " ".join(
+        filter(
+            None,
+            [
+                parsed.sheet_name,
+                " ".join(parsed.headers or []),
+                " ".join(" ".join(item.get("entries") or []) for item in _sample_raw_rows_for_ai(parsed, limit=10)),
+            ],
+        )
+    )
+    compact = _ascii_upper(sample_text)
+    type_hints = []
+    for candidate in ("DI", "DO", "AI", "AO"):
+        if candidate in compact:
+            type_hints.append(candidate)
+    channel_counts = sorted(set(int(value) for value in re.findall(r"\b(4|8|16|32|64)\b", compact)))
+    return {
+        "text": compact,
+        "types": type_hints,
+        "channel_counts": channel_counts,
+    }
+
+
+def _module_family_key(module_name):
+    compact = _compact_token(module_name)
+    compact = re.sub(r"(DI|DO|AI|AO)\d+$", "", compact)
+    compact = re.sub(r"\d+$", "", compact)
+    return compact[:24] or _compact_token(module_name)[:24]
+
+
+def _build_compact_module_catalog(module_catalog, parsed=None, workbook_plan=None, limit=18):
+    if not module_catalog:
+        return []
+
+    signal_bundle = _sheet_signal_bundle(parsed) if parsed else {"text": "", "types": [], "channel_counts": []}
+    evidence_text = signal_bundle["text"]
+    desired_types = set(signal_bundle["types"])
+    desired_counts = set(signal_bundle["channel_counts"])
+    plan_layout = _cell_to_text((workbook_plan or {}).get("layout_hint"))
+
+    scored = []
+    for item in module_catalog:
+        modelo = _cell_to_text(item.get("modelo"))
+        marca = _cell_to_text(item.get("marca"))
+        tipo = _cell_to_text(item.get("tipo"))
+        quantidade_canais = int(item.get("quantidade_canais") or 0)
+        score = 0
+        compact_model = _compact_token(modelo)
+        if compact_model and compact_model in _compact_token(evidence_text):
+            score += 120
+        if tipo and tipo in desired_types:
+            score += 65
+        if desired_counts and quantidade_canais in desired_counts:
+            score += 25
+        if marca and _compact_token(marca) and _compact_token(marca) in _compact_token(evidence_text):
+            score += 18
+        if plan_layout == "slot_blocks":
+            score += 5
+        scored.append(
+            {
+                "score": score,
+                "family": _module_family_key(modelo),
+                "tipo": tipo,
+                "quantidade_canais": quantidade_canais,
+                "modelo": modelo,
+                "marca": marca,
+            }
+        )
+
+    if desired_types:
+        scored.sort(key=lambda item: (item["tipo"] not in desired_types, -item["score"], item["quantidade_canais"], item["modelo"]))
+    else:
+        scored.sort(key=lambda item: (-item["score"], item["tipo"], item["quantidade_canais"], item["modelo"]))
+
+    compact_items = []
+    seen_keys = set()
+    for item in scored:
+        dedupe_key = (item["tipo"], item["quantidade_canais"], item["family"])
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+        compact_items.append(
+            {
+                "modelo": item["modelo"],
+                "marca": item["marca"],
+                "tipo": item["tipo"],
+                "quantidade_canais": item["quantidade_canais"],
+            }
+        )
+        if len(compact_items) >= limit:
+            break
+
+    if not compact_items:
+        return []
+    return compact_items
+
+
+def _module_catalog_stats(module_catalog):
+    by_type = Counter()
+    for item in module_catalog or []:
+        if item.get("tipo"):
+            by_type[item["tipo"]] += 1
+    return {
+        "total": len(module_catalog or []),
+        "by_type": dict(by_type),
+    }
+
+
+def _sheet_layout_markers(parsed, limit=8):
+    markers = {
+        "slot_titles": [],
+        "module_sections": [],
+        "rack_sections": [],
+    }
+    for row in parsed.raw_rows or []:
+        if len(markers["slot_titles"]) < limit:
+            slot_block = _parse_slot_block_title(row)
+            if slot_block and slot_block.get("title") and slot_block["title"] not in markers["slot_titles"]:
+                markers["slot_titles"].append(slot_block["title"])
+        if len(markers["module_sections"]) < limit:
+            module_section = _parse_module_section_title(row)
+            if module_section:
+                candidate = _cell_to_text(module_section.get("title")) or _cell_to_text(module_section.get("module_model"))
+                if candidate and candidate not in markers["module_sections"]:
+                    markers["module_sections"].append(candidate)
+        if len(markers["rack_sections"]) < limit:
+            rack_section = _parse_rack_section_title(row)
+            if rack_section and rack_section not in markers["rack_sections"]:
+                markers["rack_sections"].append(rack_section)
+    return markers
+
+
+def _build_sheet_semantic_summary(parsed):
+    signal_bundle = _sheet_signal_bundle(parsed)
+    markers = _sheet_layout_markers(parsed)
+    return {
+        "sheet_name": parsed.sheet_name,
+        "layout": parsed.layout,
+        "rows_total": parsed.rows_total,
+        "headers": parsed.headers[:12],
+        "non_empty_data_rows": _count_non_empty_data_rows(parsed.raw_rows, parsed.header_row_index),
+        "slot_block_rows": _count_slot_block_rows(parsed.raw_rows),
+        "type_hints": signal_bundle.get("types") or [],
+        "channel_count_hints": signal_bundle.get("channel_counts") or [],
+        "slot_title_examples": markers["slot_titles"][:6],
+        "module_section_examples": markers["module_sections"][:6],
+        "rack_section_examples": markers["rack_sections"][:6],
+    }
+
+
+def _effective_reasoning_effort(settings_obj, schema_name, parsed=None, total_sheets=1):
+    configured = _cell_to_text(getattr(settings_obj, "reasoning_effort", "")).lower() or "medium"
+    if configured == "none":
+        return ""
+    if schema_name == "io_sheet_semantic_analysis" and parsed is not None:
+        layout = _cell_to_text(getattr(parsed, "layout", "")).lower()
+        rows_total = int(getattr(parsed, "rows_total", 0) or 0)
+        if total_sheets == 1 and layout in {"slot_blocks", "tabular"} and rows_total <= 1200:
+            if configured in {"high", "medium"}:
+                return "low"
+    if schema_name == "io_workbook_analysis" and total_sheets <= 3 and configured in {"high", "medium"}:
+        return "low"
+    return configured
+
+
+def _hash_json_payload(payload):
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _ai_settings_fingerprint(settings_obj):
+    payload = {
+        "provider": getattr(settings_obj, "provider", ""),
+        "model": getattr(settings_obj, "model", ""),
+        "reasoning_effort": getattr(settings_obj, "reasoning_effort", ""),
+        "header_prompt": getattr(settings_obj, "header_prompt", ""),
+        "grouping_prompt": getattr(settings_obj, "grouping_prompt", ""),
+        "version": IO_IMPORT_AI_CACHE_VERSION,
+    }
+    return _hash_json_payload(payload)
+
+
+def _build_workbook_cache_fingerprint(file_sha256, settings_obj, parsed_sheets):
+    payload = {
+        "file_sha256": file_sha256,
+        "settings": _ai_settings_fingerprint(settings_obj),
+        "workbook_context": _build_workbook_ai_context(parsed_sheets=parsed_sheets, original_filename=""),
+    }
+    return _hash_json_payload(payload)
+
+
+def _build_sheet_cache_fingerprint(
+    file_sha256,
+    settings_obj,
+    parsed,
+    workbook_plan=None,
+    total_sheets=1,
+    compact_catalog=None,
+):
+    sheet_row_limit = _effective_ai_sheet_row_limit(settings_obj, total_sheets)
+    payload = {
+        "file_sha256": file_sha256,
+        "settings": _ai_settings_fingerprint(settings_obj),
+        "sheet_name": parsed.sheet_name,
+        "layout": parsed.layout,
+        "headers": parsed.headers,
+        "warnings": parsed.warnings,
+        "workbook_plan": workbook_plan or {},
+        "raw_rows": _build_raw_rows_payload(parsed, max_rows=sheet_row_limit),
+        "module_catalog": compact_catalog or [],
+    }
+    return _hash_json_payload(payload)
+
+
+def _load_ai_cache(stage, fingerprint):
+    from django.db.models import F
+    from django.utils import timezone
+
+    from core.models import IOImportAICache
+
+    item = IOImportAICache.objects.filter(stage=stage, fingerprint=fingerprint).first()
+    if not item:
+        return None
+    IOImportAICache.objects.filter(pk=item.pk).update(hits=F("hits") + 1, last_used_at=timezone.now())
+    item.hits += 1
+    return item.response_payload or {}
+
+
+def _prune_ai_cache():
+    from django.utils import timezone
+
+    from core.models import IOImportAICache
+
+    max_entries = max(40, _ai_cache_max_entries())
+    max_age_days = max(1, _ai_cache_max_age_days())
+    cutoff = timezone.now() - timedelta(days=max_age_days)
+    IOImportAICache.objects.filter(last_used_at__lt=cutoff).delete()
+    total = IOImportAICache.objects.count()
+    if total <= max_entries:
+        return
+    stale_ids = list(
+        IOImportAICache.objects.order_by("last_used_at").values_list("id", flat=True)[: max(0, total - max_entries)]
+    )
+    if stale_ids:
+        IOImportAICache.objects.filter(id__in=stale_ids).delete()
+
+
+def _save_ai_cache(stage, fingerprint, file_sha256, settings_obj, response_payload, sheet_name="", payload_meta=None):
+    from core.models import IOImportAICache
+
+    IOImportAICache.objects.update_or_create(
+        stage=stage,
+        fingerprint=fingerprint,
+        defaults={
+            "file_sha256": _cell_to_text(file_sha256),
+            "sheet_name": _cell_to_text(sheet_name),
+            "provider": _cell_to_text(getattr(settings_obj, "provider", "")),
+            "model": _cell_to_text(getattr(settings_obj, "model", "")),
+            "settings_fingerprint": _ai_settings_fingerprint(settings_obj),
+            "response_payload": response_payload or {},
+            "payload_meta": payload_meta or {},
+        },
+    )
+    _prune_ai_cache()
+
+
+def _build_workbook_ai_context(parsed_sheets, original_filename):
+    workbook_row_limit = _effective_workbook_context_limit(len(parsed_sheets or []))
+    return {
+        "original_filename": original_filename,
+        "sheets": [
+            {
+                "sheet_name": parsed.sheet_name,
+                "rows_total": parsed.rows_total,
+                "header_row_number": parsed.header_row_index + 1,
+                "layout": parsed.layout,
+                "headers": parsed.headers,
+                "parser_warnings": parsed.warnings,
+                "column_map": parsed.column_map,
+                "data_rows": _count_non_empty_data_rows(parsed.raw_rows, parsed.header_row_index),
+                "slot_block_rows": _count_slot_block_rows(parsed.raw_rows),
+                "raw_rows": _build_raw_rows_payload(parsed, max_rows=workbook_row_limit),
+            }
+            for parsed in parsed_sheets
+        ],
+    }
+
+
+def _find_workbook_sheet_plan(workbook_ai_payload, sheet_name):
+    for item in (workbook_ai_payload or {}).get("sheets") or []:
+        if _cell_to_text(item.get("sheet_name")) == _cell_to_text(sheet_name):
+            return item
+    return {}
+
+
+def _build_single_sheet_fast_workbook_plan(parsed_sheets):
+    if len(parsed_sheets or []) != 1:
+        return {}
+    parsed = parsed_sheets[0]
+    return {
+        "sheets": [
+            {
+                "sheet_name": parsed.sheet_name,
+                "use_sheet": True,
+                "layout_hint": parsed.layout or "unknown",
+                "confidence": 88,
+                "reason": "Guia unica com leitura estrutural local suficiente para seguir direto para a analise semantica.",
+            }
+        ],
+        "warnings": [],
+        "notes": "single-sheet-fast-path",
+    }
+
+
+def _should_skip_sheet_by_ai(workbook_ai_payload, parsed):
+    plan = _find_workbook_sheet_plan(workbook_ai_payload, parsed.sheet_name)
+    if not plan:
+        return False, ""
+    if not plan.get("use_sheet"):
+        confidence = _normalize_ai_confidence(plan.get("confidence"), default=0)
+        if confidence >= _ai_override_confidence_threshold():
+            return True, _cell_to_text(plan.get("reason")) or "IA classificou a guia como nao operacional."
+    return False, ""
+
+
+def _merge_ai_column_map(headers, detected_map, ai_result):
+    active_map = dict(detected_map)
+    ai_mapping = (ai_result or {}).get("column_map") or {}
+    override_threshold = _ai_override_confidence_threshold()
+
+    for field_name, suggestion in ai_mapping.items():
+        header_name = ""
+        confidence = 80
+        mode = "fill"
+        if isinstance(suggestion, str):
+            header_name = suggestion
+        elif isinstance(suggestion, dict):
+            header_name = suggestion.get("header") or ""
+            confidence = _normalize_ai_confidence(suggestion.get("confidence"), default=0)
+            mode = _normalize_ai_mode(suggestion.get("mode"))
+        header_name = _cell_to_text(header_name)
+        if not header_name:
+            continue
+
+        matching_index = None
+        for index, header in enumerate(headers):
+            if _compact_token(header) == _compact_token(header_name):
+                matching_index = index
+                header_name = header
+                break
+        if matching_index is None:
+            continue
+
+        existing_mapping = active_map.get(field_name)
+        if existing_mapping and mode != "override":
+            continue
+        if existing_mapping and mode == "override" and confidence < override_threshold:
+            continue
+
+        active_map[field_name] = {
+            "index": matching_index,
+            "header": header_name,
+            "confidence": max(confidence, 1),
+            "source": "ai",
+        }
+
+    return active_map
+
+
+def _build_ai_row_hints(ai_result):
+    hints_by_row = {}
+    for item in (ai_result or {}).get("row_hints") or []:
+        if not isinstance(item, dict):
+            continue
+        source_row = _normalize_int(item.get("source_row"))
+        if not source_row:
+            continue
+        normalized_hint = {
+            "source_row": source_row,
+            "row_kind": _normalize_ai_row_kind(item.get("row_kind")),
+            "panel": _cell_to_text(item.get("panel")),
+            "rack": _cell_to_text(item.get("rack")),
+            "slot": _cell_to_text(item.get("slot")),
+            "module_model": _cell_to_text(item.get("module_model")),
+            "channel": _cell_to_text(item.get("channel")),
+            "tag": _cell_to_text(item.get("tag")),
+            "description": _cell_to_text(item.get("description")),
+            "type": _cell_to_text(item.get("type")),
+            "confidence": _normalize_ai_confidence(item.get("confidence"), default=0),
+        }
+        current = hints_by_row.get(source_row)
+        if current is None or normalized_hint["confidence"] >= current["confidence"]:
+            hints_by_row[source_row] = normalized_hint
+    return hints_by_row
+
+
+def _ensure_row_metadata(row):
+    row.setdefault("field_sources", {})
+    row.setdefault("field_confidence", {})
+    row.setdefault("row_kind", "data")
+    for field_name in ("panel_raw", "rack_raw", "slot_raw", "module_raw", "channel_raw", "tag", "description", "type"):
+        if _cell_to_text(row.get(field_name)) and field_name not in row["field_sources"]:
+            row["field_sources"][field_name] = "heuristic"
+            row["field_confidence"][field_name] = 55
+    return row
+
+
+def _apply_ai_value_to_row(row, target_key, value, confidence):
+    value = _cell_to_text(value)
+    if not value:
+        return
+    override_threshold = _ai_override_confidence_threshold()
+    existing_value = _cell_to_text(row.get(target_key))
+    if existing_value and confidence < override_threshold:
+        return
+    row[target_key] = value
+    row["field_sources"][target_key] = "ai"
+    row["field_confidence"][target_key] = confidence
+
+
+def _merge_ai_row_hints_into_rows(normalized_rows, ai_result):
+    row_hints = _build_ai_row_hints(ai_result)
+    if not row_hints:
+        return normalized_rows, []
+
+    merged_rows = []
+    warnings = []
+    override_threshold = _ai_override_confidence_threshold()
+    for row in normalized_rows:
+        row = _ensure_row_metadata(dict(row))
+        hint = row_hints.get(row.get("source_row"))
+        if not hint:
+            merged_rows.append(row)
+            continue
+
+        row["row_kind"] = hint["row_kind"]
+        row["ai_hint_confidence"] = hint["confidence"]
+        if hint["row_kind"] in {"section", "subheader", "noise"} and hint["confidence"] >= override_threshold:
+            warnings.append(
+                f"Linha {row.get('source_row')} da guia {row.get('source_sheet') or '-'} foi descartada pela IA como {hint['row_kind']}."
+            )
+            continue
+
+        _apply_ai_value_to_row(row, "panel_raw", hint.get("panel"), hint["confidence"])
+        _apply_ai_value_to_row(row, "rack_raw", hint.get("rack"), hint["confidence"])
+        _apply_ai_value_to_row(row, "slot_raw", hint.get("slot"), hint["confidence"])
+        _apply_ai_value_to_row(row, "module_raw", hint.get("module_model"), hint["confidence"])
+        _apply_ai_value_to_row(row, "channel_raw", hint.get("channel"), hint["confidence"])
+        if hint.get("tag"):
+            tag_value = normalize_tag(hint["tag"])
+            if tag_value:
+                _apply_ai_value_to_row(row, "tag", tag_value, hint["confidence"])
+        _apply_ai_value_to_row(row, "description", hint.get("description"), hint["confidence"])
+        if hint.get("type"):
+            inferred_type = normalize_type(hint["type"]) or normalize_type(
+                "",
+                fallbacks=[row.get("channel_raw"), row.get("module_raw"), row.get("description"), row.get("tag")],
+            )
+            if inferred_type:
+                _apply_ai_value_to_row(row, "type", inferred_type, hint["confidence"])
+
+        if _cell_to_text(row.get("slot_raw")):
+            row["slot_index"] = _normalize_int(row.get("slot_raw"))
+        if _cell_to_text(row.get("channel_raw")):
+            row["channel_index"] = _normalize_channel_index(row.get("channel_raw"))
+        merged_rows.append(row)
+
+    return merged_rows, warnings
+
+
+def _validate_normalized_rows(normalized_rows, module_catalog):
+    warnings = []
+    known_models = {normalize_module_alias(item["modelo"]): item for item in module_catalog}
+    validated_rows = []
+
+    for row in normalized_rows:
+        row = _ensure_row_metadata(dict(row))
+        row["panel_raw"] = _cell_to_text(row.get("panel_raw"))
+        row["location_raw"] = _cell_to_text(row.get("location_raw"))
+        row["rack_raw"] = _cell_to_text(row.get("rack_raw"))
+        row["slot_raw"] = _cell_to_text(row.get("slot_raw"))
+        row["module_raw"] = _cell_to_text(row.get("module_raw"))
+        row["channel_raw"] = _cell_to_text(row.get("channel_raw"))
+        row["tag"] = normalize_tag(row.get("tag"))
+        row["description"] = _cell_to_text(row.get("description"))
+        explicit_type = normalize_type(row.get("type"))
+        row["type"] = explicit_type or normalize_type(
+            "",
+            fallbacks=[row.get("channel_raw"), row.get("module_raw"), row.get("description"), row.get("tag"), row.get("location_raw")],
+        )
+
+        slot_index = _normalize_int(row.get("slot_raw")) or _normalize_int(row.get("slot_index"))
+        channel_index = _normalize_channel_index(row.get("channel_raw")) or _normalize_int(row.get("channel_index"))
+        row["slot_index"] = slot_index if slot_index and slot_index > 0 else None
+        row["channel_index"] = channel_index if channel_index and channel_index > 0 else None
+
+        module_alias = normalize_module_alias(row.get("module_raw"))
+        matched_module = known_models.get(module_alias) if module_alias else None
+        if matched_module and row["type"] and matched_module["tipo"] != row["type"]:
+            warnings.append(
+                f"Linha {row.get('source_row')} da guia {row.get('source_sheet') or '-'} tinha tipo {row['type']} em conflito com o modulo {matched_module['modelo']}; o tipo foi ajustado para {matched_module['tipo']}."
+            )
+            row["type"] = matched_module["tipo"]
+            row["issues"].append("tipo_ajustado_pelo_catalogo")
+            row["field_sources"]["type"] = "catalog"
+            row["field_confidence"]["type"] = 100
+        elif matched_module and not row["type"]:
+            row["type"] = matched_module["tipo"]
+            row["field_sources"]["type"] = "catalog"
+            row["field_confidence"]["type"] = 100
+
+        hardware_context = _parse_hardware_context(
+            row.get("panel_raw"),
+            row.get("location_raw"),
+            row.get("rack_raw"),
+            row.get("slot_raw"),
+            row.get("channel_raw"),
+            row.get("module_raw"),
+        )
+        if not row["panel_raw"] and hardware_context.get("panel"):
+            row["panel_raw"] = hardware_context["panel"]
+        if not row["rack_raw"] and hardware_context.get("rack"):
+            row["rack_raw"] = str(hardware_context["rack"])
+        if not row["slot_index"] and hardware_context.get("slot"):
+            row["slot_index"] = hardware_context["slot"]
+            row["slot_raw"] = str(hardware_context["slot"])
+        if not row["channel_index"] and hardware_context.get("channel"):
+            row["channel_index"] = hardware_context["channel"]
+            row["channel_raw"] = str(hardware_context["channel"])
+
+        validated_rows.append(row)
+
+    return validated_rows, warnings
+
+
+def normalize_rows_from_ai_result(parsed, module_catalog, ai_result):
+    warnings = list(parsed.warnings or [])
+    warnings.extend((ai_result or {}).get("warnings") or [])
+    active_map = _merge_ai_column_map(parsed.headers, parsed.column_map, ai_result)
+
+    normalized_rows = []
+    for point in (ai_result or {}).get("logical_points") or []:
+        if not isinstance(point, dict):
+            continue
+        source_row = _normalize_int(point.get("source_row"))
+        if not source_row:
+            continue
+        row = {
+            "source_row": source_row,
+            "source_sheet": parsed.sheet_name,
+            "panel_raw": _cell_to_text(point.get("panel")),
+            "location_raw": "",
+            "rack_raw": _cell_to_text(point.get("rack")),
+            "slot_raw": _cell_to_text(point.get("slot")),
+            "module_raw": _cell_to_text(point.get("module_model")),
+            "channel_raw": _cell_to_text(point.get("channel")),
+            "tag": normalize_tag(point.get("tag")),
+            "description": _cell_to_text(point.get("description")),
+            "type": normalize_type(point.get("type")),
+            "slot_index": _normalize_int(point.get("slot")),
+            "channel_index": _normalize_channel_index(point.get("channel")),
+            "issues": [],
+            "field_sources": {},
+            "field_confidence": {},
+            "row_kind": "data",
+            "ai_hint_confidence": _normalize_ai_confidence(point.get("confidence"), default=0),
+        }
+        row = _ensure_row_metadata(row)
+        for field_name in ("panel_raw", "rack_raw", "slot_raw", "module_raw", "channel_raw", "tag", "description", "type"):
+            if _cell_to_text(row.get(field_name)):
+                row["field_sources"][field_name] = "ai"
+                row["field_confidence"][field_name] = row["ai_hint_confidence"] or 90
+        if not any([row["tag"], row["description"], row["channel_raw"], row["slot_raw"], row["module_raw"], row["rack_raw"], row["panel_raw"]]):
+            continue
+        normalized_rows.append(row)
+
+    normalized_rows, ai_row_warnings = _merge_ai_row_hints_into_rows(normalized_rows, ai_result)
+    warnings.extend(ai_row_warnings)
+
+    if not normalized_rows:
+        raise IOImportError("A IA nao retornou pontos operacionais suficientes para montar a importacao.")
+
+    normalized_rows, validation_warnings = _validate_normalized_rows(normalized_rows, module_catalog)
+    warnings.extend(validation_warnings)
+
+    known_models = {normalize_module_alias(item["modelo"]): item for item in module_catalog}
+    for row in normalized_rows:
+        module_alias = normalize_module_alias(row.get("module_raw"))
+        row["matched_module"] = known_models.get(module_alias) if module_alias else None
+        if not row.get("type"):
+            row["issues"].append("tipo_nao_inferido")
+        if not row.get("tag") and not row.get("description"):
+            row["issues"].append("linha_sem_tag_e_descricao")
+
+    return normalized_rows, active_map, warnings
+
+
 def serialize_module_catalog(modules_qs):
     return [
         {
@@ -1343,20 +2155,7 @@ def _normalize_slot_block_rows(parsed, active_map):
 def normalize_rows(parsed, module_catalog, ai_result=None):
     normalized_rows = []
     warnings = list(parsed.warnings)
-    ai_mapping = (ai_result or {}).get("column_map") or {}
-    active_map = dict(parsed.column_map)
-    for field_name, header_name in ai_mapping.items():
-        if field_name in active_map:
-            continue
-        for index, header in enumerate(parsed.headers):
-            if _compact_token(header) == _compact_token(header_name):
-                active_map[field_name] = {
-                    "index": index,
-                    "header": header,
-                    "confidence": 80,
-                    "source": "ai",
-                }
-                break
+    active_map = _merge_ai_column_map(parsed.headers, parsed.column_map, ai_result)
 
     block_layout_active = parsed.layout == "slot_blocks" or (
         "slot" not in active_map and "module_model" not in active_map and _has_slot_block_context(parsed.raw_rows)
@@ -1453,8 +2252,14 @@ def normalize_rows(parsed, module_catalog, ai_result=None):
                 }
             )
 
+    normalized_rows, ai_row_warnings = _merge_ai_row_hints_into_rows(normalized_rows, ai_result)
+    warnings.extend(ai_row_warnings)
+
     if not normalized_rows:
         raise IOImportError("A planilha nao possui linhas uteis abaixo do cabecalho detectado.")
+
+    normalized_rows, validation_warnings = _validate_normalized_rows(normalized_rows, module_catalog)
+    warnings.extend(validation_warnings)
 
     known_models = {normalize_module_alias(item["modelo"]): item for item in module_catalog}
     for row in normalized_rows:
@@ -1587,6 +2392,136 @@ def _resolve_rack_partition(row, original_filename):
     rack_name = rack_name or _pick_default_rack_name(original_filename, "", None, [row])
     rack_key = normalize_tag(rack_name) or "RACK_IMPORTADO"
     return rack_key, rack_name
+
+
+def _looks_like_interface_head_module(module_raw):
+    text = _ascii_upper(module_raw)
+    alias = normalize_module_alias(module_raw)
+    if not text and not alias:
+        return False
+    if "SIMATIC ET 200SP IM" in text or "IM 155" in text:
+        return True
+    if "CONTROLOGIX" in text or "CPU" in text:
+        return True
+    if "INTERFACE" in text or "HEAD" in text or "COUPLER" in text:
+        return True
+    if "AENTR" in alias or alias.startswith("CPU"):
+        return True
+    return bool(re.search(r"(^|[^A-Z])IM\d|(^|[^A-Z])IM($|[^A-Z0-9])", text))
+
+
+def _normalize_module_signature(module_raw):
+    text = _ascii_upper(module_raw)
+    if not text:
+        return ""
+    text = re.sub(r"\([^)]*\)", "", text)
+    text = re.sub(r"\b\d+\s*(DI|DO|AI|AO)\b", "", text)
+    text = re.sub(r"\s+", " ", text).strip(" :-_/")
+    return normalize_module_alias(text)
+
+
+def _rack_group_slot_module_signatures(rows):
+    signatures = set()
+    for row in rows:
+        slot_index = row.get("slot_index") or 0
+        module_alias = _normalize_module_signature(row.get("module_raw"))
+        channel_type = _ascii_upper(row.get("type"))
+        if not slot_index and not module_alias and not channel_type:
+            continue
+        signatures.add((slot_index, module_alias, channel_type))
+    return signatures
+
+
+def _should_merge_spurious_interface_rack_group(
+    rack_rows,
+    dominant_rows,
+    source_sheet,
+    dominant_name,
+    original_filename,
+):
+    if not rack_rows or not dominant_rows or not source_sheet:
+        return False
+    if len(rack_rows) > max(4, int(len(dominant_rows) * 0.08)):
+        return False
+    if len(dominant_rows) < max(8, len(rack_rows) * 4):
+        return False
+
+    rack_raw_values = [normalize_tag(row.get("rack_raw")) for row in rack_rows if row.get("rack_raw")]
+    if not rack_raw_values:
+        return False
+
+    sheet_aliases = {
+        normalize_tag(source_sheet),
+        normalize_tag(_clean_rack_name(source_sheet)),
+        normalize_tag(_infer_rack_name_from_sheet_name(source_sheet, original_filename=original_filename)),
+    }
+    if not all(value in sheet_aliases for value in rack_raw_values):
+        return False
+
+    module_values = [row.get("module_raw") for row in rack_rows if row.get("module_raw")]
+    if not module_values:
+        return False
+
+    slot_indexes = {row.get("slot_index") for row in rack_rows if row.get("slot_index")}
+    interface_only_group = all(_looks_like_interface_head_module(value) for value in module_values)
+    if interface_only_group and slot_indexes and not slot_indexes.issubset({1}):
+        return False
+
+    duplicate_slot_module_group = False
+    if not interface_only_group:
+        rack_signatures = _rack_group_slot_module_signatures(rack_rows)
+        dominant_signatures = _rack_group_slot_module_signatures(dominant_rows)
+        duplicate_slot_module_group = bool(rack_signatures and rack_signatures.issubset(dominant_signatures))
+
+    if not interface_only_group and not duplicate_slot_module_group:
+        return False
+
+    dominant_modules = [row.get("module_raw") for row in dominant_rows if row.get("module_raw")]
+    if dominant_modules and all(_looks_like_interface_head_module(value) for value in dominant_modules):
+        return False
+
+    return True
+
+
+def _collapse_spurious_interface_rack_aliases(normalized_rows, original_filename):
+    if not normalized_rows:
+        return
+
+    rows_by_sheet = defaultdict(list)
+    for row in normalized_rows:
+        source_sheet = _cell_to_text(row.get("source_sheet"))
+        if source_sheet:
+            rows_by_sheet[source_sheet].append(row)
+
+    for source_sheet, sheet_rows in rows_by_sheet.items():
+        groups = defaultdict(list)
+        for row in sheet_rows:
+            groups[row.get("resolved_rack_key") or "RACK_IMPORTADO"].append(row)
+        if len(groups) <= 1:
+            continue
+
+        dominant_key, dominant_rows = max(groups.items(), key=lambda item: len(item[1]))
+        dominant_name = dominant_rows[0].get("resolved_rack_name") or dominant_key
+        dominant_raw_name = next(
+            (_clean_rack_name(row.get("rack_raw")) for row in dominant_rows if _clean_rack_name(row.get("rack_raw"))),
+            "",
+        ) or dominant_name
+
+        for rack_key, rack_rows in list(groups.items()):
+            if rack_key == dominant_key:
+                continue
+            if not _should_merge_spurious_interface_rack_group(
+                rack_rows=rack_rows,
+                dominant_rows=dominant_rows,
+                source_sheet=source_sheet,
+                dominant_name=dominant_name,
+                original_filename=original_filename,
+            ):
+                continue
+            for row in rack_rows:
+                row["rack_raw"] = dominant_raw_name
+                row["resolved_rack_key"] = dominant_key
+                row["resolved_rack_name"] = dominant_name
 
 
 def _group_rows_by_slot(normalized_rows):
@@ -1785,6 +2720,11 @@ def build_import_proposal(
         row["resolved_rack_name"] = rack_name
         racks_by_key[rack_key].append(row)
 
+    _collapse_spurious_interface_rack_aliases(normalized_rows, original_filename=original_filename)
+    racks_by_key = defaultdict(list)
+    for row in normalized_rows:
+        racks_by_key[row.get("resolved_rack_key") or "RACK_IMPORTADO"].append(row)
+
     rack_items = sorted(
         racks_by_key.items(),
         key=lambda item: (item[1][0].get("resolved_rack_name") or item[0], item[0]),
@@ -1862,6 +2802,93 @@ def build_import_proposal(
     return proposal
 
 
+def _build_progress_rack_snapshots_from_rows(original_filename, normalized_rows, limit=3):
+    racks = {}
+    for row in normalized_rows or []:
+        rack_key, rack_name = _resolve_rack_partition(row, original_filename=original_filename)
+        snapshot = racks.setdefault(
+            rack_key,
+            {
+                "rack_key": rack_key,
+                "rack_name": rack_name,
+                "slots": set(),
+                "channels": 0,
+                "types": Counter(),
+                "sample_tags": [],
+            },
+        )
+        if row.get("slot_index"):
+            snapshot["slots"].add(int(row["slot_index"]))
+        if row.get("channel_index"):
+            snapshot["channels"] += 1
+        if row.get("type"):
+            snapshot["types"][row["type"]] += 1
+        tag_value = _cell_to_text(row.get("tag"))
+        if tag_value and len(snapshot["sample_tags"]) < 3 and tag_value not in snapshot["sample_tags"]:
+            snapshot["sample_tags"].append(tag_value)
+
+    ordered = sorted(
+        racks.values(),
+        key=lambda item: (-item["channels"], -len(item["slots"]), item["rack_name"] or item["rack_key"]),
+    )
+    snapshots = []
+    for item in ordered[:limit]:
+        top_types = [f"{channel_type} {total}" for channel_type, total in item["types"].most_common(3)]
+        snapshots.append(
+            {
+                "rack_key": item["rack_key"],
+                "rack_name": item["rack_name"],
+                "slots_count": len(item["slots"]),
+                "channels_count": int(item["channels"]),
+                "type_summary": top_types,
+                "sample_tags": item["sample_tags"],
+            }
+        )
+    return snapshots
+
+
+def _build_progress_rack_snapshots_from_proposal(proposal, limit=3):
+    snapshots = []
+    for rack_payload in (proposal or {}).get("racks") or []:
+        type_counter = Counter()
+        sample_tags = []
+        channels_total = 0
+        for module_payload in rack_payload.get("modules") or []:
+            for channel in module_payload.get("channels") or []:
+                if channel.get("type"):
+                    type_counter[channel["type"]] += 1
+                if channel.get("tag"):
+                    channels_total += 1
+                    if len(sample_tags) < 3 and channel["tag"] not in sample_tags:
+                        sample_tags.append(channel["tag"])
+        snapshots.append(
+            {
+                "rack_key": rack_payload.get("rack_key") or normalize_tag(rack_payload.get("name")) or "RACK_IMPORTADO",
+                "rack_name": rack_payload.get("name") or "Rack importado",
+                "slots_count": int(rack_payload.get("slots_total") or len(rack_payload.get("modules") or []) or 0),
+                "channels_count": channels_total,
+                "type_summary": [f"{channel_type} {total}" for channel_type, total in type_counter.most_common(3)],
+                "sample_tags": sample_tags,
+            }
+        )
+    return snapshots[:limit]
+
+
+def _emit_progress(progress_callback, stage, percent, title, message, **extra):
+    if not callable(progress_callback):
+        return
+    payload = {
+        "stage": _cell_to_text(stage).lower() or "upload",
+        "percent": max(0, min(int(percent or 0), 100)),
+        "title": _cell_to_text(title),
+        "message": _cell_to_text(message),
+    }
+    for key, value in extra.items():
+        if value is not None:
+            payload[key] = value
+    progress_callback(payload)
+
+
 def _extract_response_text(payload):
     output = payload.get("output") or []
     for item in output:
@@ -1872,7 +2899,74 @@ def _extract_response_text(payload):
     return payload.get("output_text") or ""
 
 
-def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, user_prompt, request_timeout_seconds=None):
+class _OpenAITransientError(Exception):
+    pass
+
+
+def _extract_response_error_message(payload):
+    error = payload.get("error") or {}
+    if isinstance(error, dict):
+        code = _cell_to_text(error.get("code"))
+        message = _cell_to_text(error.get("message"))
+        if code and message:
+            return f"{code}: {message}"
+        if message:
+            return message
+    incomplete_details = payload.get("incomplete_details") or {}
+    if isinstance(incomplete_details, dict):
+        reason = _cell_to_text(incomplete_details.get("reason"))
+        if reason:
+            return reason
+    return ""
+
+
+def _openai_response_is_running(status):
+    return _cell_to_text(status).lower() in {"queued", "in_progress", "running"}
+
+
+def _openai_poll_interval_seconds(elapsed_seconds):
+    if elapsed_seconds < 30:
+        return 2.0
+    if elapsed_seconds < 120:
+        return 3.0
+    return 5.0
+
+
+def _openai_request_json(method, url, api_key, timeout_seconds, payload=None):
+    headers = {"Authorization": f"Bearer {api_key}"}
+    data = None
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(payload).encode("utf-8")
+    http_request = urlrequest.Request(url=url, data=data, method=method, headers=headers)
+    transient_http_codes = {408, 409, 425, 429, 500, 502, 503, 504}
+    try:
+        with urlrequest.urlopen(http_request, timeout=timeout_seconds) as response:
+            raw_body = response.read().decode("utf-8")
+        return json.loads(raw_body) if raw_body else {}
+    except urlerror.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        message = f"Falha na chamada do agente: HTTP {exc.code} - {detail[:400]}"
+        if exc.code in transient_http_codes:
+            raise _OpenAITransientError(message)
+        raise IOImportError(message)
+    except urlerror.URLError as exc:
+        raise _OpenAITransientError(f"Falha na chamada do agente: {exc.reason}")
+    except (TimeoutError, socket.timeout):
+        raise _OpenAITransientError(f"Falha na chamada do agente: timeout de transporte apos {timeout_seconds:.1f}s.")
+    except OSError as exc:
+        raise _OpenAITransientError(f"Falha na chamada do agente: {exc}")
+
+
+def _call_openai_responses(
+    settings_obj,
+    schema_name,
+    schema,
+    system_prompt,
+    user_prompt,
+    request_timeout_seconds=None,
+    reasoning_effort_override=None,
+):
     if not settings_obj.enabled:
         raise IOImportError("Agente de importacao desativado.")
     if settings_obj.provider != settings_obj.Provider.OPENAI:
@@ -1897,47 +2991,208 @@ def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, use
                 "schema": schema,
             }
         },
-    }
-    if settings_obj.reasoning_effort and settings_obj.reasoning_effort != "none":
-        payload["reasoning"] = {"effort": settings_obj.reasoning_effort}
-
-    body = json.dumps(payload).encode("utf-8")
-    http_request = urlrequest.Request(
-        url=f"{base_url}/responses",
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {settings_obj.api_key}",
-            "Content-Type": "application/json",
+        "background": True,
+        "store": True,
+        "metadata": {
+            "schema_name": schema_name[:64],
+            "source": "io_import",
+            "client_request_id": uuid.uuid4().hex[:32],
         },
-    )
-    request_timeout_seconds = request_timeout_seconds or _ai_request_timeout_seconds()
-    try:
-        with urlrequest.urlopen(http_request, timeout=request_timeout_seconds) as response:
-            response_payload = json.loads(response.read().decode("utf-8"))
-    except urlerror.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise IOImportError(f"Falha na chamada do agente: HTTP {exc.code} - {detail[:400]}")
-    except urlerror.URLError as exc:
-        raise IOImportError(f"Falha na chamada do agente: {exc.reason}")
-    except (TimeoutError, socket.timeout):
-        raise IOImportError(f"Falha na chamada do agente: timeout apos {request_timeout_seconds:.1f}s.")
-    except OSError as exc:
-        raise IOImportError(f"Falha na chamada do agente: {exc}")
+    }
+    effective_reasoning = _cell_to_text(reasoning_effort_override or settings_obj.reasoning_effort).lower()
+    if effective_reasoning and effective_reasoning != "none":
+        payload["reasoning"] = {"effort": effective_reasoning}
 
-    response_text = _extract_response_text(response_payload)
-    if not response_text:
-        raise IOImportError("O agente nao retornou texto utilizavel.")
+    completion_budget_seconds = float(request_timeout_seconds or _ai_total_budget_seconds())
+    transport_timeout_seconds = min(max(15.0, _ai_request_timeout_seconds()), max(15.0, completion_budget_seconds))
+    max_attempts = max(1, _ai_max_retries())
+    created_payload = None
+    last_error = ""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            created_payload = _openai_request_json(
+                method="POST",
+                url=f"{base_url}/responses",
+                api_key=settings_obj.api_key,
+                timeout_seconds=transport_timeout_seconds,
+                payload=payload,
+            )
+            break
+        except _OpenAITransientError as exc:
+            last_error = str(exc)
+            if attempt < max_attempts:
+                time.sleep(min(4.0, 1.25 * attempt))
+                continue
+            raise IOImportError(last_error)
+
+    if created_payload is None:
+        raise IOImportError(last_error or "Falha na chamada do agente.")
+
+    response_payload = created_payload
+    response_id = _cell_to_text(response_payload.get("id"))
+    if not response_id:
+        raise IOImportError("O agente nao retornou um identificador de resposta utilizavel.")
+
+    polling_started_at = time.monotonic()
+    transient_poll_errors = 0
+    while True:
+        response_text = _extract_response_text(response_payload)
+        if response_text:
+            break
+
+        status = _cell_to_text(response_payload.get("status")).lower()
+        if not _openai_response_is_running(status):
+            error_detail = _extract_response_error_message(response_payload)
+            raise IOImportError(
+                error_detail or f"O agente finalizou sem texto utilizavel (status {status or 'desconhecido'})."
+            )
+
+        elapsed_seconds = time.monotonic() - polling_started_at
+        if elapsed_seconds >= completion_budget_seconds:
+            raise IOImportError(
+                f"A analise com IA excedeu o tempo de espera de {completion_budget_seconds:.1f}s sem concluir a resposta final."
+            )
+
+        time.sleep(_openai_poll_interval_seconds(elapsed_seconds))
+        try:
+            response_payload = _openai_request_json(
+                method="GET",
+                url=f"{base_url}/responses/{response_id}",
+                api_key=settings_obj.api_key,
+                timeout_seconds=transport_timeout_seconds,
+            )
+            transient_poll_errors = 0
+        except _OpenAITransientError as exc:
+            transient_poll_errors += 1
+            last_error = str(exc)
+            if transient_poll_errors >= max_attempts:
+                raise IOImportError(last_error)
+            continue
+
     try:
         return json.loads(response_text)
     except json.JSONDecodeError as exc:
         raise IOImportError(f"O agente retornou JSON invalido: {exc}")
 
 
-def run_ai_analysis(settings_obj, parsed, normalized_rows, module_catalog, request_timeout_seconds=None):
-    sample_rows = []
-    for row in normalized_rows[: min(len(normalized_rows), settings_obj.max_rows_for_ai)]:
-        sample_rows.append(
+def run_ai_workbook_analysis(settings_obj, parsed_sheets, original_filename, file_sha256="", request_timeout_seconds=None):
+    schema = {
+        "type": "object",
+        "properties": {
+            "sheets": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "sheet_name": {"type": "string"},
+                        "use_sheet": {"type": "boolean"},
+                        "layout_hint": {"type": "string", "enum": ["tabular", "slot_blocks", "hybrid", "unknown"]},
+                        "confidence": {"type": "integer"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["sheet_name", "use_sheet", "layout_hint", "confidence", "reason"],
+                    "additionalProperties": False,
+                },
+            },
+            "warnings": {"type": "array", "items": {"type": "string"}},
+            "notes": {"type": "string"},
+        },
+        "required": ["sheets", "warnings", "notes"],
+        "additionalProperties": False,
+    }
+    cache_fingerprint = _build_workbook_cache_fingerprint(file_sha256=file_sha256, settings_obj=settings_obj, parsed_sheets=parsed_sheets)
+    cached_payload = _load_ai_cache("WORKBOOK", cache_fingerprint)
+    if cached_payload:
+        return cached_payload
+
+    system_prompt = (
+        "You are the primary interpreter for a heterogeneous industrial IO workbook. "
+        "Decide which sheets carry operational IO data, which are helper/index/noise sheets, "
+        "and what layout each relevant sheet uses. Prefer broad inclusion when uncertain."
+    )
+    workbook_context = None
+    response_payload = None
+    last_exc = None
+    workbook_row_profiles = sorted(
+        {
+            _effective_workbook_context_limit(len(parsed_sheets or [])),
+            max(16, _effective_workbook_context_limit(len(parsed_sheets or [])) // 2),
+        },
+        reverse=True,
+    )
+    for row_limit in workbook_row_profiles:
+        try:
+            workbook_context = {
+                "original_filename": original_filename,
+                "sheets": [
+                    {
+                        "sheet_name": parsed.sheet_name,
+                        "rows_total": parsed.rows_total,
+                        "header_row_number": parsed.header_row_index + 1,
+                        "layout": parsed.layout,
+                        "headers": parsed.headers,
+                        "parser_warnings": parsed.warnings,
+                        "column_map": parsed.column_map,
+                        "data_rows": _count_non_empty_data_rows(parsed.raw_rows, parsed.header_row_index),
+                        "slot_block_rows": _count_slot_block_rows(parsed.raw_rows),
+                        "raw_rows": _build_raw_rows_payload(parsed, max_rows=row_limit),
+                    }
+                    for parsed in parsed_sheets
+                ],
+            }
+            user_prompt = json.dumps(workbook_context, ensure_ascii=True)
+            response_payload = _call_openai_responses(
+                settings_obj=settings_obj,
+                schema_name="io_workbook_analysis",
+                schema=schema,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                request_timeout_seconds=request_timeout_seconds,
+                reasoning_effort_override=_effective_reasoning_effort(
+                    settings_obj=settings_obj,
+                    schema_name="io_workbook_analysis",
+                    parsed=None,
+                    total_sheets=len(parsed_sheets or []),
+                ),
+            )
+            break
+        except IOImportError as exc:
+            last_exc = exc
+            continue
+    if response_payload is None:
+        raise last_exc or IOImportError("Falha na analise estrutural com IA.")
+    _save_ai_cache(
+        stage="WORKBOOK",
+        fingerprint=cache_fingerprint,
+        file_sha256=file_sha256,
+        settings_obj=settings_obj,
+        response_payload=response_payload,
+        payload_meta={
+            "sheets_total": len(parsed_sheets or []),
+            "context_rows_total": sum(len((item or {}).get("raw_rows") or []) for item in workbook_context.get("sheets") or []),
+        },
+    )
+    return response_payload
+
+
+def run_ai_analysis(
+    settings_obj,
+    parsed,
+    normalized_rows,
+    module_catalog,
+    file_sha256="",
+    workbook_plan=None,
+    request_timeout_seconds=None,
+    total_sheets=1,
+):
+    sheet_row_limit = _effective_ai_sheet_row_limit(settings_obj, total_sheets)
+    if parsed.layout == "slot_blocks":
+        sheet_row_limit = min(sheet_row_limit, 72 if total_sheets <= 2 else 60)
+    elif parsed.layout == "tabular":
+        sheet_row_limit = min(sheet_row_limit, 96 if total_sheets == 1 else 120)
+    bootstrap_rows = []
+    for row in (normalized_rows or [])[: min(len(normalized_rows or []), sheet_row_limit)]:
+        bootstrap_rows.append(
             {
                 "source_row": row["source_row"],
                 "rack_raw": row["rack_raw"],
@@ -1953,44 +3208,272 @@ def run_ai_analysis(settings_obj, parsed, normalized_rows, module_catalog, reque
     schema = {
         "type": "object",
         "properties": {
+            "sheet_role": {"type": "string", "enum": ["data", "helper", "noise"]},
+            "skip_sheet": {"type": "boolean"},
+            "layout_hint": {"type": "string", "enum": ["tabular", "slot_blocks", "hybrid", "unknown"]},
             "rack_name": {"type": "string"},
             "column_map": {
                 "type": "object",
                 "properties": {
-                    "rack": {"type": "string"},
-                    "slot": {"type": "string"},
-                    "module_model": {"type": "string"},
-                    "channel": {"type": "string"},
-                    "tag": {"type": "string"},
-                    "description": {"type": "string"},
-                    "type": {"type": "string"},
+                    "panel": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "rack": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "slot": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "module_model": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "channel": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "location": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "tag": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "description": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
+                    "type": {
+                        "type": "object",
+                        "properties": {
+                            "header": {"type": "string"},
+                            "confidence": {"type": "integer"},
+                            "mode": {"type": "string", "enum": ["fill", "override"]},
+                        },
+                        "required": ["header", "confidence", "mode"],
+                        "additionalProperties": False,
+                    },
                 },
-                "required": ["rack", "slot", "module_model", "channel", "tag", "description", "type"],
+                "required": ["panel", "rack", "slot", "module_model", "channel", "location", "tag", "description", "type"],
                 "additionalProperties": False,
+            },
+            "logical_points": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "source_row": {"type": "integer"},
+                        "panel": {"type": "string"},
+                        "rack": {"type": "string"},
+                        "slot": {"type": "string"},
+                        "module_model": {"type": "string"},
+                        "channel": {"type": "string"},
+                        "tag": {"type": "string"},
+                        "description": {"type": "string"},
+                        "type": {"type": "string"},
+                        "confidence": {"type": "integer"},
+                    },
+                    "required": [
+                        "source_row",
+                        "panel",
+                        "rack",
+                        "slot",
+                        "module_model",
+                        "channel",
+                        "tag",
+                        "description",
+                        "type",
+                        "confidence",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "row_hints": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "source_row": {"type": "integer"},
+                        "row_kind": {"type": "string", "enum": ["data", "section", "subheader", "noise"]},
+                        "panel": {"type": "string"},
+                        "rack": {"type": "string"},
+                        "slot": {"type": "string"},
+                        "module_model": {"type": "string"},
+                        "channel": {"type": "string"},
+                        "tag": {"type": "string"},
+                        "description": {"type": "string"},
+                        "type": {"type": "string"},
+                        "confidence": {"type": "integer"},
+                    },
+                    "required": [
+                        "source_row",
+                        "row_kind",
+                        "panel",
+                        "rack",
+                        "slot",
+                        "module_model",
+                        "channel",
+                        "tag",
+                        "description",
+                        "type",
+                        "confidence",
+                    ],
+                    "additionalProperties": False,
+                },
             },
             "warnings": {"type": "array", "items": {"type": "string"}},
             "notes": {"type": "string"},
         },
-        "required": ["rack_name", "column_map", "warnings", "notes"],
+        "required": ["sheet_role", "skip_sheet", "layout_hint", "rack_name", "column_map", "logical_points", "row_hints", "warnings", "notes"],
         "additionalProperties": False,
     }
-    user_prompt = json.dumps(
-        {
-            "headers": parsed.headers,
-            "detected_column_map": parsed.column_map,
-            "sample_rows": sample_rows,
-            "module_catalog": module_catalog,
-        },
-        ensure_ascii=True,
+    system_prompt = (
+        f"{settings_obj.header_prompt}\n\n{settings_obj.grouping_prompt}\n\n"
+        "You are the primary semantic parser for this IO sheet. Use the raw rows as the source of truth. "
+        "Prefer a sparse guidance strategy: return a strong column_map, rack_name and only the row_hints that "
+        "correct, discard or contextualize ambiguous rows. Only return logical_points when the sheet cannot be "
+        "materialized safely from column_map plus selective row_hints alone. For regular tabular or slot-block "
+        "sheets, avoid enumerating every point. The local parser will materialize the full dataset from your "
+        "semantic guidance."
     )
-    return _call_openai_responses(
+    row_profiles = sorted({sheet_row_limit, max(24, sheet_row_limit // 2)}, reverse=True)
+    base_catalog_limit = 14 if total_sheets >= 12 else 18
+    compact_catalog_seed = _build_compact_module_catalog(
+        module_catalog=module_catalog,
+        parsed=parsed,
+        workbook_plan=workbook_plan,
+        limit=base_catalog_limit,
+    )
+    cache_fingerprint = _build_sheet_cache_fingerprint(
+        file_sha256=file_sha256,
         settings_obj=settings_obj,
-        schema_name="io_import_analysis",
-        schema=schema,
-        system_prompt=f"{settings_obj.header_prompt}\n\n{settings_obj.grouping_prompt}",
-        user_prompt=user_prompt,
-        request_timeout_seconds=request_timeout_seconds,
+        parsed=parsed,
+        workbook_plan=workbook_plan,
+        total_sheets=total_sheets,
+        compact_catalog=compact_catalog_seed,
     )
+    cached_payload = _load_ai_cache("SHEET", cache_fingerprint)
+    if cached_payload:
+        return cached_payload
+
+    catalog_profiles = sorted({base_catalog_limit, 10}, reverse=True)
+    user_payload = None
+    compact_catalog = []
+    response_payload = None
+    last_exc = None
+    for row_limit in row_profiles:
+        for catalog_limit in catalog_profiles:
+            compact_catalog = _build_compact_module_catalog(
+                module_catalog=module_catalog,
+                parsed=parsed,
+                workbook_plan=workbook_plan,
+                limit=catalog_limit,
+            )
+            user_payload = {
+                "sheet_name": parsed.sheet_name,
+                "layout": parsed.layout,
+                "header_row_number": parsed.header_row_index + 1,
+                "headers": parsed.headers,
+                "sheet_summary": _build_sheet_semantic_summary(parsed),
+                "parser_warnings": parsed.warnings,
+                "detected_column_map": parsed.column_map,
+                "workbook_plan": workbook_plan or {},
+                "raw_rows": _build_raw_rows_payload(parsed, max_rows=row_limit),
+                "module_catalog": compact_catalog,
+                "module_catalog_stats": _module_catalog_stats(compact_catalog),
+            }
+            if bootstrap_rows:
+                user_payload["bootstrap_rows"] = bootstrap_rows
+            try:
+                user_prompt = json.dumps(user_payload, ensure_ascii=True)
+                response_payload = _call_openai_responses(
+                    settings_obj=settings_obj,
+                    schema_name="io_sheet_semantic_analysis",
+                    schema=schema,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    request_timeout_seconds=request_timeout_seconds,
+                    reasoning_effort_override=_effective_reasoning_effort(
+                        settings_obj=settings_obj,
+                        schema_name="io_sheet_semantic_analysis",
+                        parsed=parsed,
+                        total_sheets=total_sheets,
+                    ),
+                )
+                break
+            except IOImportError as exc:
+                last_exc = exc
+                continue
+        if response_payload is not None:
+            break
+    if response_payload is None:
+        raise last_exc or IOImportError(f"Falha na analise com IA da guia {parsed.sheet_name}.")
+    _save_ai_cache(
+        stage="SHEET",
+        fingerprint=cache_fingerprint,
+        file_sha256=file_sha256,
+        sheet_name=parsed.sheet_name,
+        settings_obj=settings_obj,
+        response_payload=response_payload,
+        payload_meta={
+            "raw_rows_sent": len(user_payload.get("raw_rows") or []),
+            "catalog_items_sent": len(compact_catalog),
+            "layout": parsed.layout,
+        },
+    )
+    return response_payload
 
 
 def _format_sheet_warning(sheet_name, warning, multi_sheet):
@@ -2002,14 +3485,37 @@ def _format_sheet_warning(sheet_name, warning, multi_sheet):
     return warning
 
 
-def reprocess_import_job(job, module_catalog, settings_obj=None):
+def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callback=None):
     if not job.source_file:
         raise IOImportError("Arquivo fonte da importacao nao encontrado.")
+    ai_required = bool(settings_obj and settings_obj.enabled)
+    _emit_progress(
+        progress_callback,
+        stage="upload",
+        percent=6,
+        title="Arquivo recebido",
+        message="O arquivo foi recebido e a leitura inicial da planilha esta começando.",
+        progress_label="Arquivo recebido",
+        snapshots=[],
+    )
     job.source_file.open("rb")
     raw_bytes = job.source_file.read()
     job.source_file.close()
 
     parsed_sheets = parse_workbook(raw_bytes=raw_bytes, original_filename=job.original_filename)
+    _emit_progress(
+        progress_callback,
+        stage="parse",
+        percent=18,
+        title="Estrutura da planilha identificada",
+        message=(
+            f"{len(parsed_sheets)} guia(s) localizada(s). A estrutura base esta sendo organizada para a analise."
+        ),
+        progress_label="Estrutura identificada",
+        sheets_total=len(parsed_sheets),
+        sheets_processed=0,
+        snapshots=[],
+    )
     multi_sheet = len(parsed_sheets) > 1
     normalized_rows = []
     warnings = []
@@ -2023,14 +3529,203 @@ def reprocess_import_job(job, module_catalog, settings_obj=None):
     ai_attempts = 0
     processed_sheets = []
     ai_started_at = time.monotonic()
-    ai_request_timeout = _ai_request_timeout_seconds()
     ai_total_budget = _ai_total_budget_seconds()
     ai_max_sheets = _ai_max_sheets_per_job()
+    ai_rack_names = []
+    workbook_ai_payload = {}
+    workbook_ai_error = ""
+    single_sheet_fast_path = len(parsed_sheets) == 1 and _cell_to_text(parsed_sheets[0].layout).lower() in {"tabular", "slot_blocks", "hybrid"}
 
-    for parsed in parsed_sheets:
+    if settings_obj and settings_obj.enabled:
+        _emit_progress(
+            progress_callback,
+            stage="ai",
+            percent=28,
+            title="Entendendo a estrutura da importacao",
+            message="A analise esta separando guias uteis, resumos e contextos de rack antes da leitura detalhada.",
+            progress_label="Preparando leitura guiada",
+            sheets_total=len(parsed_sheets),
+            sheets_processed=0,
+            snapshots=[],
+        )
+        remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
+        if single_sheet_fast_path:
+            workbook_ai_payload = _build_single_sheet_fast_workbook_plan(parsed_sheets)
+            ai_success += 1
+            _emit_progress(
+                progress_callback,
+                stage="ai",
+                percent=31,
+                title="Estrutura principal identificada",
+                message="A guia unica foi validada e a analise semantica detalhada vai comecar.",
+                progress_label="Guia principal validada",
+                sheets_total=len(parsed_sheets),
+                sheets_processed=0,
+                snapshots=[],
+            )
+        elif remaining_budget > 1 and ai_attempts < ai_max_sheets:
+            try:
+                ai_attempts += 1
+                workbook_ai_payload = run_ai_workbook_analysis(
+                    settings_obj=settings_obj,
+                    parsed_sheets=parsed_sheets,
+                    original_filename=job.original_filename,
+                    file_sha256=job.file_sha256,
+                    request_timeout_seconds=remaining_budget,
+                )
+                ai_success += 1
+            except IOImportError as exc:
+                workbook_ai_error = str(exc)
+                ai_errors.append(workbook_ai_error)
+                if ai_required:
+                    raise IOImportError(
+                        f"A analise com IA nao conseguiu entender a estrutura geral da planilha. {workbook_ai_error}"
+                    ) from exc
+        elif remaining_budget <= 1:
+            workbook_ai_error = "A analise com IA nao recebeu tempo suficiente para concluir a leitura estrutural."
+            ai_errors.append(workbook_ai_error)
+            if ai_required:
+                raise IOImportError(workbook_ai_error)
+        else:
+            workbook_ai_error = "A analise com IA excedeu o limite de chamadas previsto para esta importacao."
+            ai_errors.append(workbook_ai_error)
+            if ai_required:
+                raise IOImportError(workbook_ai_error)
+
+    total_sheets = max(len(parsed_sheets), 1)
+    processed_count = 0
+    for sheet_index, parsed in enumerate(parsed_sheets, start=1):
+        sheet_ai_payload = {}
+        sheet_warnings = []
+        skip_by_ai, skip_reason = _should_skip_sheet_by_ai(workbook_ai_payload, parsed)
+        current_percent = 34 + int(((sheet_index - 1) / total_sheets) * 46)
+        _emit_progress(
+            progress_callback,
+            stage="ai" if settings_obj and settings_obj.enabled else "parse",
+            percent=current_percent,
+            title="Correlacionando guias e sinais",
+            message=f"Analisando a guia {sheet_index} de {total_sheets}: {parsed.sheet_name}.",
+            progress_label=f"Guia {sheet_index} de {total_sheets}",
+            current_sheet=parsed.sheet_name,
+            current_sheet_index=sheet_index,
+            sheets_total=total_sheets,
+            sheets_processed=processed_count,
+            snapshots=_build_progress_rack_snapshots_from_rows(job.original_filename, normalized_rows),
+        )
+        if skip_by_ai:
+            formatted_skip_reason = (
+                f"Guia ignorada pela IA: {skip_reason}" if skip_reason else "Guia ignorada pela IA."
+            )
+            warnings.append(_format_sheet_warning(parsed.sheet_name, formatted_skip_reason, multi_sheet))
+            ai_payload["sheets"][parsed.sheet_name] = {
+                "sheet_role": "helper",
+                "skip_sheet": True,
+                "warnings": [formatted_skip_reason],
+            }
+            sheet_summaries.append(
+                {
+                    "sheet_name": parsed.sheet_name,
+                    "header_row_index": parsed.header_row_index + 1,
+                    "rows_total": parsed.rows_total,
+                    "rows_parsed": 0,
+                    "layout": parsed.layout,
+                    "column_map": {},
+                      "skipped": True,
+                  }
+              )
+            processed_count += 1
+            continue
+
         try:
-            sheet_rows, sheet_map, sheet_warnings = normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=None)
+            if settings_obj and settings_obj.enabled:
+                remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
+                if ai_attempts >= ai_max_sheets:
+                    message = (
+                        f"A analise com IA atingiu o limite previsto antes de concluir a guia {parsed.sheet_name}."
+                    )
+                    ai_errors.append(_format_sheet_warning(parsed.sheet_name, message, multi_sheet))
+                    if ai_required:
+                        raise IOImportError(message)
+                    sheet_warnings.append(message)
+                    sheet_rows, sheet_map, fallback_warnings = normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=None)
+                    sheet_warnings.extend(fallback_warnings)
+                elif remaining_budget <= 1:
+                    message = (
+                        f"A analise com IA ficou sem tempo antes de concluir a guia {parsed.sheet_name}."
+                    )
+                    ai_errors.append(_format_sheet_warning(parsed.sheet_name, message, multi_sheet))
+                    if ai_required:
+                        raise IOImportError(message)
+                    sheet_warnings.append(message)
+                    sheet_rows, sheet_map, fallback_warnings = normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=None)
+                    sheet_warnings.extend(fallback_warnings)
+                else:
+                    try:
+                        ai_attempts += 1
+                        sheet_ai_payload = run_ai_analysis(
+                            settings_obj=settings_obj,
+                            parsed=parsed,
+                            normalized_rows=[],
+                            module_catalog=module_catalog,
+                            file_sha256=job.file_sha256,
+                            workbook_plan=_find_workbook_sheet_plan(workbook_ai_payload, parsed.sheet_name),
+                            request_timeout_seconds=remaining_budget,
+                            total_sheets=total_sheets,
+                        )
+                        if sheet_ai_payload.get("skip_sheet"):
+                            skip_reason = _cell_to_text((sheet_ai_payload.get("warnings") or [""])[0]) or "Guia sem dados operacionais."
+                            warnings.append(_format_sheet_warning(parsed.sheet_name, f"Guia ignorada pela IA: {skip_reason}", multi_sheet))
+                            ai_payload["sheets"][parsed.sheet_name] = sheet_ai_payload
+                            sheet_summaries.append(
+                                {
+                                    "sheet_name": parsed.sheet_name,
+                                    "header_row_index": parsed.header_row_index + 1,
+                                    "rows_total": parsed.rows_total,
+                                    "rows_parsed": 0,
+                                    "layout": parsed.layout,
+                                    "column_map": {},
+                                    "skipped": True,
+                                }
+                            )
+                            ai_success += 1
+                            continue
+                        if (sheet_ai_payload.get("logical_points") or []):
+                            sheet_rows, sheet_map, sheet_warnings = normalize_rows_from_ai_result(
+                                parsed=parsed,
+                                module_catalog=module_catalog,
+                                ai_result=sheet_ai_payload,
+                            )
+                        else:
+                            sheet_rows, sheet_map, sheet_warnings = normalize_rows(
+                                parsed=parsed,
+                                module_catalog=module_catalog,
+                                ai_result=sheet_ai_payload,
+                            )
+                        if _cell_to_text(sheet_ai_payload.get("rack_name")):
+                            ai_rack_names.append(_cell_to_text(sheet_ai_payload.get("rack_name")))
+                        ai_success += 1
+                    except IOImportError as exc:
+                        ai_errors.append(_format_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
+                        if ai_required:
+                            raise IOImportError(
+                                f"A analise com IA nao conseguiu concluir a guia {parsed.sheet_name}. {exc}"
+                            ) from exc
+                        sheet_warnings.append(str(exc))
+                        sheet_rows, sheet_map, fallback_warnings = normalize_rows(
+                            parsed=parsed,
+                            module_catalog=module_catalog,
+                            ai_result=None,
+                        )
+                        sheet_warnings.extend(fallback_warnings)
+            else:
+                sheet_rows, sheet_map, sheet_warnings = normalize_rows(
+                    parsed=parsed,
+                    module_catalog=module_catalog,
+                    ai_result=None,
+                )
         except IOImportError as exc:
+            if ai_required:
+                raise
             warnings.append(_format_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
             sheet_summaries.append(
                 {
@@ -2043,38 +3738,8 @@ def reprocess_import_job(job, module_catalog, settings_obj=None):
                     "skipped": True,
                 }
             )
+            processed_count += 1
             continue
-        sheet_ai_payload = {}
-        if settings_obj and settings_obj.enabled:
-            remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
-            if ai_attempts >= ai_max_sheets:
-                sheet_warnings.append(
-                    "Analise com IA pulada nesta aba para respeitar o limite operacional da importacao web."
-                )
-            elif remaining_budget <= 1:
-                sheet_warnings.append(
-                    "Analise com IA pulada nesta aba porque o tempo maximo da importacao web foi atingido."
-                )
-            else:
-                request_timeout_seconds = min(ai_request_timeout, remaining_budget)
-                try:
-                    ai_attempts += 1
-                    sheet_ai_payload = run_ai_analysis(
-                        settings_obj=settings_obj,
-                        parsed=parsed,
-                        normalized_rows=sheet_rows,
-                        module_catalog=module_catalog,
-                        request_timeout_seconds=request_timeout_seconds,
-                    )
-                    sheet_rows, sheet_map, sheet_warnings = normalize_rows(
-                        parsed=parsed,
-                        module_catalog=module_catalog,
-                        ai_result=sheet_ai_payload,
-                    )
-                    ai_success += 1
-                except IOImportError as exc:
-                    ai_errors.append(_format_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
-                    sheet_warnings.append(str(exc))
         normalized_rows.extend(sheet_rows)
         effective_map[parsed.sheet_name] = sheet_map
         ai_payload["sheets"][parsed.sheet_name] = sheet_ai_payload
@@ -2089,16 +3754,34 @@ def reprocess_import_job(job, module_catalog, settings_obj=None):
             }
         )
         processed_sheets.append(parsed)
+        processed_count += 1
         for warning in sheet_warnings:
             formatted = _format_sheet_warning(parsed.sheet_name, warning, multi_sheet)
             if formatted:
                 warnings.append(formatted)
+        _emit_progress(
+            progress_callback,
+            stage="ai" if settings_obj and settings_obj.enabled else "parse",
+            percent=34 + int((processed_count / total_sheets) * 46),
+            title="Guia consolidada",
+            message=(
+                f"{parsed.sheet_name} foi consolidada. "
+                f"{len(normalized_rows)} linha(s) util(is) acumulada(s) ate agora."
+            ),
+            progress_label=f"Guia {processed_count} de {total_sheets}",
+            current_sheet=parsed.sheet_name,
+            current_sheet_index=processed_count,
+            sheets_total=total_sheets,
+            sheets_processed=processed_count,
+            snapshots=_build_progress_rack_snapshots_from_rows(job.original_filename, normalized_rows),
+        )
 
     if not normalized_rows:
         raise IOImportError("Nenhuma aba util gerou linhas normalizadas para importacao.")
 
     if settings_obj and settings_obj.enabled:
-        if ai_success == len(processed_sheets):
+        expected_successes = len(processed_sheets) + (1 if workbook_ai_payload else 0)
+        if ai_success >= max(expected_successes, 1):
             ai_status = job.AIStatus.SUCCESS
         elif ai_success == 0:
             ai_status = job.AIStatus.FAILED
@@ -2110,6 +3793,24 @@ def reprocess_import_job(job, module_catalog, settings_obj=None):
     else:
         ai_error = ""
 
+    if len(set(name for name in ai_rack_names if name)) == 1:
+        ai_payload["rack_name"] = ai_rack_names[0]
+    if workbook_ai_payload:
+      ai_payload["workbook"] = workbook_ai_payload
+    elif workbook_ai_error:
+      ai_payload["workbook_error"] = workbook_ai_error
+
+    _emit_progress(
+        progress_callback,
+        stage="preview",
+        percent=90,
+        title="Montando a previa para revisao",
+        message="Os racks sugeridos estao sendo organizados para abrir a revisao final.",
+        progress_label="Montando a previa",
+        sheets_total=total_sheets,
+        sheets_processed=processed_count,
+        snapshots=_build_progress_rack_snapshots_from_rows(job.original_filename, normalized_rows),
+    )
     proposal = build_import_proposal(
         original_filename=job.original_filename,
         normalized_rows=normalized_rows,
@@ -2117,6 +3818,19 @@ def reprocess_import_job(job, module_catalog, settings_obj=None):
         requested_rack_name=job.requested_rack_name,
         target_rack=job.target_rack,
         ai_result=ai_payload,
+    )
+    final_snapshots = _build_progress_rack_snapshots_from_proposal(proposal)
+    _emit_progress(
+        progress_callback,
+        stage="preview",
+        percent=100,
+        title="Preview pronta",
+        message="A estrutura sugerida foi consolidada e esta pronta para revisao.",
+        progress_label="Preview pronta",
+        sheets_total=total_sheets,
+        sheets_processed=processed_count,
+        snapshots=final_snapshots,
+        summary=proposal.get("summary") or {},
     )
     primary_sheet = processed_sheets[0]
     sheet_label = primary_sheet.sheet_name if len(processed_sheets) == 1 else f"{primary_sheet.sheet_name} +{len(processed_sheets) - 1}"
@@ -2135,6 +3849,17 @@ def reprocess_import_job(job, module_catalog, settings_obj=None):
         "ai_payload": ai_payload,
         "ai_error": ai_error,
         "ai_model": ai_model,
+        "progress_payload": {
+            "stage": "preview",
+            "percent": 100,
+            "title": "Preview pronta",
+            "message": "A estrutura sugerida foi consolidada e esta pronta para revisao.",
+            "progress_label": "Preview pronta",
+            "sheets_total": total_sheets,
+            "sheets_processed": processed_count,
+            "snapshots": final_snapshots,
+            "summary": proposal.get("summary") or {},
+        },
     }
 
 
