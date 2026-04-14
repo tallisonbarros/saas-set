@@ -8,6 +8,7 @@ from core.access_control import TRIAL_DURATION_DAYS, get_user_product_access, is
 from core.models import (
     AcessoProdutoUsuario,
     AssinaturaUsuario,
+    ConsumoImportacaoDiaria,
     ConfiguracaoPagamento,
     PlanoComercial,
     ProdutoPlataforma,
@@ -18,6 +19,8 @@ from core.models import (
 DOCUMENTATION_PRODUCT_CODE = "DOCUMENTACAO_TECNICA"
 STARTER_PLAN_CODE = PlanoComercial.Codigo.STARTER
 PROFESSIONAL_PLAN_CODE = PlanoComercial.Codigo.PROFESSIONAL
+DEFAULT_DAILY_IO_IMPORT_LIMIT = 3
+DEFAULT_DAILY_IP_IMPORT_LIMIT = 3
 
 
 def ensure_billing_catalog():
@@ -39,6 +42,8 @@ def ensure_billing_catalog():
             "is_free": True,
             "ordem": 10,
             "rack_limit_simultaneous": 3,
+            "daily_io_import_limit": DEFAULT_DAILY_IO_IMPORT_LIMIT,
+            "daily_ip_import_limit": DEFAULT_DAILY_IP_IMPORT_LIMIT,
             "preco_mensal": 0,
             "preco_anual": 0,
         },
@@ -53,6 +58,8 @@ def ensure_billing_catalog():
             "is_free": False,
             "ordem": 20,
             "rack_limit_simultaneous": None,
+            "daily_io_import_limit": None,
+            "daily_ip_import_limit": None,
         },
     )
     ConfiguracaoPagamento.load()
@@ -145,6 +152,124 @@ def _starter_limit(starter):
     if not starter or starter.rack_limit_simultaneous is None:
         return 3
     return int(starter.rack_limit_simultaneous)
+
+
+def _normalize_import_module(module_code):
+    normalized = (module_code or "").strip().upper()
+    if normalized in {"IO", "IOS"}:
+        return ConsumoImportacaoDiaria.Modulo.IO
+    if normalized in {"IP", "IPS"}:
+        return ConsumoImportacaoDiaria.Modulo.IP
+    raise ValueError("Modulo de importacao invalido.")
+
+
+def _module_import_label(module_code):
+    return "planilhas de IO" if _normalize_import_module(module_code) == ConsumoImportacaoDiaria.Modulo.IO else "planilhas de IP"
+
+
+def _trial_daily_import_limit(settings_obj, module_code):
+    module_key = _normalize_import_module(module_code)
+    if module_key == ConsumoImportacaoDiaria.Modulo.IO:
+        return max(1, int(getattr(settings_obj, "trial_daily_io_import_limit", DEFAULT_DAILY_IO_IMPORT_LIMIT) or DEFAULT_DAILY_IO_IMPORT_LIMIT))
+    return max(1, int(getattr(settings_obj, "trial_daily_ip_import_limit", DEFAULT_DAILY_IP_IMPORT_LIMIT) or DEFAULT_DAILY_IP_IMPORT_LIMIT))
+
+
+def _plan_daily_import_limit(plan, module_code):
+    if not plan:
+        return None
+    module_key = _normalize_import_module(module_code)
+    if plan.codigo == PROFESSIONAL_PLAN_CODE:
+        return None
+    if module_key == ConsumoImportacaoDiaria.Modulo.IO:
+        fallback = DEFAULT_DAILY_IO_IMPORT_LIMIT if plan.codigo == STARTER_PLAN_CODE else None
+        return int(plan.daily_io_import_limit if plan.daily_io_import_limit is not None else fallback) if fallback or plan.daily_io_import_limit is not None else None
+    fallback = DEFAULT_DAILY_IP_IMPORT_LIMIT if plan.codigo == STARTER_PLAN_CODE else None
+    return int(plan.daily_ip_import_limit if plan.daily_ip_import_limit is not None else fallback) if fallback or plan.daily_ip_import_limit is not None else None
+
+
+def _usage_reference_date(moment=None):
+    return timezone.localdate(moment or timezone.now())
+
+
+def count_successful_imports_today(user, module_code, product_code=DOCUMENTATION_PRODUCT_CODE, moment=None):
+    product = product_by_code(product_code)
+    if not product or not user or not getattr(user, "is_authenticated", False):
+        return 0
+    module_key = _normalize_import_module(module_code)
+    reference_date = _usage_reference_date(moment)
+    usage = ConsumoImportacaoDiaria.objects.filter(
+        usuario=user,
+        produto=product,
+        modulo=module_key,
+        referencia_data=reference_date,
+    ).first()
+    return int(usage.importacoes_bem_sucedidas if usage else 0)
+
+
+def resolve_import_quota(user, module_code, product_code=DOCUMENTATION_PRODUCT_CODE, moment=None):
+    ensure_billing_catalog()
+    product = product_by_code(product_code)
+    entitlement = resolve_entitlement(user, product_code)
+    module_key = _normalize_import_module(module_code)
+    settings_obj = payment_config()
+    limit = None
+    source = "unlimited"
+    current_plan = entitlement.get("current_plan")
+
+    if entitlement.get("status") == "trial_active":
+        limit = _trial_daily_import_limit(settings_obj, module_key)
+        source = "trial"
+    elif current_plan and current_plan.codigo == STARTER_PLAN_CODE and entitlement.get("status") == "plan_active":
+        limit = _plan_daily_import_limit(current_plan, module_key)
+        source = "starter"
+
+    used = count_successful_imports_today(user, module_key, product_code=product_code, moment=moment)
+    remaining = None if limit is None else max(limit - used, 0)
+    return {
+        "product": product,
+        "module": module_key,
+        "source": source,
+        "limit": limit,
+        "used": used,
+        "remaining": remaining,
+        "enforced": limit is not None,
+        "label": _module_import_label(module_key),
+        "entitlement": entitlement,
+    }
+
+
+def import_quota_error_message(user, module_code, product_code=DOCUMENTATION_PRODUCT_CODE, moment=None):
+    quota = resolve_import_quota(user, module_code, product_code=product_code, moment=moment)
+    if not quota["enforced"]:
+        return ""
+    plan_label = "Seu trial" if quota["source"] == "trial" else "O plano Iniciante"
+    return (
+        f"{plan_label} permite ate {quota['limit']} importacoes concluidas de {quota['label']} por dia. "
+        f"Hoje voce ja concluiu {quota['used']}."
+    )
+
+
+def register_successful_import_usage(user, module_code, product_code=DOCUMENTATION_PRODUCT_CODE, moment=None):
+    quota = resolve_import_quota(user, module_code, product_code=product_code, moment=moment)
+    if not quota["enforced"]:
+        return quota
+
+    product = quota["product"]
+    reference_date = _usage_reference_date(moment)
+    usage, _ = ConsumoImportacaoDiaria.objects.select_for_update().get_or_create(
+        usuario=user,
+        produto=product,
+        modulo=quota["module"],
+        referencia_data=reference_date,
+        defaults={"importacoes_bem_sucedidas": 0},
+    )
+    if usage.importacoes_bem_sucedidas >= quota["limit"]:
+        raise ValueError(import_quota_error_message(user, module_code, product_code=product_code, moment=moment))
+    usage.importacoes_bem_sucedidas += 1
+    usage.save(update_fields=["importacoes_bem_sucedidas", "atualizado_em"])
+    quota["used"] = usage.importacoes_bem_sucedidas
+    quota["remaining"] = max(quota["limit"] - usage.importacoes_bem_sucedidas, 0)
+    return quota
 
 
 def resolve_entitlement(user, product_code=DOCUMENTATION_PRODUCT_CODE):

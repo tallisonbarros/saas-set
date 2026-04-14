@@ -154,6 +154,60 @@
       .ip-import-step.is-active { border-color: rgba(255, 170, 94, 0.26); background: rgba(255, 132, 38, 0.08); }
       .ip-import-step.is-active .ip-import-step-dot { background: #ffb66f; box-shadow: 0 0 0 6px rgba(255, 132, 38, 0.14); }
       .ip-import-step.is-done .ip-import-step-dot { background: #65f0bf; }
+      .ip-import-list-card {
+        padding: 18px 20px;
+      }
+      .ip-import-list-shell {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .ip-import-list-main {
+        min-width: 0;
+        flex: 1 1 460px;
+      }
+      .ip-import-list-actions {
+        display: grid;
+        gap: 8px;
+        justify-items: end;
+      }
+      .ip-import-list-collapsed {
+        padding: 13px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 148, 72, 0.12);
+        background:
+          linear-gradient(180deg, rgba(255, 180, 120, 0.04), rgba(255, 255, 255, 0.012)),
+          rgba(255, 255, 255, 0.012);
+      }
+      .ip-import-list-collapsed .ip-import-list-shell {
+        align-items: center;
+      }
+      .ip-import-list-collapsed-copy {
+        margin: 8px 0 0;
+        max-width: 700px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.66);
+      }
+      .ip-import-list-collapsed-note {
+        margin: 0;
+        max-width: 240px;
+        font-size: 10px;
+        line-height: 1.35;
+        text-align: right;
+        color: rgba(255, 255, 255, 0.48);
+      }
+      @media (max-width: 760px) {
+        .ip-import-list-actions {
+          justify-items: start;
+        }
+        .ip-import-list-collapsed-note {
+          text-align: left;
+          max-width: none;
+        }
+      }
       @keyframes ip-import-page-scan { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
       @keyframes ip-import-page-pulse {
         0% { transform: scale(.88); opacity: .64; }
@@ -261,9 +315,9 @@
     {% elif preview_lists %}
       <section class="stack" style="gap: 18px;">
         {% for item in preview_lists %}
-          <section class="io-card" style="padding: 18px 20px;">
-            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-              <div style="min-width: 0; flex: 1 1 460px;">
+          <section class="io-card ip-import-list-card{% if item.is_applied %} ip-import-list-collapsed{% endif %}">
+            <div class="ip-import-list-shell">
+              <div class="ip-import-list-main">
                 {% if item.source_sheets %}
                   <div class="module-meta-row" style="margin-bottom: 8px;">
                     {% for sheet_name in item.source_sheets %}
@@ -272,7 +326,11 @@
                   </div>
                 {% endif %}
                 <h2 class="io-title" style="margin: 0;">{{ item.name }}</h2>
-                <p class="muted" style="margin: 8px 0 0;">{{ item.description }}</p>
+                {% if item.is_applied %}
+                  <p class="ip-import-list-collapsed-copy">Lista criada no modulo de IPs. Se quiser refinar nomes, descricoes ou equipamentos, siga direto no modulo.</p>
+                {% else %}
+                  <p class="muted" style="margin: 8px 0 0;">{{ item.description }}</p>
+                {% endif %}
                 <div class="module-meta-row" style="margin-top: 12px;">
                   <span class="module-meta-pill">Faixa {{ item.faixa_inicio }} - {{ item.faixa_fim }}</span>
                   <span class="module-meta-pill">IPs {{ item.total_ips }}</span>
@@ -289,10 +347,10 @@
                 </div>
               </div>
 
-              <div style="display: grid; gap: 8px; justify-items: end;">
+              <div class="ip-import-list-actions">
                 {% if item.is_applied %}
-                  <a class="btn btn-outline btn-compact" href="{% url 'listas_ip_list' %}">Abrir modulo de IPs</a>
-                  <button class="btn btn-primary btn-compact" type="button" disabled>Lista criada no seu modulo</button>
+                  <a class="btn btn-outline btn-compact" href="{% url 'listas_ip_list' %}">Ir para o modulo de IPs</a>
+                  <p class="ip-import-list-collapsed-note">Voce ainda pode editar essa lista depois, se precisar.</p>
                 {% else %}
                   <form method="post" style="display: flex; justify-content: flex-end;">
                     {% csrf_token %}
@@ -300,39 +358,41 @@
                     <input type="hidden" name="list_key" value="{{ item.key }}">
                     <button class="btn btn-primary btn-compact" type="submit">Aprovar e Aplicar</button>
                   </form>
+                  <p class="muted" style="margin: 0; max-width: 260px; text-align: right; font-size: 12px;">
+                    Voce pode editar essa lista depois dentro do modulo, se precisar.
+                  </p>
                 {% endif %}
-                <p class="muted" style="margin: 0; max-width: 260px; text-align: right; font-size: 12px;">
-                  Voce pode editar essa lista depois dentro do modulo, se precisar.
-                </p>
               </div>
             </div>
 
-            <div class="table-wrap" style="margin-top: 16px;">
-              <table class="table ip-list-table">
-                <thead>
-                  <tr>
-                    <th>IP</th>
-                    <th>Equipamento</th>
-                    <th>Descricao</th>
-                    <th>MAC</th>
-                    <th>Protocolo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for row in item.items %}
+            {% if not item.is_applied %}
+              <div class="table-wrap" style="margin-top: 16px;">
+                <table class="table ip-list-table">
+                  <thead>
                     <tr>
-                      <td>{{ row.ip }}</td>
-                      <td>{{ row.device_name|default:"-" }}</td>
-                      <td>{{ row.description|default:"-" }}</td>
-                      <td>{{ row.mac|default:"-" }}</td>
-                      <td>{{ row.protocol|default:"-" }}</td>
+                      <th>IP</th>
+                      <th>Equipamento</th>
+                      <th>Descricao</th>
+                      <th>MAC</th>
+                      <th>Protocolo</th>
                     </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            {% if item.extra_items > 0 %}
-              <p class="muted" style="margin: 10px 0 0;">+ {{ item.extra_items }} IP(s) adicionais preservados na aplicacao.</p>
+                  </thead>
+                  <tbody>
+                    {% for row in item.items %}
+                      <tr>
+                        <td>{{ row.ip }}</td>
+                        <td>{{ row.device_name|default:"-" }}</td>
+                        <td>{{ row.description|default:"-" }}</td>
+                        <td>{{ row.mac|default:"-" }}</td>
+                        <td>{{ row.protocol|default:"-" }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% if item.extra_items > 0 %}
+                <p class="muted" style="margin: 10px 0 0;">+ {{ item.extra_items }} IP(s) adicionais preservados na aplicacao.</p>
+              {% endif %}
             {% endif %}
           </section>
         {% endfor %}

@@ -82,6 +82,14 @@
             <input type="number" min="1" max="120" name="trial_duration_days" value="{{ settings_obj.trial_duration_days }}">
           </label>
           <label class="field">
+            <span>Trial IO por dia</span>
+            <input type="number" min="1" max="50" name="trial_daily_io_import_limit" value="{{ settings_obj.trial_daily_io_import_limit }}">
+          </label>
+          <label class="field">
+            <span>Trial IP por dia</span>
+            <input type="number" min="1" max="50" name="trial_daily_ip_import_limit" value="{{ settings_obj.trial_daily_ip_import_limit }}">
+          </label>
+          <label class="field">
             <span>Public key</span>
             <input type="text" name="mercado_pago_public_key" value="{{ settings_obj.mercado_pago_public_key }}" placeholder="APP_USR-...">
           </label>
@@ -173,6 +181,14 @@
                   <label class="field">
                     <span>Limite de racks</span>
                     <input type="number" min="1" max="999" name="rack_limit_simultaneous" value="{{ plan.rack_limit_simultaneous|default:'' }}" placeholder="vazio = ilimitado">
+                  </label>
+                  <label class="field">
+                    <span>IO por dia</span>
+                    <input type="number" min="1" max="50" name="daily_io_import_limit" value="{{ plan.daily_io_import_limit|default:'' }}" placeholder="vazio = ilimitado">
+                  </label>
+                  <label class="field">
+                    <span>IP por dia</span>
+                    <input type="number" min="1" max="50" name="daily_ip_import_limit" value="{{ plan.daily_ip_import_limit|default:'' }}" placeholder="vazio = ilimitado">
                   </label>
                   <label class="field">
                     <span>Preco mensal</span>

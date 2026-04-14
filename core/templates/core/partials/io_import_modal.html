@@ -272,6 +272,11 @@
             <p class="muted" style="margin-top: 10px;">
               Envie apenas o arquivo da planilha. O sistema analisa a estrutura, organiza uma previa dos racks sugeridos e, depois da aplicacao, voce pode ajustar cada rack diretamente no modulo.
             </p>
+            {% if commercial_status.io_import_quota.enforced %}
+              <p class="muted" style="margin-top: -4px; font-size: 12px; opacity: 0.74;">
+                Limite de hoje neste modulo: {{ commercial_status.io_import_quota.used }}/{{ commercial_status.io_import_quota.limit }} importacoes concluidas.
+              </p>
+            {% endif %}
             <footer class="radar-export-modal-foot">
               <button class="btn btn-primary" type="submit" data-io-import-submit>Enviar para analise</button>
             </footer>

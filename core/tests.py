@@ -18,6 +18,7 @@ from core.models import (
     AcessoProdutoUsuario,
     App,
     AssinaturaUsuario,
+    ConsumoImportacaoDiaria,
     ConfiguracaoPagamento,
     GrupoRackIO,
     IPImportJob,
@@ -53,7 +54,14 @@ from core.models import (
     TipoCanalIO,
     TipoPerfil,
 )
-from core.services.billing import DOCUMENTATION_PRODUCT_CODE, activate_starter_plan, activate_trial, ensure_billing_catalog
+from core.services.billing import (
+    DOCUMENTATION_PRODUCT_CODE,
+    activate_starter_plan,
+    activate_trial,
+    ensure_billing_catalog,
+    register_successful_import_usage,
+    resolve_import_quota,
+)
 from core.services.io_import import (
     _call_openai_responses,
     ParsedSpreadsheet,
@@ -302,6 +310,37 @@ class BillingAndPlanFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/produtos/planos/", response["Location"])
 
+    def test_trial_daily_import_quota_is_tracked_separately_for_io_and_ip(self):
+        activate_trial(self.user, DOCUMENTATION_PRODUCT_CODE)
+        io_quota = resolve_import_quota(self.user, "IO")
+        ip_quota = resolve_import_quota(self.user, "IP")
+
+        self.assertTrue(io_quota["enforced"])
+        self.assertEqual(io_quota["limit"], 3)
+        self.assertEqual(io_quota["used"], 0)
+        self.assertEqual(ip_quota["limit"], 3)
+        self.assertEqual(ip_quota["used"], 0)
+
+        for _ in range(3):
+            register_successful_import_usage(self.user, "IO")
+        refreshed_io_quota = resolve_import_quota(self.user, "IO")
+        refreshed_ip_quota = resolve_import_quota(self.user, "IP")
+
+        self.assertEqual(refreshed_io_quota["used"], 3)
+        self.assertEqual(refreshed_io_quota["remaining"], 0)
+        self.assertEqual(refreshed_ip_quota["used"], 0)
+        self.assertEqual(
+            ConsumoImportacaoDiaria.objects.get(
+                usuario=self.user,
+                produto__codigo=DOCUMENTATION_PRODUCT_CODE,
+                modulo=ConsumoImportacaoDiaria.Modulo.IO,
+            ).importacoes_bem_sucedidas,
+            3,
+        )
+
+        with self.assertRaisesMessage(ValueError, "3 importacoes concluidas de planilhas de IO por dia"):
+            register_successful_import_usage(self.user, "IO")
+
     def test_billing_admin_page_is_available_for_dev(self):
         dev_type = TipoPerfil.objects.get(codigo="DEV")
         admin_user = User.objects.create_user(username="billing-dev@set.local", email="billing-dev@set.local", password="123456")
@@ -328,7 +367,7 @@ class BillingAndPlanFlowTests(TestCase):
     def test_plans_page_is_separate_from_landing(self):
         response = self.client_http.get("/produtos/planos/?next=/ios/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ver pagina do produto")
+        self.assertContains(response, "Ver página do produto")
         self.assertContains(response, "Ative um plano da plataforma para continuar usando os produtos liberados na sua conta.")
         self.assertContains(response, "Plano Iniciante")
 
@@ -1813,7 +1852,7 @@ class IOImportPipelineTests(TestCase):
         self.assertEqual([module["slot_index"] for module in proposal["modules"]], [1, 2])
         self.assertEqual([module["module_type"] for module in proposal["modules"]], ["DI", "DO"])
 
-    def test_import_timeout_do_agente_interrompe_pipeline_ai_first(self):
+    def test_import_transport_timeout_do_agente_interrompe_pipeline_ai_first(self):
         settings_obj = IOImportSettings.load()
         settings_obj.enabled = True
         settings_obj.api_key = "test-key"
@@ -1912,6 +1951,69 @@ class IOImportPipelineTests(TestCase):
         self.assertTrue(post_payload["background"])
         self.assertTrue(post_payload["store"])
         self.assertEqual(post_payload["metadata"]["schema_name"], "io_sheet_semantic_analysis")
+
+    def test_call_openai_responses_does_not_abort_only_because_total_wait_is_long(self):
+        settings_obj = IOImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        requested = []
+        queued_payload = {"id": "resp_123", "status": "queued", "output": []}
+        running_payload = {"id": "resp_123", "status": "in_progress", "output": []}
+        completed_payload = {
+            "id": "resp_123",
+            "status": "completed",
+            "output": [
+                {
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": json.dumps({"result": "ok"}),
+                        }
+                    ]
+                }
+            ],
+        }
+        responses = [queued_payload, running_payload, completed_payload]
+
+        class _FakeHTTPResponse:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def read(self):
+                return json.dumps(self.payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            requested.append(
+                {
+                    "url": request.full_url,
+                    "method": request.get_method(),
+                    "timeout": timeout,
+                }
+            )
+            return _FakeHTTPResponse(responses[len(requested) - 1])
+
+        with patch("core.services.io_import.urlrequest.urlopen", side_effect=fake_urlopen), patch(
+            "core.services.io_import.time.sleep"
+        ), patch("core.services.io_import.time.monotonic", side_effect=[0.0, 600.0, 1800.0]):
+            result = _call_openai_responses(
+                settings_obj=settings_obj,
+                schema_name="io_sheet_semantic_analysis",
+                schema={"type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"], "additionalProperties": False},
+                system_prompt="system",
+                user_prompt="{}",
+                request_timeout_seconds=30,
+            )
+
+        self.assertEqual(result, {"result": "ok"})
+        self.assertEqual([item["method"] for item in requested], ["POST", "GET", "GET"])
 
     def test_call_openai_responses_retries_polling_same_response_instead_of_resubmitting(self):
         settings_obj = IOImportSettings.load()
@@ -2736,6 +2838,8 @@ class IOImportPipelineTests(TestCase):
         self.assertEqual(sorted(RackIO.objects.filter(cliente=self.perfil).values_list("nome", flat=True)), ["REM01", "UBS3"])
 
     def test_apply_import_can_approve_racks_individually_without_duplication(self):
+        self.perfil.tipos.clear()
+        activate_trial(self.user, DOCUMENTATION_PRODUCT_CODE)
         upload = SimpleUploadedFile(
             "PLANILHA DE IO UBS3 NUTRIEN - REM01 REV03.xlsx",
             self._build_slot_block_workbook(),
@@ -2770,7 +2874,16 @@ class IOImportPipelineTests(TestCase):
         job.refresh_from_db()
         self.assertEqual(job.status, IOImportJob.Status.REVIEW)
         self.assertEqual(job.apply_log["racks_applied"], 1)
+        self.assertIsNotNone(job.first_applied_at)
         self.assertEqual(RackIO.objects.filter(cliente=self.perfil).count(), 1)
+        self.assertEqual(
+            ConsumoImportacaoDiaria.objects.get(
+                usuario=self.user,
+                produto__codigo=DOCUMENTATION_PRODUCT_CODE,
+                modulo=ConsumoImportacaoDiaria.Modulo.IO,
+            ).importacoes_bem_sucedidas,
+            1,
+        )
 
         duplicated_apply = apply_import_job(
             job=job,
@@ -2785,6 +2898,14 @@ class IOImportPipelineTests(TestCase):
         )
         self.assertEqual(len(duplicated_apply), 1)
         self.assertEqual(RackIO.objects.filter(cliente=self.perfil).count(), 1)
+        self.assertEqual(
+            ConsumoImportacaoDiaria.objects.get(
+                usuario=self.user,
+                produto__codigo=DOCUMENTATION_PRODUCT_CODE,
+                modulo=ConsumoImportacaoDiaria.Modulo.IO,
+            ).importacoes_bem_sucedidas,
+            1,
+        )
 
         second_apply = apply_import_job(
             job=job,
@@ -2803,6 +2924,14 @@ class IOImportPipelineTests(TestCase):
         self.assertEqual(job.apply_log["racks_applied"], 2)
         self.assertEqual(len(job.apply_log["applied_rack_keys"]), 2)
         self.assertEqual(RackIO.objects.filter(cliente=self.perfil).count(), 2)
+        self.assertEqual(
+            ConsumoImportacaoDiaria.objects.get(
+                usuario=self.user,
+                produto__codigo=DOCUMENTATION_PRODUCT_CODE,
+                modulo=ConsumoImportacaoDiaria.Modulo.IO,
+            ).importacoes_bem_sucedidas,
+            1,
+        )
 
     def test_generated_fixture_files_all_parse_without_conflicts(self):
         manifest = json.loads((self.FIXTURES_DIR / "manifest.json").read_text(encoding="utf-8"))
@@ -3293,6 +3422,8 @@ class IPImportPipelineTests(TestCase):
         self.assertIn("Drive AENTR", extracted_rows[1]["description"])
 
     def test_apply_import_can_approve_lists_individually_without_duplication(self):
+        self.perfil.tipos.clear()
+        activate_trial(self.user, DOCUMENTATION_PRODUCT_CODE)
         upload = SimpleUploadedFile(
             "listas-ip.xlsx",
             self._build_ip_workbook(),
@@ -3308,11 +3439,28 @@ class IPImportPipelineTests(TestCase):
         self.assertEqual(len(first_apply), 1)
         job.refresh_from_db()
         self.assertEqual(job.status, IPImportJob.Status.REVIEW)
+        self.assertIsNotNone(job.first_applied_at)
         self.assertEqual(ListaIP.objects.filter(cliente=self.perfil).count(), 1)
+        self.assertEqual(
+            ConsumoImportacaoDiaria.objects.get(
+                usuario=self.user,
+                produto__codigo=DOCUMENTATION_PRODUCT_CODE,
+                modulo=ConsumoImportacaoDiaria.Modulo.IP,
+            ).importacoes_bem_sucedidas,
+            1,
+        )
 
         duplicated_apply = apply_ip_import_job(job=job, user=self.user, selected_list_keys=[list_keys[0]])
         self.assertEqual(len(duplicated_apply), 1)
         self.assertEqual(ListaIP.objects.filter(cliente=self.perfil).count(), 1)
+        self.assertEqual(
+            ConsumoImportacaoDiaria.objects.get(
+                usuario=self.user,
+                produto__codigo=DOCUMENTATION_PRODUCT_CODE,
+                modulo=ConsumoImportacaoDiaria.Modulo.IP,
+            ).importacoes_bem_sucedidas,
+            1,
+        )
 
         second_apply = apply_ip_import_job(job=job, user=self.user, selected_list_keys=[list_keys[1]])
         self.assertEqual(len(second_apply), 1)
@@ -3320,6 +3468,14 @@ class IPImportPipelineTests(TestCase):
         self.assertEqual(job.status, IPImportJob.Status.APPLIED)
         self.assertEqual(ListaIP.objects.filter(cliente=self.perfil).count(), 2)
         self.assertEqual(ListaIPItem.objects.filter(lista__cliente=self.perfil).count(), 4)
+        self.assertEqual(
+            ConsumoImportacaoDiaria.objects.get(
+                usuario=self.user,
+                produto__codigo=DOCUMENTATION_PRODUCT_CODE,
+                modulo=ConsumoImportacaoDiaria.Modulo.IP,
+            ).importacoes_bem_sucedidas,
+            1,
+        )
 
     def test_import_admin_renders_separate_settings(self):
         admin_user = User.objects.create_superuser("ip-admin", "ip-admin@set.local", "123456")
@@ -3329,7 +3485,7 @@ class IPImportPipelineTests(TestCase):
         self.assertContains(response, "Importacao de planilhas de IP")
         self.assertTrue(IPImportSettings.objects.exists())
 
-    def test_import_timeout_do_agente_interrompe_pipeline_ai_first(self):
+    def test_import_transport_timeout_do_agente_interrompe_pipeline_ai_first(self):
         settings_obj = IPImportSettings.load()
         settings_obj.enabled = True
         settings_obj.api_key = "test-key"
@@ -3453,6 +3609,60 @@ class IPImportPipelineTests(TestCase):
         self.assertTrue(post_payload["background"])
         self.assertTrue(post_payload["store"])
         self.assertEqual(post_payload["metadata"]["source"], "ip_import")
+
+    def test_ip_call_openai_responses_does_not_abort_only_because_total_wait_is_long(self):
+        settings_obj = IPImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        requested = []
+        queued_payload = {"id": "resp_ip_123", "status": "queued", "output": []}
+        running_payload = {"id": "resp_ip_123", "status": "in_progress", "output": []}
+        completed_payload = {
+            "id": "resp_ip_123",
+            "status": "completed",
+            "output": [{"content": [{"type": "output_text", "text": json.dumps({"result": "ok"})}]}],
+        }
+        responses = [queued_payload, running_payload, completed_payload]
+
+        class _FakeHTTPResponse:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def read(self):
+                return json.dumps(self.payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            requested.append(
+                {
+                    "url": request.full_url,
+                    "method": request.get_method(),
+                    "timeout": timeout,
+                }
+            )
+            return _FakeHTTPResponse(responses[len(requested) - 1])
+
+        with patch("core.services.ip_import.urlrequest.urlopen", side_effect=fake_urlopen), patch(
+            "core.services.ip_import.time.sleep"
+        ), patch("core.services.ip_import.time.monotonic", side_effect=[0.0, 600.0, 1800.0]):
+            result = call_ip_openai_responses(
+                settings_obj=settings_obj,
+                schema_name="ip_sheet_semantic_analysis",
+                schema={"type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"], "additionalProperties": False},
+                system_prompt="system",
+                user_prompt="{}",
+                request_timeout_seconds=30,
+            )
+
+        self.assertEqual(result, {"result": "ok"})
+        self.assertEqual([item["method"] for item in requested], ["POST", "GET", "GET"])
 
     def test_reprocess_ip_import_job_ai_can_skip_summary_sheet_and_keep_data_sheets(self):
         settings_obj = IPImportSettings.load()

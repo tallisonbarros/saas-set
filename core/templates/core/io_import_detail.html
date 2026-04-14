@@ -124,6 +124,17 @@
           linear-gradient(180deg, rgba(255, 146, 64, 0.032), rgba(255, 255, 255, 0.012));
         border-color: rgba(255, 146, 64, 0.1);
       }
+      .io-import-rack-section.is-applied {
+        padding: 12px 16px 12px 18px;
+        border-radius: 22px;
+        background:
+          linear-gradient(180deg, rgba(255, 148, 72, 0.035), rgba(255, 255, 255, 0.01)),
+          rgba(255, 255, 255, 0.012);
+        border-color: rgba(255, 148, 72, 0.1);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.02),
+          0 10px 24px rgba(0, 0, 0, 0.12);
+      }
       .io-import-rack-separator {
         display: flex;
         align-items: center;
@@ -148,8 +159,73 @@
         color: rgba(255, 255, 255, 0.48);
         white-space: nowrap;
       }
+      .io-import-rack-section.is-applied .io-import-rack-separator {
+        margin-bottom: 8px;
+      }
+      .io-import-rack-section.is-applied .io-import-rack-separator::before,
+      .io-import-rack-section.is-applied .io-import-rack-separator::after {
+        background: linear-gradient(90deg, transparent, rgba(255, 148, 72, 0.12), transparent);
+      }
+      .io-import-rack-section.is-applied .io-import-rack-separator-label {
+        color: rgba(255, 214, 184, 0.68);
+      }
       .io-import-rack-section.is-alt .io-import-rack-separator-label {
         color: rgba(255, 202, 165, 0.68);
+      }
+      .io-import-rack-collapsed {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 2px 0 0;
+      }
+      .io-import-rack-collapsed-main {
+        min-width: 0;
+        display: grid;
+        gap: 8px;
+        flex: 1 1 auto;
+      }
+      .io-import-rack-collapsed-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .io-import-rack-collapsed-title {
+        margin: 0;
+        font-size: clamp(18px, 2.2vw, 24px);
+        line-height: 1.02;
+        letter-spacing: -0.03em;
+      }
+      .io-import-rack-collapsed-copy {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.4;
+        color: rgba(255, 255, 255, 0.64);
+      }
+      .io-import-rack-collapsed-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .io-import-rack-collapsed-meta .module-meta-pill,
+      .io-import-rack-collapsed-head .ios-rack-context-pill {
+        padding: 4px 9px;
+        font-size: 10px;
+      }
+      .io-import-rack-collapsed-actions {
+        display: grid;
+        justify-items: end;
+        gap: 6px;
+        flex: 0 0 auto;
+      }
+      .io-import-rack-collapsed-note {
+        margin: 0;
+        font-size: 10px;
+        line-height: 1.35;
+        text-align: right;
+        color: rgba(255, 255, 255, 0.48);
       }
       .io-import-rack-top {
         display: grid;
@@ -452,6 +528,16 @@
           max-width: none;
           text-align: left;
         }
+        .io-import-rack-collapsed {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .io-import-rack-collapsed-actions {
+          justify-items: start;
+        }
+        .io-import-rack-collapsed-note {
+          text-align: left;
+        }
       }
     </style>
 
@@ -526,76 +612,90 @@
       {% endif %}
 
       {% for rack in preview_racks %}
-        <section class="stack io-import-rack-section {% cycle '' 'is-alt' %}" data-import-preview-root data-rack-key="{{ rack.key }}" data-selected-module-id="{{ rack.selected_module_id }}">
+        <section class="stack io-import-rack-section {% cycle '' 'is-alt' %}{% if rack.is_applied %} is-applied{% endif %}" data-import-preview-root data-rack-key="{{ rack.key }}" data-selected-module-id="{{ rack.selected_module_id }}">
           <div class="io-import-rack-separator" aria-hidden="true">
             <span class="io-import-rack-separator-label">Rack {{ forloop.counter|stringformat:"02d" }} de {{ preview_racks|length|stringformat:"02d" }}</span>
           </div>
 
-          <div class="io-import-rack-top">
-            <section class="io-import-rack-header">
-              <div class="ios-rack-topcard-head">
-                <div class="ios-rack-topcard-copy">
+          {% if rack.is_applied %}
+            <section class="io-import-rack-collapsed" aria-label="Rack aplicado">
+              <div class="io-import-rack-collapsed-main">
+                <div class="io-import-rack-collapsed-head">
                   {% if rack.source_sheets %}
-                    <div class="ios-rack-context">
-                      {% for sheet_name in rack.source_sheets %}
-                        <span class="ios-rack-context-pill">{{ sheet_name }}</span>
-                      {% endfor %}
-                    </div>
+                    {% for sheet_name in rack.source_sheets %}
+                      <span class="ios-rack-context-pill">{{ sheet_name }}</span>
+                    {% endfor %}
                   {% endif %}
-                  <h2 class="page-title ios-rack-page-title">{{ rack.name }}</h2>
-                  <p class="page-subtitle ios-rack-page-subtitle">{{ rack.descricao }}</p>
+                  <span class="module-meta-pill">Aplicado</span>
                 </div>
-                <div class="ios-rack-availability">
-                  <div class="ios-rack-availability-label">Canais disponiveis</div>
-                  {% if rack.canais_disponiveis %}
-                    <div class="module-meta-row">
-                      {% for item in rack.canais_disponiveis %}
-                        <span class="module-meta-pill">{{ item.tipo }} {{ item.total|stringformat:"02d" }}</span>
-                      {% endfor %}
-                    </div>
-                  {% else %}
-                    <div class="muted">Sem canais disponiveis.</div>
-                  {% endif %}
+                <h2 class="page-title io-import-rack-collapsed-title">{{ rack.name }}</h2>
+                <p class="io-import-rack-collapsed-copy">Rack criado no modulo de IOs. A partir daqui, qualquer ajuste segue direto no modulo.</p>
+                <div class="io-import-rack-collapsed-meta">
+                  <span class="module-meta-pill">Slots {{ rack.slots_total }}</span>
+                  <span class="module-meta-pill">Modulos {{ rack.summary.modules|default:0 }}</span>
+                  {% for item in rack.canais_disponiveis %}
+                    <span class="module-meta-pill">{{ item.tipo }} {{ item.total|stringformat:"02d" }}</span>
+                  {% endfor %}
                 </div>
               </div>
-              {% if not proposal.conflicts %}
-                <div class="io-import-rack-header-bottom" aria-label="Aprovacao do rack">
-                  <div class="io-import-review-copy">
-                    {% if rack.is_applied %}
-                      <p class="io-import-review-text">Rack ja criado no modulo de IOs. O preview abaixo permanece como referencia da estrutura aplicada.</p>
+              <div class="io-import-rack-collapsed-actions">
+                <a
+                  class="btn btn-outline btn-compact io-import-rack-open-link"
+                  href="{% url 'ios_list' %}"
+                  data-open-io-module
+                  data-pending-racks="{{ pending_racks_count }}"
+                >Ir para o modulo de IOs</a>
+                <p class="io-import-rack-collapsed-note">Voce ainda pode editar esse rack depois, se precisar.</p>
+              </div>
+            </section>
+          {% else %}
+            <div class="io-import-rack-top">
+              <section class="io-import-rack-header">
+                <div class="ios-rack-topcard-head">
+                  <div class="ios-rack-topcard-copy">
+                    {% if rack.source_sheets %}
+                      <div class="ios-rack-context">
+                        {% for sheet_name in rack.source_sheets %}
+                          <span class="ios-rack-context-pill">{{ sheet_name }}</span>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                    <h2 class="page-title ios-rack-page-title">{{ rack.name }}</h2>
+                    <p class="page-subtitle ios-rack-page-subtitle">{{ rack.descricao }}</p>
+                  </div>
+                  <div class="ios-rack-availability">
+                    <div class="ios-rack-availability-label">Canais disponiveis</div>
+                    {% if rack.canais_disponiveis %}
+                      <div class="module-meta-row">
+                        {% for item in rack.canais_disponiveis %}
+                          <span class="module-meta-pill">{{ item.tipo }} {{ item.total|stringformat:"02d" }}</span>
+                        {% endfor %}
+                      </div>
                     {% else %}
-                      <p class="io-import-review-text">Revise os slots abaixo e aplique este rack se a composicao estiver correta.</p>
+                      <div class="muted">Sem canais disponiveis.</div>
                     {% endif %}
                   </div>
-                  <div class="io-import-rack-actions-box">
-                    <div class="io-import-rack-actions">
-                      {% if rack.is_applied %}
-                        <a
-                          class="btn btn-outline btn-compact io-import-rack-open-link"
-                          href="{% url 'ios_list' %}"
-                          data-open-io-module
-                          data-pending-racks="{{ pending_racks_count }}"
-                        >Abrir modulo de IOs</a>
-                        <button class="btn btn-primary btn-compact io-import-rack-apply-btn is-applied" type="button" disabled>Rack criado no seu modulo</button>
-                      {% else %}
+                </div>
+                {% if not proposal.conflicts %}
+                  <div class="io-import-rack-header-bottom" aria-label="Aprovacao do rack">
+                    <div class="io-import-review-copy">
+                      <p class="io-import-review-text">Revise os slots abaixo e aplique este rack se a composicao estiver correta.</p>
+                    </div>
+                    <div class="io-import-rack-actions-box">
+                      <div class="io-import-rack-actions">
                         <form method="post" class="io-import-rack-apply-form">
                           {% csrf_token %}
                           <input type="hidden" name="action" value="apply_import_rack">
                           <input type="hidden" name="rack_key" value="{{ rack.key }}">
                           <button class="btn btn-primary btn-compact io-import-rack-apply-btn" type="submit">Aprovar e Aplicar</button>
                         </form>
-                      {% endif %}
-                    </div>
-                    {% if rack.is_applied %}
-                      <p class="io-import-rack-actions-note">Se precisar, voce ainda pode ajustar esse rack depois dentro do modulo.</p>
-                    {% else %}
+                      </div>
                       <p class="io-import-rack-actions-note">Voce pode ajustar esse rack depois dentro do modulo, se precisar.</p>
-                    {% endif %}
+                    </div>
                   </div>
-                </div>
-              {% endif %}
-            </section>
-          </div>
+                {% endif %}
+              </section>
+            </div>
 
           <section class="io-import-slot-stage" aria-label="Preview tecnico do rack">
             <div class="rack-carousel">
@@ -690,6 +790,7 @@
               </article>
             </section>
           </div>
+          {% endif %}
         </section>
       {% empty %}
         <section class="io-card ios-empty-state io-center">

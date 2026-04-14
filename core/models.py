@@ -165,6 +165,8 @@ class PlanoComercial(models.Model):
     is_free = models.BooleanField(default=False)
     ordem = models.PositiveSmallIntegerField(default=0)
     rack_limit_simultaneous = models.PositiveIntegerField(null=True, blank=True)
+    daily_io_import_limit = models.PositiveIntegerField(null=True, blank=True)
+    daily_ip_import_limit = models.PositiveIntegerField(null=True, blank=True)
     preco_mensal = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     preco_anual = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     provider_plan_code_mensal = models.CharField(max_length=120, blank=True, default="")
@@ -253,6 +255,8 @@ class ConfiguracaoPagamento(models.Model):
         MERCADO_PAGO = "MERCADO_PAGO", "Mercado Pago"
 
     trial_duration_days = models.PositiveIntegerField(default=30)
+    trial_daily_io_import_limit = models.PositiveIntegerField(default=3)
+    trial_daily_ip_import_limit = models.PositiveIntegerField(default=3)
     enabled = models.BooleanField(default=False)
     provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.MERCADO_PAGO)
     sandbox_mode = models.BooleanField(default=True)
@@ -297,6 +301,8 @@ class ConfiguracaoPagamento(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1
         self.trial_duration_days = max(1, min(int(self.trial_duration_days or 30), 120))
+        self.trial_daily_io_import_limit = max(1, min(int(self.trial_daily_io_import_limit or 3), 50))
+        self.trial_daily_ip_import_limit = max(1, min(int(self.trial_daily_ip_import_limit or 3), 50))
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -321,6 +327,43 @@ class EventoPagamentoWebhook(models.Model):
 
     def __str__(self):
         return f"{self.provider} - {self.external_id}"
+
+
+class ConsumoImportacaoDiaria(models.Model):
+    class Modulo(models.TextChoices):
+        IO = "IO", "IO"
+        IP = "IP", "IP"
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="consumos_importacao_diaria",
+    )
+    produto = models.ForeignKey(
+        "ProdutoPlataforma",
+        on_delete=models.CASCADE,
+        related_name="consumos_importacao_diaria",
+    )
+    modulo = models.CharField(max_length=8, choices=Modulo.choices)
+    referencia_data = models.DateField()
+    importacoes_bem_sucedidas = models.PositiveIntegerField(default=0)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-referencia_data", "produto__nome", "modulo", "usuario__username"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "produto", "modulo", "referencia_data"],
+                name="unique_consumo_importacao_diaria_usuario_produto_modulo_data",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["produto", "modulo", "referencia_data"]),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} - {self.produto} - {self.modulo} ({self.referencia_data})"
 
 
 class Caderno(models.Model):
@@ -1569,6 +1612,7 @@ class IOImportJob(models.Model):
     progress_payload = models.JSONField(default=dict, blank=True)
     warnings = models.JSONField(default=list, blank=True)
     apply_log = models.JSONField(default=dict, blank=True)
+    first_applied_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1577,6 +1621,7 @@ class IOImportJob(models.Model):
         indexes = [
             models.Index(fields=["status", "created_at"]),
             models.Index(fields=["ai_status", "created_at"]),
+            models.Index(fields=["created_by", "first_applied_at"]),
         ]
 
     def __str__(self):
@@ -1727,6 +1772,7 @@ class IPImportJob(models.Model):
     progress_payload = models.JSONField(default=dict, blank=True)
     warnings = models.JSONField(default=list, blank=True)
     apply_log = models.JSONField(default=dict, blank=True)
+    first_applied_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1735,6 +1781,7 @@ class IPImportJob(models.Model):
         indexes = [
             models.Index(fields=["status", "created_at"]),
             models.Index(fields=["ai_status", "created_at"]),
+            models.Index(fields=["created_by", "first_applied_at"]),
         ]
 
     def __str__(self):

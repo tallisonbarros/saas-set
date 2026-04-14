@@ -100,6 +100,7 @@ from .services.billing import (
     count_user_racks,
     ensure_billing_catalog,
     payment_config,
+    resolve_import_quota,
     resolve_entitlement,
     start_professional_checkout,
 )
@@ -695,13 +696,15 @@ def _documentacao_tecnica_status_context(user):
     return {
         "entitlement": entitlement,
         "plan_badge": _documentacao_tecnica_plan_badge(user),
+        "io_import_quota": resolve_import_quota(user, "IO", DOCUMENTATION_PRODUCT_CODE),
+        "ip_import_quota": resolve_import_quota(user, "IP", DOCUMENTATION_PRODUCT_CODE),
     }
 
 
 def _starter_limit_error_message(user, product_code=DOCUMENTATION_PRODUCT_CODE):
     entitlement = resolve_entitlement(user, product_code)
     return (
-        f"O plano Iniciante permite ate {entitlement['starter_limit']} racks simultaneos. "
+        f"O plano Iniciante permite até {entitlement['starter_limit']} racks simultâneos. "
         f"Sua conta possui {entitlement['rack_count']} racks. "
         "Exclua racks para liberar este plano ou siga com o Profissional."
     )
@@ -3029,6 +3032,14 @@ def produto_documentacao_tecnica(request):
     access_state = "disponivel"
     access = None
     entitlement = _resolve_documentacao_entitlement_safe(request.user if request.user.is_authenticated else None)
+    io_import_quota = resolve_import_quota(request.user if request.user.is_authenticated else None, "IO", DOCUMENTATION_PRODUCT_CODE)
+    ip_import_quota = resolve_import_quota(request.user if request.user.is_authenticated else None, "IP", DOCUMENTATION_PRODUCT_CODE)
+    payment_settings = payment_config()
+    starter_plan = entitlement.get("starter_plan")
+    trial_io_import_limit = getattr(payment_settings, "trial_daily_io_import_limit", 3) or 3
+    trial_ip_import_limit = getattr(payment_settings, "trial_daily_ip_import_limit", 3) or 3
+    starter_io_import_limit = getattr(starter_plan, "daily_io_import_limit", None) or 3
+    starter_ip_import_limit = getattr(starter_plan, "daily_ip_import_limit", None) or 3
     if request.user.is_authenticated:
         access_state, access = _user_documentacao_access_state(request.user)
         if not state:
@@ -3049,7 +3060,7 @@ def produto_documentacao_tecnica(request):
         message = "Seu trial terminou. Escolha um plano para continuar usando IOs e Listas de IP."
         message_level = "warning"
     elif state == "bloqueado":
-        message = "Seu acesso a este produto esta bloqueado no momento."
+        message = "Seu acesso a este produto está bloqueado no momento."
         message_level = "warning"
     elif state == "starter_bloqueado":
         message = _starter_limit_error_message(request.user)
@@ -3066,6 +3077,12 @@ def produto_documentacao_tecnica(request):
             "access": access,
             "access_state": access_state,
             "entitlement": entitlement,
+            "io_import_quota": io_import_quota,
+            "ip_import_quota": ip_import_quota,
+            "trial_io_import_limit": trial_io_import_limit,
+            "trial_ip_import_limit": trial_ip_import_limit,
+            "starter_io_import_limit": starter_io_import_limit,
+            "starter_ip_import_limit": starter_ip_import_limit,
             "entry_url": entry_url,
             "plans_url": plans_url,
             "activate_url": activate_url,
@@ -3092,6 +3109,12 @@ def produto_documentacao_tecnica_planos(request):
     access_state = "disponivel"
     access = None
     entitlement = _resolve_documentacao_entitlement_safe(request.user if request.user.is_authenticated else None)
+    payment_settings = payment_config()
+    starter_plan = entitlement.get("starter_plan")
+    trial_io_import_limit = getattr(payment_settings, "trial_daily_io_import_limit", 3) or 3
+    trial_ip_import_limit = getattr(payment_settings, "trial_daily_ip_import_limit", 3) or 3
+    starter_io_import_limit = getattr(starter_plan, "daily_io_import_limit", None) or 3
+    starter_ip_import_limit = getattr(starter_plan, "daily_ip_import_limit", None) or 3
     if request.user.is_authenticated:
         access_state, access = _user_documentacao_access_state(request.user)
         if not state:
@@ -3134,6 +3157,10 @@ def produto_documentacao_tecnica_planos(request):
             "requested_next": requested_next,
             "message": message,
             "message_level": message_level,
+            "trial_io_import_limit": trial_io_import_limit,
+            "trial_ip_import_limit": trial_ip_import_limit,
+            "starter_io_import_limit": starter_io_import_limit,
+            "starter_ip_import_limit": starter_ip_import_limit,
         },
     )
 
@@ -10220,6 +10247,14 @@ def pagamentos_planos_gerenciar(request):
                 settings_obj.trial_duration_days = max(1, min(int(request.POST.get("trial_duration_days") or "30"), 120))
             except (TypeError, ValueError):
                 settings_obj.trial_duration_days = 30
+            for field_name, fallback in (
+                ("trial_daily_io_import_limit", 3),
+                ("trial_daily_ip_import_limit", 3),
+            ):
+                try:
+                    setattr(settings_obj, field_name, max(1, min(int(request.POST.get(field_name) or str(fallback)), 50)))
+                except (TypeError, ValueError):
+                    setattr(settings_obj, field_name, fallback)
             settings_obj.updated_by = request.user
             settings_obj.save()
             return redirect("pagamentos_planos_gerenciar")
@@ -10241,6 +10276,15 @@ def pagamentos_planos_gerenciar(request):
                     pass
             else:
                 plan.rack_limit_simultaneous = None
+            for field_name in ("daily_io_import_limit", "daily_ip_import_limit"):
+                raw_limit = (request.POST.get(field_name) or "").strip()
+                if raw_limit:
+                    try:
+                        setattr(plan, field_name, max(1, min(int(raw_limit), 50)))
+                    except (TypeError, ValueError):
+                        pass
+                else:
+                    setattr(plan, field_name, None)
             for field_name in ("preco_mensal", "preco_anual"):
                 raw = (request.POST.get(field_name) or "").replace(",", ".").strip()
                 try:

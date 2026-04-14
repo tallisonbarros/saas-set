@@ -17,8 +17,10 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 
 from openpyxl import load_workbook
+from django.utils import timezone
 
 from core.models import ListaIP, ListaIPID, ListaIPItem
+from core.services.billing import register_successful_import_usage
 
 
 DEFAULT_AI_REQUEST_TIMEOUT_SECONDS = 25.0
@@ -956,8 +958,10 @@ def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, use
         "client_request_id": uuid.uuid4().hex[:32],
     }
 
-    completion_budget_seconds = float(request_timeout_seconds or _ai_total_budget_seconds())
-    transport_timeout_seconds = min(max(15.0, _ai_request_timeout_seconds()), max(15.0, completion_budget_seconds))
+    transport_timeout_seconds = max(
+        15.0,
+        float(request_timeout_seconds or _ai_request_timeout_seconds() or DEFAULT_AI_REQUEST_TIMEOUT_SECONDS),
+    )
     max_attempts = max(1, _ai_max_retries())
     created_payload = None
     last_error = ""
@@ -1001,11 +1005,6 @@ def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, use
             )
 
         elapsed_seconds = time.monotonic() - polling_started_at
-        if elapsed_seconds >= completion_budget_seconds:
-            raise IPImportError(
-                f"A analise com IA excedeu o tempo de espera de {completion_budget_seconds:.1f}s sem concluir a resposta final."
-            )
-
         time.sleep(_openai_poll_interval_seconds(elapsed_seconds))
         try:
             response_payload = _openai_request_json(
@@ -1263,8 +1262,6 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
     ai_success = 0
     ai_attempts = 0
     processed_sheets = []
-    ai_started_at = time.monotonic()
-    ai_total_budget = _ai_total_budget_seconds()
     ai_max_sheets = _ai_max_sheets_per_job()
     workbook_ai_payload = {}
     workbook_ai_error = ""
@@ -1281,7 +1278,6 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
             sheets_processed=0,
             snapshots=[],
         )
-        remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
         if len(parsed_sheets) == 1:
             only_sheet = parsed_sheets[0]
             workbook_ai_payload = {
@@ -1300,10 +1296,6 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
                 "notes": "single-sheet-fast-path",
             }
             ai_success += 1
-        elif remaining_budget <= 1:
-            workbook_ai_error = "A analise com IA nao recebeu tempo suficiente para concluir a leitura estrutural."
-            ai_errors.append(workbook_ai_error)
-            raise IPImportError(workbook_ai_error)
         elif ai_attempts >= ai_max_sheets:
             workbook_ai_error = "A analise com IA excedeu o limite de chamadas previsto para esta importacao."
             ai_errors.append(workbook_ai_error)
@@ -1316,7 +1308,6 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
                     parsed_sheets=parsed_sheets,
                     original_filename=job.original_filename,
                     file_sha256=job.file_sha256,
-                    request_timeout_seconds=remaining_budget,
                 )
                 ai_success += 1
             except IPImportError as exc:
@@ -1370,14 +1361,9 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
 
         try:
             if settings_obj and settings_obj.enabled:
-                remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
                 if ai_attempts >= ai_max_sheets:
                     raise IPImportError(
                         f"A analise com IA atingiu o limite previsto antes de concluir a guia {parsed.sheet_name}."
-                    )
-                if remaining_budget <= 1:
-                    raise IPImportError(
-                        f"A analise com IA ficou sem tempo antes de concluir a guia {parsed.sheet_name}."
                     )
                 ai_attempts += 1
                 sheet_ai_payload = run_ai_analysis(
@@ -1385,7 +1371,6 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
                     parsed=parsed,
                     workbook_plan=_find_workbook_sheet_plan(workbook_ai_payload, parsed.sheet_name),
                     file_sha256=job.file_sha256,
-                    request_timeout_seconds=remaining_budget,
                 )
                 if sheet_ai_payload.get("skip_sheet"):
                     skip_reason = _cell_to_text((sheet_ai_payload.get("warnings") or [""])[0]) or "Guia sem dados operacionais."
@@ -1538,81 +1523,94 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
 
 
 def apply_import_job(job, user, selected_list_keys=None):
-    proposal = job.proposal_payload or {}
-    list_payloads = proposal.get("lists") or []
-    if not list_payloads:
-        raise IPImportError("A importacao nao possui listas prontas para aplicacao.")
-    if not job.cliente:
-        raise IPImportError("A importacao nao possui cliente associado.")
+    from django.db import transaction
 
-    apply_log = dict(job.apply_log or {})
-    applied_list_keys = dict(apply_log.get("applied_list_keys") or {})
-    applied_list_ids = list(apply_log.get("applied_list_ids") or [])
-    requested_keys = {str(item) for item in (selected_list_keys or [payload.get("list_key") for payload in list_payloads]) if str(item)}
-    applied = []
+    original_job = job
+    with transaction.atomic():
+        job = type(job).objects.select_for_update().get(pk=original_job.pk)
+        proposal = job.proposal_payload or {}
+        list_payloads = proposal.get("lists") or []
+        if not list_payloads:
+            raise IPImportError("A importacao nao possui listas prontas para aplicacao.")
+        if not job.cliente:
+            raise IPImportError("A importacao nao possui cliente associado.")
 
-    for payload in list_payloads:
-        list_key = str(payload.get("list_key") or "")
-        if not list_key or list_key not in requested_keys:
-            continue
+        apply_log = dict(job.apply_log or {})
+        applied_list_keys = dict(apply_log.get("applied_list_keys") or {})
+        applied_list_ids = list(apply_log.get("applied_list_ids") or [])
+        requested_keys = {str(item) for item in (selected_list_keys or [payload.get("list_key") for payload in list_payloads]) if str(item)}
+        applied = []
 
-        existing_id = applied_list_keys.get(list_key)
-        if existing_id:
-            existing_lista = ListaIP.objects.filter(pk=existing_id).first()
-            if existing_lista:
-                applied.append(existing_lista)
+        for payload in list_payloads:
+            list_key = str(payload.get("list_key") or "")
+            if not list_key or list_key not in requested_keys:
                 continue
 
-        id_listaip_obj = None
-        if payload.get("id_listaip"):
-            id_listaip_obj, _ = ListaIPID.objects.get_or_create(codigo=_cell_to_text(payload.get("id_listaip")).upper())
+            existing_id = applied_list_keys.get(list_key)
+            if existing_id:
+                existing_lista = ListaIP.objects.filter(pk=existing_id).first()
+                if existing_lista:
+                    applied.append(existing_lista)
+                    continue
 
-        descricao = _cell_to_text(payload.get("description"))
-        if payload.get("is_sparse"):
-            sparse_note = "Importado de planilha com IPs nao contiguos."
-            descricao = f"{descricao} {sparse_note}".strip() if descricao else sparse_note
+            id_listaip_obj = None
+            if payload.get("id_listaip"):
+                id_listaip_obj, _ = ListaIPID.objects.get_or_create(codigo=_cell_to_text(payload.get("id_listaip")).upper())
 
-        lista = ListaIP.objects.create(
-            cliente=job.cliente,
-            id_listaip=id_listaip_obj,
-            nome=_cell_to_text(payload.get("name"))[:120] or f"Lista importada {len(applied_list_keys) + 1}",
-            descricao=descricao[:500],
-            faixa_inicio=_cell_to_text(payload.get("faixa_inicio")),
-            faixa_fim=_cell_to_text(payload.get("faixa_fim")),
-            protocolo_padrao=_cell_to_text(payload.get("protocolo_padrao"))[:30],
-        )
+            descricao = _cell_to_text(payload.get("description"))
+            if payload.get("is_sparse"):
+                sparse_note = "Importado de planilha com IPs nao contiguos."
+                descricao = f"{descricao} {sparse_note}".strip() if descricao else sparse_note
 
-        item_payloads, _ = _dedupe_ip_items(payload.get("items") or [])
-        ListaIPItem.objects.bulk_create(
-            [
-                ListaIPItem(
-                    lista=lista,
-                    ip=item["ip"],
-                    nome_equipamento=_cell_to_text(item.get("device_name"))[:120],
-                    descricao=_cell_to_text(item.get("description"))[:200],
-                    mac=_cell_to_text(item.get("mac"))[:30],
-                    protocolo=_cell_to_text(item.get("protocol"))[:30],
-                )
-                for item in item_payloads
-            ]
-        )
+            lista = ListaIP.objects.create(
+                cliente=job.cliente,
+                id_listaip=id_listaip_obj,
+                nome=_cell_to_text(payload.get("name"))[:120] or f"Lista importada {len(applied_list_keys) + 1}",
+                descricao=descricao[:500],
+                faixa_inicio=_cell_to_text(payload.get("faixa_inicio")),
+                faixa_fim=_cell_to_text(payload.get("faixa_fim")),
+                protocolo_padrao=_cell_to_text(payload.get("protocolo_padrao"))[:30],
+            )
 
-        applied.append(lista)
-        applied_list_keys[list_key] = lista.pk
-        if lista.pk not in applied_list_ids:
-            applied_list_ids.append(lista.pk)
-        job.applied_lista = lista
+            item_payloads, _ = _dedupe_ip_items(payload.get("items") or [])
+            ListaIPItem.objects.bulk_create(
+                [
+                    ListaIPItem(
+                        lista=lista,
+                        ip=item["ip"],
+                        nome_equipamento=_cell_to_text(item.get("device_name"))[:120],
+                        descricao=_cell_to_text(item.get("description"))[:200],
+                        mac=_cell_to_text(item.get("mac"))[:30],
+                        protocolo=_cell_to_text(item.get("protocol"))[:30],
+                    )
+                    for item in item_payloads
+                ]
+            )
 
-    if not applied:
-        raise IPImportError("Nenhuma lista foi aplicada. Revise a selecao da preview.")
+            applied.append(lista)
+            applied_list_keys[list_key] = lista.pk
+            if lista.pk not in applied_list_ids:
+                applied_list_ids.append(lista.pk)
+            job.applied_lista = lista
 
-    all_keys = {str(payload.get("list_key") or "") for payload in list_payloads if payload.get("list_key")}
-    applied_now = set(applied_list_keys.keys())
-    apply_log["applied_list_keys"] = applied_list_keys
-    apply_log["applied_list_ids"] = applied_list_ids
-    apply_log["lists_applied"] = len(applied_now)
-    apply_log["items_applied"] = ListaIPItem.objects.filter(lista_id__in=applied_list_ids).count()
-    job.apply_log = apply_log
-    job.status = job.Status.APPLIED if all_keys and all_keys <= applied_now else job.Status.REVIEW
-    job.save(update_fields=["applied_lista", "apply_log", "status", "updated_at"])
+        if not applied:
+            raise IPImportError("Nenhuma lista foi aplicada. Revise a selecao da preview.")
+
+        all_keys = {str(payload.get("list_key") or "") for payload in list_payloads if payload.get("list_key")}
+        applied_now = set(applied_list_keys.keys())
+        if not job.first_applied_at:
+            try:
+                register_successful_import_usage(user, "IP")
+            except ValueError as exc:
+                raise IPImportError(str(exc)) from exc
+            job.first_applied_at = timezone.now()
+        apply_log["applied_list_keys"] = applied_list_keys
+        apply_log["applied_list_ids"] = applied_list_ids
+        apply_log["lists_applied"] = len(applied_now)
+        apply_log["items_applied"] = ListaIPItem.objects.filter(lista_id__in=applied_list_ids).count()
+        job.apply_log = apply_log
+        job.status = job.Status.APPLIED if all_keys and all_keys <= applied_now else job.Status.REVIEW
+        job.save(update_fields=["applied_lista", "apply_log", "status", "first_applied_at", "updated_at"])
+    for field_name in ("applied_lista", "apply_log", "status", "first_applied_at", "updated_at"):
+        setattr(original_job, field_name, getattr(job, field_name))
     return applied

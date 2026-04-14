@@ -18,6 +18,9 @@ from zipfile import BadZipFile
 
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from django.utils import timezone
+
+from core.services.billing import register_successful_import_usage
 
 
 TYPE_ALIASES = {
@@ -2152,6 +2155,101 @@ def _normalize_slot_block_rows(parsed, active_map):
     return normalized_rows
 
 
+def _normalize_tabular_rows(parsed, active_map, start_index=None):
+    normalized_rows = []
+    row_start = parsed.header_row_index + 1 if start_index is None else max(0, start_index)
+    current_section_context = {}
+    if row_start > 0:
+        for previous_row in reversed(parsed.raw_rows[:row_start]):
+            previous_section_context = _parse_module_section_title(previous_row)
+            if previous_section_context:
+                current_section_context = previous_section_context
+                break
+    for row_offset, row in enumerate(parsed.raw_rows[row_start:], start=row_start + 1):
+        if _non_empty_cells(row) == 0:
+            continue
+        if _looks_like_section_title(row):
+            continue
+
+        section_context = _parse_module_section_title(row)
+        if section_context:
+            current_section_context = section_context
+            continue
+        if _looks_like_repeated_tabular_header(row):
+            continue
+        if _row_repeats_headers(row, parsed.headers):
+            continue
+
+        panel_raw = _extract_row_value(row, active_map, "panel") or current_section_context.get("panel") or ""
+        rack_raw = _extract_row_value(row, active_map, "rack")
+        slot_raw = _extract_row_value(row, active_map, "slot")
+        module_raw = _extract_row_value(row, active_map, "module_model") or current_section_context.get("module_model") or ""
+        channel_raw = _extract_row_value(row, active_map, "channel")
+        address_raw = _extract_row_value(row, active_map, "address")
+        fieldbus_raw = _extract_row_value(row, active_map, "fieldbus")
+        signal_raw = _extract_row_value(row, active_map, "signal_hint")
+        tag_raw = _extract_row_value(row, active_map, "tag")
+        description_raw = _extract_row_value(row, active_map, "description")
+        type_raw = _extract_row_value(row, active_map, "type")
+        location_raw = _find_first_value(
+            _extract_row_value(row, active_map, "location"),
+            fieldbus_raw,
+            address_raw,
+            _extract_row_value(row, active_map, "point_ref"),
+        )
+        hardware_context = _parse_hardware_context(
+            panel_raw,
+            location_raw,
+            address_raw,
+            fieldbus_raw,
+            rack_raw,
+            slot_raw,
+            channel_raw,
+            _row_text(row),
+        )
+        if not panel_raw:
+            panel_raw = hardware_context.get("panel") or ""
+        if not rack_raw and current_section_context.get("rack"):
+            rack_raw = str(current_section_context["rack"])
+        if not rack_raw and hardware_context.get("rack"):
+            rack_raw = str(hardware_context["rack"])
+        if not slot_raw and current_section_context.get("slot"):
+            slot_raw = str(current_section_context["slot"])
+        if not slot_raw and hardware_context.get("slot"):
+            slot_raw = str(hardware_context["slot"])
+        if not channel_raw and hardware_context.get("channel"):
+            channel_raw = str(hardware_context["channel"])
+
+        if not any([rack_raw, slot_raw, channel_raw, tag_raw, description_raw, location_raw, panel_raw]):
+            continue
+        if not tag_raw and not description_raw:
+            continue
+
+        inferred_type = normalize_type(
+            type_raw,
+            fallbacks=[signal_raw, channel_raw, address_raw, tag_raw, description_raw, module_raw, location_raw],
+        )
+        normalized_rows.append(
+            {
+                "source_row": row_offset,
+                "source_sheet": parsed.sheet_name,
+                "panel_raw": panel_raw,
+                "location_raw": location_raw,
+                "rack_raw": rack_raw,
+                "slot_raw": slot_raw,
+                "module_raw": module_raw,
+                "channel_raw": channel_raw,
+                "tag": normalize_tag(tag_raw),
+                "description": description_raw,
+                "type": inferred_type,
+                "slot_index": _normalize_int(slot_raw) or hardware_context.get("slot"),
+                "channel_index": _normalize_channel_index(channel_raw) or hardware_context.get("channel"),
+                "issues": [],
+            }
+        )
+    return normalized_rows
+
+
 def normalize_rows(parsed, module_catalog, ai_result=None):
     normalized_rows = []
     warnings = list(parsed.warnings)
@@ -2163,100 +2261,23 @@ def normalize_rows(parsed, module_catalog, ai_result=None):
     if block_layout_active:
         normalized_rows = _normalize_slot_block_rows(parsed, active_map)
     else:
-        current_section_context = {}
-        for previous_row in reversed(parsed.raw_rows[: parsed.header_row_index + 1]):
-            previous_section_context = _parse_module_section_title(previous_row)
-            if previous_section_context:
-                current_section_context = previous_section_context
-                break
-        for row_offset, row in enumerate(parsed.raw_rows[parsed.header_row_index + 1 :], start=parsed.header_row_index + 2):
-            if _non_empty_cells(row) == 0:
-                continue
-            if _looks_like_section_title(row):
-                continue
-
-            section_context = _parse_module_section_title(row)
-            if section_context:
-                current_section_context = section_context
-                continue
-            if _looks_like_repeated_tabular_header(row):
-                continue
-            if _row_repeats_headers(row, parsed.headers):
-                continue
-
-            panel_raw = _extract_row_value(row, active_map, "panel") or current_section_context.get("panel") or ""
-            rack_raw = _extract_row_value(row, active_map, "rack")
-            slot_raw = _extract_row_value(row, active_map, "slot")
-            module_raw = _extract_row_value(row, active_map, "module_model") or current_section_context.get("module_model") or ""
-            channel_raw = _extract_row_value(row, active_map, "channel")
-            address_raw = _extract_row_value(row, active_map, "address")
-            fieldbus_raw = _extract_row_value(row, active_map, "fieldbus")
-            signal_raw = _extract_row_value(row, active_map, "signal_hint")
-            tag_raw = _extract_row_value(row, active_map, "tag")
-            description_raw = _extract_row_value(row, active_map, "description")
-            type_raw = _extract_row_value(row, active_map, "type")
-            location_raw = _find_first_value(
-                _extract_row_value(row, active_map, "location"),
-                fieldbus_raw,
-                address_raw,
-                _extract_row_value(row, active_map, "point_ref"),
-            )
-            hardware_context = _parse_hardware_context(
-                panel_raw,
-                location_raw,
-                address_raw,
-                fieldbus_raw,
-                rack_raw,
-                slot_raw,
-                channel_raw,
-                _row_text(row),
-            )
-            if not panel_raw:
-                panel_raw = hardware_context.get("panel") or ""
-            if not rack_raw and current_section_context.get("rack"):
-                rack_raw = str(current_section_context["rack"])
-            if not rack_raw and hardware_context.get("rack"):
-                rack_raw = str(hardware_context["rack"])
-            if not slot_raw and current_section_context.get("slot"):
-                slot_raw = str(current_section_context["slot"])
-            if not slot_raw and hardware_context.get("slot"):
-                slot_raw = str(hardware_context["slot"])
-            if not channel_raw and hardware_context.get("channel"):
-                channel_raw = str(hardware_context["channel"])
-
-            if not any([rack_raw, slot_raw, channel_raw, tag_raw, description_raw, location_raw, panel_raw]):
-                continue
-            if not tag_raw and not description_raw:
-                continue
-
-            inferred_type = normalize_type(
-                type_raw,
-                fallbacks=[signal_raw, channel_raw, address_raw, tag_raw, description_raw, module_raw, location_raw],
-            )
-            normalized_rows.append(
-                {
-                    "source_row": row_offset,
-                    "source_sheet": parsed.sheet_name,
-                    "panel_raw": panel_raw,
-                    "location_raw": location_raw,
-                    "rack_raw": rack_raw,
-                    "slot_raw": slot_raw,
-                    "module_raw": module_raw,
-                    "channel_raw": channel_raw,
-                    "tag": normalize_tag(tag_raw),
-                    "description": description_raw,
-                    "type": inferred_type,
-                    "slot_index": _normalize_int(slot_raw) or hardware_context.get("slot"),
-                    "channel_index": _normalize_channel_index(channel_raw) or hardware_context.get("channel"),
-                    "issues": [],
-                }
-            )
+        normalized_rows = _normalize_tabular_rows(parsed, active_map)
+        if not normalized_rows:
+            normalized_rows = _normalize_tabular_rows(parsed, active_map, start_index=0)
+            if normalized_rows:
+                warnings.append(
+                    "O cabecalho detectado nao foi confiavel para esta guia; a leitura foi refeita a partir das linhas brutas para preservar a interpretacao."
+                )
 
     normalized_rows, ai_row_warnings = _merge_ai_row_hints_into_rows(normalized_rows, ai_result)
     warnings.extend(ai_row_warnings)
 
     if not normalized_rows:
-        raise IOImportError("A planilha nao possui linhas uteis abaixo do cabecalho detectado.")
+        sheet_role = _cell_to_text((ai_result or {}).get("sheet_role")).lower()
+        if (ai_result or {}).get("skip_sheet") or sheet_role in {"helper", "noise"}:
+            warnings.append("A guia foi classificada como nao operacional durante a leitura semantica.")
+            return [], active_map, warnings
+        raise IOImportError("A IA nao conseguiu materializar linhas operacionais suficientes a partir desta guia.")
 
     normalized_rows, validation_warnings = _validate_normalized_rows(normalized_rows, module_catalog)
     warnings.extend(validation_warnings)
@@ -3003,8 +3024,7 @@ def _call_openai_responses(
     if effective_reasoning and effective_reasoning != "none":
         payload["reasoning"] = {"effort": effective_reasoning}
 
-    completion_budget_seconds = float(request_timeout_seconds or _ai_total_budget_seconds())
-    transport_timeout_seconds = min(max(15.0, _ai_request_timeout_seconds()), max(15.0, completion_budget_seconds))
+    transport_timeout_seconds = max(15.0, float(request_timeout_seconds or _ai_request_timeout_seconds()))
     max_attempts = max(1, _ai_max_retries())
     created_payload = None
     last_error = ""
@@ -3048,11 +3068,6 @@ def _call_openai_responses(
             )
 
         elapsed_seconds = time.monotonic() - polling_started_at
-        if elapsed_seconds >= completion_budget_seconds:
-            raise IOImportError(
-                f"A analise com IA excedeu o tempo de espera de {completion_budget_seconds:.1f}s sem concluir a resposta final."
-            )
-
         time.sleep(_openai_poll_interval_seconds(elapsed_seconds))
         try:
             response_payload = _openai_request_json(
@@ -3528,8 +3543,6 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
     ai_success = 0
     ai_attempts = 0
     processed_sheets = []
-    ai_started_at = time.monotonic()
-    ai_total_budget = _ai_total_budget_seconds()
     ai_max_sheets = _ai_max_sheets_per_job()
     ai_rack_names = []
     workbook_ai_payload = {}
@@ -3548,7 +3561,6 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
             sheets_processed=0,
             snapshots=[],
         )
-        remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
         if single_sheet_fast_path:
             workbook_ai_payload = _build_single_sheet_fast_workbook_plan(parsed_sheets)
             ai_success += 1
@@ -3563,7 +3575,7 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
                 sheets_processed=0,
                 snapshots=[],
             )
-        elif remaining_budget > 1 and ai_attempts < ai_max_sheets:
+        elif ai_attempts < ai_max_sheets:
             try:
                 ai_attempts += 1
                 workbook_ai_payload = run_ai_workbook_analysis(
@@ -3571,7 +3583,6 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
                     parsed_sheets=parsed_sheets,
                     original_filename=job.original_filename,
                     file_sha256=job.file_sha256,
-                    request_timeout_seconds=remaining_budget,
                 )
                 ai_success += 1
             except IOImportError as exc:
@@ -3581,11 +3592,6 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
                     raise IOImportError(
                         f"A analise com IA nao conseguiu entender a estrutura geral da planilha. {workbook_ai_error}"
                     ) from exc
-        elif remaining_budget <= 1:
-            workbook_ai_error = "A analise com IA nao recebeu tempo suficiente para concluir a leitura estrutural."
-            ai_errors.append(workbook_ai_error)
-            if ai_required:
-                raise IOImportError(workbook_ai_error)
         else:
             workbook_ai_error = "A analise com IA excedeu o limite de chamadas previsto para esta importacao."
             ai_errors.append(workbook_ai_error)
@@ -3638,20 +3644,9 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
 
         try:
             if settings_obj and settings_obj.enabled:
-                remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
                 if ai_attempts >= ai_max_sheets:
                     message = (
                         f"A analise com IA atingiu o limite previsto antes de concluir a guia {parsed.sheet_name}."
-                    )
-                    ai_errors.append(_format_sheet_warning(parsed.sheet_name, message, multi_sheet))
-                    if ai_required:
-                        raise IOImportError(message)
-                    sheet_warnings.append(message)
-                    sheet_rows, sheet_map, fallback_warnings = normalize_rows(parsed=parsed, module_catalog=module_catalog, ai_result=None)
-                    sheet_warnings.extend(fallback_warnings)
-                elif remaining_budget <= 1:
-                    message = (
-                        f"A analise com IA ficou sem tempo antes de concluir a guia {parsed.sheet_name}."
                     )
                     ai_errors.append(_format_sheet_warning(parsed.sheet_name, message, multi_sheet))
                     if ai_required:
@@ -3669,7 +3664,6 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
                             module_catalog=module_catalog,
                             file_sha256=job.file_sha256,
                             workbook_plan=_find_workbook_sheet_plan(workbook_ai_payload, parsed.sheet_name),
-                            request_timeout_seconds=remaining_budget,
                             total_sheets=total_sheets,
                         )
                         if sheet_ai_payload.get("skip_sheet"):
@@ -3727,6 +3721,23 @@ def reprocess_import_job(job, module_catalog, settings_obj=None, progress_callba
             if ai_required:
                 raise
             warnings.append(_format_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
+            sheet_summaries.append(
+                {
+                    "sheet_name": parsed.sheet_name,
+                    "header_row_index": parsed.header_row_index + 1,
+                    "rows_total": parsed.rows_total,
+                    "rows_parsed": 0,
+                    "layout": parsed.layout,
+                    "column_map": {},
+                    "skipped": True,
+                }
+            )
+            processed_count += 1
+            continue
+        if not sheet_rows:
+            skip_reason = _cell_to_text((sheet_ai_payload or {}).get("notes")) or "Guia sem linhas operacionais materializadas."
+            warnings.append(_format_sheet_warning(parsed.sheet_name, f"Guia ignorada apos a leitura semantica: {skip_reason}", multi_sheet))
+            ai_payload["sheets"][parsed.sheet_name] = sheet_ai_payload
             sheet_summaries.append(
                 {
                     "sheet_name": parsed.sheet_name,
@@ -4012,54 +4023,56 @@ def apply_import_job(
 ):
     from django.db import transaction
 
-    proposal = job.proposal_payload or {}
-    proposal_racks = proposal.get("racks") or []
-    if not proposal_racks and proposal.get("modules"):
-        proposal_racks = [
-            {
-                "name": (proposal.get("rack") or {}).get("name") or job.requested_rack_name or "Rack importado",
-                "slots_total": (proposal.get("rack") or {}).get("slots_total") or len(proposal.get("modules") or []),
-                "modules": proposal.get("modules") or [],
-                "summary": proposal.get("summary") or {},
-            }
-        ]
+    original_job = job
+    with transaction.atomic():
+        job = type(job).objects.select_for_update().get(pk=original_job.pk)
+        proposal = job.proposal_payload or {}
+        proposal_racks = proposal.get("racks") or []
+        if not proposal_racks and proposal.get("modules"):
+            proposal_racks = [
+                {
+                    "name": (proposal.get("rack") or {}).get("name") or job.requested_rack_name or "Rack importado",
+                    "slots_total": (proposal.get("rack") or {}).get("slots_total") or len(proposal.get("modules") or []),
+                    "modules": proposal.get("modules") or [],
+                    "summary": proposal.get("summary") or {},
+                }
+            ]
 
-    conflicts = proposal.get("conflicts") or []
-    if conflicts:
-        raise IOImportError("A proposta possui conflitos e nao pode ser aplicada.")
-    if not proposal_racks:
-        raise IOImportError("A proposta nao possui racks para aplicar.")
-    if job.target_rack and len(proposal_racks) > 1:
-        raise IOImportError("Esta importacao gerou multiplos racks e nao pode ser aplicada em um rack destino unico.")
+        conflicts = proposal.get("conflicts") or []
+        if conflicts:
+            raise IOImportError("A proposta possui conflitos e nao pode ser aplicada.")
+        if not proposal_racks:
+            raise IOImportError("A proposta nao possui racks para aplicar.")
+        if job.target_rack and len(proposal_racks) > 1:
+            raise IOImportError("Esta importacao gerou multiplos racks e nao pode ser aplicada em um rack destino unico.")
+        all_source_racks = list(proposal_racks)
 
-    module_map = {str(module.id): module for module in module_qs}
-    existing_apply_log = dict(job.apply_log or {})
-    applied_rack_key_map = dict(existing_apply_log.get("applied_rack_keys") or {})
-    if selected_rack_keys:
-        selected_set = {str(item) for item in selected_rack_keys if str(item).strip()}
+        module_map = {str(module.id): module for module in module_qs}
+        existing_apply_log = dict(job.apply_log or {})
+        applied_rack_key_map = dict(existing_apply_log.get("applied_rack_keys") or {})
+        if selected_rack_keys:
+            selected_set = {str(item) for item in selected_rack_keys if str(item).strip()}
+            proposal_racks = [
+                rack_payload
+                for rack_payload in proposal_racks
+                if str(rack_payload.get("rack_key") or "").strip() in selected_set
+            ]
+            if not proposal_racks:
+                raise IOImportError("Nenhum rack selecionado para aplicacao.")
         proposal_racks = [
             rack_payload
             for rack_payload in proposal_racks
-            if str(rack_payload.get("rack_key") or "").strip() in selected_set
+            if str(rack_payload.get("rack_key") or "").strip() not in applied_rack_key_map
         ]
         if not proposal_racks:
-            raise IOImportError("Nenhum rack selecionado para aplicacao.")
-    proposal_racks = [
-        rack_payload
-        for rack_payload in proposal_racks
-        if str(rack_payload.get("rack_key") or "").strip() not in applied_rack_key_map
-    ]
-    if not proposal_racks:
-        selected_ids = [
-            rack_id
-            for rack_key, rack_id in applied_rack_key_map.items()
-            if not selected_rack_keys or rack_key in {str(item) for item in selected_rack_keys}
-        ]
-        return list(rack_model.objects.filter(id__in=selected_ids))
+            selected_ids = [
+                rack_id
+                for rack_key, rack_id in applied_rack_key_map.items()
+                if not selected_rack_keys or rack_key in {str(item) for item in selected_rack_keys}
+            ]
+            return list(rack_model.objects.filter(id__in=selected_ids))
 
-    applied_racks = []
-
-    with transaction.atomic():
+        applied_racks = []
         for index, rack_payload in enumerate(proposal_racks):
             rack = _apply_single_rack_payload(
                 job=job,
@@ -4080,22 +4093,35 @@ def apply_import_job(
 
         all_proposal_keys = {
             str(rack_payload.get("rack_key") or "").strip()
-            for rack_payload in (proposal.get("racks") or [])
+            for rack_payload in all_source_racks
             if str(rack_payload.get("rack_key") or "").strip()
         }
         all_applied_ids = list(dict.fromkeys(list(applied_rack_key_map.values())))
+        if not job.first_applied_at:
+            try:
+                register_successful_import_usage(user, "IO")
+            except ValueError as exc:
+                raise IOImportError(str(exc)) from exc
+            job.first_applied_at = timezone.now()
         job.applied_rack = rack_model.objects.filter(id__in=all_applied_ids).order_by("id").first()
-        job.status = job.Status.APPLIED if all_proposal_keys and all_proposal_keys.issubset(applied_rack_key_map.keys()) else job.Status.REVIEW
+        applied_all_racks = False
+        if all_proposal_keys:
+            applied_all_racks = all_proposal_keys.issubset(applied_rack_key_map.keys())
+        else:
+            applied_all_racks = len(all_applied_ids) >= len(all_source_racks)
+        job.status = job.Status.APPLIED if applied_all_racks else job.Status.REVIEW
         job.apply_log = {
             "applied_by": getattr(user, "username", "") or "",
             "racks_applied": len(all_applied_ids),
             "modules_applied": sum(
                 len(rack_payload.get("modules") or [])
-                for rack_payload in (proposal.get("racks") or [])
-                if str(rack_payload.get("rack_key") or "").strip() in applied_rack_key_map
+                for rack_payload in all_source_racks
+                if not all_proposal_keys or str(rack_payload.get("rack_key") or "").strip() in applied_rack_key_map
             ),
             "applied_rack_ids": all_applied_ids,
             "applied_rack_keys": applied_rack_key_map,
         }
-        job.save(update_fields=["applied_rack", "status", "apply_log"])
+        job.save(update_fields=["applied_rack", "status", "apply_log", "first_applied_at", "updated_at"])
+    for field_name in ("applied_rack", "status", "apply_log", "first_applied_at", "updated_at"):
+        setattr(original_job, field_name, getattr(job, field_name))
     return applied_racks
