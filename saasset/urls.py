@@ -122,6 +122,7 @@ urlpatterns = [
     path('listas-ip/', views.listas_ip_list, name="listas_ip_list"),
     path('listas-ip/importacoes/nova/', views.listas_ip_import_create, name="listas_ip_import_create"),
     path('listas-ip/importacoes/admin/', views.listas_ip_import_admin, name="listas_ip_import_admin"),
+    path('listas-ip/importacoes/<int:pk>/status/', views.listas_ip_import_status, name="listas_ip_import_status"),
     path('listas-ip/importacoes/<int:pk>/', views.listas_ip_import_detail, name="listas_ip_import_detail"),
     path('listas-ip/<int:pk>/', views.lista_ip_detail, name="lista_ip_detail"),
     path('radar-atividades/', views.radar_list, name="radar_list"),

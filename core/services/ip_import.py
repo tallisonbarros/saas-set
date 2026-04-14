@@ -7,8 +7,10 @@ import re
 import socket
 import time
 import unicodedata
+import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from urllib import error as urlerror
@@ -22,6 +24,10 @@ from core.models import ListaIP, ListaIPID, ListaIPItem
 DEFAULT_AI_REQUEST_TIMEOUT_SECONDS = 25.0
 DEFAULT_AI_TOTAL_BUDGET_SECONDS = 180.0
 DEFAULT_AI_MAX_SHEETS_PER_JOB = 24
+DEFAULT_AI_MAX_RETRIES = 2
+DEFAULT_AI_CACHE_MAX_ENTRIES = 160
+DEFAULT_AI_CACHE_MAX_AGE_DAYS = 14
+IP_IMPORT_AI_CACHE_VERSION = "v1"
 
 
 HEADER_ALIASES = {
@@ -140,6 +146,51 @@ def _ai_total_budget_seconds():
 
 def _ai_max_sheets_per_job():
     return _read_positive_int_env("IP_IMPORT_AI_MAX_SHEETS_PER_JOB", DEFAULT_AI_MAX_SHEETS_PER_JOB)
+
+
+def _ai_max_retries():
+    return _read_positive_int_env("IP_IMPORT_AI_MAX_RETRIES", DEFAULT_AI_MAX_RETRIES)
+
+
+def _ai_cache_max_entries():
+    return _read_positive_int_env("IP_IMPORT_AI_CACHE_MAX_ENTRIES", DEFAULT_AI_CACHE_MAX_ENTRIES)
+
+
+def _ai_cache_max_age_days():
+    return _read_positive_int_env("IP_IMPORT_AI_CACHE_MAX_AGE_DAYS", DEFAULT_AI_CACHE_MAX_AGE_DAYS)
+
+
+def _hash_json_payload(payload):
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _ai_settings_fingerprint(settings_obj):
+    payload = {
+        "provider": getattr(settings_obj, "provider", ""),
+        "model": getattr(settings_obj, "model", ""),
+        "reasoning_effort": getattr(settings_obj, "reasoning_effort", ""),
+        "max_rows_for_ai": getattr(settings_obj, "max_rows_for_ai", 0),
+        "header_prompt": getattr(settings_obj, "header_prompt", ""),
+        "grouping_prompt": getattr(settings_obj, "grouping_prompt", ""),
+        "version": IP_IMPORT_AI_CACHE_VERSION,
+    }
+    return _hash_json_payload(payload)
+
+
+def _emit_progress(progress_callback, stage, percent, title, message, **extra):
+    if not callable(progress_callback):
+        return
+    payload = {
+        "stage": _cell_to_text(stage).lower() or "upload",
+        "percent": max(0, min(int(percent or 0), 100)),
+        "title": _cell_to_text(title),
+        "message": _cell_to_text(message),
+    }
+    for key, value in extra.items():
+        if value is not None:
+            payload[key] = value
+    progress_callback(payload)
 
 
 def _compact_token(value):
@@ -338,6 +389,123 @@ def parse_workbook(raw_bytes, original_filename):
     return parsed
 
 
+def _build_raw_rows_payload(parsed, max_rows=18, max_cols=10):
+    payload = []
+    for row in (parsed.raw_rows or [])[:max_rows]:
+        payload.append([_cell_to_text(cell) for cell in row[:max_cols]])
+    return payload
+
+
+def _build_workbook_ai_context(parsed_sheets, original_filename):
+    return {
+        "original_filename": original_filename,
+        "sheets": [
+            {
+                "sheet_name": parsed.sheet_name,
+                "rows_total": parsed.rows_total,
+                "header_row_number": parsed.header_row_index + 1,
+                "headers": parsed.headers[:18],
+                "detected_column_map": parsed.column_map,
+                "suggested_list_name": parsed.suggested_list_name,
+                "parser_warnings": parsed.warnings,
+                "raw_rows": _build_raw_rows_payload(parsed, max_rows=18, max_cols=10),
+            }
+            for parsed in parsed_sheets
+        ],
+    }
+
+
+def _find_workbook_sheet_plan(workbook_ai_payload, sheet_name):
+    for item in (workbook_ai_payload or {}).get("sheets") or []:
+        if _cell_to_text(item.get("sheet_name")) == _cell_to_text(sheet_name):
+            return item
+    return {}
+
+
+def _should_skip_sheet_by_ai(workbook_ai_payload, parsed):
+    plan = _find_workbook_sheet_plan(workbook_ai_payload, parsed.sheet_name)
+    if not plan:
+        return False, ""
+    if not plan.get("use_sheet"):
+        return True, _cell_to_text(plan.get("reason")) or "Guia classificada como auxiliar."
+    return False, ""
+
+
+def _build_workbook_cache_fingerprint(file_sha256, settings_obj, parsed_sheets):
+    payload = {
+        "file_sha256": file_sha256,
+        "settings": _ai_settings_fingerprint(settings_obj),
+        "workbook_context": _build_workbook_ai_context(parsed_sheets=parsed_sheets, original_filename=""),
+    }
+    return _hash_json_payload(payload)
+
+
+def _build_sheet_cache_fingerprint(file_sha256, settings_obj, parsed, workbook_plan=None):
+    payload = {
+        "file_sha256": file_sha256,
+        "settings": _ai_settings_fingerprint(settings_obj),
+        "sheet_name": parsed.sheet_name,
+        "headers": parsed.headers,
+        "detected_column_map": parsed.column_map,
+        "parser_warnings": parsed.warnings,
+        "workbook_plan": workbook_plan or {},
+        "raw_rows": _build_raw_rows_payload(parsed, max_rows=max(20, int(getattr(settings_obj, "max_rows_for_ai", 180) or 180)), max_cols=12),
+    }
+    return _hash_json_payload(payload)
+
+
+def _load_ai_cache(stage, fingerprint):
+    from django.db.models import F
+    from django.utils import timezone
+
+    from core.models import IPImportAICache
+
+    item = IPImportAICache.objects.filter(stage=stage, fingerprint=fingerprint).first()
+    if not item:
+        return None
+    IPImportAICache.objects.filter(pk=item.pk).update(hits=F("hits") + 1, last_used_at=timezone.now())
+    item.hits += 1
+    return item.response_payload or {}
+
+
+def _prune_ai_cache():
+    from django.utils import timezone
+
+    from core.models import IPImportAICache
+
+    max_entries = max(30, _ai_cache_max_entries())
+    max_age_days = max(1, _ai_cache_max_age_days())
+    cutoff = timezone.now() - timedelta(days=max_age_days)
+    IPImportAICache.objects.filter(last_used_at__lt=cutoff).delete()
+    total = IPImportAICache.objects.count()
+    if total <= max_entries:
+        return
+    stale_ids = list(
+        IPImportAICache.objects.order_by("last_used_at").values_list("id", flat=True)[: max(0, total - max_entries)]
+    )
+    if stale_ids:
+        IPImportAICache.objects.filter(id__in=stale_ids).delete()
+
+
+def _save_ai_cache(stage, fingerprint, file_sha256, settings_obj, response_payload, sheet_name="", payload_meta=None):
+    from core.models import IPImportAICache
+
+    IPImportAICache.objects.update_or_create(
+        stage=stage,
+        fingerprint=fingerprint,
+        defaults={
+            "file_sha256": _cell_to_text(file_sha256),
+            "sheet_name": _cell_to_text(sheet_name),
+            "provider": _cell_to_text(getattr(settings_obj, "provider", "")),
+            "model": _cell_to_text(getattr(settings_obj, "model", "")),
+            "settings_fingerprint": _ai_settings_fingerprint(settings_obj),
+            "response_payload": response_payload or {},
+            "payload_meta": payload_meta or {},
+        },
+    )
+    _prune_ai_cache()
+
+
 def _extract_row_value(row, column_map, field_name):
     mapping = column_map.get(field_name) or {}
     index = mapping.get("index")
@@ -517,6 +685,67 @@ def normalize_rows(parsed, ai_result=None):
     return normalized_rows, effective_map, warnings
 
 
+def normalize_rows_from_ai_result(parsed, ai_result):
+    warnings = list(parsed.warnings or [])
+    warnings.extend((ai_result or {}).get("warnings") or [])
+    normalized_rows = []
+
+    for item in (ai_result or {}).get("logical_items") or []:
+        if not isinstance(item, dict):
+            continue
+        ip_value = _validate_ip(item.get("ip"))
+        if not ip_value:
+            range_start = _cell_to_text(item.get("range_start"))
+            range_end = _cell_to_text(item.get("range_end"))
+            if range_start and range_end:
+                try:
+                    ip_values = _expand_ip_range(range_start, range_end)
+                except IPImportError as exc:
+                    source_row = item.get("source_row") or "?"
+                    warnings.append(f"Linha {source_row}: {exc}")
+                    continue
+            else:
+                continue
+        else:
+            ip_values = [ip_value]
+
+        list_name = _clean_list_name(item.get("list_name")) or _clean_list_name(
+            (ai_result or {}).get("default_list_name")
+        ) or parsed.suggested_list_name
+        list_code = _cell_to_text(item.get("list_code")).upper() or _cell_to_text(
+            (ai_result or {}).get("default_list_code")
+        ).upper()
+        device_name = _cell_to_text(item.get("device_name"))[:120]
+        description = _cell_to_text(item.get("description"))[:200]
+        protocol = _cell_to_text(item.get("protocol"))[:30]
+        mac_value, mac_ok = _normalize_mac(item.get("mac"))
+        if mac_value and not mac_ok:
+            source_row = item.get("source_row") or "?"
+            warnings.append(f"Linha {source_row}: MAC mantido como texto bruto porque o formato parece invalido.")
+        source_row = int(item.get("source_row") or 0) or parsed.header_row_index + 2
+
+        for expanded_ip in ip_values:
+            normalized_rows.append(
+                {
+                    "source_sheet": parsed.sheet_name,
+                    "source_row": source_row,
+                    "list_name": list_name[:120],
+                    "list_code": list_code[:60],
+                    "ip": expanded_ip,
+                    "device_name": device_name,
+                    "description": description,
+                    "mac": mac_value[:30],
+                    "protocol": protocol,
+                }
+            )
+
+    if not normalized_rows:
+        raise IPImportError("A IA nao retornou itens operacionais suficientes para montar a lista de IP.")
+
+    effective_map = {field_name: _cell_to_text(value) for field_name, value in ((ai_result or {}).get("column_map") or {}).items()}
+    return normalized_rows, effective_map, warnings
+
+
 def build_import_proposal(original_filename, normalized_rows):
     grouped = defaultdict(list)
     for row in normalized_rows:
@@ -576,6 +805,50 @@ def build_import_proposal(original_filename, normalized_rows):
     }
 
 
+def _build_progress_list_snapshots_from_rows(normalized_rows, limit=4):
+    grouped = defaultdict(list)
+    for row in normalized_rows or []:
+        key = _compact_token(row.get("list_code") or row.get("list_name") or row.get("source_sheet")) or str(len(grouped) + 1)
+        grouped[key].append(row)
+
+    snapshots = []
+    for _, rows in list(grouped.items())[:limit]:
+        sorted_rows = sorted(rows, key=lambda item: (_cell_to_text(item.get("list_name")), item.get("ip")))
+        names = [item.get("device_name") for item in sorted_rows if item.get("device_name")][:3]
+        ip_values = [item.get("ip") for item in sorted_rows if item.get("ip")]
+        snapshots.append(
+            {
+                "list_name": _clean_list_name(sorted_rows[0].get("list_name")) or _clean_list_name(sorted_rows[0].get("source_sheet")) or "Lista em analise",
+                "items": len(sorted_rows),
+                "devices": sum(1 for item in sorted_rows if item.get("device_name")),
+                "sample_names": names,
+                "range_start": ip_values[0] if ip_values else "",
+                "range_end": ip_values[-1] if ip_values else "",
+            }
+        )
+    return snapshots
+
+
+def _build_progress_list_snapshots_from_proposal(proposal, limit=4):
+    snapshots = []
+    for item in (proposal or {}).get("lists") or []:
+        rows = item.get("items") or []
+        names = [row.get("device_name") for row in rows if row.get("device_name")][:3]
+        snapshots.append(
+            {
+                "list_name": _cell_to_text(item.get("name")) or "Lista importada",
+                "items": int(item.get("total_ips") or len(rows)),
+                "devices": int(item.get("filled_devices") or 0),
+                "sample_names": names,
+                "range_start": _cell_to_text(item.get("faixa_inicio")),
+                "range_end": _cell_to_text(item.get("faixa_fim")),
+            }
+        )
+        if len(snapshots) >= limit:
+            break
+    return snapshots
+
+
 def _extract_response_text(response_payload):
     if not isinstance(response_payload, dict):
         return ""
@@ -587,6 +860,65 @@ def _extract_response_text(response_payload):
     if response_payload.get("output_text"):
         return response_payload.get("output_text")
     return ""
+
+
+class _OpenAITransientError(Exception):
+    pass
+
+
+def _extract_response_error_message(payload):
+    error = payload.get("error") or {}
+    if isinstance(error, dict):
+        code = _cell_to_text(error.get("code"))
+        message = _cell_to_text(error.get("message"))
+        if code and message:
+            return f"{code}: {message}"
+        if message:
+            return message
+    incomplete_details = payload.get("incomplete_details") or {}
+    if isinstance(incomplete_details, dict):
+        reason = _cell_to_text(incomplete_details.get("reason"))
+        if reason:
+            return reason
+    return ""
+
+
+def _openai_response_is_running(status):
+    return _cell_to_text(status).lower() in {"queued", "in_progress", "running"}
+
+
+def _openai_poll_interval_seconds(elapsed_seconds):
+    if elapsed_seconds < 30:
+        return 2.0
+    if elapsed_seconds < 120:
+        return 3.0
+    return 5.0
+
+
+def _openai_request_json(method, url, api_key, timeout_seconds, payload=None):
+    headers = {"Authorization": f"Bearer {api_key}"}
+    data = None
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(payload).encode("utf-8")
+    http_request = urlrequest.Request(url=url, data=data, method=method, headers=headers)
+    transient_http_codes = {408, 409, 425, 429, 500, 502, 503, 504}
+    try:
+        with urlrequest.urlopen(http_request, timeout=timeout_seconds) as response:
+            raw_body = response.read().decode("utf-8")
+        return json.loads(raw_body) if raw_body else {}
+    except urlerror.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        message = f"Falha na chamada do agente: HTTP {exc.code} - {detail[:400]}"
+        if exc.code in transient_http_codes:
+            raise _OpenAITransientError(message)
+        raise IPImportError(message)
+    except urlerror.URLError as exc:
+        raise _OpenAITransientError(f"Falha na chamada do agente: {exc.reason}")
+    except (TimeoutError, socket.timeout):
+        raise _OpenAITransientError(f"Falha na chamada do agente: timeout de transporte apos {timeout_seconds:.1f}s.")
+    except OSError as exc:
+        raise _OpenAITransientError(f"Falha na chamada do agente: {exc}")
 
 
 def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, user_prompt, request_timeout_seconds=None):
@@ -616,59 +948,160 @@ def _call_openai_responses(settings_obj, schema_name, schema, system_prompt, use
     if settings_obj.reasoning_effort and settings_obj.reasoning_effort != "none":
         payload["reasoning"] = {"effort": settings_obj.reasoning_effort}
 
-    body = json.dumps(payload).encode("utf-8")
-    http_request = urlrequest.Request(
-        url=f"{base_url}/responses",
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {settings_obj.api_key}",
-            "Content-Type": "application/json",
-        },
-    )
-    request_timeout_seconds = request_timeout_seconds or _ai_request_timeout_seconds()
-    try:
-        with urlrequest.urlopen(http_request, timeout=request_timeout_seconds) as response:
-            response_payload = json.loads(response.read().decode("utf-8"))
-    except urlerror.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise IPImportError(f"Falha na chamada do agente: HTTP {exc.code} - {detail[:400]}")
-    except urlerror.URLError as exc:
-        raise IPImportError(f"Falha na chamada do agente: {exc.reason}")
-    except (TimeoutError, socket.timeout):
-        raise IPImportError(f"Falha na chamada do agente: timeout apos {request_timeout_seconds:.1f}s.")
-    except OSError as exc:
-        raise IPImportError(f"Falha na chamada do agente: {exc}")
+    payload["background"] = True
+    payload["store"] = True
+    payload["metadata"] = {
+        "schema_name": schema_name[:64],
+        "source": "ip_import",
+        "client_request_id": uuid.uuid4().hex[:32],
+    }
 
-    response_text = _extract_response_text(response_payload)
-    if not response_text:
-        raise IPImportError("O agente nao retornou texto utilizavel.")
+    completion_budget_seconds = float(request_timeout_seconds or _ai_total_budget_seconds())
+    transport_timeout_seconds = min(max(15.0, _ai_request_timeout_seconds()), max(15.0, completion_budget_seconds))
+    max_attempts = max(1, _ai_max_retries())
+    created_payload = None
+    last_error = ""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            created_payload = _openai_request_json(
+                method="POST",
+                url=f"{base_url}/responses",
+                api_key=settings_obj.api_key,
+                timeout_seconds=transport_timeout_seconds,
+                payload=payload,
+            )
+            break
+        except _OpenAITransientError as exc:
+            last_error = str(exc)
+            if attempt < max_attempts:
+                time.sleep(min(4.0, 1.25 * attempt))
+                continue
+            raise IPImportError(last_error)
+
+    if created_payload is None:
+        raise IPImportError(last_error or "Falha na chamada do agente.")
+
+    response_payload = created_payload
+    response_id = _cell_to_text(response_payload.get("id"))
+    if not response_id:
+        raise IPImportError("O agente nao retornou um identificador de resposta utilizavel.")
+
+    polling_started_at = time.monotonic()
+    transient_poll_errors = 0
+    while True:
+        response_text = _extract_response_text(response_payload)
+        if response_text:
+            break
+
+        status = _cell_to_text(response_payload.get("status")).lower()
+        if not _openai_response_is_running(status):
+            error_detail = _extract_response_error_message(response_payload)
+            raise IPImportError(
+                error_detail or f"O agente finalizou sem texto utilizavel (status {status or 'desconhecido'})."
+            )
+
+        elapsed_seconds = time.monotonic() - polling_started_at
+        if elapsed_seconds >= completion_budget_seconds:
+            raise IPImportError(
+                f"A analise com IA excedeu o tempo de espera de {completion_budget_seconds:.1f}s sem concluir a resposta final."
+            )
+
+        time.sleep(_openai_poll_interval_seconds(elapsed_seconds))
+        try:
+            response_payload = _openai_request_json(
+                method="GET",
+                url=f"{base_url}/responses/{response_id}",
+                api_key=settings_obj.api_key,
+                timeout_seconds=transport_timeout_seconds,
+            )
+            transient_poll_errors = 0
+        except _OpenAITransientError as exc:
+            transient_poll_errors += 1
+            last_error = str(exc)
+            if transient_poll_errors >= max_attempts:
+                raise IPImportError(last_error)
+            continue
+
     try:
         return json.loads(response_text)
     except json.JSONDecodeError as exc:
         raise IPImportError(f"O agente retornou JSON invalido: {exc}")
 
 
-def run_ai_analysis(settings_obj, parsed, normalized_rows, request_timeout_seconds=None):
-    sample_rows = []
-    for row in normalized_rows[: min(len(normalized_rows), settings_obj.max_rows_for_ai)]:
-        sample_rows.append(
-            {
-                "source_row": row["source_row"],
-                "list_name": row["list_name"],
-                "list_code": row["list_code"],
-                "ip": row["ip"],
-                "device_name": row["device_name"],
-                "description": row["description"],
-                "mac": row["mac"],
-                "protocol": row["protocol"],
-            }
-        )
-
+def run_ai_workbook_analysis(settings_obj, parsed_sheets, original_filename, file_sha256="", request_timeout_seconds=None):
     schema = {
         "type": "object",
         "properties": {
+            "sheets": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "sheet_name": {"type": "string"},
+                        "use_sheet": {"type": "boolean"},
+                        "sheet_role": {"type": "string", "enum": ["data", "summary", "helper", "noise"]},
+                        "default_list_name": {"type": "string"},
+                        "default_list_code": {"type": "string"},
+                        "confidence": {"type": "integer"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": [
+                        "sheet_name",
+                        "use_sheet",
+                        "sheet_role",
+                        "default_list_name",
+                        "default_list_code",
+                        "confidence",
+                        "reason",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "warnings": {"type": "array", "items": {"type": "string"}},
+            "notes": {"type": "string"},
+        },
+        "required": ["sheets", "warnings", "notes"],
+        "additionalProperties": False,
+    }
+    cache_fingerprint = _build_workbook_cache_fingerprint(file_sha256=file_sha256, settings_obj=settings_obj, parsed_sheets=parsed_sheets)
+    cached_payload = _load_ai_cache("WORKBOOK", cache_fingerprint)
+    if cached_payload:
+        return cached_payload
+
+    system_prompt = (
+        "You are the primary interpreter for a heterogeneous industrial IP workbook. "
+        "Decide which sheets contain operational IP list data and which sheets are summary, helper or noise. "
+        "Prefer skipping summary/index sheets when they only repeat data already represented in dedicated sheets. "
+        "Return stable default names/codes when the workbook structure strongly implies them, but do not invent network ranges."
+    )
+    user_prompt = json.dumps(_build_workbook_ai_context(parsed_sheets=parsed_sheets, original_filename=original_filename), ensure_ascii=True)
+    response_payload = _call_openai_responses(
+        settings_obj=settings_obj,
+        schema_name="ip_workbook_analysis",
+        schema=schema,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    _save_ai_cache(
+        stage="WORKBOOK",
+        fingerprint=cache_fingerprint,
+        file_sha256=file_sha256,
+        settings_obj=settings_obj,
+        response_payload=response_payload,
+        payload_meta={"sheets_total": len(parsed_sheets or [])},
+    )
+    return response_payload
+
+
+def run_ai_analysis(settings_obj, parsed, workbook_plan=None, file_sha256="", request_timeout_seconds=None):
+    schema = {
+        "type": "object",
+        "properties": {
+            "skip_sheet": {"type": "boolean"},
+            "sheet_role": {"type": "string", "enum": ["data", "summary", "helper", "noise"]},
             "default_list_name": {"type": "string"},
+            "default_list_code": {"type": "string"},
             "column_map": {
                 "type": "object",
                 "properties": {
@@ -695,39 +1128,129 @@ def run_ai_analysis(settings_obj, parsed, normalized_rows, request_timeout_secon
                 ],
                 "additionalProperties": False,
             },
+            "logical_items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "source_row": {"type": "integer"},
+                        "list_name": {"type": "string"},
+                        "list_code": {"type": "string"},
+                        "ip": {"type": "string"},
+                        "range_start": {"type": "string"},
+                        "range_end": {"type": "string"},
+                        "device_name": {"type": "string"},
+                        "description": {"type": "string"},
+                        "mac": {"type": "string"},
+                        "protocol": {"type": "string"},
+                        "confidence": {"type": "integer"},
+                    },
+                    "required": [
+                        "source_row",
+                        "list_name",
+                        "list_code",
+                        "ip",
+                        "range_start",
+                        "range_end",
+                        "device_name",
+                        "description",
+                        "mac",
+                        "protocol",
+                        "confidence",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
             "warnings": {"type": "array", "items": {"type": "string"}},
             "notes": {"type": "string"},
         },
-        "required": ["default_list_name", "column_map", "warnings", "notes"],
+        "required": [
+            "skip_sheet",
+            "sheet_role",
+            "default_list_name",
+            "default_list_code",
+            "column_map",
+            "logical_items",
+            "warnings",
+            "notes",
+        ],
         "additionalProperties": False,
     }
-    user_prompt = json.dumps(
-        {
-            "headers": parsed.headers,
-            "detected_column_map": parsed.column_map,
-            "sample_rows": sample_rows,
-            "sheet_name": parsed.sheet_name,
-        },
-        ensure_ascii=True,
-    )
-    return _call_openai_responses(
+    cache_fingerprint = _build_sheet_cache_fingerprint(
+        file_sha256=file_sha256,
         settings_obj=settings_obj,
-        schema_name="ip_import_analysis",
+        parsed=parsed,
+        workbook_plan=workbook_plan,
+    )
+    cached_payload = _load_ai_cache("SHEET", cache_fingerprint)
+    if cached_payload:
+        return cached_payload
+
+    raw_rows_limit = max(20, min(int(getattr(settings_obj, "max_rows_for_ai", 180) or 180), max(parsed.rows_total, 20)))
+    context_payload = {
+        "sheet_name": parsed.sheet_name,
+        "header_row_number": parsed.header_row_index + 1,
+        "headers": parsed.headers,
+        "detected_column_map": parsed.column_map,
+        "suggested_list_name": parsed.suggested_list_name,
+        "parser_warnings": parsed.warnings,
+        "workbook_plan": workbook_plan or {},
+        "raw_rows": _build_raw_rows_payload(parsed, max_rows=raw_rows_limit, max_cols=12),
+    }
+    response_payload = _call_openai_responses(
+        settings_obj=settings_obj,
+        schema_name="ip_sheet_semantic_analysis",
         schema=schema,
-        system_prompt=f"{settings_obj.header_prompt}\n\n{settings_obj.grouping_prompt}",
-        user_prompt=user_prompt,
+        system_prompt=(
+            "You are the primary interpreter for an industrial IP list sheet. "
+            "Your job is to identify the operational IP entries, determine the correct columns and produce normalized logical items. "
+            "Summary/helper rows must be skipped. When there is a clear data sheet, return every operational entry you can recover. "
+            f"{settings_obj.header_prompt}\n\n{settings_obj.grouping_prompt}"
+        ),
+        user_prompt=json.dumps(context_payload, ensure_ascii=True),
         request_timeout_seconds=request_timeout_seconds,
     )
+    _save_ai_cache(
+        stage="SHEET",
+        fingerprint=cache_fingerprint,
+        file_sha256=file_sha256,
+        settings_obj=settings_obj,
+        response_payload=response_payload,
+        sheet_name=parsed.sheet_name,
+        payload_meta={"rows_total": parsed.rows_total},
+    )
+    return response_payload
 
 
-def reprocess_import_job(job, settings_obj=None):
+def reprocess_import_job(job, settings_obj=None, progress_callback=None):
     if not job.source_file:
         raise IPImportError("Arquivo fonte da importacao nao encontrado.")
+    ai_required = bool(settings_obj and settings_obj.enabled)
+    _emit_progress(
+        progress_callback,
+        stage="upload",
+        percent=6,
+        title="Arquivo recebido",
+        message="O arquivo foi recebido e a leitura inicial da planilha esta comecando.",
+        progress_label="Arquivo recebido",
+        snapshots=[],
+    )
     job.source_file.open("rb")
     raw_bytes = job.source_file.read()
     job.source_file.close()
 
     parsed_sheets = parse_workbook(raw_bytes=raw_bytes, original_filename=job.original_filename)
+    _emit_progress(
+        progress_callback,
+        stage="parse",
+        percent=18,
+        title="Estrutura da planilha identificada",
+        message=f"{len(parsed_sheets)} guia(s) localizada(s). A estrutura base esta sendo organizada para a analise.",
+        progress_label="Estrutura identificada",
+        sheets_total=len(parsed_sheets),
+        sheets_processed=0,
+        snapshots=[],
+    )
     multi_sheet = len(parsed_sheets) > 1
     normalized_rows = []
     warnings = []
@@ -741,14 +1264,157 @@ def reprocess_import_job(job, settings_obj=None):
     ai_attempts = 0
     processed_sheets = []
     ai_started_at = time.monotonic()
-    ai_request_timeout = _ai_request_timeout_seconds()
     ai_total_budget = _ai_total_budget_seconds()
     ai_max_sheets = _ai_max_sheets_per_job()
+    workbook_ai_payload = {}
+    workbook_ai_error = ""
 
-    for parsed in parsed_sheets:
+    if settings_obj and settings_obj.enabled:
+        _emit_progress(
+            progress_callback,
+            stage="ai",
+            percent=28,
+            title="Organizando o contexto da planilha",
+            message="A IA esta distinguindo guias operacionais, resumos e agrupamentos antes da leitura detalhada.",
+            progress_label="Separando guias uteis",
+            sheets_total=len(parsed_sheets),
+            sheets_processed=0,
+            snapshots=[],
+        )
+        remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
+        if len(parsed_sheets) == 1:
+            only_sheet = parsed_sheets[0]
+            workbook_ai_payload = {
+                "sheets": [
+                    {
+                        "sheet_name": only_sheet.sheet_name,
+                        "use_sheet": True,
+                        "sheet_role": "data",
+                        "default_list_name": only_sheet.suggested_list_name,
+                        "default_list_code": "",
+                        "confidence": 92,
+                        "reason": "Guia unica priorizada para leitura semantica detalhada.",
+                    }
+                ],
+                "warnings": [],
+                "notes": "single-sheet-fast-path",
+            }
+            ai_success += 1
+        elif remaining_budget <= 1:
+            workbook_ai_error = "A analise com IA nao recebeu tempo suficiente para concluir a leitura estrutural."
+            ai_errors.append(workbook_ai_error)
+            raise IPImportError(workbook_ai_error)
+        elif ai_attempts >= ai_max_sheets:
+            workbook_ai_error = "A analise com IA excedeu o limite de chamadas previsto para esta importacao."
+            ai_errors.append(workbook_ai_error)
+            raise IPImportError(workbook_ai_error)
+        else:
+            try:
+                ai_attempts += 1
+                workbook_ai_payload = run_ai_workbook_analysis(
+                    settings_obj=settings_obj,
+                    parsed_sheets=parsed_sheets,
+                    original_filename=job.original_filename,
+                    file_sha256=job.file_sha256,
+                    request_timeout_seconds=remaining_budget,
+                )
+                ai_success += 1
+            except IPImportError as exc:
+                workbook_ai_error = str(exc)
+                ai_errors.append(workbook_ai_error)
+                raise IPImportError(
+                    f"A analise com IA nao conseguiu entender a estrutura geral da planilha. {workbook_ai_error}"
+                ) from exc
+
+    total_sheets = max(len(parsed_sheets), 1)
+    processed_count = 0
+    for sheet_index, parsed in enumerate(parsed_sheets, start=1):
+        sheet_ai_payload = {}
+        sheet_warnings = []
+        skip_by_ai, skip_reason = _should_skip_sheet_by_ai(workbook_ai_payload, parsed)
+        current_percent = 34 + int(((sheet_index - 1) / total_sheets) * 46)
+        _emit_progress(
+            progress_callback,
+            stage="ai" if settings_obj and settings_obj.enabled else "parse",
+            percent=current_percent,
+            title="Correlacionando guias e enderecos",
+            message=f"Analisando a guia {sheet_index} de {total_sheets}: {parsed.sheet_name}.",
+            progress_label=f"Guia {sheet_index} de {total_sheets}",
+            current_sheet=parsed.sheet_name,
+            current_sheet_index=sheet_index,
+            sheets_total=total_sheets,
+            sheets_processed=processed_count,
+            snapshots=_build_progress_list_snapshots_from_rows(normalized_rows),
+        )
+
+        if skip_by_ai:
+            formatted_skip_reason = f"Guia ignorada pela IA: {skip_reason}" if skip_reason else "Guia ignorada pela IA."
+            warnings.append(_build_sheet_warning(parsed.sheet_name, formatted_skip_reason, multi_sheet))
+            ai_payload["sheets"][parsed.sheet_name] = {
+                "sheet_role": "summary",
+                "skip_sheet": True,
+                "warnings": [formatted_skip_reason],
+            }
+            sheet_summaries.append(
+                {
+                    "sheet_name": parsed.sheet_name,
+                    "header_row_index": parsed.header_row_index + 1,
+                    "rows_total": parsed.rows_total,
+                    "rows_parsed": 0,
+                    "column_map": {},
+                    "skipped": True,
+                }
+            )
+            processed_count += 1
+            continue
+
         try:
-            sheet_rows, sheet_map, sheet_warnings = normalize_rows(parsed=parsed, ai_result=None)
+            if settings_obj and settings_obj.enabled:
+                remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
+                if ai_attempts >= ai_max_sheets:
+                    raise IPImportError(
+                        f"A analise com IA atingiu o limite previsto antes de concluir a guia {parsed.sheet_name}."
+                    )
+                if remaining_budget <= 1:
+                    raise IPImportError(
+                        f"A analise com IA ficou sem tempo antes de concluir a guia {parsed.sheet_name}."
+                    )
+                ai_attempts += 1
+                sheet_ai_payload = run_ai_analysis(
+                    settings_obj=settings_obj,
+                    parsed=parsed,
+                    workbook_plan=_find_workbook_sheet_plan(workbook_ai_payload, parsed.sheet_name),
+                    file_sha256=job.file_sha256,
+                    request_timeout_seconds=remaining_budget,
+                )
+                if sheet_ai_payload.get("skip_sheet"):
+                    skip_reason = _cell_to_text((sheet_ai_payload.get("warnings") or [""])[0]) or "Guia sem dados operacionais."
+                    warnings.append(_build_sheet_warning(parsed.sheet_name, f"Guia ignorada pela IA: {skip_reason}", multi_sheet))
+                    ai_payload["sheets"][parsed.sheet_name] = sheet_ai_payload
+                    sheet_summaries.append(
+                        {
+                            "sheet_name": parsed.sheet_name,
+                            "header_row_index": parsed.header_row_index + 1,
+                            "rows_total": parsed.rows_total,
+                            "rows_parsed": 0,
+                            "column_map": {},
+                            "skipped": True,
+                        }
+                    )
+                    ai_success += 1
+                    processed_count += 1
+                    continue
+                if sheet_ai_payload.get("logical_items"):
+                    sheet_rows, sheet_map, sheet_warnings = normalize_rows_from_ai_result(parsed=parsed, ai_result=sheet_ai_payload)
+                else:
+                    sheet_rows, sheet_map, sheet_warnings = normalize_rows(parsed=parsed, ai_result=sheet_ai_payload)
+                ai_success += 1
+            else:
+                sheet_rows, sheet_map, sheet_warnings = normalize_rows(parsed=parsed, ai_result=None)
         except IPImportError as exc:
+            ai_errors.append(_build_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
+            if ai_required:
+                raise IPImportError(f"A analise com IA nao conseguiu concluir a guia {parsed.sheet_name}. {exc}") from exc
             warnings.append(_build_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
             sheet_summaries.append(
                 {
@@ -760,34 +1426,8 @@ def reprocess_import_job(job, settings_obj=None):
                     "skipped": True,
                 }
             )
+            processed_count += 1
             continue
-
-        sheet_ai_payload = {}
-        if settings_obj and settings_obj.enabled:
-            remaining_budget = ai_total_budget - (time.monotonic() - ai_started_at)
-            if ai_attempts >= ai_max_sheets:
-                sheet_warnings.append(
-                    "Analise com IA pulada nesta aba para respeitar o limite operacional da importacao web."
-                )
-            elif remaining_budget <= 1:
-                sheet_warnings.append(
-                    "Analise com IA pulada nesta aba porque o tempo maximo da importacao web foi atingido."
-                )
-            else:
-                request_timeout_seconds = min(ai_request_timeout, remaining_budget)
-                try:
-                    ai_attempts += 1
-                    sheet_ai_payload = run_ai_analysis(
-                        settings_obj=settings_obj,
-                        parsed=parsed,
-                        normalized_rows=sheet_rows,
-                        request_timeout_seconds=request_timeout_seconds,
-                    )
-                    sheet_rows, sheet_map, sheet_warnings = normalize_rows(parsed=parsed, ai_result=sheet_ai_payload)
-                    ai_success += 1
-                except IPImportError as exc:
-                    ai_errors.append(_build_sheet_warning(parsed.sheet_name, str(exc), multi_sheet))
-                    sheet_warnings.append(str(exc))
 
         normalized_rows.extend(sheet_rows)
         effective_map[parsed.sheet_name] = sheet_map
@@ -802,25 +1442,69 @@ def reprocess_import_job(job, settings_obj=None):
             }
         )
         processed_sheets.append(parsed)
+        processed_count += 1
         for warning in sheet_warnings:
             formatted = _build_sheet_warning(parsed.sheet_name, warning, multi_sheet)
             if formatted:
                 warnings.append(formatted)
+        _emit_progress(
+            progress_callback,
+            stage="ai" if settings_obj and settings_obj.enabled else "parse",
+            percent=34 + int((processed_count / total_sheets) * 46),
+            title="Guia consolidada",
+            message=f"{parsed.sheet_name} foi consolidada. {len(normalized_rows)} endereco(s) validado(s) ate agora.",
+            progress_label=f"Guia {processed_count} de {total_sheets}",
+            current_sheet=parsed.sheet_name,
+            current_sheet_index=processed_count,
+            sheets_total=total_sheets,
+            sheets_processed=processed_count,
+            snapshots=_build_progress_list_snapshots_from_rows(normalized_rows),
+        )
 
     if not normalized_rows:
         raise IPImportError("Nenhuma aba util gerou linhas normalizadas para importacao.")
 
     if settings_obj and settings_obj.enabled:
-        ai_status = job.AIStatus.SUCCESS if ai_success == len(processed_sheets) else job.AIStatus.FAILED
+        expected_successes = len(processed_sheets) + (1 if workbook_ai_payload else 0)
+        ai_status = job.AIStatus.SUCCESS if ai_success >= max(expected_successes, 1) else job.AIStatus.FAILED
         ai_error = " | ".join(error for error in ai_errors if error)
         if ai_error:
             warnings.extend(error for error in ai_errors if error)
     else:
         ai_error = ""
 
+    if workbook_ai_payload:
+        ai_payload["workbook"] = workbook_ai_payload
+    elif workbook_ai_error:
+        ai_payload["workbook_error"] = workbook_ai_error
+
+    _emit_progress(
+        progress_callback,
+        stage="preview",
+        percent=90,
+        title="Montando a previa para revisao",
+        message="As listas sugeridas estao sendo organizadas para abrir a revisao final.",
+        progress_label="Montando a previa",
+        sheets_total=total_sheets,
+        sheets_processed=processed_count,
+        snapshots=_build_progress_list_snapshots_from_rows(normalized_rows),
+    )
     proposal = build_import_proposal(original_filename=job.original_filename, normalized_rows=normalized_rows)
     for warning in proposal.get("warnings") or []:
         warnings.append(warning)
+    final_snapshots = _build_progress_list_snapshots_from_proposal(proposal)
+    _emit_progress(
+        progress_callback,
+        stage="preview",
+        percent=100,
+        title="Preview pronta",
+        message="A estrutura sugerida foi consolidada e esta pronta para revisao.",
+        progress_label="Preview pronta",
+        sheets_total=total_sheets,
+        sheets_processed=processed_count,
+        snapshots=final_snapshots,
+        summary=proposal.get("summary") or {},
+    )
 
     primary_sheet = processed_sheets[0]
     sheet_label = primary_sheet.sheet_name if len(processed_sheets) == 1 else f"{primary_sheet.sheet_name} +{len(processed_sheets) - 1}"
@@ -839,6 +1523,17 @@ def reprocess_import_job(job, settings_obj=None):
         "ai_payload": ai_payload,
         "ai_error": ai_error,
         "ai_model": ai_model,
+        "progress_payload": {
+            "stage": "preview",
+            "percent": 100,
+            "title": "Preview pronta",
+            "message": "A estrutura sugerida foi consolidada e esta pronta para revisao.",
+            "progress_label": "Preview pronta",
+            "sheets_total": total_sheets,
+            "sheets_processed": processed_count,
+            "snapshots": final_snapshots,
+            "summary": proposal.get("summary") or {},
+        },
     }
 
 

@@ -1608,8 +1608,8 @@ class IOImportAICache(models.Model):
             models.UniqueConstraint(fields=["stage", "fingerprint"], name="unique_io_import_ai_cache_stage_fingerprint"),
         ]
         indexes = [
-            models.Index(fields=["stage", "file_sha256", "updated_at"]),
-            models.Index(fields=["last_used_at"]),
+            models.Index(fields=["stage", "file_sha256", "updated_at"], name="core_ioimpo_stage_5a6484_idx"),
+            models.Index(fields=["last_used_at"], name="core_ioimpo_last_us_8a5d4a_idx"),
         ]
 
     def __str__(self):
@@ -1724,6 +1724,7 @@ class IPImportJob(models.Model):
     extracted_payload = models.JSONField(default=dict, blank=True)
     proposal_payload = models.JSONField(default=dict, blank=True)
     ai_payload = models.JSONField(default=dict, blank=True)
+    progress_payload = models.JSONField(default=dict, blank=True)
     warnings = models.JSONField(default=list, blank=True)
     apply_log = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1738,3 +1739,37 @@ class IPImportJob(models.Model):
 
     def __str__(self):
         return f"{self.original_filename} - {self.get_status_display()}"
+
+
+class IPImportAICache(models.Model):
+    class Stage(models.TextChoices):
+        WORKBOOK = "WORKBOOK", "Analise do workbook"
+        SHEET = "SHEET", "Analise da guia"
+
+    stage = models.CharField(max_length=20, choices=Stage.choices)
+    fingerprint = models.CharField(max_length=64)
+    file_sha256 = models.CharField(max_length=64, blank=True, default="")
+    sheet_name = models.CharField(max_length=120, blank=True, default="")
+    provider = models.CharField(max_length=20, blank=True, default="")
+    model = models.CharField(max_length=120, blank=True, default="")
+    settings_fingerprint = models.CharField(max_length=64, blank=True, default="")
+    response_payload = models.JSONField(default=dict, blank=True)
+    payload_meta = models.JSONField(default=dict, blank=True)
+    hits = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["stage", "fingerprint"], name="unique_ip_import_ai_cache_stage_fingerprint"),
+        ]
+        indexes = [
+            models.Index(fields=["stage", "file_sha256", "updated_at"]),
+            models.Index(fields=["last_used_at"]),
+        ]
+
+    def __str__(self):
+        label = self.sheet_name or self.file_sha256 or self.fingerprint[:12]
+        return f"{self.stage} - {label}"

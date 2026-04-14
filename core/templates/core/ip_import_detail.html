@@ -16,6 +16,153 @@
 
 {% block content %}
   <section class="ios-ops-shell">
+    <style>
+      .ip-import-processing-page {
+        position: relative;
+        overflow: hidden;
+        border-radius: 26px;
+        border: 1px solid rgba(255, 132, 38, 0.18);
+        background:
+          radial-gradient(circle at top, rgba(255, 132, 38, 0.18), transparent 40%),
+          linear-gradient(180deg, rgba(28, 20, 14, 0.98), rgba(18, 13, 9, 0.99));
+        padding: 24px;
+      }
+      .ip-import-processing-page::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent 0%, rgba(255, 148, 72, 0.08) 50%, transparent 100%);
+        transform: translateX(-100%);
+        animation: ip-import-page-scan 2.6s linear infinite;
+        pointer-events: none;
+      }
+      .ip-import-processing-grid {
+        position: relative;
+        display: grid;
+        gap: 18px;
+        max-width: 720px;
+        margin: 0 auto;
+        text-align: center;
+      }
+      .ip-import-processing-kicker {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(255, 205, 168, 0.76);
+      }
+      .ip-import-processing-orb {
+        width: 88px;
+        height: 88px;
+        margin: 0 auto;
+        border-radius: 999px;
+        position: relative;
+        background: radial-gradient(circle, rgba(255, 188, 121, 0.96), rgba(255, 117, 24, 0.46) 48%, rgba(40, 18, 6, 0.16) 72%, transparent 76%);
+        box-shadow: 0 0 36px rgba(255, 132, 38, 0.30);
+      }
+      .ip-import-processing-orb::before,
+      .ip-import-processing-orb::after {
+        content: "";
+        position: absolute;
+        inset: -10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 170, 94, 0.24);
+      }
+      .ip-import-processing-orb::before { animation: ip-import-page-pulse 2s ease-out infinite; }
+      .ip-import-processing-orb::after {
+        inset: 8px;
+        border-color: rgba(255, 170, 94, 0.14);
+        animation: ip-import-page-pulse 2s ease-out infinite 0.6s;
+      }
+      .ip-import-processing-title { margin: 0; font-size: 28px; }
+      .ip-import-processing-copy { margin: 0; color: rgba(224, 237, 255, 0.76); }
+      .ip-import-progress { position: relative; height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 148, 72, 0.14); }
+      .ip-import-progress-bar { width: 0%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff8a2f 0%, #ffb062 55%, #ffd0a1 100%); box-shadow: 0 0 24px rgba(255, 132, 38, 0.28); transition: width .35s ease; }
+      .ip-import-progress-meta { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: rgba(255, 220, 196, 0.74); }
+      .ip-import-sheet-meta {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 148, 72, 0.1);
+        background: rgba(255, 255, 255, 0.028);
+        color: rgba(255, 230, 208, 0.78);
+        font-size: 12px;
+      }
+      .ip-import-sheet-meta.is-visible { display: flex; }
+      .ip-import-live-preview[hidden] { display: none !important; }
+      .ip-import-live-preview-line {
+        position: relative;
+        overflow: hidden;
+        padding: 11px 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 148, 72, 0.12);
+        background:
+          linear-gradient(180deg, rgba(255, 190, 138, 0.04), rgba(255, 255, 255, 0.01)),
+          repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0, rgba(255, 255, 255, 0.018) 1px, transparent 1px, transparent 4px),
+          linear-gradient(180deg, rgba(32, 20, 14, 0.96), rgba(21, 14, 10, 0.98));
+      }
+      .ip-import-live-preview-track {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 34px;
+        white-space: nowrap;
+        min-width: 100%;
+        color: rgba(255, 231, 210, 0.9);
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        text-shadow: 0 0 10px rgba(255, 144, 52, 0.12);
+        animation: ip-import-page-marquee 18s linear infinite;
+      }
+      .ip-import-live-preview-track.is-static { animation: none; }
+      .ip-import-live-preview-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: "Consolas", "SFMono-Regular", "Roboto Mono", monospace;
+        font-weight: 600;
+      }
+      .ip-import-live-preview-item::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(255, 173, 102, 0.92);
+        box-shadow: 0 0 10px rgba(255, 132, 38, 0.28), 0 0 0 4px rgba(255, 132, 38, 0.06);
+      }
+      .ip-import-live-preview-item::after {
+        content: "///";
+        margin-left: 10px;
+        color: rgba(255, 187, 132, 0.22);
+        letter-spacing: 0.08em;
+      }
+      .ip-import-steps { display: grid; gap: 10px; }
+      .ip-import-step {
+        display: grid;
+        grid-template-columns: 18px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 11px 13px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 148, 72, 0.10);
+      }
+      .ip-import-step-dot { width: 10px; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.24); transition: all .25s ease; }
+      .ip-import-step.is-active { border-color: rgba(255, 170, 94, 0.26); background: rgba(255, 132, 38, 0.08); }
+      .ip-import-step.is-active .ip-import-step-dot { background: #ffb66f; box-shadow: 0 0 0 6px rgba(255, 132, 38, 0.14); }
+      .ip-import-step.is-done .ip-import-step-dot { background: #65f0bf; }
+      @keyframes ip-import-page-scan { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+      @keyframes ip-import-page-pulse {
+        0% { transform: scale(.88); opacity: .64; }
+        70% { transform: scale(1.15); opacity: 0; }
+        100% { transform: scale(1.15); opacity: 0; }
+      }
+      @keyframes ip-import-page-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    </style>
+
     <section class="io-card" style="padding: 18px 22px 16px;">
       <div class="ios-ops-topbar" style="margin: 0 0 10px;">
         <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Navegacao da importacao">
@@ -46,7 +193,72 @@
       </div>
     </section>
 
-    {% if preview_lists %}
+    {% if job.status == 'UPLOADED' %}
+      <section
+        class="ip-import-processing-page"
+        data-ip-import-processing-page
+        data-status-url="{{ status_url }}"
+        data-redirect-url="{% url 'listas_ip_import_detail' job.pk %}"
+      >
+        <div class="ip-import-processing-grid">
+          <div class="ip-import-processing-kicker">Analise de IA</div>
+          <div class="ip-import-processing-orb" aria-hidden="true"></div>
+          <h2 class="ip-import-processing-title" data-ip-import-page-title>{{ progress.title|default:"Processando em segundo plano" }}</h2>
+          <p class="ip-import-processing-copy" data-ip-import-page-copy>{{ progress.message|default:"A planilha esta sendo interpretada para gerar a previa das listas." }}</p>
+
+          <div class="ip-import-progress" aria-hidden="true">
+            <div class="ip-import-progress-bar" data-ip-import-page-progress-bar style="width: {{ progress.percent|default:0 }}%;"></div>
+          </div>
+          <div class="ip-import-progress-meta">
+            <span data-ip-import-page-progress-label>{{ progress.progress_label|default:"Processando importacao" }}</span>
+            <span data-ip-import-page-progress-value>{{ progress.percent|default:0 }}%</span>
+          </div>
+
+          <div class="ip-import-sheet-meta{% if progress.current_sheet or progress.sheets_total %} is-visible{% endif %}" data-ip-import-page-sheet-meta>
+            <span data-ip-import-page-current-sheet>{{ progress.current_sheet|default:"" }}</span>
+            <span data-ip-import-page-sheet-count>{% if progress.sheets_total %}Guias {{ progress.current_sheet_index|default:progress.sheets_processed|default:0 }}/{{ progress.sheets_total }}{% endif %}</span>
+          </div>
+
+          <section class="ip-import-live-preview" data-ip-import-page-live-preview {% if not progress.snapshots %}hidden{% endif %}>
+            <div class="ip-import-live-preview-line">
+              <div class="ip-import-live-preview-track{% if progress.snapshots|length <= 1 %} is-static{% endif %}" data-ip-import-page-live-preview-grid>
+                {% for snapshot in progress.snapshots %}
+                  <span class="ip-import-live-preview-item">{{ snapshot.list_name }}</span>
+                {% endfor %}
+                {% if progress.snapshots|length > 1 %}
+                  {% for snapshot in progress.snapshots %}
+                    <span class="ip-import-live-preview-item">{{ snapshot.list_name }}</span>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </div>
+          </section>
+
+          <div class="ip-import-steps">
+            <article class="ip-import-step{% if progress.steps.upload == 'active' %} is-active{% elif progress.steps.upload == 'done' %} is-done{% endif %}" data-ip-import-page-step="upload">
+              <span class="ip-import-step-dot" aria-hidden="true"></span>
+              <div>Arquivo enviado</div>
+              <div data-ip-import-page-step-status="upload">{% if progress.steps.upload == 'done' %}Concluido{% elif progress.steps.upload == 'active' %}Em processamento{% else %}Aguardando{% endif %}</div>
+            </article>
+            <article class="ip-import-step{% if progress.steps.parse == 'active' %} is-active{% elif progress.steps.parse == 'done' %} is-done{% endif %}" data-ip-import-page-step="parse">
+              <span class="ip-import-step-dot" aria-hidden="true"></span>
+              <div>Lendo estrutura da planilha</div>
+              <div data-ip-import-page-step-status="parse">{% if progress.steps.parse == 'done' %}Concluido{% elif progress.steps.parse == 'active' %}Em processamento{% else %}Aguardando{% endif %}</div>
+            </article>
+            <article class="ip-import-step{% if progress.steps.ai == 'active' %} is-active{% elif progress.steps.ai == 'done' %} is-done{% endif %}" data-ip-import-page-step="ai">
+              <span class="ip-import-step-dot" aria-hidden="true"></span>
+              <div>Analisando com IA</div>
+              <div data-ip-import-page-step-status="ai">{% if progress.steps.ai == 'done' %}Concluido{% elif progress.steps.ai == 'active' %}Em processamento{% else %}Aguardando{% endif %}</div>
+            </article>
+            <article class="ip-import-step{% if progress.steps.preview == 'active' %} is-active{% elif progress.steps.preview == 'done' %} is-done{% endif %}" data-ip-import-page-step="preview">
+              <span class="ip-import-step-dot" aria-hidden="true"></span>
+              <div>Montando a previa para revisao</div>
+              <div data-ip-import-page-step-status="preview">{% if progress.steps.preview == 'done' %}Concluido{% elif progress.steps.preview == 'active' %}Em processamento{% else %}Aguardando{% endif %}</div>
+            </article>
+          </div>
+        </div>
+      </section>
+    {% elif preview_lists %}
       <section class="stack" style="gap: 18px;">
         {% for item in preview_lists %}
           <section class="io-card" style="padding: 18px 20px;">
@@ -178,4 +390,133 @@
       </section>
     {% endif %}
   </section>
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  {% if job.status == 'UPLOADED' %}
+    <script>
+      (function () {
+        var root = document.querySelector("[data-ip-import-processing-page]");
+        if (!root) {
+          return;
+        }
+        var statusUrl = root.getAttribute("data-status-url");
+        var redirectUrl = root.getAttribute("data-redirect-url");
+        var stepOrder = ["upload", "parse", "ai", "preview"];
+        var titleNode = root.querySelector("[data-ip-import-page-title]");
+        var copyNode = root.querySelector("[data-ip-import-page-copy]");
+        var progressBar = root.querySelector("[data-ip-import-page-progress-bar]");
+        var progressLabel = root.querySelector("[data-ip-import-page-progress-label]");
+        var progressValue = root.querySelector("[data-ip-import-page-progress-value]");
+        var sheetMeta = root.querySelector("[data-ip-import-page-sheet-meta]");
+        var currentSheetNode = root.querySelector("[data-ip-import-page-current-sheet]");
+        var sheetCountNode = root.querySelector("[data-ip-import-page-sheet-count]");
+        var livePreview = root.querySelector("[data-ip-import-page-live-preview]");
+        var livePreviewGrid = root.querySelector("[data-ip-import-page-live-preview-grid]");
+
+        function setStepState(stepName, state) {
+          var step = root.querySelector('[data-ip-import-page-step="' + stepName + '"]');
+          var statusNode = root.querySelector('[data-ip-import-page-step-status="' + stepName + '"]');
+          if (!step || !statusNode) {
+            return;
+          }
+          step.classList.toggle("is-active", state === "active");
+          step.classList.toggle("is-done", state === "done");
+          statusNode.textContent = state === "done" ? "Concluido" : state === "active" ? "Em processamento" : "Aguardando";
+        }
+
+        function setSnapshots(items) {
+          if (!livePreview || !livePreviewGrid) {
+            return;
+          }
+          var snapshots = Array.isArray(items) ? items.filter(Boolean) : [];
+          if (!snapshots.length) {
+            livePreview.hidden = true;
+            livePreviewGrid.innerHTML = "";
+            return;
+          }
+          var labels = snapshots.map(function (snapshot) {
+            return snapshot.list_name || "Lista em analise";
+          }).filter(Boolean);
+          var uniqueLabels = Array.from(new Set(labels));
+          var itemsHtml = uniqueLabels.map(function (label) {
+            return '<span class="ip-import-live-preview-item">' + label + "</span>";
+          }).join("");
+          livePreview.hidden = false;
+          if (uniqueLabels.length <= 1 || uniqueLabels.join(" · ").length <= 56) {
+            livePreviewGrid.classList.add("is-static");
+            livePreviewGrid.innerHTML = itemsHtml;
+            return;
+          }
+          livePreviewGrid.classList.remove("is-static");
+          livePreviewGrid.innerHTML = itemsHtml + itemsHtml;
+        }
+
+        function renderProgress(payload) {
+          payload = payload || {};
+          if (titleNode && payload.title) {
+            titleNode.textContent = payload.title;
+          }
+          if (copyNode && payload.message) {
+            copyNode.textContent = payload.message;
+          }
+          if (progressBar) {
+            progressBar.style.width = String(payload.percent || 0) + "%";
+          }
+          if (progressLabel) {
+            progressLabel.textContent = payload.progress_label || payload.title || "Processando importacao";
+          }
+          if (progressValue) {
+            progressValue.textContent = String(Math.round(payload.percent || 0)) + "%";
+          }
+          if (sheetMeta && currentSheetNode && sheetCountNode) {
+            if (payload.current_sheet || payload.sheets_total) {
+              sheetMeta.classList.add("is-visible");
+              currentSheetNode.textContent = payload.current_sheet || "Preparando leitura";
+              sheetCountNode.textContent = payload.sheets_total
+                ? ("Guias " + (payload.current_sheet_index || payload.sheets_processed || 0) + "/" + payload.sheets_total)
+                : "";
+            } else {
+              sheetMeta.classList.remove("is-visible");
+              currentSheetNode.textContent = "";
+              sheetCountNode.textContent = "";
+            }
+          }
+          var steps = payload.steps || {};
+          stepOrder.forEach(function (stepName) {
+            setStepState(stepName, steps[stepName] || "idle");
+          });
+          setSnapshots(payload.snapshots || []);
+        }
+
+        function poll() {
+          fetch(statusUrl, {
+            method: "GET",
+            credentials: "same-origin",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          }).then(function (response) {
+            return response.json();
+          }).then(function (payload) {
+            if (!payload || !payload.ok) {
+              window.setTimeout(poll, 3000);
+              return;
+            }
+            if (payload.progress) {
+              renderProgress(payload.progress);
+            }
+            if (payload.complete) {
+              window.location.href = payload.redirect_url || redirectUrl;
+              return;
+            }
+            window.setTimeout(poll, 1800);
+          }).catch(function () {
+            window.setTimeout(poll, 3000);
+          });
+        }
+
+        window.setTimeout(poll, 1200);
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

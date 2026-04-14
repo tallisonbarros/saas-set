@@ -66,6 +66,109 @@
           .ip-import-progress { position: relative; height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 148, 72, 0.14); }
           .ip-import-progress-bar { width: 0%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff8a2f 0%, #ffb062 55%, #ffd0a1 100%); box-shadow: 0 0 24px rgba(255, 132, 38, 0.28); transition: width .35s ease; }
           .ip-import-progress-meta { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: rgba(255, 220, 196, 0.74); }
+          .ip-import-sheet-meta {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 148, 72, 0.1);
+            background: rgba(255, 255, 255, 0.028);
+            color: rgba(255, 230, 208, 0.78);
+            font-size: 12px;
+          }
+          .ip-import-sheet-meta.is-visible { display: flex; }
+          .ip-import-sheet-current {
+            min-width: 0;
+            font-weight: 600;
+            color: rgba(255, 244, 234, 0.92);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .ip-import-sheet-count {
+            white-space: nowrap;
+            color: rgba(255, 210, 178, 0.64);
+          }
+          .ip-import-live-preview { display: block; }
+          .ip-import-live-preview[hidden] { display: none !important; }
+          .ip-import-live-preview-line {
+            position: relative;
+            overflow: hidden;
+            padding: 11px 14px;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 148, 72, 0.12);
+            background:
+              linear-gradient(180deg, rgba(255, 190, 138, 0.04), rgba(255, 255, 255, 0.01)),
+              repeating-linear-gradient(
+                180deg,
+                rgba(255, 255, 255, 0.018) 0,
+                rgba(255, 255, 255, 0.018) 1px,
+                transparent 1px,
+                transparent 4px
+              ),
+              linear-gradient(180deg, rgba(32, 20, 14, 0.96), rgba(21, 14, 10, 0.98));
+            box-shadow:
+              inset 0 1px 0 rgba(255, 208, 170, 0.05),
+              inset 0 -10px 18px rgba(0, 0, 0, 0.18),
+              0 16px 30px rgba(0, 0, 0, 0.14);
+          }
+          .ip-import-live-preview-line::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 173, 97, 0.09) 50%, transparent 100%);
+            transform: translateX(-100%);
+            animation: ip-import-ticker-scan 3.4s linear infinite;
+            pointer-events: none;
+          }
+          .ip-import-live-preview-line::after {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 181, 116, 0.06);
+            pointer-events: none;
+          }
+          .ip-import-live-preview-track {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 34px;
+            white-space: nowrap;
+            min-width: 100%;
+            color: rgba(255, 231, 210, 0.9);
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(255, 144, 52, 0.12);
+            animation: ip-import-marquee 18s linear infinite;
+          }
+          .ip-import-live-preview-track.is-static { animation: none; }
+          .ip-import-live-preview-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: "Consolas", "SFMono-Regular", "Roboto Mono", monospace;
+            font-weight: 600;
+          }
+          .ip-import-live-preview-item::before {
+            content: "";
+            width: 5px;
+            height: 5px;
+            border-radius: 999px;
+            background: rgba(255, 173, 102, 0.92);
+            box-shadow:
+              0 0 10px rgba(255, 132, 38, 0.28),
+              0 0 0 4px rgba(255, 132, 38, 0.06);
+          }
+          .ip-import-live-preview-item::after {
+            content: "///";
+            margin-left: 10px;
+            color: rgba(255, 187, 132, 0.22);
+            letter-spacing: 0.08em;
+          }
           .ip-import-steps { display: grid; gap: 10px; }
           .ip-import-step {
             display: grid;
@@ -90,6 +193,8 @@
             70% { transform: scale(1.15); opacity: 0; }
             100% { transform: scale(1.15); opacity: 0; }
           }
+          @keyframes ip-import-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+          @keyframes ip-import-ticker-scan { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
         </style>
         <div class="ip-import-flow" data-ip-import-flow>
           <div class="ip-import-error" data-ip-import-error></div>
@@ -102,7 +207,7 @@
               </label>
             </div>
             <p class="muted" style="margin-top: 10px;">
-              A importacao recebe apenas o arquivo. O pipeline analisa a planilha, monta a preview das listas sugeridas e, depois da aplicacao, qualquer ajuste fino continua sendo feito diretamente dentro do modulo.
+              Envie apenas o arquivo da planilha. O sistema interpreta a estrutura, organiza uma previa das listas sugeridas e, depois da aplicacao, voce pode ajustar os detalhes diretamente no modulo.
             </p>
             <footer class="radar-export-modal-foot">
               <button class="btn btn-primary" type="submit" data-ip-import-submit>Enviar para analise</button>
@@ -115,7 +220,7 @@
                 <div class="ip-import-processing-kicker">Analise de IA</div>
                 <div class="ip-import-processing-orb" aria-hidden="true"></div>
                 <h3 class="ip-import-processing-title" data-ip-import-title>Analisando planilha</h3>
-                <p class="ip-import-processing-copy" data-ip-import-copy>O arquivo foi recebido e o motor de importacao esta estruturando as listas e os enderecos sugeridos.</p>
+                <p class="ip-import-processing-copy" data-ip-import-copy>O arquivo foi recebido e a estrutura das listas sugeridas esta sendo montada para revisao.</p>
               </div>
 
               <div class="ip-import-progress" aria-hidden="true">
@@ -125,6 +230,17 @@
                 <span data-ip-import-progress-label>Preparando upload</span>
                 <span data-ip-import-progress-value>0%</span>
               </div>
+
+              <div class="ip-import-sheet-meta" data-ip-import-sheet-meta>
+                <span class="ip-import-sheet-current" data-ip-import-current-sheet></span>
+                <span class="ip-import-sheet-count" data-ip-import-sheet-count></span>
+              </div>
+
+              <section class="ip-import-live-preview" data-ip-import-live-preview hidden>
+                <div class="ip-import-live-preview-line">
+                  <div class="ip-import-live-preview-track" data-ip-import-live-preview-grid></div>
+                </div>
+              </section>
 
               <div class="ip-import-steps">
                 <article class="ip-import-step" data-ip-import-step="upload">
@@ -144,7 +260,7 @@
                 </article>
                 <article class="ip-import-step" data-ip-import-step="preview">
                   <span class="ip-import-step-dot" aria-hidden="true"></span>
-                  <div class="ip-import-step-title">Gerando preview operacional</div>
+                  <div class="ip-import-step-title">Montando a previa para revisao</div>
                   <div class="ip-import-step-status" data-ip-import-step-status="preview">Aguardando</div>
                 </article>
               </div>

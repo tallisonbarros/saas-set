@@ -66,8 +66,18 @@ from core.services.io_import import (
     run_ai_analysis,
     serialize_module_catalog,
 )
-from core.services.ip_import import apply_import_job as apply_ip_import_job
-from core.views import _build_proposta_pdf_context, _build_radar_relatorio_pdf_context, _sanitize_proposta_descricao, _user_role
+from core.services.ip_import import (
+    _call_openai_responses as call_ip_openai_responses,
+    apply_import_job as apply_ip_import_job,
+    reprocess_import_job as reprocess_ip_import_job,
+)
+from core.views import (
+    _build_proposta_pdf_context,
+    _build_radar_relatorio_pdf_context,
+    _reprocess_ip_import_job,
+    _sanitize_proposta_descricao,
+    _user_role,
+)
 
 
 class AccessControlFoundationTests(TestCase):
@@ -3138,6 +3148,27 @@ class IPImportPipelineTests(TestCase):
         self.perfil.tipos.add(self.tipo_dev)
         self.client_http.force_login(self.user)
 
+    def _post_import_and_process(self, upload, ajax=False):
+        headers = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"} if ajax else {}
+        def run_inline(job_id):
+            job = IPImportJob.objects.get(pk=job_id)
+            try:
+                _reprocess_ip_import_job(job)
+            except Exception as exc:
+                job.refresh_from_db()
+                job.status = IPImportJob.Status.FAILED
+                job.ai_status = IPImportJob.AIStatus.FAILED
+                job.ai_error = str(exc)
+                warnings = list(job.warnings or [])
+                warnings.append(str(exc))
+                job.warnings = warnings
+                job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "updated_at"])
+
+        with patch("core.views._spawn_ip_import_job_processor_safe", side_effect=run_inline):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client_http.post("/listas-ip/importacoes/nova/", {"arquivo": upload}, **headers)
+        return response
+
     def _build_ip_workbook(self):
         workbook = Workbook()
         sheet1 = workbook.active
@@ -3175,6 +3206,32 @@ class IPImportPipelineTests(TestCase):
         workbook.save(buffer)
         return buffer.getvalue()
 
+    def _build_multisheet_with_summary_workbook(self):
+        workbook = Workbook()
+        summary = workbook.active
+        summary.title = "Resumo"
+        for row in [
+            ["AREA", "OBS"],
+            ["Rede Principal", "Resumo executivo"],
+            ["Rede Remota", "Resumo executivo"],
+        ]:
+            summary.append(row)
+        data_1 = workbook.create_sheet("Rede Principal")
+        for row in [
+            ["LISTA", "ID_LISTAIP", "IP", "EQUIPAMENTO", "DESCRICAO", "MAC", "PROTOCOLO"],
+            ["PLC PRINCIPAL", "LIP-001", "192.168.10.10", "PLC_MAIN", "Controlador principal", "001122334455", "Modbus TCP"],
+        ]:
+            data_1.append(row)
+        data_2 = workbook.create_sheet("Rede Remota")
+        for row in [
+            ["LISTA", "ID_LISTAIP", "IP", "EQUIPAMENTO", "DESCRICAO", "MAC", "PROTOCOLO"],
+            ["REMOTA", "LIP-002", "10.20.30.40", "SW_REM_01", "Switch remoto", "", "PROFINET"],
+        ]:
+            data_2.append(row)
+        buffer = BytesIO()
+        workbook.save(buffer)
+        return buffer.getvalue()
+
     def test_import_csv_creates_review_job_and_preview(self):
         upload = SimpleUploadedFile(
             "lista-ip.csv",
@@ -3185,7 +3242,7 @@ class IPImportPipelineTests(TestCase):
             ),
             content_type="text/csv",
         )
-        response = self.client_http.post("/listas-ip/importacoes/nova/", {"arquivo": upload})
+        response = self._post_import_and_process(upload)
         self.assertEqual(response.status_code, 302)
 
         job = IPImportJob.objects.get()
@@ -3206,7 +3263,7 @@ class IPImportPipelineTests(TestCase):
             self._build_ip_workbook(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        response = self.client_http.post("/listas-ip/importacoes/nova/", {"arquivo": upload})
+        response = self._post_import_and_process(upload)
         self.assertEqual(response.status_code, 302)
 
         job = IPImportJob.objects.latest("id")
@@ -3222,7 +3279,7 @@ class IPImportPipelineTests(TestCase):
             self._build_devices_style_ip_workbook(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        response = self.client_http.post("/listas-ip/importacoes/nova/", {"arquivo": upload})
+        response = self._post_import_and_process(upload)
         self.assertEqual(response.status_code, 302)
 
         job = IPImportJob.objects.latest("id")
@@ -3241,7 +3298,7 @@ class IPImportPipelineTests(TestCase):
             self._build_ip_workbook(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        response = self.client_http.post("/listas-ip/importacoes/nova/", {"arquivo": upload})
+        response = self._post_import_and_process(upload)
         self.assertEqual(response.status_code, 302)
 
         job = IPImportJob.objects.latest("id")
@@ -3272,7 +3329,7 @@ class IPImportPipelineTests(TestCase):
         self.assertContains(response, "Importacao de planilhas de IP")
         self.assertTrue(IPImportSettings.objects.exists())
 
-    def test_import_timeout_do_agente_nao_quebra_pipeline(self):
+    def test_import_timeout_do_agente_interrompe_pipeline_ai_first(self):
         settings_obj = IPImportSettings.load()
         settings_obj.enabled = True
         settings_obj.api_key = "test-key"
@@ -3284,11 +3341,246 @@ class IPImportPipelineTests(TestCase):
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         with patch("core.services.ip_import.urlrequest.urlopen", side_effect=TimeoutError("timed out")):
-            response = self.client_http.post("/listas-ip/importacoes/nova/", {"arquivo": upload})
+            response = self._post_import_and_process(upload)
 
         self.assertEqual(response.status_code, 302)
         job = IPImportJob.objects.latest("id")
-        self.assertEqual(job.status, IPImportJob.Status.REVIEW)
+        self.assertEqual(job.status, IPImportJob.Status.FAILED)
         self.assertEqual(job.ai_status, IPImportJob.AIStatus.FAILED)
         self.assertIn("timeout", job.ai_error.lower())
+        self.assertTrue(any("timeout" in warning.lower() for warning in (job.warnings or [])))
+
+    def test_import_ajax_returns_json_redirect_and_status_urls(self):
+        upload = SimpleUploadedFile(
+            "listas-ip.xlsx",
+            self._build_ip_workbook(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response = self._post_import_and_process(upload, ajax=True)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("/listas-ip/importacoes/", payload["redirect_url"])
+        self.assertIn("/status/", payload["status_url"])
+
+        job = IPImportJob.objects.latest("id")
+        self.assertEqual(job.status, IPImportJob.Status.REVIEW)
         self.assertEqual(job.proposal_payload["summary"]["lists"], 2)
+
+    def test_import_ajax_status_endpoint_reports_processing(self):
+        upload = SimpleUploadedFile(
+            "listas-ip.xlsx",
+            self._build_ip_workbook(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        with self.captureOnCommitCallbacks(execute=False):
+            response = self.client_http.post(
+                "/listas-ip/importacoes/nova/",
+                {"arquivo": upload},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        job = IPImportJob.objects.latest("id")
+        self.assertEqual(job.status, IPImportJob.Status.UPLOADED)
+
+        status_response = self.client_http.get(
+            f"/listas-ip/importacoes/{job.pk}/status/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(status_response.status_code, 200)
+        status_payload = status_response.json()
+        self.assertTrue(status_payload["ok"])
+        self.assertTrue(status_payload["processing"])
+        self.assertFalse(status_payload["complete"])
+        self.assertEqual(status_payload["progress"]["stage"], "upload")
+
+    def test_ip_call_openai_responses_polls_background_response_until_completed(self):
+        settings_obj = IPImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        requested = []
+        queued_payload = {"id": "resp_ip_123", "status": "queued", "output": []}
+        running_payload = {"id": "resp_ip_123", "status": "in_progress", "output": []}
+        completed_payload = {
+            "id": "resp_ip_123",
+            "status": "completed",
+            "output": [{"content": [{"type": "output_text", "text": json.dumps({"result": "ok"})}]}],
+        }
+        responses = [queued_payload, running_payload, completed_payload]
+
+        class _FakeHTTPResponse:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def read(self):
+                return json.dumps(self.payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            requested.append(
+                {
+                    "url": request.full_url,
+                    "method": request.get_method(),
+                    "timeout": timeout,
+                    "data": request.data,
+                }
+            )
+            return _FakeHTTPResponse(responses[len(requested) - 1])
+
+        with patch("core.services.ip_import.urlrequest.urlopen", side_effect=fake_urlopen), patch(
+            "core.services.ip_import.time.sleep"
+        ):
+            result = call_ip_openai_responses(
+                settings_obj=settings_obj,
+                schema_name="ip_sheet_semantic_analysis",
+                schema={"type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"], "additionalProperties": False},
+                system_prompt="system",
+                user_prompt="{}",
+                request_timeout_seconds=300,
+            )
+
+        self.assertEqual(result, {"result": "ok"})
+        self.assertEqual([item["method"] for item in requested], ["POST", "GET", "GET"])
+        post_payload = json.loads(requested[0]["data"].decode("utf-8"))
+        self.assertTrue(post_payload["background"])
+        self.assertTrue(post_payload["store"])
+        self.assertEqual(post_payload["metadata"]["source"], "ip_import")
+
+    def test_reprocess_ip_import_job_ai_can_skip_summary_sheet_and_keep_data_sheets(self):
+        settings_obj = IPImportSettings.load()
+        settings_obj.enabled = True
+        settings_obj.api_key = "test-key"
+        settings_obj.save()
+
+        raw_bytes = self._build_multisheet_with_summary_workbook()
+        job = IPImportJob.objects.create(
+            created_by=self.user,
+            cliente=self.perfil,
+            original_filename="listas-resumo.xlsx",
+            source_file=SimpleUploadedFile(
+                "listas-resumo.xlsx",
+                raw_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            file_sha256=build_file_sha256(raw_bytes),
+        )
+
+        workbook_payload = {
+            "sheets": [
+                {
+                    "sheet_name": "Resumo",
+                    "use_sheet": False,
+                    "sheet_role": "summary",
+                    "default_list_name": "",
+                    "default_list_code": "",
+                    "confidence": 98,
+                    "reason": "Guia de resumo sem registros operacionais individuais.",
+                },
+                {
+                    "sheet_name": "Rede Principal",
+                    "use_sheet": True,
+                    "sheet_role": "data",
+                    "default_list_name": "PLC PRINCIPAL",
+                    "default_list_code": "LIP-001",
+                    "confidence": 94,
+                    "reason": "Guia com registros operacionais de IP.",
+                },
+                {
+                    "sheet_name": "Rede Remota",
+                    "use_sheet": True,
+                    "sheet_role": "data",
+                    "default_list_name": "REMOTA",
+                    "default_list_code": "LIP-002",
+                    "confidence": 94,
+                    "reason": "Guia com registros operacionais de IP.",
+                },
+            ],
+            "warnings": [],
+            "notes": "ok",
+        }
+        principal_payload = {
+            "skip_sheet": False,
+            "sheet_role": "data",
+            "default_list_name": "PLC PRINCIPAL",
+            "default_list_code": "LIP-001",
+            "column_map": {
+                "list_name": "LISTA",
+                "list_code": "ID_LISTAIP",
+                "ip": "IP",
+                "device_name": "EQUIPAMENTO",
+                "description": "DESCRICAO",
+                "mac": "MAC",
+                "protocol": "PROTOCOLO",
+                "range_start": "",
+                "range_end": "",
+            },
+            "logical_items": [
+                {
+                    "source_row": 2,
+                    "list_name": "PLC PRINCIPAL",
+                    "list_code": "LIP-001",
+                    "ip": "192.168.10.10",
+                    "range_start": "",
+                    "range_end": "",
+                    "device_name": "PLC_MAIN",
+                    "description": "Controlador principal",
+                    "mac": "001122334455",
+                    "protocol": "Modbus TCP",
+                    "confidence": 96,
+                }
+            ],
+            "warnings": [],
+            "notes": "ok",
+        }
+        remota_payload = {
+            "skip_sheet": False,
+            "sheet_role": "data",
+            "default_list_name": "REMOTA",
+            "default_list_code": "LIP-002",
+            "column_map": {
+                "list_name": "LISTA",
+                "list_code": "ID_LISTAIP",
+                "ip": "IP",
+                "device_name": "EQUIPAMENTO",
+                "description": "DESCRICAO",
+                "mac": "MAC",
+                "protocol": "PROTOCOLO",
+                "range_start": "",
+                "range_end": "",
+            },
+            "logical_items": [
+                {
+                    "source_row": 2,
+                    "list_name": "REMOTA",
+                    "list_code": "LIP-002",
+                    "ip": "10.20.30.40",
+                    "range_start": "",
+                    "range_end": "",
+                    "device_name": "SW_REM_01",
+                    "description": "Switch remoto",
+                    "mac": "",
+                    "protocol": "PROFINET",
+                    "confidence": 96,
+                }
+            ],
+            "warnings": [],
+            "notes": "ok",
+        }
+
+        with patch("core.services.ip_import._call_openai_responses", side_effect=[workbook_payload, principal_payload, remota_payload]):
+            result = reprocess_ip_import_job(job=job, settings_obj=settings_obj)
+
+        sheet_names = [sheet["sheet_name"] for sheet in result["sheet_summaries"]]
+        self.assertEqual(sheet_names, ["Resumo", "Rede Principal", "Rede Remota"])
+        resumo = next(item for item in result["sheet_summaries"] if item["sheet_name"] == "Resumo")
+        self.assertTrue(resumo["skipped"])
+        self.assertEqual(result["proposal"]["summary"]["lists"], 2)
+        self.assertEqual(sorted(item["name"] for item in result["proposal"]["lists"]), ["PLC PRINCIPAL", "REMOTA"])

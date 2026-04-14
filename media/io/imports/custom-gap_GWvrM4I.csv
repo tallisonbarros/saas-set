@@ -1,4 +1,0 @@
-panel;rack;slot;channel;module_model;type;tag;description
-PNL-CUSTOM-01;1;1;1;AI-CUSTOM-04;AI;AIT_001;Transmissor 01
-PNL-CUSTOM-01;1;1;2;AI-CUSTOM-04;AI;AIT_002;Transmissor 02
-PNL-CUSTOM-01;1;2;1;AO-CUSTOM-02;AO;FCV_001_CMD;Comando de controle

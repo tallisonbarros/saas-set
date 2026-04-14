@@ -13104,6 +13104,11 @@ select:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .product-doc-journey-frame::before,
+  .product-doc-journey-frame::after {
+    display: none;
+  }
+
   .product-doc-preview-board-stages,
   .product-doc-preview-result-grid {
     grid-template-columns: 1fr;

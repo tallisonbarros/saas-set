@@ -1204,6 +1204,103 @@ def _ip_import_settings():
     return settings_obj
 
 
+def _ip_import_user_message(user, detailed_message, generic_message=None):
+    if _is_dev_user(user):
+        return detailed_message
+    return generic_message or "Nao foi possivel concluir a importacao da planilha de IP. Revise o arquivo e tente novamente."
+
+
+def _initial_ip_import_progress_payload(filename=""):
+    return {
+        "stage": "upload",
+        "percent": 4,
+        "title": "Arquivo recebido",
+        "message": (
+            f"{filename} foi recebido e a analise da planilha de IP esta sendo iniciada."
+            if filename
+            else "O arquivo foi recebido e a analise da planilha de IP esta sendo iniciada."
+        ),
+        "progress_label": "Arquivo recebido",
+        "snapshots": [],
+        "sheets_total": 0,
+        "sheets_processed": 0,
+    }
+
+
+def _failed_ip_import_progress_payload(message, existing_payload=None):
+    payload = dict(existing_payload or {})
+    payload.update(
+        {
+            "stage": payload.get("stage") or "preview",
+            "title": "Analise interrompida",
+            "message": "A analise nao conseguiu ser concluida. Revise o arquivo e tente novamente.",
+        }
+    )
+    payload["failed"] = True
+    return payload
+
+
+def _save_ip_import_progress(job, payload):
+    progress_payload = dict(payload or {})
+    IPImportJob.objects.filter(pk=job.pk).update(progress_payload=progress_payload, updated_at=timezone.now())
+    job.progress_payload = progress_payload
+    return progress_payload
+
+
+def _build_ip_import_status_progress(job):
+    payload = dict(job.progress_payload or {})
+    if not payload:
+        payload = _initial_ip_import_progress_payload(job.original_filename)
+    stage = (payload.get("stage") or "upload").lower()
+    percent = max(0, min(int(payload.get("percent") or 0), 100))
+    stage_order = ["upload", "parse", "ai", "preview"]
+    current_index = stage_order.index(stage) if stage in stage_order else 0
+    steps = {}
+    for index, step_name in enumerate(stage_order):
+        if job.status in {IPImportJob.Status.REVIEW, IPImportJob.Status.APPLIED}:
+            state = "done"
+        elif job.status == IPImportJob.Status.FAILED:
+            state = "done" if index < current_index else "active" if index == current_index else "idle"
+        else:
+            state = "done" if index < current_index else "active" if index == current_index else "idle"
+        steps[step_name] = state
+    payload["stage"] = stage
+    payload["percent"] = percent
+    payload["steps"] = steps
+    payload["snapshots"] = list(payload.get("snapshots") or [])[:6]
+    return payload
+
+
+def _spawn_ip_import_job_processor(job_id):
+    manage_py = Path(settings.BASE_DIR) / "manage.py"
+    env = os.environ.copy()
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    subprocess.Popen(
+        [sys.executable, str(manage_py), "process_ip_import_job", str(job_id)],
+        cwd=str(settings.BASE_DIR),
+        env=env,
+        start_new_session=True,
+    )
+
+
+def _spawn_ip_import_job_processor_safe(job_id):
+    try:
+        _spawn_ip_import_job_processor(job_id)
+    except Exception as exc:
+        logger.exception("Failed to spawn IP import background processor", extra={"job_id": job_id})
+        job = IPImportJob.objects.filter(pk=job_id).first()
+        if not job:
+            return
+        job.status = IPImportJob.Status.FAILED
+        job.ai_status = IPImportJob.AIStatus.FAILED
+        job.ai_error = str(exc)
+        warnings = list(job.warnings or [])
+        warnings.append(f"Falha interna ao iniciar o processamento em segundo plano: {exc}")
+        job.warnings = warnings
+        job.progress_payload = _failed_ip_import_progress_payload(str(exc), job.progress_payload)
+        job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
+
+
 def _build_ip_import_job_queryset(request, cliente):
     queryset = IPImportJob.objects.select_related("cliente", "created_by", "applied_lista")
     if _is_admin_user(request.user) and not cliente:
@@ -1215,7 +1312,11 @@ def _build_ip_import_job_queryset(request, cliente):
 
 def _reprocess_ip_import_job(job):
     settings_obj = _ip_import_settings()
-    result = reprocess_ip_import_job(job=job, settings_obj=settings_obj)
+    result = reprocess_ip_import_job(
+        job=job,
+        settings_obj=settings_obj,
+        progress_callback=lambda payload: _save_ip_import_progress(job, payload),
+    )
     job.file_format = result["file_format"]
     job.sheet_name = result["sheet_name"]
     job.header_row_index = result["header_row_index"]
@@ -1229,6 +1330,7 @@ def _reprocess_ip_import_job(job):
     job.ai_payload = result["ai_payload"]
     job.ai_error = result["ai_error"]
     job.ai_model = result["ai_model"]
+    job.progress_payload = result.get("progress_payload") or job.progress_payload
     job.status = IPImportJob.Status.FAILED if result["proposal"].get("conflicts") else IPImportJob.Status.REVIEW
     job.save(
         update_fields=[
@@ -1245,6 +1347,7 @@ def _reprocess_ip_import_job(job):
             "ai_payload",
             "ai_error",
             "ai_model",
+            "progress_payload",
             "status",
             "updated_at",
         ]
@@ -5531,42 +5634,146 @@ def inventario_item_detail(request, inventario_pk, ativo_pk, pk):
 def listas_ip_import_create(request):
     denied_response = _require_internal_module_access(request, "LISTA_IP")
     if denied_response:
+        if _is_ajax_request(request):
+            return _json_error_response("Seu acesso atual nao permite importar planilhas de IP.", status=403)
         return denied_response
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     cliente = _get_cliente(request.user)
     if not _ip_import_can_manage(request, cliente):
+        if _is_ajax_request(request):
+            return _json_error_response("Sem permissao para importar planilhas de IP.", status=403)
         return HttpResponseForbidden("Sem permissao.")
+
+    ajax_request = _is_ajax_request(request)
 
     arquivo = request.FILES.get("arquivo")
     if not arquivo:
+        if ajax_request:
+            return _json_error_response("Selecione um arquivo para enviar.", status=400)
         return HttpResponse("Arquivo obrigatorio.", status=400)
 
     job_cliente = cliente
     if not job_cliente:
+        if ajax_request:
+            return _json_error_response("Conta sem cliente associado para importar listas de IP.", status=400)
         return HttpResponse("Conta sem cliente associado para importar listas de IP.", status=400)
 
     raw_bytes = arquivo.read()
     arquivo.seek(0)
 
-    job = IPImportJob.objects.create(
-        created_by=request.user,
-        cliente=job_cliente,
-        original_filename=arquivo.name,
-        source_file=arquivo,
-        file_sha256=build_ip_file_sha256(raw_bytes),
-    )
+    job = None
+    redirect_url = None
     try:
-        _reprocess_ip_import_job(job)
+        job = IPImportJob.objects.create(
+            created_by=request.user,
+            cliente=job_cliente,
+            original_filename=arquivo.name,
+            source_file=arquivo,
+            file_sha256=build_ip_file_sha256(raw_bytes),
+            progress_payload=_initial_ip_import_progress_payload(arquivo.name),
+        )
+        redirect_url = reverse("listas_ip_import_detail", kwargs={"pk": job.pk})
+        transaction.on_commit(lambda job_id=job.pk: _spawn_ip_import_job_processor_safe(job_id))
+        if ajax_request:
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "job_id": job.pk,
+                    "status_url": reverse("listas_ip_import_status", kwargs={"pk": job.pk}),
+                    "redirect_url": redirect_url,
+                }
+            )
     except IPImportError as exc:
+        if not job:
+            if ajax_request:
+                return _json_error_response(
+                    _ip_import_user_message(
+                        request.user,
+                        str(exc),
+                        "Nao foi possivel analisar o arquivo enviado. Revise o arquivo e tente novamente.",
+                    ),
+                    status=400,
+                )
+            return HttpResponse(str(exc), status=400)
         job.status = IPImportJob.Status.FAILED
+        job.ai_status = IPImportJob.AIStatus.FAILED
+        job.ai_error = str(exc)
         job.warnings = [str(exc)]
-        job.save(update_fields=["status", "warnings", "updated_at"])
+        job.progress_payload = _failed_ip_import_progress_payload(str(exc), job.progress_payload)
+        job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
+    except Exception as exc:
+        logger.exception(
+            "Unhandled IP import error while creating import job",
+            extra={"user_id": request.user.id, "job_id": job.pk if job else None, "upload_name": arquivo.name},
+        )
+        if job:
+            job.status = IPImportJob.Status.FAILED
+            job.ai_status = IPImportJob.AIStatus.FAILED
+            job.ai_error = str(exc)
+            job.warnings = [f"Falha interna ao analisar a planilha: {exc}"]
+            job.progress_payload = _failed_ip_import_progress_payload(str(exc), job.progress_payload)
+            job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
+        if ajax_request:
+            return _json_error_response(
+                _ip_import_user_message(
+                    request.user,
+                    "Falha interna ao analisar a planilha. Verifique o log do servidor.",
+                    "Nao foi possivel concluir a analise da planilha agora. Tente novamente em instantes.",
+                ),
+                status=500,
+                job_id=job.pk if job else None,
+                redirect_url=redirect_url,
+            )
+        if job:
+            return redirect("listas_ip_import_detail", pk=job.pk)
+        return HttpResponse("Falha interna ao criar a importacao.", status=500)
 
-    redirect_url = reverse("listas_ip_import_detail", kwargs={"pk": job.pk})
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+    redirect_url = redirect_url or reverse("listas_ip_import_detail", kwargs={"pk": job.pk})
+    if ajax_request:
         return JsonResponse({"ok": True, "redirect_url": redirect_url})
     return redirect("listas_ip_import_detail", pk=job.pk)
+
+
+@login_required
+def listas_ip_import_status(request, pk):
+    denied_response = _require_internal_module_access(request, "LISTA_IP")
+    if denied_response:
+        return _json_error_response("Seu acesso atual nao permite consultar esta importacao.", status=403)
+    cliente = _get_cliente(request.user)
+    job = get_object_or_404(_build_ip_import_job_queryset(request, cliente), pk=pk)
+    processing = job.status == IPImportJob.Status.UPLOADED
+    failed = job.status == IPImportJob.Status.FAILED
+    message = ""
+    progress = _build_ip_import_status_progress(job)
+    if failed and not _is_dev_user(request.user):
+        progress["title"] = "Analise interrompida"
+        progress["message"] = "Nao foi possivel concluir a analise da planilha. Revise o arquivo e tente novamente."
+    if failed:
+        technical_message = (job.warnings or [job.ai_error or "Falha ao processar a importacao."])[0]
+        message = _ip_import_user_message(
+            request.user,
+            technical_message,
+            "Nao foi possivel concluir a analise da planilha. Revise o arquivo e tente novamente.",
+        )
+    elif processing:
+        message = progress.get("message") or "A planilha esta sendo analisada em segundo plano."
+    return JsonResponse(
+        {
+            "ok": True,
+            "job_id": job.pk,
+            "status": job.status,
+            "status_display": job.get_status_display(),
+            "processing": processing,
+            "complete": not processing,
+            "failed": failed,
+            "redirect_url": reverse("listas_ip_import_detail", kwargs={"pk": job.pk}),
+            "message": message,
+            "warnings_count": len(job.warnings or []) if _is_dev_user(request.user) else 0,
+            "ai_status": job.ai_status if _is_dev_user(request.user) else "",
+            "progress": progress,
+        }
+    )
 
 
 @login_required
@@ -5580,7 +5787,13 @@ def listas_ip_import_detail(request, pk):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "reanalyze":
-            _reprocess_ip_import_job(job)
+            job.status = IPImportJob.Status.UPLOADED
+            job.ai_status = IPImportJob.AIStatus.SKIPPED
+            job.ai_error = ""
+            job.warnings = []
+            job.progress_payload = _initial_ip_import_progress_payload(job.original_filename)
+            job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
+            transaction.on_commit(lambda job_id=job.pk: _spawn_ip_import_job_processor_safe(job_id))
             return redirect("listas_ip_import_detail", pk=job.pk)
         if action == "apply_import_list":
             list_key = (request.POST.get("list_key") or "").strip()
@@ -5631,6 +5844,8 @@ def listas_ip_import_detail(request, pk):
             "pending_lists_count": pending_lists_count,
             "applied_lists": applied_lists,
             "ip_import_is_dev": _is_dev_user(request.user),
+            "status_url": reverse("listas_ip_import_status", kwargs={"pk": job.pk}),
+            "progress": _build_ip_import_status_progress(job),
         },
     )
 
@@ -5667,7 +5882,13 @@ def listas_ip_import_admin(request):
             job_id = request.POST.get("job_id")
             job = IPImportJob.objects.filter(pk=job_id).first()
             if job:
-                _reprocess_ip_import_job(job)
+                job.status = IPImportJob.Status.UPLOADED
+                job.ai_status = IPImportJob.AIStatus.SKIPPED
+                job.ai_error = ""
+                job.warnings = []
+                job.progress_payload = _initial_ip_import_progress_payload(job.original_filename)
+                job.save(update_fields=["status", "ai_status", "ai_error", "warnings", "progress_payload", "updated_at"])
+                transaction.on_commit(lambda job_id=job.pk: _spawn_ip_import_job_processor_safe(job_id))
                 return redirect("listas_ip_import_admin")
 
     jobs = IPImportJob.objects.select_related("cliente", "created_by", "applied_lista").order_by("-created_at")[:30]
