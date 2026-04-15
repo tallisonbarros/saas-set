@@ -95,11 +95,11 @@
           </label>
           <label class="field">
             <span>Access token</span>
-            <input type="password" name="mercado_pago_access_token" value="" placeholder="{% if settings_obj.mercado_pago_access_token %}{{ settings_obj.masked_access_token }}{% else %}APP_USR-...{% endif %}">
+            <input type="password" name="mercado_pago_access_token" value="" placeholder="{% if settings_obj.has_access_token_saved %}{{ settings_obj.masked_access_token }}{% else %}APP_USR-...{% endif %}">
           </label>
           <label class="field">
             <span>Webhook secret</span>
-            <input type="password" name="mercado_pago_webhook_secret" value="" placeholder="assinatura do webhook">
+            <input type="password" name="mercado_pago_webhook_secret" value="" placeholder="{% if settings_obj.has_webhook_secret_saved %}{{ settings_obj.masked_webhook_secret }}{% else %}assinatura do webhook{% endif %}">
           </label>
           <label class="field admin-provider-field-wide">
             <span>URL sucesso</span>
@@ -115,6 +115,25 @@
           </label>
         </div>
         <div class="admin-list">
+          <article class="admin-list-row">
+            <div class="admin-list-row-main">
+              <div class="admin-list-title">Credenciais salvas</div>
+              <div class="admin-list-meta">
+                {% if settings_obj.has_access_token_saved %}
+                  <span class="admin-token is-success">Access token salvo</span>
+                  <span class="admin-token is-neutral">{{ settings_obj.masked_access_token }}</span>
+                {% else %}
+                  <span class="admin-token is-warn">Access token pendente</span>
+                {% endif %}
+                {% if settings_obj.has_webhook_secret_saved %}
+                  <span class="admin-token is-success">Webhook secret salvo</span>
+                  <span class="admin-token is-neutral">{{ settings_obj.masked_webhook_secret }}</span>
+                {% else %}
+                  <span class="admin-token is-warn">Webhook secret pendente</span>
+                {% endif %}
+              </div>
+            </div>
+          </article>
           <article class="admin-list-row">
             <div class="admin-list-row-main">
               <div class="admin-list-title">URLs padrao do ambiente</div>
@@ -271,6 +290,9 @@
                     <span class="admin-token is-success">Processado</span>
                   {% else %}
                     <span class="admin-token is-warn">Pendente</span>
+                  {% endif %}
+                  {% if event.processing_error %}
+                    <span class="admin-token is-warn">{{ event.processing_error }}</span>
                   {% endif %}
                 </div>
               </div>

@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
+from decimal import Decimal
 from datetime import timedelta
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from core.access_control import TRIAL_DURATION_DAYS, get_user_product_access, is_admin_user, resolve_perfil
 from core.models import (
@@ -21,6 +28,7 @@ STARTER_PLAN_CODE = PlanoComercial.Codigo.STARTER
 PROFESSIONAL_PLAN_CODE = PlanoComercial.Codigo.PROFESSIONAL
 DEFAULT_DAILY_IO_IMPORT_LIMIT = 3
 DEFAULT_DAILY_IP_IMPORT_LIMIT = 3
+MERCADO_PAGO_API_BASE_URL = "https://api.mercadopago.com"
 
 
 def ensure_billing_catalog():
@@ -87,6 +95,274 @@ def plan_by_code(product_code: str, plan_code: str):
 
 def payment_config():
     return ConfiguracaoPagamento.load()
+
+
+def _mercado_pago_api_request(config, method, path, payload=None, *, timeout=60, idempotency_key=""):
+    token = (config.mercado_pago_access_token or "").strip()
+    if not token:
+        raise ValueError("Access token do Mercado Pago nao configurado.")
+
+    body = None
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+
+    request = urlrequest.Request(f"{MERCADO_PAGO_API_BASE_URL}{path}", data=body, method=method.upper())
+    request.add_header("Authorization", f"Bearer {token}")
+    request.add_header("Accept", "application/json")
+    if body is not None:
+        request.add_header("Content-Type", "application/json")
+    if idempotency_key:
+        request.add_header("X-Idempotency-Key", idempotency_key)
+
+    try:
+        with urlrequest.urlopen(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8")
+    except urlerror.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="ignore")
+        detail = raw.strip() or f"HTTP {exc.code}"
+        raise ValueError(f"Mercado Pago retornou erro ao processar a requisicao: {detail}") from exc
+    except urlerror.URLError as exc:
+        raise ValueError("Nao foi possivel conectar ao Mercado Pago.") from exc
+
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except ValueError as exc:
+        raise ValueError("Mercado Pago retornou uma resposta invalida.") from exc
+
+
+def _provider_plan_code(plan, billing_interval):
+    if not plan:
+        return ""
+    if billing_interval == AssinaturaUsuario.BillingInterval.YEARLY:
+        return (plan.provider_plan_code_anual or "").strip()
+    return (plan.provider_plan_code_mensal or "").strip()
+
+
+def _billing_frequency_payload(billing_interval):
+    if billing_interval == AssinaturaUsuario.BillingInterval.YEARLY:
+        return {"frequency": 12, "frequency_type": "months"}
+    return {"frequency": 1, "frequency_type": "months"}
+
+
+def _build_subscription_reason(product, plan, billing_interval):
+    product_name = product.nome if product else "Produto SET"
+    interval_label = "Anual" if billing_interval == AssinaturaUsuario.BillingInterval.YEARLY else "Mensal"
+    return f"{product_name} - {plan.nome} ({interval_label})"
+
+
+def _subscription_external_reference(subscription):
+    timestamp = int(timezone.now().timestamp())
+    return f"SETSUB-{subscription.id}-{timestamp}"
+
+
+def _parse_provider_datetime(value):
+    if not value:
+        return None
+    parsed = parse_datetime(str(value))
+    if not parsed:
+        return None
+    if timezone.is_naive(parsed):
+        return timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
+
+
+def _billing_interval_from_remote(auto_recurring, default_interval):
+    frequency = int(auto_recurring.get("frequency") or 0)
+    frequency_type = (auto_recurring.get("frequency_type") or "").strip().lower()
+    if frequency_type == "months" and frequency >= 12:
+        return AssinaturaUsuario.BillingInterval.YEARLY
+    if frequency_type in {"months", "days"}:
+        return AssinaturaUsuario.BillingInterval.MONTHLY if default_interval != AssinaturaUsuario.BillingInterval.YEARLY else default_interval
+    return default_interval
+
+
+def _subscription_status_from_provider(remote_status):
+    normalized = (remote_status or "").strip().lower()
+    if normalized in {"authorized", "active"}:
+        return AssinaturaUsuario.Status.ACTIVE
+    if normalized in {"pending", "in_process"}:
+        return AssinaturaUsuario.Status.PENDING
+    if normalized in {"paused"}:
+        return AssinaturaUsuario.Status.PAST_DUE
+    if normalized in {"cancelled", "cancelled_by_user"}:
+        return AssinaturaUsuario.Status.CANCELED
+    if normalized in {"expired"}:
+        return AssinaturaUsuario.Status.EXPIRED
+    return AssinaturaUsuario.Status.PENDING
+
+
+def _sync_access_from_subscription(subscription):
+    if not subscription or not subscription.usuario_id or not subscription.produto_id:
+        return None
+
+    now = timezone.now()
+    access = AcessoProdutoUsuario.objects.filter(usuario=subscription.usuario, produto=subscription.produto).first()
+
+    if subscription.status in {AssinaturaUsuario.Status.ACTIVE, AssinaturaUsuario.Status.TRIALING}:
+        access, _ = AcessoProdutoUsuario.objects.update_or_create(
+            usuario=subscription.usuario,
+            produto=subscription.produto,
+            defaults={
+                "origem": AcessoProdutoUsuario.Origem.INTERNO,
+                "status": AcessoProdutoUsuario.Status.ATIVO,
+                "trial_inicio": None,
+                "trial_fim": None,
+                "acesso_inicio": subscription.current_period_start or now,
+                "acesso_fim": None,
+                "observacao": "Entitlement sincronizado com a assinatura profissional via Mercado Pago.",
+            },
+        )
+        return access
+
+    if access and access.status == AcessoProdutoUsuario.Status.TRIAL_ATIVO and access.trial_fim and access.trial_fim > now:
+        return access
+
+    if not access:
+        return None
+
+    access.origem = AcessoProdutoUsuario.Origem.INTERNO
+    if subscription.status in {AssinaturaUsuario.Status.CANCELED, AssinaturaUsuario.Status.EXPIRED}:
+        access.status = AcessoProdutoUsuario.Status.EXPIRADO
+        access.acesso_fim = now
+        access.observacao = "A assinatura profissional foi encerrada e o acesso foi expirado."
+    else:
+        access.status = AcessoProdutoUsuario.Status.BLOQUEADO
+        access.acesso_fim = None
+        access.observacao = "A assinatura profissional ainda nao foi confirmada pelo provider."
+    access.save(update_fields=["origem", "status", "acesso_fim", "observacao", "atualizado_em"])
+    return access
+
+
+def _build_professional_checkout_payload(subscription, config):
+    provider_plan_code = _provider_plan_code(subscription.plano, subscription.billing_interval)
+    payload = {
+        "payer_email": subscription.usuario.email,
+        "external_reference": subscription.external_reference,
+        "back_url": config.checkout_pending_url,
+        "reason": _build_subscription_reason(subscription.produto, subscription.plano, subscription.billing_interval),
+        "status": "pending",
+    }
+    if provider_plan_code:
+        payload["preapproval_plan_id"] = provider_plan_code
+    else:
+        frequency_payload = _billing_frequency_payload(subscription.billing_interval)
+        payload["auto_recurring"] = {
+            **frequency_payload,
+            "currency_id": subscription.moeda or "BRL",
+            "transaction_amount": float(subscription.preco_ciclo or Decimal("0")),
+            "start_date": timezone.now().isoformat(),
+        }
+    return payload
+
+
+def _resolve_checkout_url(response_payload, sandbox_mode):
+    if sandbox_mode and response_payload.get("sandbox_init_point"):
+        return str(response_payload.get("sandbox_init_point") or "").strip()
+    return str(response_payload.get("init_point") or response_payload.get("sandbox_init_point") or "").strip()
+
+
+def fetch_mercado_pago_subscription(config, provider_subscription_id):
+    if not provider_subscription_id:
+        raise ValueError("Identificador da assinatura no provider nao informado.")
+    return _mercado_pago_api_request(config, "GET", f"/preapproval/{provider_subscription_id}", timeout=60)
+
+
+def reconcile_mercado_pago_subscription(remote_payload, *, fallback_subscription=None):
+    provider_subscription_id = str(remote_payload.get("id") or "").strip()
+    external_reference = str(remote_payload.get("external_reference") or "").strip()
+    if not provider_subscription_id and not external_reference and not fallback_subscription:
+        raise ValueError("Nao foi possivel identificar a assinatura retornada pelo provider.")
+
+    subscription = fallback_subscription
+    if not subscription and provider_subscription_id:
+        subscription = (
+            AssinaturaUsuario.objects.select_related("usuario", "produto", "plano")
+            .filter(provider=AssinaturaUsuario.Provider.MERCADO_PAGO, provider_subscription_id=provider_subscription_id)
+            .order_by("-updated_at", "-created_at")
+            .first()
+        )
+    if not subscription and external_reference:
+        subscription = (
+            AssinaturaUsuario.objects.select_related("usuario", "produto", "plano")
+            .filter(provider=AssinaturaUsuario.Provider.MERCADO_PAGO, external_reference=external_reference)
+            .order_by("-updated_at", "-created_at")
+            .first()
+        )
+    if not subscription:
+        raise ValueError("A assinatura recebida do Mercado Pago nao foi encontrada no sistema.")
+
+    auto_recurring = remote_payload.get("auto_recurring") or {}
+    subscription.provider_subscription_id = provider_subscription_id or subscription.provider_subscription_id
+    subscription.provider_plan_id = str(remote_payload.get("preapproval_plan_id") or subscription.provider_plan_id or "").strip()
+    subscription.external_reference = external_reference or subscription.external_reference
+    subscription.provider_customer_id = str(
+        remote_payload.get("payer_id")
+        or remote_payload.get("payer", {}).get("id")
+        or subscription.provider_customer_id
+        or ""
+    ).strip()
+    subscription.status = _subscription_status_from_provider(remote_payload.get("status"))
+    subscription.billing_interval = _billing_interval_from_remote(auto_recurring, subscription.billing_interval)
+    subscription.preco_ciclo = Decimal(str(auto_recurring.get("transaction_amount") or subscription.preco_ciclo or 0))
+    subscription.moeda = str(auto_recurring.get("currency_id") or subscription.moeda or "BRL").strip() or "BRL"
+    subscription.current_period_start = _parse_provider_datetime(
+        remote_payload.get("date_created") or remote_payload.get("last_modified") or subscription.current_period_start
+    ) or subscription.current_period_start
+    subscription.current_period_end = _parse_provider_datetime(
+        remote_payload.get("next_payment_date")
+        or auto_recurring.get("end_date")
+        or subscription.current_period_end
+    )
+    if subscription.status == AssinaturaUsuario.Status.CANCELED:
+        subscription.canceled_at = _parse_provider_datetime(remote_payload.get("last_modified")) or timezone.now()
+        subscription.expires_at = subscription.canceled_at
+    elif subscription.status == AssinaturaUsuario.Status.EXPIRED:
+        subscription.expires_at = _parse_provider_datetime(remote_payload.get("last_modified")) or timezone.now()
+    else:
+        subscription.canceled_at = None
+        subscription.expires_at = None
+    subscription.observacao = f"Assinatura sincronizada com Mercado Pago ({remote_payload.get('status') or 'sem status'})."
+    subscription.save()
+    _sync_access_from_subscription(subscription)
+    return subscription
+
+
+def process_mercado_pago_webhook_payload(payload, *, data_id=""):
+    config = payment_config()
+    data = payload.get("data") or {}
+    provider_subscription_id = str(data_id or data.get("id") or payload.get("id") or "").strip()
+    if not provider_subscription_id:
+        raise ValueError("Webhook sem identificador de assinatura.")
+    remote_payload = fetch_mercado_pago_subscription(config, provider_subscription_id)
+    return reconcile_mercado_pago_subscription(remote_payload)
+
+
+def validate_mercado_pago_webhook_signature(secret, *, signature_header="", request_id="", data_id=""):
+    normalized_secret = (secret or "").strip()
+    if not normalized_secret or not signature_header or not request_id or not data_id:
+        return True
+
+    parts = {}
+    for chunk in str(signature_header).split(","):
+        if "=" not in chunk:
+            continue
+        key, value = chunk.split("=", 1)
+        parts[key.strip()] = value.strip()
+
+    ts = parts.get("ts")
+    v1 = parts.get("v1")
+    if not ts or not v1:
+        return True
+
+    manifest = f"id:{data_id};request-id:{request_id};ts:{ts};"
+    expected = hmac.new(
+        normalized_secret.encode("utf-8"),
+        manifest.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, v1)
 
 
 def trial_duration_days():
@@ -473,8 +749,15 @@ def start_professional_checkout(user, billing_interval=AssinaturaUsuario.Billing
     product = product_by_code(product_code)
     plan = professional_plan(product_code)
     config = payment_config()
+    if not product or not plan:
+        return None, "O produto ou o plano profissional ainda nao foi configurado."
+    if not getattr(user, "email", "").strip():
+        return None, "Informe um e-mail valido na sua conta antes de iniciar a assinatura."
     now = timezone.now()
     price = plan.preco_anual if billing_interval == AssinaturaUsuario.BillingInterval.YEARLY else plan.preco_mensal
+    provider_plan_code = _provider_plan_code(plan, billing_interval)
+    if not provider_plan_code and (price is None or Decimal(str(price)) <= 0):
+        return None, "Defina o valor do plano profissional antes de iniciar o checkout."
     subscription, _ = AssinaturaUsuario.objects.update_or_create(
         usuario=user,
         produto=product,
@@ -488,10 +771,50 @@ def start_professional_checkout(user, billing_interval=AssinaturaUsuario.Billing
             "moeda": "BRL",
             "current_period_start": now,
             "current_period_end": None,
+            "provider_customer_id": "",
+            "provider_subscription_id": "",
+            "provider_plan_id": provider_plan_code,
+            "external_reference": "",
             "checkout_url": "",
             "observacao": "Aguardando conclusao do checkout profissional.",
         },
     )
     if not config.enabled or not config.mercado_pago_public_key or not config.mercado_pago_access_token:
         return subscription, "A integracao de pagamento ainda nao foi configurada no painel administrativo."
-    return subscription, "Checkout preparado para integracao com Mercado Pago."
+    subscription.external_reference = _subscription_external_reference(subscription)
+    request_payload = _build_professional_checkout_payload(subscription, config)
+    try:
+        response_payload = _mercado_pago_api_request(
+            config,
+            "POST",
+            "/preapproval",
+            request_payload,
+            timeout=60,
+            idempotency_key=subscription.external_reference,
+        )
+    except ValueError as exc:
+        subscription.observacao = f"Falha ao iniciar checkout profissional: {exc}"
+        subscription.save(update_fields=["observacao", "updated_at"])
+        return subscription, "Nao foi possivel iniciar o checkout do plano profissional."
+
+    subscription.provider_subscription_id = str(response_payload.get("id") or "").strip()
+    subscription.provider_plan_id = str(
+        response_payload.get("preapproval_plan_id") or subscription.provider_plan_id or ""
+    ).strip()
+    subscription.checkout_url = _resolve_checkout_url(response_payload, config.sandbox_mode)
+    subscription.status = _subscription_status_from_provider(response_payload.get("status"))
+    subscription.observacao = "Checkout profissional iniciado no Mercado Pago."
+    subscription.save(
+        update_fields=[
+            "external_reference",
+            "provider_subscription_id",
+            "provider_plan_id",
+            "checkout_url",
+            "status",
+            "observacao",
+            "updated_at",
+        ]
+    )
+    if not subscription.checkout_url:
+        return subscription, "O Mercado Pago nao retornou a URL do checkout da assinatura."
+    return subscription, ""

@@ -100,9 +100,11 @@ from .services.billing import (
     count_user_racks,
     ensure_billing_catalog,
     payment_config,
+    process_mercado_pago_webhook_payload,
     resolve_import_quota,
     resolve_entitlement,
     start_professional_checkout,
+    validate_mercado_pago_webhook_signature,
 )
 from .services.io_import import (
     DEFAULT_GROUPING_PROMPT,
@@ -3237,8 +3239,9 @@ def mercado_pago_webhook(request):
         payload = json.loads((request.body or b"{}").decode("utf-8"))
     except (TypeError, ValueError, UnicodeDecodeError):
         payload = {}
-    external_id = str(payload.get("id") or payload.get("data", {}).get("id") or timezone.now().timestamp()).strip()
-    event_type = str(payload.get("type") or payload.get("action") or "unknown").strip()
+    data_id = str(request.GET.get("data.id") or payload.get("data", {}).get("id") or payload.get("id") or "").strip()
+    external_id = data_id or str(timezone.now().timestamp()).strip()
+    event_type = str(request.GET.get("type") or payload.get("type") or payload.get("action") or "unknown").strip()
     event, created = EventoPagamentoWebhook.objects.get_or_create(
         provider=ConfiguracaoPagamento.Provider.MERCADO_PAGO,
         external_id=external_id,
@@ -3251,12 +3254,38 @@ def mercado_pago_webhook(request):
     if not created:
         event.event_type = event_type or event.event_type
         event.raw_payload = payload
-        event.save(update_fields=["event_type", "raw_payload"])
-    event.processed = True
-    event.processed_at = timezone.now()
-    event.processing_error = ""
-    event.save(update_fields=["processed", "processed_at", "processing_error"])
-    return JsonResponse({"ok": True})
+        event.processed = False
+        event.processed_at = None
+        event.processing_error = ""
+        event.save(update_fields=["event_type", "raw_payload", "processed", "processed_at", "processing_error"])
+
+    settings_obj = payment_config()
+    signature_ok = validate_mercado_pago_webhook_signature(
+        settings_obj.mercado_pago_webhook_secret,
+        signature_header=request.headers.get("x-signature", ""),
+        request_id=request.headers.get("x-request-id", ""),
+        data_id=data_id,
+    )
+    if not signature_ok:
+        event.processing_error = "Assinatura do webhook invalida."
+        event.processed = False
+        event.processed_at = timezone.now()
+        event.save(update_fields=["processing_error", "processed", "processed_at"])
+        return JsonResponse({"ok": False}, status=401)
+
+    try:
+        process_mercado_pago_webhook_payload(payload, data_id=data_id)
+        event.processed = True
+        event.processed_at = timezone.now()
+        event.processing_error = ""
+        event.save(update_fields=["processed", "processed_at", "processing_error"])
+        return JsonResponse({"ok": True})
+    except Exception as exc:
+        event.processed = False
+        event.processed_at = timezone.now()
+        event.processing_error = str(exc)
+        event.save(update_fields=["processed", "processed_at", "processing_error"])
+        return JsonResponse({"ok": False}, status=500)
 
 
 def pagamento_checkout_sucesso(request):

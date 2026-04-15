@@ -298,6 +298,21 @@ class ConfiguracaoPagamento(models.Model):
             return "*" * len(value)
         return f"{value[:4]}...{value[-4:]}"
 
+    @property
+    def masked_webhook_secret(self):
+        value = (self.mercado_pago_webhook_secret or "").strip()
+        if len(value) <= 8:
+            return "*" * len(value)
+        return f"{value[:4]}...{value[-4:]}"
+
+    @property
+    def has_access_token_saved(self):
+        return bool((self.mercado_pago_access_token or "").strip())
+
+    @property
+    def has_webhook_secret_saved(self):
+        return bool((self.mercado_pago_webhook_secret or "").strip())
+
     def save(self, *args, **kwargs):
         self.pk = 1
         self.trial_duration_days = max(1, min(int(self.trial_duration_days or 30), 120))

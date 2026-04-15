@@ -56,13 +56,13 @@
               {% if entitlement.has_access %}
                 <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
               {% elif access_state == "disponivel" %}
-                <a class="btn btn-primary" href="{{ activate_url }}">Testar com planilha</a>
+                <a class="btn btn-primary" href="{{ activate_url }}">Testar</a>
               {% else %}
                 <a class="btn btn-primary" href="{{ plans_url }}">Ver planos</a>
               {% endif %}
               <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
             {% else %}
-              <a class="btn btn-primary" href="{{ register_url }}">Testar com planilha</a>
+              <a class="btn btn-primary" href="{{ register_url }}">Testar</a>
               <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
             {% endif %}
           </div>
@@ -294,13 +294,13 @@
               {% if entitlement.has_access %}
                 <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
               {% elif access_state == "disponivel" %}
-                <a class="btn btn-primary" href="{{ activate_url }}">Testar com planilha</a>
+                <a class="btn btn-primary" href="{{ activate_url }}">Testar</a>
               {% else %}
                 <a class="btn btn-primary" href="{{ plans_url }}">Ver planos</a>
               {% endif %}
               <a class="btn btn-ghost" href="{% url 'painel' %}">Voltar ao painel</a>
             {% else %}
-              <a class="btn btn-primary" href="{{ register_url }}">Testar com planilha</a>
+              <a class="btn btn-primary" href="{{ register_url }}">Testar</a>
               <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
             {% endif %}
           </div>
