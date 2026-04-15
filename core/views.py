@@ -100,11 +100,11 @@ from .services.billing import (
     count_user_racks,
     ensure_billing_catalog,
     payment_config,
-    process_mercado_pago_webhook_payload,
+    process_provider_webhook_payload,
     resolve_import_quota,
     resolve_entitlement,
     start_professional_checkout,
-    validate_mercado_pago_webhook_signature,
+    validate_provider_webhook_signature,
 )
 from .services.io_import import (
     DEFAULT_GROUPING_PROMPT,
@@ -603,6 +603,12 @@ def _payment_checkout_default_urls(request):
         "success": request.build_absolute_uri(reverse("pagamento_checkout_sucesso")),
         "failure": request.build_absolute_uri(reverse("pagamento_checkout_falha")),
         "pending": request.build_absolute_uri(reverse("pagamento_checkout_pendente")),
+    }
+
+
+def _payment_provider_default_urls(request):
+    return {
+        "webhook": request.build_absolute_uri(reverse("stripe_webhook")),
     }
 
 
@@ -3215,6 +3221,7 @@ def produto_documentacao_tecnica_checkout_professional(request):
     next_url = _get_safe_next_url(request, fallback="ios_list")
     if not _documentacao_tecnica_product():
         return _redirect_documentacao_tecnica_billing_unavailable(next_url)
+    _ensure_payment_checkout_urls(request, payment_config())
     interval = (request.POST.get("interval") or request.GET.get("interval") or AssinaturaUsuario.BillingInterval.MONTHLY).strip().upper()
     if interval not in AssinaturaUsuario.BillingInterval.values:
         interval = AssinaturaUsuario.BillingInterval.MONTHLY
@@ -3239,19 +3246,19 @@ def produto_documentacao_tecnica_checkout_professional(request):
 
 
 @csrf_exempt
-def mercado_pago_webhook(request):
+def stripe_webhook(request):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
+    raw_body = request.body or b"{}"
     payload = {}
     try:
-        payload = json.loads((request.body or b"{}").decode("utf-8"))
+        payload = json.loads(raw_body.decode("utf-8"))
     except (TypeError, ValueError, UnicodeDecodeError):
         payload = {}
-    data_id = str(request.GET.get("data.id") or payload.get("data", {}).get("id") or payload.get("id") or "").strip()
-    external_id = data_id or str(timezone.now().timestamp()).strip()
-    event_type = str(request.GET.get("type") or payload.get("type") or payload.get("action") or "unknown").strip()
+    external_id = str(payload.get("id") or timezone.now().timestamp()).strip()
+    event_type = str(payload.get("type") or "unknown").strip()
     event, created = EventoPagamentoWebhook.objects.get_or_create(
-        provider=ConfiguracaoPagamento.Provider.MERCADO_PAGO,
+        provider=ConfiguracaoPagamento.Provider.STRIPE,
         external_id=external_id,
         defaults={
             "event_type": event_type,
@@ -3268,11 +3275,10 @@ def mercado_pago_webhook(request):
         event.save(update_fields=["event_type", "raw_payload", "processed", "processed_at", "processing_error"])
 
     settings_obj = payment_config()
-    signature_ok = validate_mercado_pago_webhook_signature(
-        settings_obj.mercado_pago_webhook_secret,
-        signature_header=request.headers.get("x-signature", ""),
-        request_id=request.headers.get("x-request-id", ""),
-        data_id=data_id,
+    signature_ok = validate_provider_webhook_signature(
+        settings_obj,
+        raw_body,
+        signature_header=request.headers.get("Stripe-Signature", ""),
     )
     if not signature_ok:
         event.processing_error = "Assinatura do webhook invalida."
@@ -3282,7 +3288,7 @@ def mercado_pago_webhook(request):
         return JsonResponse({"ok": False}, status=401)
 
     try:
-        process_mercado_pago_webhook_payload(payload, data_id=data_id)
+        process_provider_webhook_payload(payload)
         event.processed = True
         event.processed_at = timezone.now()
         event.processing_error = ""
@@ -10264,19 +10270,20 @@ def pagamentos_planos_gerenciar(request):
     product = ensure_billing_catalog()
     settings_obj = payment_config()
     provider_defaults = _ensure_payment_checkout_urls(request, settings_obj)
+    provider_urls = _payment_provider_default_urls(request)
     message = None
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_payment_config":
+            settings_obj.provider = ConfiguracaoPagamento.Provider.STRIPE
             settings_obj.enabled = request.POST.get("enabled") == "on"
-            settings_obj.sandbox_mode = request.POST.get("sandbox_mode") == "on"
-            settings_obj.mercado_pago_public_key = (request.POST.get("mercado_pago_public_key") or "").strip()
-            access_token = (request.POST.get("mercado_pago_access_token") or "").strip()
-            webhook_secret = (request.POST.get("mercado_pago_webhook_secret") or "").strip()
-            if access_token:
-                settings_obj.mercado_pago_access_token = access_token
+            settings_obj.stripe_publishable_key = (request.POST.get("stripe_publishable_key") or "").strip()
+            secret_key = (request.POST.get("stripe_secret_key") or "").strip()
+            webhook_secret = (request.POST.get("stripe_webhook_secret") or "").strip()
+            if secret_key:
+                settings_obj.stripe_secret_key = secret_key
             if webhook_secret:
-                settings_obj.mercado_pago_webhook_secret = webhook_secret
+                settings_obj.stripe_webhook_secret = webhook_secret
             settings_obj.checkout_success_url = (request.POST.get("checkout_success_url") or "").strip() or provider_defaults["success"]
             settings_obj.checkout_failure_url = (request.POST.get("checkout_failure_url") or "").strip() or provider_defaults["failure"]
             settings_obj.checkout_pending_url = (request.POST.get("checkout_pending_url") or "").strip() or provider_defaults["pending"]
@@ -10348,6 +10355,7 @@ def pagamentos_planos_gerenciar(request):
             "product": product,
             "settings_obj": settings_obj,
             "provider_defaults": provider_defaults,
+            "provider_urls": provider_urls,
             "plans": plans,
             "subscriptions": subscriptions,
             "webhook_events": webhook_events,

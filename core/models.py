@@ -187,7 +187,7 @@ class PlanoComercial(models.Model):
 class AssinaturaUsuario(models.Model):
     class Provider(models.TextChoices):
         INTERNAL = "INTERNAL", "Interno"
-        MERCADO_PAGO = "MERCADO_PAGO", "Mercado Pago"
+        STRIPE = "STRIPE", "Stripe"
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pendente"
@@ -252,17 +252,17 @@ class AssinaturaUsuario(models.Model):
 
 class ConfiguracaoPagamento(models.Model):
     class Provider(models.TextChoices):
-        MERCADO_PAGO = "MERCADO_PAGO", "Mercado Pago"
+        STRIPE = "STRIPE", "Stripe"
 
     trial_duration_days = models.PositiveIntegerField(default=30)
     trial_daily_io_import_limit = models.PositiveIntegerField(default=3)
     trial_daily_ip_import_limit = models.PositiveIntegerField(default=3)
     enabled = models.BooleanField(default=False)
-    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.MERCADO_PAGO)
+    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.STRIPE)
     sandbox_mode = models.BooleanField(default=True)
-    mercado_pago_public_key = models.CharField(max_length=255, blank=True, default="")
-    mercado_pago_access_token = models.CharField(max_length=255, blank=True, default="")
-    mercado_pago_webhook_secret = models.CharField(max_length=255, blank=True, default="")
+    stripe_publishable_key = models.CharField(max_length=255, blank=True, default="")
+    stripe_secret_key = models.CharField(max_length=255, blank=True, default="")
+    stripe_webhook_secret = models.CharField(max_length=255, blank=True, default="")
     checkout_success_url = models.CharField(max_length=255, blank=True, default="")
     checkout_failure_url = models.CharField(max_length=255, blank=True, default="")
     checkout_pending_url = models.CharField(max_length=255, blank=True, default="")
@@ -285,36 +285,55 @@ class ConfiguracaoPagamento(models.Model):
         return config
 
     @property
-    def masked_access_token(self):
-        value = (self.mercado_pago_access_token or "").strip()
+    def masked_stripe_publishable_key(self):
+        value = (self.stripe_publishable_key or "").strip()
         if len(value) <= 8:
             return "*" * len(value)
         return f"{value[:4]}...{value[-4:]}"
 
     @property
-    def masked_public_key(self):
-        value = (self.mercado_pago_public_key or "").strip()
+    def masked_stripe_secret_key(self):
+        value = (self.stripe_secret_key or "").strip()
         if len(value) <= 8:
             return "*" * len(value)
         return f"{value[:4]}...{value[-4:]}"
 
     @property
-    def masked_webhook_secret(self):
-        value = (self.mercado_pago_webhook_secret or "").strip()
+    def masked_stripe_webhook_secret(self):
+        value = (self.stripe_webhook_secret or "").strip()
         if len(value) <= 8:
             return "*" * len(value)
         return f"{value[:4]}...{value[-4:]}"
 
     @property
-    def has_access_token_saved(self):
-        return bool((self.mercado_pago_access_token or "").strip())
+    def has_stripe_secret_key_saved(self):
+        return bool((self.stripe_secret_key or "").strip())
 
     @property
-    def has_webhook_secret_saved(self):
-        return bool((self.mercado_pago_webhook_secret or "").strip())
+    def has_stripe_webhook_secret_saved(self):
+        return bool((self.stripe_webhook_secret or "").strip())
+
+    @property
+    def has_stripe_publishable_key_saved(self):
+        return bool((self.stripe_publishable_key or "").strip())
+
+    @property
+    def stripe_mode_label(self):
+        secret_key = (self.stripe_secret_key or "").strip()
+        publishable_key = (self.stripe_publishable_key or "").strip()
+        if secret_key.startswith("sk_test_") or publishable_key.startswith("pk_test_"):
+            return "Teste"
+        if secret_key.startswith("sk_live_") or publishable_key.startswith("pk_live_"):
+            return "Producao"
+        return "Nao configurado"
 
     def save(self, *args, **kwargs):
         self.pk = 1
+        self.provider = self.Provider.STRIPE
+        if (self.stripe_secret_key or "").strip().startswith("sk_test_") or (self.stripe_publishable_key or "").strip().startswith("pk_test_"):
+            self.sandbox_mode = True
+        elif (self.stripe_secret_key or "").strip().startswith("sk_live_") or (self.stripe_publishable_key or "").strip().startswith("pk_live_"):
+            self.sandbox_mode = False
         self.trial_duration_days = max(1, min(int(self.trial_duration_days or 30), 120))
         self.trial_daily_io_import_limit = max(1, min(int(self.trial_daily_io_import_limit or 3), 50))
         self.trial_daily_ip_import_limit = max(1, min(int(self.trial_daily_ip_import_limit or 3), 50))

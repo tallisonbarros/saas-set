@@ -35,7 +35,7 @@
       <div class="admin-metric-card">
         <div class="admin-metric-label">Provider</div>
         <div class="admin-metric-value">{{ settings_obj.get_provider_display }}</div>
-        <div class="admin-metric-note">{% if settings_obj.enabled %}Ligado{% else %}Desligado{% endif %} · {% if settings_obj.sandbox_mode %}Sandbox{% else %}Producao{% endif %}</div>
+        <div class="admin-metric-note">{% if settings_obj.enabled %}Ligado{% else %}Desligado{% endif %} · {{ settings_obj.stripe_mode_label }}</div>
       </div>
       <div class="admin-metric-card">
         <div class="admin-metric-label">Trial</div>
@@ -57,7 +57,7 @@
     <section class="card compact-card admin-subcard admin-provider-section">
       <div class="admin-title-stack">
         <h2 class="admin-section-title">Configuracao do provider</h2>
-        <p class="admin-section-note">Credenciais e parametros do checkout interno com foco no Mercado Pago.</p>
+        <p class="admin-section-note">Credenciais e parametros do checkout interno com foco no Stripe.</p>
       </div>
       <p class="muted">
         As URLs de retorno abaixo ja apontam para paginas padrao do proprio sistema. Se voce nao informar nada,
@@ -71,10 +71,7 @@
             <input type="checkbox" name="enabled" {% if settings_obj.enabled %}checked{% endif %}>
             Habilitar cobranca
           </label>
-          <label class="checkbox-item">
-            <input type="checkbox" name="sandbox_mode" {% if settings_obj.sandbox_mode %}checked{% endif %}>
-            Usar sandbox
-          </label>
+          <span class="admin-token is-neutral">Modo {{ settings_obj.stripe_mode_label }}</span>
         </div>
         <div class="admin-form-grid admin-provider-grid">
           <label class="field">
@@ -90,16 +87,16 @@
             <input type="number" min="1" max="50" name="trial_daily_ip_import_limit" value="{{ settings_obj.trial_daily_ip_import_limit }}">
           </label>
           <label class="field">
-            <span>Public key</span>
-            <input type="text" name="mercado_pago_public_key" value="{{ settings_obj.mercado_pago_public_key }}" placeholder="APP_USR-...">
+            <span>Publishable key</span>
+            <input type="text" name="stripe_publishable_key" value="{{ settings_obj.stripe_publishable_key }}" placeholder="pk_test_... ou pk_live_...">
           </label>
           <label class="field">
-            <span>Access token</span>
-            <input type="password" name="mercado_pago_access_token" value="" placeholder="{% if settings_obj.has_access_token_saved %}{{ settings_obj.masked_access_token }}{% else %}APP_USR-...{% endif %}">
+            <span>Secret key</span>
+            <input type="password" name="stripe_secret_key" value="" placeholder="{% if settings_obj.has_stripe_secret_key_saved %}{{ settings_obj.masked_stripe_secret_key }}{% else %}sk_test_... ou sk_live_...{% endif %}">
           </label>
           <label class="field">
             <span>Webhook secret</span>
-            <input type="password" name="mercado_pago_webhook_secret" value="" placeholder="{% if settings_obj.has_webhook_secret_saved %}{{ settings_obj.masked_webhook_secret }}{% else %}assinatura do webhook{% endif %}">
+            <input type="password" name="stripe_webhook_secret" value="" placeholder="{% if settings_obj.has_stripe_webhook_secret_saved %}{{ settings_obj.masked_stripe_webhook_secret }}{% else %}whsec_...{% endif %}">
           </label>
           <label class="field admin-provider-field-wide">
             <span>URL sucesso</span>
@@ -119,15 +116,21 @@
             <div class="admin-list-row-main">
               <div class="admin-list-title">Credenciais salvas</div>
               <div class="admin-list-meta">
-                {% if settings_obj.has_access_token_saved %}
-                  <span class="admin-token is-success">Access token salvo</span>
-                  <span class="admin-token is-neutral">{{ settings_obj.masked_access_token }}</span>
+                {% if settings_obj.has_stripe_publishable_key_saved %}
+                  <span class="admin-token is-success">Publishable key salva</span>
+                  <span class="admin-token is-neutral">{{ settings_obj.masked_stripe_publishable_key }}</span>
                 {% else %}
-                  <span class="admin-token is-warn">Access token pendente</span>
+                  <span class="admin-token is-warn">Publishable key pendente</span>
                 {% endif %}
-                {% if settings_obj.has_webhook_secret_saved %}
+                {% if settings_obj.has_stripe_secret_key_saved %}
+                  <span class="admin-token is-success">Secret key salva</span>
+                  <span class="admin-token is-neutral">{{ settings_obj.masked_stripe_secret_key }}</span>
+                {% else %}
+                  <span class="admin-token is-warn">Secret key pendente</span>
+                {% endif %}
+                {% if settings_obj.has_stripe_webhook_secret_saved %}
                   <span class="admin-token is-success">Webhook secret salvo</span>
-                  <span class="admin-token is-neutral">{{ settings_obj.masked_webhook_secret }}</span>
+                  <span class="admin-token is-neutral">{{ settings_obj.masked_stripe_webhook_secret }}</span>
                 {% else %}
                   <span class="admin-token is-warn">Webhook secret pendente</span>
                 {% endif %}
@@ -136,11 +139,22 @@
           </article>
           <article class="admin-list-row">
             <div class="admin-list-row-main">
-              <div class="admin-list-title">URLs padrao do ambiente</div>
+              <div class="admin-list-title">URLs do provider</div>
               <div class="admin-list-meta">
+                <span class="admin-token is-neutral">Webhook: {{ provider_urls.webhook }}</span>
                 <span class="admin-token is-neutral">Sucesso: {{ provider_defaults.success }}</span>
                 <span class="admin-token is-neutral">Falha: {{ provider_defaults.failure }}</span>
                 <span class="admin-token is-neutral">Pendente: {{ provider_defaults.pending }}</span>
+              </div>
+            </div>
+          </article>
+          <article class="admin-list-row">
+            <div class="admin-list-row-main">
+              <div class="admin-list-title">Teste rapido</div>
+              <div class="admin-list-meta">
+                <span class="admin-token is-neutral">Cartao: 4242 4242 4242 4242</span>
+                <span class="admin-token is-neutral">Validade: qualquer data futura</span>
+                <span class="admin-token is-neutral">CVC: qualquer 3 digitos</span>
               </div>
             </div>
           </article>
@@ -218,12 +232,12 @@
                     <input type="text" name="preco_anual" value="{{ plan.preco_anual|default:'' }}">
                   </label>
                   <label class="field">
-                    <span>Provider plan mensal</span>
-                    <input type="text" name="provider_plan_code_mensal" value="{{ plan.provider_plan_code_mensal }}">
+                    <span>Stripe Price ID mensal</span>
+                    <input type="text" name="provider_plan_code_mensal" value="{{ plan.provider_plan_code_mensal }}" placeholder="price_... ou vazio para usar o valor do card">
                   </label>
                   <label class="field">
-                    <span>Provider plan anual</span>
-                    <input type="text" name="provider_plan_code_anual" value="{{ plan.provider_plan_code_anual }}">
+                    <span>Stripe Price ID anual</span>
+                    <input type="text" name="provider_plan_code_anual" value="{{ plan.provider_plan_code_anual }}" placeholder="price_... ou vazio para usar o valor do card">
                   </label>
                 </div>
                 <div class="checkbox-grid">
