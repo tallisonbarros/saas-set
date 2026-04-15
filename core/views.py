@@ -3113,10 +3113,15 @@ def produto_documentacao_tecnica_planos(request):
     entitlement = _resolve_documentacao_entitlement_safe(request.user if request.user.is_authenticated else None)
     payment_settings = payment_config()
     starter_plan = entitlement.get("starter_plan")
+    professional_plan = entitlement.get("professional_plan")
     trial_io_import_limit = getattr(payment_settings, "trial_daily_io_import_limit", 3) or 3
     trial_ip_import_limit = getattr(payment_settings, "trial_daily_ip_import_limit", 3) or 3
     starter_io_import_limit = getattr(starter_plan, "daily_io_import_limit", None) or 3
     starter_ip_import_limit = getattr(starter_plan, "daily_ip_import_limit", None) or 3
+    professional_monthly_price = getattr(professional_plan, "preco_mensal", None)
+    professional_yearly_price = getattr(professional_plan, "preco_anual", None)
+    professional_monthly_price_label = _format_brl_currency(professional_monthly_price) if professional_monthly_price is not None else ""
+    professional_yearly_price_label = _format_brl_currency(professional_yearly_price) if professional_yearly_price is not None else ""
     if request.user.is_authenticated:
         access_state, access = _user_documentacao_access_state(request.user)
         if not state:
@@ -3163,6 +3168,9 @@ def produto_documentacao_tecnica_planos(request):
             "trial_ip_import_limit": trial_ip_import_limit,
             "starter_io_import_limit": starter_io_import_limit,
             "starter_ip_import_limit": starter_ip_import_limit,
+            "professional_plan": professional_plan,
+            "professional_monthly_price_label": professional_monthly_price_label,
+            "professional_yearly_price_label": professional_yearly_price_label,
         },
     )
 

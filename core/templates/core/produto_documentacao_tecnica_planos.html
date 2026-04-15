@@ -32,7 +32,7 @@
               <div class="product-doc-plan-kicker">Trial Full</div>
               <h3>30 dias liberados</h3>
             </div>
-            <div class="product-doc-plan-price">R$ 0</div>
+            <div class="product-doc-plan-price">Gratuito</div>
           </div>
           <p>Acesso completo aos módulos de IO e IP durante o período de avaliação.</p>
           <ul class="product-doc-import-preview-list">
@@ -62,7 +62,7 @@
               <div class="product-doc-plan-kicker">Plano Iniciante</div>
               <h3>Gratuito após o trial</h3>
             </div>
-            <div class="product-doc-plan-price">R$ 0</div>
+            <div class="product-doc-plan-price">Gratuito</div>
           </div>
           <p>Indicado para operação enxuta, desde que o total não ultrapasse {{ entitlement.starter_limit }} racks simultâneos.</p>
           <ul class="product-doc-import-preview-list">
@@ -93,13 +93,29 @@
               <div class="product-doc-plan-kicker">Plano Profissional</div>
               <h3>Racks ilimitados</h3>
             </div>
-            <div class="product-doc-plan-price">Sob configuração</div>
+            <div class="product-doc-plan-price">
+              {% if professional_monthly_price_label %}
+                {{ professional_monthly_price_label }}/mês
+              {% elif professional_yearly_price_label %}
+                {{ professional_yearly_price_label }}/ano
+              {% else %}
+                A definir
+              {% endif %}
+            </div>
           </div>
           <p>Para estruturas maiores, com recorrência automática.</p>
           <ul class="product-doc-import-preview-list">
             <li>Racks ilimitados</li>
             <li>Importações diárias sem limite</li>
-            <li>Mensal e anual</li>
+            {% if professional_monthly_price_label %}
+              <li>Mensal: {{ professional_monthly_price_label }}</li>
+            {% endif %}
+            {% if professional_yearly_price_label %}
+              <li>Anual: {{ professional_yearly_price_label }}</li>
+            {% endif %}
+            {% if not professional_monthly_price_label and not professional_yearly_price_label %}
+              <li>Mensal e anual</li>
+            {% endif %}
             <li>Continuidade operacional sem limite de uso</li>
           </ul>
           <div class="product-doc-plan-foot product-doc-plan-foot-split">
