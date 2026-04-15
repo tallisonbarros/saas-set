@@ -345,6 +345,7 @@ def reconcile_provider_subscription(remote_payload, *, fallback_subscription=Non
     subscription.provider_customer_id = str(remote_payload.get("customer") or subscription.provider_customer_id or "").strip()
     subscription.status = _subscription_status_from_provider(remote_payload.get("status"))
     subscription.billing_interval = _billing_interval_from_remote(recurring.get("interval"), subscription.billing_interval)
+    subscription.auto_renew = not bool(remote_payload.get("cancel_at_period_end"))
     unit_amount = price.get("unit_amount_decimal") or price.get("unit_amount")
     subscription.preco_ciclo = Decimal(str(unit_amount or 0)) / Decimal("100") if unit_amount is not None else subscription.preco_ciclo
     subscription.moeda = str(price.get("currency") or subscription.moeda or "BRL").strip().upper() or "BRL"
@@ -875,3 +876,47 @@ def start_professional_checkout(user, billing_interval=AssinaturaUsuario.Billing
     if not subscription.checkout_url:
         return subscription, "O Stripe nao retornou a URL do checkout da assinatura."
     return subscription, ""
+
+
+def cancel_professional_subscription(user, product_code=DOCUMENTATION_PRODUCT_CODE):
+    subscription = active_subscription(user, product_code)
+    if not subscription:
+        return None, "Nenhum plano ativo foi encontrado para esta conta."
+    if subscription.provider != AssinaturaUsuario.Provider.STRIPE:
+        return subscription, "O plano atual nao exige cancelamento de cobranca automatica."
+    if subscription.status not in {
+        AssinaturaUsuario.Status.ACTIVE,
+        AssinaturaUsuario.Status.TRIALING,
+        AssinaturaUsuario.Status.PAST_DUE,
+        AssinaturaUsuario.Status.PENDING,
+    }:
+        return subscription, "O plano atual nao esta disponivel para cancelamento agora."
+    if not subscription.provider_subscription_id:
+        return subscription, "A assinatura ainda esta sendo sincronizada. Tente novamente em instantes."
+    if not subscription.auto_renew:
+        return subscription, "A renovacao automatica deste plano ja foi desligada."
+
+    config = payment_config()
+    try:
+        remote_payload = _stripe_api_request(
+            config,
+            "POST",
+            f"/subscriptions/{subscription.provider_subscription_id}",
+            payload=[("cancel_at_period_end", "true")],
+            timeout=60,
+            idempotency_key=f"cancel:{subscription.external_reference or subscription.provider_subscription_id}",
+        )
+        subscription = reconcile_provider_subscription(remote_payload, fallback_subscription=subscription)
+    except ValueError as exc:
+        subscription.observacao = f"Falha ao cancelar renovacao profissional: {exc}"
+        subscription.save(update_fields=["observacao", "updated_at"])
+        return subscription, "Nao foi possivel cancelar a renovacao automatica agora."
+
+    cycle_end = subscription.current_period_end or subscription.expires_at
+    if cycle_end:
+        cycle_end_text = timezone.localtime(cycle_end).strftime("%d/%m/%Y")
+        return (
+            subscription,
+            f"Renovacao automatica cancelada. O acesso continua disponivel ate {cycle_end_text}.",
+        )
+    return subscription, "Renovacao automatica cancelada. O acesso segue ativo ate o fim do ciclo atual."

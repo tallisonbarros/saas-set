@@ -97,6 +97,7 @@ from .services.billing import (
     DOCUMENTATION_PRODUCT_CODE,
     activate_starter_plan,
     activate_trial,
+    cancel_professional_subscription,
     count_user_racks,
     ensure_billing_catalog,
     payment_config,
@@ -8923,16 +8924,19 @@ def meu_perfil(request):
     user = request.user
     perfil = _get_cliente(user)
     message = None
+    message_level = "info"
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "update_user":
             email = request.POST.get("email", "").strip().lower()
             if not email:
                 message = "Informe um email valido."
+                message_level = "error"
             else:
                 existing = User.objects.filter(username=email).exclude(pk=user.pk)
                 if existing.exists():
                     message = "Email ja cadastrado."
+                    message_level = "error"
                 else:
                     user.username = email
                     user.email = email
@@ -9003,14 +9007,81 @@ def meu_perfil(request):
                 user.set_password(new_password)
                 user.save(update_fields=["password"])
                 message = "Senha atualizada."
+                message_level = "success"
             else:
                 message = "Informe uma senha valida."
+                message_level = "error"
+        if action == "cancel_active_plan":
+            _, cancel_message = cancel_professional_subscription(user, DOCUMENTATION_PRODUCT_CODE)
+            message = cancel_message
+            message_level = "success" if cancel_message and "cancelada" in cancel_message.lower() else "warning"
+
+    entitlement = _resolve_documentacao_entitlement_safe(user)
+    subscription = entitlement.get("subscription")
+    current_plan = entitlement.get("current_plan")
+    quota_io = resolve_import_quota(user, "IO", DOCUMENTATION_PRODUCT_CODE)
+    quota_ip = resolve_import_quota(user, "IP", DOCUMENTATION_PRODUCT_CODE)
+    trial_days_remaining = entitlement.get("trial_days_remaining")
+    current_cycle_end = None
+    if subscription:
+        current_cycle_end = subscription.current_period_end or subscription.expires_at
+    plan_state_label_map = {
+        "trial_active": "Trial ativo",
+        "plan_active": "Plano ativo",
+        "legacy_active": "Acesso ativo",
+        "starter_blocked_by_usage": "Iniciante acima do limite",
+        "trial_expired": "Trial encerrado",
+        "blocked": "Plano pendente",
+        "requires_plan_selection": "Escolha um plano",
+        "admin_access": "Acesso administrativo",
+        "anonymous": "Sem plano",
+    }
+    plan_state_label = plan_state_label_map.get(entitlement.get("status"), "Sem plano")
+    billing_status_tone = "neutral"
+    if entitlement.get("has_access"):
+        billing_status_tone = "success"
+    elif entitlement.get("status") in {"trial_expired", "starter_blocked_by_usage", "blocked"}:
+        billing_status_tone = "warning"
+    elif entitlement.get("status") == "requires_plan_selection":
+        billing_status_tone = "danger"
+
+    cancellation_available = bool(
+        subscription
+        and subscription.provider == AssinaturaUsuario.Provider.STRIPE
+        and subscription.auto_renew
+        and subscription.status
+        in {
+            AssinaturaUsuario.Status.ACTIVE,
+            AssinaturaUsuario.Status.TRIALING,
+            AssinaturaUsuario.Status.PAST_DUE,
+            AssinaturaUsuario.Status.PENDING,
+        }
+    )
+    cancellation_scheduled = bool(
+        subscription
+        and subscription.provider == AssinaturaUsuario.Provider.STRIPE
+        and not subscription.auto_renew
+        and (subscription.current_period_end or subscription.expires_at)
+    )
     return render(
         request,
         "core/meu_perfil.html",
         {
             "perfil": perfil,
             "message": message,
+            "message_level": message_level,
+            "entitlement": entitlement,
+            "subscription": subscription,
+            "current_plan": current_plan,
+            "quota_io": quota_io,
+            "quota_ip": quota_ip,
+            "trial_days_remaining": trial_days_remaining,
+            "current_cycle_end": current_cycle_end,
+            "plan_state_label": plan_state_label,
+            "billing_status_tone": billing_status_tone,
+            "cancellation_available": cancellation_available,
+            "cancellation_scheduled": cancellation_scheduled,
+            "commercial_plans_url": _platform_plans_url(next_url=reverse("meu_perfil")),
         },
     )
 

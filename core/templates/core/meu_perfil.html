@@ -12,120 +12,260 @@
 {% endblock %}
 
 {% block content %}
-  <section class="card stack">
-    <div class="page-hud">
+  <section class="card stack profile-shell profile-shell-minimal">
+    <div class="page-hud profile-hud profile-hud-minimal">
       <div class="hud-top">
         <div class="hud-title">Painel de perfil</div>
-        <div class="hud-pill">Dados</div>
+        <span class="profile-status-badge profile-status-badge-{{ billing_status_tone }}">{{ plan_state_label }}</span>
         <div class="hud-menu" aria-label="Menu do modulo">
           <a class="hud-menu-pill" href="{% url 'painel' %}">Voltar</a>
         </div>
       </div>
-      <div class="page-hud-head">
-        <div>
-          <div class="page-kicker">Usuario</div>
-          <h1 class="page-title">Meu perfil</h1>
-          <p class="page-subtitle">Atualize dados e IDs vinculados.</p>
-        </div>
-      </div>
-      <div class="hud-meta">Perfil, plantas e financeiros.</div>
     </div>
+
     {% if message %}
-      <p class="muted">{{ message }}</p>
+      <div class="profile-feedback profile-feedback-{{ message_level }}">
+        <strong>{% if message_level == "success" %}Atualizado{% elif message_level == "warning" %}Atencao{% elif message_level == "error" %}Nao foi possivel concluir{% else %}Informacao{% endif %}</strong>
+        <span>{{ message }}</span>
+      </div>
     {% endif %}
 
-    <div class="user-page-grid">
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Dados</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_user">
-          <label class="field">
-            <span>Email</span>
-            <input type="email" name="email" value="{{ request.user.username }}" required>
-          </label>
-          <button class="btn btn-primary" type="submit">Salvar conta</button>
-        </form>
+    <section class="profile-edit-panel">
+      <div class="profile-edit-head">
+        <div>
+          <span class="profile-card-kicker">Edicao da conta</span>
+          <h1>Meu perfil</h1>
+          <p>Atualize os dados principais usados nos modulos e IDs vinculados a sua operacao.</p>
+        </div>
+        <button class="btn btn-ghost btn-compact" type="button" data-profile-password-open>Alterar senha</button>
       </div>
 
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Perfil</h2>
-        <form method="post" class="stack">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_profile">
-          <label class="field">
-            <span>Nome</span>
-            <input type="text" name="nome" value="{% if perfil %}{{ perfil.nome }}{% endif %}">
-          </label>
-          <label class="field">
-            <span>Empresa</span>
-            <input type="text" name="empresa" value="{% if perfil %}{{ perfil.empresa }}{% endif %}">
-          </label>
-          <label class="field">
-            <span>Sigla cidade</span>
-            <input type="text" name="sigla_cidade" value="{% if perfil %}{{ perfil.sigla_cidade }}{% endif %}">
-          </label>
-          <label class="field">
-            <span>ID_PLANTA (separados por virgula)</span>
-            <input
-              type="text"
-              name="plantas"
-              placeholder="PLANTA-001, PLANTA-002"
-              value="{% if perfil %}{% for planta in perfil.plantas.all %}{{ planta.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_FINANCEIRO (separados por virgula)</span>
-            <input
-              type="text"
-              name="financeiros"
-              placeholder="FIN-001, FIN-002"
-              value="{% if perfil %}{% for fin in perfil.financeiros.all %}{{ fin.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_INVENTARIO (separados por virgula)</span>
-            <input
-              type="text"
-              name="inventarios"
-              placeholder="INV-001, INV-002"
-              value="{% if perfil %}{% for inv in perfil.inventarios.all %}{{ inv.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_LISTAIP (separados por virgula)</span>
-            <input
-              type="text"
-              name="listas_ip"
-              placeholder="LIP-001, LIP-002"
-              value="{% if perfil %}{% for lista in perfil.listas_ip.all %}{{ lista.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
-          <label class="field">
-            <span>ID_RADAR (separados por virgula)</span>
-            <input
-              type="text"
-              name="radares"
-              placeholder="RDR-001, RDR-002"
-              value="{% if perfil %}{% for radar in perfil.radares.all %}{{ radar.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
-            >
-          </label>
+      <form method="post" id="profile-email-form" class="profile-edit-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_user">
+        <div class="profile-edit-group">
+          <div class="profile-edit-group-title">Acesso</div>
+          <div class="profile-edit-grid profile-edit-grid-2">
+            <label class="field">
+              <span>Email principal</span>
+              <input type="email" name="email" value="{{ request.user.username }}" required>
+            </label>
+            <div class="profile-account-inline-action">
+              <button class="btn btn-ghost btn-compact" type="submit">Salvar email</button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <form method="post" class="profile-edit-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_profile">
+
+        <div class="profile-edit-group">
+          <div class="profile-edit-group-title">Identificacao</div>
+          <div class="profile-edit-grid profile-edit-grid-3">
+            <label class="field">
+              <span>Nome</span>
+              <input type="text" name="nome" value="{% if perfil %}{{ perfil.nome }}{% endif %}">
+            </label>
+            <label class="field">
+              <span>Empresa</span>
+              <input type="text" name="empresa" value="{% if perfil %}{{ perfil.empresa }}{% endif %}">
+            </label>
+            <label class="field">
+              <span>Sigla cidade</span>
+              <input type="text" name="sigla_cidade" value="{% if perfil %}{{ perfil.sigla_cidade }}{% endif %}">
+            </label>
+          </div>
+        </div>
+
+        <div class="profile-edit-group">
+          <div class="profile-edit-group-title">IDs vinculados</div>
+          <div class="profile-edit-grid profile-edit-grid-2">
+            <label class="field">
+              <span>ID_PLANTA</span>
+              <input
+                type="text"
+                name="plantas"
+                placeholder="PLANTA-001, PLANTA-002"
+                value="{% if perfil %}{% for planta in perfil.plantas.all %}{{ planta.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+              >
+            </label>
+            <label class="field">
+              <span>ID_FINANCEIRO</span>
+              <input
+                type="text"
+                name="financeiros"
+                placeholder="FIN-001, FIN-002"
+                value="{% if perfil %}{% for fin in perfil.financeiros.all %}{{ fin.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+              >
+            </label>
+            <label class="field">
+              <span>ID_INVENTARIO</span>
+              <input
+                type="text"
+                name="inventarios"
+                placeholder="INV-001, INV-002"
+                value="{% if perfil %}{% for inv in perfil.inventarios.all %}{{ inv.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+              >
+            </label>
+            <label class="field">
+              <span>ID_LISTAIP</span>
+              <input
+                type="text"
+                name="listas_ip"
+                placeholder="LIP-001, LIP-002"
+                value="{% if perfil %}{% for lista in perfil.listas_ip.all %}{{ lista.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+              >
+            </label>
+            <label class="field">
+              <span>ID_RADAR</span>
+              <input
+                type="text"
+                name="radares"
+                placeholder="RDR-001, RDR-002"
+                value="{% if perfil %}{% for radar in perfil.radares.all %}{{ radar.codigo }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}"
+              >
+            </label>
+          </div>
+        </div>
+
+        <div class="profile-edit-actions">
           <button class="btn btn-primary" type="submit">Salvar perfil</button>
-        </form>
+        </div>
+      </form>
+
+    </section>
+
+    <section class="profile-plan-terminal profile-plan-terminal-minimal">
+      <div class="profile-card-head profile-card-head-terminal">
+        <div>
+          <span class="profile-card-kicker">Assinatura</span>
+          <h2>Plano da conta</h2>
+        </div>
+        {% if current_plan %}
+          <span class="profile-status-chip">{{ current_plan.nome }}</span>
+        {% endif %}
       </div>
 
-      <div class="card compact-card">
-        <h2 style="margin-top: 0;">Senha</h2>
+      <div class="profile-plan-compact-grid">
+        <div>
+          <span>Status</span>
+          <strong>{{ plan_state_label }}</strong>
+        </div>
+        <div>
+          <span>Plano</span>
+          <strong>{% if current_plan %}{{ current_plan.nome }}{% elif trial_days_remaining %}Trial{% else %}Nao definido{% endif %}</strong>
+        </div>
+        <div>
+          <span>Ciclo</span>
+          <strong>{% if subscription %}{{ subscription.get_billing_interval_display }}{% else %}-{% endif %}</strong>
+        </div>
+        <div>
+          <span>Renovacao</span>
+          <strong>{% if subscription and subscription.auto_renew %}Ativa{% elif subscription %}Desligada{% else %}-{% endif %}</strong>
+        </div>
+      </div>
+
+      {% if cancellation_available %}
+        <div class="profile-terminal-copy">
+          <strong>Cancelar renovacao automatica</strong>
+          <p>O acesso continua ativo ate o fim do ciclo ja contratado. Depois disso, nenhuma nova cobranca sera feita.</p>
+          {% if current_cycle_end %}
+            <div class="profile-inline-note">Acesso previsto ate {{ current_cycle_end|date:"d/m/Y" }}.</div>
+          {% endif %}
+        </div>
+        <form method="post" class="profile-terminal-actions">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="cancel_active_plan">
+          <button class="btn btn-ghost btn-danger-lite" type="submit">Cancelar plano atual</button>
+          <a class="btn btn-ghost" href="{{ commercial_plans_url }}">Ver planos</a>
+        </form>
+      {% elif cancellation_scheduled %}
+        <div class="profile-terminal-copy">
+          <strong>Renovacao ja cancelada</strong>
+          <p>Seu plano fica ativo ate o fim do ciclo atual e nao sera renovado automaticamente.</p>
+          {% if current_cycle_end %}
+            <div class="profile-inline-note">Encerramento previsto para {{ current_cycle_end|date:"d/m/Y" }}.</div>
+          {% endif %}
+        </div>
+      {% elif current_plan and current_plan.is_free %}
+        <div class="profile-terminal-copy">
+          <strong>Plano sem cobranca recorrente</strong>
+          <p>O plano atual nao possui renovacao automatica.</p>
+        </div>
+        <div class="profile-terminal-actions">
+          <a class="btn btn-ghost" href="{{ commercial_plans_url }}">Ver planos</a>
+        </div>
+      {% else %}
+        <div class="profile-terminal-copy">
+          <strong>Nenhum plano recorrente ativo</strong>
+          <p>Nao existe uma assinatura paga com renovacao automatica para cancelar agora.</p>
+        </div>
+        <div class="profile-terminal-actions">
+          <a class="btn btn-ghost" href="{{ commercial_plans_url }}">Ver planos</a>
+        </div>
+      {% endif %}
+    </section>
+  </section>
+
+  <div class="radar-export-modal profile-password-modal" id="profile-password-modal" hidden>
+    <div class="radar-export-modal-backdrop" data-profile-password-close></div>
+    <section class="radar-export-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-password-title">
+      <header class="radar-export-modal-head">
+        <h2 id="profile-password-title">Alterar senha</h2>
+        <button class="btn btn-ghost btn-compact" type="button" data-profile-password-close>Fechar</button>
+      </header>
+      <div class="radar-export-modal-body">
         <form method="post" class="stack">
           {% csrf_token %}
           <input type="hidden" name="action" value="set_password">
           <label class="field">
             <span>Nova senha</span>
-            <input type="password" name="new_password" placeholder="Digite a nova senha">
+            <input type="password" name="new_password" placeholder="Digite a nova senha" data-profile-password-input>
           </label>
-          <button class="btn btn-ghost" type="submit">Atualizar senha</button>
+          <p class="profile-edit-note">Ao salvar, sua proxima autenticacao passa a usar a nova senha.</p>
+          <footer class="radar-export-modal-foot">
+            <button class="btn btn-primary" type="submit">Salvar nova senha</button>
+          </footer>
         </form>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      var modal = document.getElementById("profile-password-modal");
+      var openButton = document.querySelector("[data-profile-password-open]");
+      var closeButtons = document.querySelectorAll("[data-profile-password-close]");
+      var input = modal ? modal.querySelector("[data-profile-password-input]") : null;
+      if (!modal || !openButton) {
+        return;
+      }
+      function openModal() {
+        modal.hidden = false;
+        modal.classList.add("is-open");
+        document.body.classList.add("radar-export-modal-open");
+        window.setTimeout(function () {
+          if (input) {
+            input.focus();
+          }
+        }, 80);
+      }
+      function closeModal() {
+        modal.classList.remove("is-open");
+        modal.hidden = true;
+        document.body.classList.remove("radar-export-modal-open");
+      }
+      openButton.addEventListener("click", openModal);
+      closeButtons.forEach(function (button) {
+        button.addEventListener("click", closeModal);
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && modal.classList.contains("is-open")) {
+          closeModal();
+        }
+      });
+    })();
+  </script>
 {% endblock %}
