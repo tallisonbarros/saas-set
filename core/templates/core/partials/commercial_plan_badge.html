@@ -1,0 +1,10 @@
+{% if status and status.plan_badge.visible %}
+  <div class="commercial-plan-badge-row">
+    <span class="commercial-plan-badge commercial-plan-badge-{{ status.plan_badge.tone|default:'info' }}">
+      {{ status.plan_badge.label }}
+    </span>
+    {% if plans_url %}
+      <a class="commercial-plan-badge-link" href="{{ plans_url }}">Planos</a>
+    {% endif %}
+  </div>
+{% endif %}

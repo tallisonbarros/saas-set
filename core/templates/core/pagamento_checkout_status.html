@@ -1,57 +1,292 @@
 {% extends "core/base.html" %}
 
-{% block title %}Status do pagamento{% endblock %}
+{% block title %}Status da assinatura{% endblock %}
 
 {% block content %}
-  <section class="card stack admin-shell" style="max-width: 840px; margin: 32px auto;">
-    <div class="page-hud">
-      <div class="hud-top">
-        <div class="hud-title">Checkout interno</div>
-        <div class="hud-pill">
-          {% if status_code == "sucesso" %}
-            Confirmado
-          {% elif status_code == "falha" %}
-            Falha
-          {% else %}
-            Pendente
-          {% endif %}
-        </div>
-      </div>
-      <div class="page-hud-head">
-        <div class="page-hud-main">
-          <div class="page-kicker">Retorno do provider</div>
-          <h1 class="page-title">{{ status_title }}</h1>
-          <p class="page-subtitle">{{ status_message }}</p>
-        </div>
-      </div>
-      {% if status_note %}
-        <div class="hud-meta">{{ status_note }}</div>
-      {% endif %}
-    </div>
+  <style>
+    .checkout-status-shell {
+      max-width: 920px;
+      margin: 36px auto;
+      padding: 18px;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background:
+        radial-gradient(circle at top left, rgba(255, 128, 32, 0.08), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+      box-shadow: 0 22px 70px rgba(5, 8, 16, 0.34);
+    }
 
-    <div class="admin-reference-grid">
-      <article class="admin-reference-item">
-        <div class="admin-title-stack">
-          <strong>Proximo passo</strong>
-          <span class="muted">
+    .checkout-status-card {
+      position: relative;
+      overflow: hidden;
+      padding: 28px 28px 24px;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(180deg, rgba(37, 43, 54, 0.96), rgba(24, 28, 36, 0.98));
+    }
+
+    .checkout-status-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at top center, rgba(255, 160, 92, 0.12), transparent 28%),
+        repeating-linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.03) 0,
+          rgba(255, 255, 255, 0.03) 1px,
+          transparent 1px,
+          transparent 22px
+        );
+      pointer-events: none;
+    }
+
+    .checkout-status-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 22px;
+    }
+
+    .checkout-status-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .checkout-status-kicker {
+      font-size: 0.85rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #ff8a33;
+    }
+
+    .checkout-status-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.86rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #f3f5f8;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .checkout-status-pill.is-success {
+      color: #9ff5c9;
+      border-color: rgba(86, 220, 158, 0.3);
+      background: rgba(40, 112, 77, 0.18);
+    }
+
+    .checkout-status-pill.is-failure {
+      color: #ffc2b6;
+      border-color: rgba(255, 124, 99, 0.28);
+      background: rgba(124, 52, 40, 0.18);
+    }
+
+    .checkout-status-pill.is-pending {
+      color: #ffd2a3;
+      border-color: rgba(255, 162, 76, 0.28);
+      background: rgba(110, 68, 27, 0.18);
+    }
+
+    .checkout-status-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 220px;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .checkout-status-title {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 0.98;
+      color: #f5f7fb;
+    }
+
+    .checkout-status-message {
+      margin: 14px 0 0;
+      max-width: 780px;
+      font-size: 1.2rem;
+      line-height: 1.5;
+      color: rgba(235, 239, 245, 0.82);
+    }
+
+    .checkout-status-orb-wrap {
+      display: flex;
+      justify-content: center;
+    }
+
+    .checkout-status-orb {
+      width: 156px;
+      height: 156px;
+      border-radius: 50%;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        inset 0 0 38px rgba(0, 0, 0, 0.24),
+        0 0 0 10px rgba(255, 255, 255, 0.03),
+        0 0 46px rgba(255, 140, 58, 0.2);
+    }
+
+    .checkout-status-orb::before {
+      content: "";
+      position: absolute;
+      inset: 16px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 224, 179, 0.96), rgba(255, 138, 51, 0.78) 48%, rgba(54, 18, 0, 0.96) 100%);
+    }
+
+    .checkout-status-orb.is-success::before {
+      background: radial-gradient(circle, rgba(214, 255, 239, 0.98), rgba(98, 232, 170, 0.84) 46%, rgba(8, 55, 35, 0.96) 100%);
+    }
+
+    .checkout-status-orb.is-failure::before {
+      background: radial-gradient(circle, rgba(255, 226, 221, 0.98), rgba(255, 128, 104, 0.82) 46%, rgba(77, 20, 8, 0.96) 100%);
+    }
+
+    .checkout-status-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+      gap: 18px;
+    }
+
+    .checkout-status-panel {
+      padding: 20px 22px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .checkout-status-panel h2 {
+      margin: 0 0 8px;
+      font-size: 1.02rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .checkout-status-panel p {
+      margin: 0;
+      color: rgba(228, 233, 240, 0.74);
+      line-height: 1.55;
+      font-size: 1.03rem;
+    }
+
+    .checkout-status-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .checkout-status-list li {
+      position: relative;
+      padding-left: 18px;
+      color: rgba(235, 239, 245, 0.78);
+      line-height: 1.45;
+    }
+
+    .checkout-status-list li::before {
+      content: "";
+      position: absolute;
+      top: 0.66em;
+      left: 0;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ff8a33;
+      box-shadow: 0 0 12px rgba(255, 138, 51, 0.5);
+    }
+
+    .checkout-status-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding-top: 4px;
+    }
+
+    @media (max-width: 860px) {
+      .checkout-status-hero,
+      .checkout-status-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .checkout-status-orb-wrap {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+
+  <section class="checkout-status-shell">
+    <div class="checkout-status-card">
+      <div class="checkout-status-content">
+        <div class="checkout-status-topbar">
+          <div class="checkout-status-kicker">Assinatura da plataforma</div>
+          <div class="checkout-status-pill {% if status_code == "sucesso" %}is-success{% elif status_code == "falha" %}is-failure{% else %}is-pending{% endif %}">
             {% if status_code == "sucesso" %}
-              Volte para os modulos e valide se a liberacao comercial ja foi refletida.
+              Liberado
             {% elif status_code == "falha" %}
-              Revise a cobranca e tente novamente quando quiser.
+              Revisar
             {% else %}
-              Aguarde a confirmacao final do provider antes de considerar a assinatura ativa.
+              Em andamento
             {% endif %}
-          </span>
+          </div>
         </div>
-        <div class="form-actions" style="margin-top: 16px;">
-          <a class="btn btn-primary" href="{% url 'produto_documentacao_tecnica' %}">Voltar aos planos</a>
+
+        <div class="checkout-status-hero">
+          <div>
+            <h1 class="checkout-status-title">{{ status_title }}</h1>
+            <p class="checkout-status-message">{{ status_message }}</p>
+          </div>
+          <div class="checkout-status-orb-wrap">
+            <div class="checkout-status-orb {% if status_code == "sucesso" %}is-success{% elif status_code == "falha" %}is-failure{% endif %}"></div>
+          </div>
+        </div>
+
+        <div class="checkout-status-grid">
+          <article class="checkout-status-panel">
+            <h2>O que acontece agora</h2>
+            <p>{{ status_note }}</p>
+          </article>
+          <article class="checkout-status-panel">
+            <h2>Proximo passo</h2>
+            <ul class="checkout-status-list">
+              {% if status_code == "sucesso" %}
+                <li>Volte aos modulos para confirmar se os recursos ja aparecem liberados na sua conta.</li>
+                <li>Se algo ainda estiver atualizando, aguarde alguns segundos e tente novamente.</li>
+              {% elif status_code == "falha" %}
+                <li>Revise o pagamento com calma e tente novamente quando quiser.</li>
+                <li>Seu plano atual permanece sem alteracoes ate uma nova confirmacao.</li>
+              {% else %}
+                <li>A confirmacao ainda esta sendo finalizada e pode levar mais alguns instantes.</li>
+                <li>Voce pode retornar depois sem perder o andamento da sua assinatura.</li>
+              {% endif %}
+            </ul>
+          </article>
+        </div>
+
+        <div class="checkout-status-actions">
+          <a class="btn btn-primary" href="{% url 'produto_documentacao_tecnica' %}">
+            {% if status_code == "sucesso" %}
+              Ver assinatura
+            {% elif status_code == "falha" %}
+              Tentar novamente
+            {% else %}
+              Acompanhar assinatura
+            {% endif %}
+          </a>
           {% if request.user.is_authenticated %}
-            <a class="btn btn-ghost" href="{% url 'painel' %}">Ir ao painel</a>
+            <a class="btn btn-ghost" href="{% url 'painel' %}">Abrir painel</a>
           {% else %}
             <a class="btn btn-ghost" href="{% url 'home' %}">Ir para a home</a>
           {% endif %}
         </div>
-      </article>
+      </div>
     </div>
   </section>
 {% endblock %}

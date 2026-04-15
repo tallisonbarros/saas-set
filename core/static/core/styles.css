@@ -3255,30 +3255,33 @@ select {
 }
 
 .panel-card-commercial {
-  margin-top: 10px;
+  margin-top: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(255, 255, 255, 0.025);
-  color: #9fb0be;
-  font-size: 11px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.018);
+  color: #95a6b4;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .panel-card-commercial-warning {
-  color: #f3b072;
-  border-color: rgba(255, 122, 26, 0.22);
-  background: rgba(255, 122, 26, 0.1);
+  color: #e9ab75;
+  border-color: rgba(255, 122, 26, 0.16);
+  background: rgba(255, 122, 26, 0.07);
 }
 
 .panel-card-commercial-success {
-  color: #67d2a3;
-  border-color: rgba(16, 185, 129, 0.2);
-  background: rgba(16, 185, 129, 0.08);
+  color: #7fd7ae;
+  border-color: rgba(16, 185, 129, 0.16);
+  background: rgba(16, 185, 129, 0.06);
 }
 
 .panel-card-commercial-info {
@@ -9400,33 +9403,64 @@ select:focus {
   color: #f0af73;
 }
 
-.io-commercial-notice {
-  margin-bottom: 18px;
-  display: flex;
+.commercial-plan-badge-row {
+  margin-bottom: 14px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.io-commercial-notice-link {
+.commercial-plan-badge,
+.commercial-plan-badge-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 12px;
+  min-height: 28px;
+  padding: 0 11px;
   border-radius: 999px;
-  border: 1px solid currentColor;
-  color: inherit;
   text-decoration: none;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1;
-  transition: background 0.16s ease, opacity 0.16s ease;
+  letter-spacing: 0.02em;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
 }
 
-.io-commercial-notice-link:hover {
-  background: rgba(255, 255, 255, 0.08);
-  opacity: 0.96;
+.commercial-plan-badge {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: #aab6c2;
+}
+
+.commercial-plan-badge-warning {
+  border-color: rgba(255, 122, 26, 0.18);
+  background: rgba(255, 122, 26, 0.1);
+  color: #f0b47f;
+}
+
+.commercial-plan-badge-success {
+  border-color: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.08);
+  color: #84deba;
+}
+
+.commercial-plan-badge-info {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: #aab6c2;
+}
+
+.commercial-plan-badge-link {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.022);
+  color: #c9d1d9;
+}
+
+.commercial-plan-badge-link:hover {
+  border-color: rgba(255, 122, 26, 0.18);
+  background: rgba(255, 122, 26, 0.06);
+  color: #fff2e9;
 }
 
 .product-doc-limit-modal .radar-export-modal-dialog {

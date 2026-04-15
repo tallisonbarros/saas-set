@@ -3308,9 +3308,9 @@ def pagamento_checkout_sucesso(request):
         "core/pagamento_checkout_status.html",
         {
             "status_code": "sucesso",
-            "status_title": "Pagamento confirmado",
-            "status_message": "Sua assinatura foi confirmada com sucesso. Se a conciliacao automatica ainda estiver em processamento, aguarde alguns instantes e tente abrir os modulos novamente.",
-            "status_note": "Se o acesso nao refletir de imediato, o webhook ou a sincronizacao do provider ainda pode estar finalizando a atualizacao.",
+            "status_title": "Assinatura liberada",
+            "status_message": "Seu plano foi confirmado com sucesso. Em instantes, os recursos liberados pela assinatura ficam disponiveis na sua conta.",
+            "status_note": "Se a liberacao ainda nao aparecer, aguarde alguns segundos e tente abrir os modulos novamente.",
         },
     )
 
@@ -3321,9 +3321,9 @@ def pagamento_checkout_falha(request):
         "core/pagamento_checkout_status.html",
         {
             "status_code": "falha",
-            "status_title": "Pagamento nao concluido",
-            "status_message": "O checkout retornou uma falha ou cancelamento. Voce pode revisar os dados do pagamento e tentar novamente quando quiser.",
-            "status_note": "Nenhuma liberacao adicional sera aplicada enquanto a cobranca nao for confirmada pelo provider.",
+            "status_title": "Nao foi possivel concluir",
+            "status_message": "Nao conseguimos finalizar a assinatura desta vez. Voce pode revisar o pagamento e tentar novamente quando quiser.",
+            "status_note": "Enquanto a confirmacao nao acontece, seu plano atual continua sem alteracoes.",
         },
     )
 
@@ -3334,9 +3334,9 @@ def pagamento_checkout_pendente(request):
         "core/pagamento_checkout_status.html",
         {
             "status_code": "pendente",
-            "status_title": "Pagamento em analise",
-            "status_message": "O provider informou que a cobranca ainda esta pendente. Isso pode acontecer em meios de pagamento que dependem de confirmacao posterior.",
-            "status_note": "Assim que houver confirmacao, a assinatura podera ser atualizada automaticamente pelo webhook.",
+            "status_title": "Confirmacao em andamento",
+            "status_message": "Recebemos sua solicitacao e a confirmacao do pagamento ainda esta em andamento. Assim que ela terminar, sua assinatura sera atualizada automaticamente.",
+            "status_note": "Voce pode voltar depois para acompanhar ou abrir os modulos novamente em alguns instantes.",
         },
     )
 
@@ -3604,6 +3604,7 @@ def ios_search(request):
             "message": message,
             "message_level": message_level,
             "commercial_status": _documentacao_tecnica_status_context(request.user),
+            "commercial_plans_url": _documentacao_tecnica_plans_url(next_url=request.path),
             **_io_import_upload_context(request, cliente),
         },
     )
@@ -3717,6 +3718,7 @@ def ios_rack_new(request):
             "message": message,
             "message_level": message_level,
             "commercial_status": _documentacao_tecnica_status_context(request.user),
+            "commercial_plans_url": _documentacao_tecnica_plans_url(next_url=request.path),
         },
     )
 
@@ -6038,6 +6040,7 @@ def listas_ip_list(request):
             "ip_import_can_upload": _ip_import_can_manage(request, cliente),
             "ip_import_is_admin": _is_admin_user(request.user),
             "commercial_status": _documentacao_tecnica_status_context(request.user),
+            "commercial_plans_url": _documentacao_tecnica_plans_url(next_url=request.path),
         },
     )
 
