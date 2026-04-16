@@ -13233,12 +13233,54 @@ select:focus {
   gap: 12px;
 }
 
+.product-doc-title {
+  max-width: min(100%, 22ch);
+}
+
 .product-doc-hero-support {
-  max-width: 40ch;
+  max-width: 56ch;
+  padding-left: 14px;
+  border-left: 1px solid rgba(255, 143, 63, 0.28);
+  color: #c9d1d8;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.product-doc-hero-journey {
+  margin-top: 16px;
+}
+
+.product-doc-hero-cta-row {
+  margin-top: 8px;
+}
+
+.product-doc-cta-context {
+  position: relative;
+  max-width: 54ch;
+  margin: -1px 0 0;
+  padding-left: 14px;
+  color: #a7b2bb;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.product-doc-cta-context::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 143, 63, 0.76);
+  box-shadow: 0 0 12px rgba(255, 143, 63, 0.22);
 }
 
 .product-doc-problem-section {
-  gap: 26px;
+  gap: 24px;
+  margin-top: 12px;
+  padding-top: 10px;
 }
 
 .product-doc-section-head,
@@ -13248,7 +13290,7 @@ select:focus {
 }
 
 .product-doc-module-section {
-  gap: 24px;
+  gap: 28px;
 }
 
 .product-doc-module-subtitle,
@@ -13257,33 +13299,37 @@ select:focus {
 }
 
 .product-doc-module-benefits {
-  border-color: rgba(78, 90, 102, 0.14);
+  border-color: rgba(78, 90, 102, 0.11);
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(255, 255, 255, 0.008));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.006));
 }
 
 .product-doc-module-benefit {
-  min-height: 78px;
-  padding: 13px 15px;
-  gap: 6px;
+  min-height: 70px;
+  padding: 11px 14px;
+  gap: 5px;
   background: transparent;
 }
 
+.product-doc-module-benefit + .product-doc-module-benefit {
+  border-left-color: rgba(78, 90, 102, 0.13);
+}
+
 .product-doc-module-benefit strong {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .product-doc-module-benefit span {
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 10.5px;
+  line-height: 1.38;
   color: #aeb8c1;
 }
 
 .product-doc-final-cta {
   grid-template-columns: minmax(0, 1fr) minmax(300px, 0.52fr);
-  gap: 20px;
+  gap: 18px;
   align-items: center;
-  padding: 18px 0 2px;
+  padding: 20px 0 0;
   border: 0;
   border-top: 1px solid rgba(78, 90, 102, 0.18);
   border-radius: 0;
@@ -13298,20 +13344,20 @@ select:focus {
 .product-doc-final-signal-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .product-doc-final-signal {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(87, 99, 111, 0.16);
-  background: rgba(255, 255, 255, 0.02);
-  color: #b8c2ca;
-  font-size: 11px;
+  border: 1px solid rgba(87, 99, 111, 0.14);
+  background: rgba(255, 255, 255, 0.016);
+  color: #adb8c1;
+  font-size: 10.5px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -13322,9 +13368,9 @@ select:focus {
 }
 
 .product-doc-final-action-panel {
-  width: min(100%, 360px);
+  width: min(100%, 390px);
   gap: 10px;
-  padding: 16px;
+  padding: 15px;
   border-radius: 18px;
   border: 1px solid rgba(88, 100, 112, 0.14);
   background:
@@ -13957,5 +14003,45 @@ select:focus {
   .profile-edit-actions {
     align-items: flex-start;
     justify-content: flex-start;
+  }
+}
+
+.module-hud-menu .hud-menu-pill.is-active {
+  background: rgba(255, 122, 26, 0.18) !important;
+  border-color: rgba(255, 122, 26, 0.42) !important;
+  color: #ffbe8d !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 190, 141, 0.06);
+}
+
+.module-hud-menu .hud-menu-pill.is-active:hover {
+  background: rgba(255, 122, 26, 0.24) !important;
+  border-color: rgba(255, 122, 26, 0.56) !important;
+  color: #ffd7bd !important;
+}
+
+.channel-row.is-search-highlight {
+  animation: channel-search-highlight-pulse 1.4s ease-in-out infinite;
+  background: rgba(255, 122, 26, 0.14) !important;
+  border-color: rgba(255, 178, 115, 0.5) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 199, 154, 0.18),
+    0 0 0 1px rgba(255, 122, 26, 0.16),
+    0 14px 30px rgba(255, 122, 26, 0.14);
+}
+
+@keyframes channel-search-highlight-pulse {
+  0%, 100% {
+    transform: translateY(0);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 199, 154, 0.16),
+      0 0 0 1px rgba(255, 122, 26, 0.12),
+      0 12px 26px rgba(255, 122, 26, 0.12);
+  }
+  50% {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 220, 190, 0.28),
+      0 0 0 3px rgba(255, 122, 26, 0.18),
+      0 18px 36px rgba(255, 122, 26, 0.18);
   }
 }

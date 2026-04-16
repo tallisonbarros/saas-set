@@ -56,6 +56,7 @@
   var moduleCards = Array.from(document.querySelectorAll(".js-rack-module-card"));
   var rackTrack = byId("rack-carousel-track");
   var activeModuleId = panel.dataset.selectedModuleId || "";
+  var highlightedChannelId = "";
   var manageModal = byId("rack-module-manage-modal");
   var manageModalId = byId("rack-module-manage-id");
   var manageModalSlot = byId("rack-module-manage-slot");
@@ -63,6 +64,12 @@
   var manageForm = byId("rack-module-manage-form");
   var deleteForm = byId("rack-module-delete-form");
   var deleteModalId = byId("rack-module-delete-id");
+
+  try {
+    highlightedChannelId = new URL(window.location.href).searchParams.get("channel") || "";
+  } catch (error) {
+    highlightedChannelId = "";
+  }
 
   function showRowToast(row, text) {
     if (!row) {
@@ -239,6 +246,33 @@
       led.classList.toggle("is-pending", !info.all_canais_comissionados);
       led.setAttribute("aria-label", info.all_canais_comissionados ? "Comissionado" : "Nao comissionado");
     });
+  }
+
+  function clearHighlightedChannelFromUrl() {
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.delete("channel");
+      window.history.replaceState({}, "", url.toString());
+    } catch (error) {}
+  }
+
+  function highlightChannelFromSearch() {
+    if (!highlightedChannelId) {
+      return;
+    }
+    var row = Array.from(panelBody.querySelectorAll("[data-channel-id]")).find(function (candidate) {
+      return String(candidate.getAttribute("data-channel-id")) === String(highlightedChannelId);
+    });
+    if (!row) {
+      return;
+    }
+    highlightedChannelId = "";
+    row.classList.add("is-search-highlight");
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    clearHighlightedChannelFromUrl();
+    window.setTimeout(function () {
+      row.classList.remove("is-search-highlight");
+    }, 15000);
   }
 
   function syncModuleChannelDataFromRow(row) {
@@ -566,6 +600,7 @@
       syncPanelDock();
     });
     bindEditorInteractions(info);
+    window.requestAnimationFrame(highlightChannelFromSearch);
 
     try {
       var url = new URL(window.location.href);

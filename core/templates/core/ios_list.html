@@ -45,16 +45,7 @@
 {% block content %}
   <section class="ios-ops-shell">
     <div class="ios-ops-topbar">
-      <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Menu do modulo">
-        <a class="hud-menu-pill" href="{% url 'ios_search' %}">Pesquisa de I/Os</a>
-        <a class="hud-menu-pill" href="{% url 'ios_modulos' %}">Modelos de modulos</a>
-        {% if io_import_can_upload %}
-          <button class="hud-menu-pill" type="button" data-io-import-open>Importar planilha</button>
-        {% endif %}
-        {% if can_manage %}
-          <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ios-rack-open>Novo rack</button>
-        {% endif %}
-      </div>
+      {% include "core/partials/ios_hud_menu.html" with active="racks" show_import=io_import_can_upload show_new_rack=can_manage %}
     </div>
 
     {% include "core/partials/commercial_plan_badge.html" with status=commercial_status plans_url=commercial_plans_url %}

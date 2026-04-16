@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 {% load static %}
 
-{% block title %}Preview da Importacao de IOs{% endblock %}
+{% block title %}Sugestoes da Importacao de IOs{% endblock %}
 {% block body_class %}page page-ios{% endblock %}
 
 {% block breadcrumbs %}
@@ -10,7 +10,7 @@
     <span class="crumb-sep">/</span>
     <a href="{% url 'ios_list' %}">IOs</a>
     <span class="crumb-sep">/</span>
-    <a href="{% url 'ios_import_admin' %}">Preview da Importacao de IOs</a>
+    <a href="{% url 'ios_import_admin' %}">Sugestoes da Importacao de IOs</a>
     <span class="crumb-sep">/</span>
     <span>{{ job.original_filename }}</span>
   </nav>
@@ -544,7 +544,7 @@
     <section class="card stack io-import-overview-card">
       <div class="page-hud">
         <div class="hud-top" style="align-items: center; gap: 10px;">
-          <div class="hud-title" style="font-size: 12px; letter-spacing: .08em; opacity: .7;">Preview da Importacao de IOs</div>
+          <div class="hud-title" style="font-size: 12px; letter-spacing: .08em; opacity: .7;">Sugestoes da Importacao de IOs</div>
           <div class="hud-pill">{{ job.get_status_display }}</div>
         </div>
         <div class="page-hud-head" style="align-items: start; gap: 12px;">
@@ -593,7 +593,7 @@
           <h2 class="io-import-processing-title">Processamento em segundo plano</h2>
           <p class="io-import-processing-copy">
             A planilha foi recebida e a importacao esta executando a leitura estrutural e a correlacao com IA fora da requisicao web.
-            Assim a analise pode terminar sem derrubar o preview, mesmo em arquivos maiores.
+            Assim a analise pode terminar sem derrubar a tela de sugestoes, mesmo em arquivos maiores.
           </p>
           <div class="module-meta-row" style="justify-content:center; gap:8px;">
             <span class="module-meta-pill">Status {{ job.get_status_display }}</span>
@@ -697,7 +697,7 @@
               </section>
             </div>
 
-          <section class="io-import-slot-stage" aria-label="Preview tecnico do rack">
+          <section class="io-import-slot-stage" aria-label="Sugestoes tecnicas do rack">
             <div class="rack-carousel">
               <div class="proposal-grid rack-grid rack-carousel-track" data-preview-track>
                 {% for slot in rack.slots %}
@@ -796,7 +796,7 @@
         <section class="io-card ios-empty-state io-center">
           <div class="ios-empty-icon">!</div>
           <h2 class="ios-empty-title">Nenhum rack sugerido</h2>
-          <p class="muted">A importacao ainda nao conseguiu montar uma preview visual do rack.</p>
+          <p class="muted">A importacao ainda nao conseguiu montar sugestoes visuais para o rack.</p>
         </section>
       {% endfor %}
     </section>

@@ -16,15 +16,16 @@
 {% endblock %}
 
 {% block content %}
+  <section class="ios-ops-shell">
+    <div class="ios-ops-topbar">
+      {% include "core/partials/ios_hud_menu.html" with active="rack" rack=rack show_rack_io_list=True show_pdf=True %}
+    </div>
+
   <section class="card io-compact">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Painel do modulo</div>
         <div class="hud-pill">Mapa do modulo</div>
-        <div class="hud-menu" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'ios_list' %}">Meus Racks</a>
-          <a class="hud-menu-pill" href="{% url 'ios_rack_detail' rack.id %}">Voltar</a>
-        </div>
       </div>
       <div class="page-hud-head centered">
         <div class="page-hud-main">
@@ -487,5 +488,6 @@
       });
     })();
   </script>
+  </section>
 
 {% endblock %}

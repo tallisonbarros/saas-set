@@ -233,12 +233,12 @@
     stepOrder.forEach(function (stepName) {
       setStepState(stepName, "done", "Concluido");
     });
-    updateProgress(100, "Preview pronta");
+    updateProgress(100, "Sugestoes prontas");
     if (titleNode) {
       titleNode.textContent = "Analise concluida";
     }
     if (copyNode) {
-      copyNode.textContent = "A previa foi gerada. Abrindo o resultado da importacao.";
+      copyNode.textContent = "As sugestoes foram geradas. Abrindo o resultado da importacao.";
     }
   }
 

@@ -13,8 +13,8 @@
     <section class="card product-doc-hero reveal-on-scroll is-visible">
       <div class="product-doc-hero-grid">
         <div class="product-doc-hero-copy">
-          <h1 class="product-doc-title">Importe sua planilha. Revise a estrutura antes de aplicar.</h1>
-          <p class="product-doc-hero-support">Menos recadastro. Mais clareza para começar pela sua planilha ou seguir criando um novo rack do zero.</p>
+          <h1 class="product-doc-title">Menos retrabalho para organizar IOs e IPs da automação.</h1>
+          <p class="product-doc-hero-support">Use a planilha que já existe ou comece direto pela ferramenta para comissionar canais e rede com mais segurança.</p>
           <div class="product-doc-journey-frame product-doc-hero-journey" data-journey-flow>
             <div class="product-doc-journey-strip">
               <article class="product-doc-journey-node" data-journey-node>
@@ -23,7 +23,7 @@
                   <small>Entrada</small>
                   <strong>Envie a planilha</strong>
                 </div>
-                <p>Use a base atual, sem recadastrar do zero.</p>
+                <p>Aproveite a base da automação ou crie na ferramenta.</p>
               </article>
               <article class="product-doc-journey-node" data-journey-node>
                 <div class="product-doc-journey-node-badge">02</div>
@@ -31,30 +31,30 @@
                   <small>Análise</small>
                   <strong>A IA interpreta a base</strong>
                 </div>
-                <p>Colunas, sinais e grupos são correlacionados.</p>
+                <p>Sinais e grupos são correlacionados.</p>
               </article>
               <article class="product-doc-journey-node" data-journey-node>
                 <div class="product-doc-journey-node-badge">03</div>
                 <div class="product-doc-journey-node-meta">
-                  <small>Prévia</small>
-                  <strong>Revise o preview</strong>
+                  <small>Sugestões</small>
+                  <strong>Revise as sugestões</strong>
                 </div>
-                <p>Veja a estrutura antes de aplicar.</p>
+                <p>Reduza risco antes de aplicar.</p>
               </article>
               <article class="product-doc-journey-node" data-journey-node>
                 <div class="product-doc-journey-node-badge">04</div>
                 <div class="product-doc-journey-node-meta">
                   <small>Aplicação</small>
-                  <strong>Aplique no módulo</strong>
+                  <strong>Aplique na ferramenta</strong>
                 </div>
-                <p>Finalize os ajustes no módulo.</p>
+                <p>Siga com os ajustes no fluxo.</p>
               </article>
             </div>
           </div>
           <div class="product-doc-actions product-doc-hero-cta-row">
             {% if request.user.is_authenticated %}
               {% if entitlement.has_access %}
-                <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
+                <a class="btn btn-primary" href="{{ entry_url }}">Abrir ferramenta</a>
               {% elif access_state == "disponivel" %}
                 <a class="btn btn-primary" href="{{ activate_url }}">Testar</a>
               {% else %}
@@ -66,6 +66,7 @@
               <a class="btn btn-ghost" href="{{ login_url }}">Entrar</a>
             {% endif %}
           </div>
+          <p class="product-doc-cta-context">Acesse a ferramenta para importar, criar rack e comissionar os canais da sua automação.</p>
         </div>
       </div>
     </section>
@@ -79,42 +80,42 @@
 
     <section id="product-doc-pain" class="product-doc-section product-doc-problem-section reveal-on-scroll">
       <div class="product-doc-section-head">
-        <h2>O problema não é só manter. É gastar tempo organizando o que já existe.</h2>
+        <h2>O retrabalho começa quando a base da automação se espalha.</h2>
         <p class="product-doc-section-subtitle">
-          Quando IOs e IPs ficam entre Excel, PDF, print e anotação solta, revisar vira retrabalho.
+          Excel, PDF, print e anotações paralelas tornam a revisão de IO e rede lenta, duplicada e menos segura.
         </p>
       </div>
       <div class="product-doc-problem-grid">
         <article class="product-doc-problem-card reveal-on-scroll">
           <strong>Base espalhada e revisão duplicada</strong>
-          <p>Informação repartida em arquivos e registros paralelos, sem uma leitura confiável.</p>
+          <p>Cada arquivo vira uma versão possível da base técnica.</p>
         </article>
         <article class="product-doc-problem-card reveal-on-scroll">
           <strong>Recadastro lento e aplicação insegura</strong>
-          <p>Sem uma prévia clara, organizar e aplicar a estrutura exige mais tempo e mais conferência.</p>
+          <p>Sem sugestões claras, aplicar a estrutura exige conferência demais.</p>
         </article>
       </div>
     </section>
 
     <section id="product-doc-modules" class="product-doc-module-section reveal-on-scroll">
       <div class="product-doc-module-copy">
-        <div class="product-doc-kicker">Módulo IO</div>
-        <h2>Depois da importação, revise rack, slot, módulo e canal com leitura próxima do hardware.</h2>
+        <div class="product-doc-kicker">Área de IO</div>
+        <h2>Revise IO no contexto do rack, sem voltar para planilhas paralelas.</h2>
         <p class="product-doc-module-subtitle">
-          O preview acelera a entrada. No módulo de IO, a revisão segue no contexto certo do rack, com criação e ajuste direto quando necessário.
+          Importe, crie ou ajuste direto na área de IO. Rack, slot, módulo e canal seguem juntos para acelerar o comissionamento da automação.
         </p>
         <div class="product-doc-module-benefits">
           <div class="product-doc-module-benefit">
-            <strong>Leitura por rack e slot</strong>
-            <span>Leitura próxima do hardware.</span>
+            <strong>Rack e slot em contexto</strong>
+            <span>Menos procura fora da base técnica.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Tags e descrições no mesmo fluxo</strong>
-            <span>Canal, tag e descrição no mesmo fluxo.</span>
+            <strong>Canal, tag e descrição juntos</strong>
+            <span>Consulta rápida para operação.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Ajuste fino no módulo</strong>
-            <span>Validação, criação e ajuste no próprio fluxo.</span>
+            <strong>Ajuste direto no fluxo</strong>
+            <span>Corrija sem voltar ao Excel.</span>
           </div>
         </div>
       </div>
@@ -162,7 +163,7 @@
                   <em class="product-doc-rack-card-slot">Slot 04</em>
                   <strong>Slot livre</strong>
                   <span>Selecione</span>
-                  <span>um módulo</span>
+                  <span>um módulo de IO</span>
                 </div>
               </div>
             </div>
@@ -253,23 +254,23 @@
       </div>
 
       <div class="product-doc-module-copy">
-        <div class="product-doc-kicker">Módulo IP</div>
-        <h2>A mesma lógica continua para rede, equipamentos e endereçamento.</h2>
+        <div class="product-doc-kicker">Área de IP</div>
+        <h2>Rede de automação organizada para consulta rápida.</h2>
         <p class="product-doc-module-subtitle">
-          A base importada também segue para a rede. Quando fizer mais sentido, o inventário continua direto no módulo.
+          A mesma lógica vale para IPs, equipamentos e faixas. A base pode vir da planilha ou ser construída direto na área de IP.
         </p>
         <div class="product-doc-module-benefits">
           <div class="product-doc-module-benefit">
-            <strong>Inventário mais consultável</strong>
-            <span>IP, equipamento e faixa no mesmo inventário.</span>
+            <strong>Inventário consultável</strong>
+            <span>Menos busca manual na rede.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Revisão de rede no mesmo fluxo</strong>
-            <span>Rede conectada ao restante da base técnica.</span>
+            <strong>Rede no contexto da automação</strong>
+            <span>Endereços com função clara.</span>
           </div>
           <div class="product-doc-module-benefit">
-            <strong>Continuidade após a entrada</strong>
-            <span>Importado ou iniciado no módulo, o inventário segue no mesmo fluxo.</span>
+            <strong>Continuidade direta</strong>
+            <span>Sem depender da planilha.</span>
           </div>
         </div>
       </div>
@@ -277,22 +278,22 @@
 
     <section class="product-doc-final-cta reveal-on-scroll">
       <div class="product-doc-final-copy">
-        <h2>Comece pela planilha que já existe ou crie um novo rack manualmente.</h2>
-        <p>Importe quando a base já estiver pronta, revise antes de aplicar e continue o trabalho no fluxo certo.</p>
+        <h2>Organize a base da automação sem começar do zero.</h2>
+        <p>Importe sua planilha ou inicie um novo rack direto na ferramenta.</p>
         <div class="product-doc-final-signal-row" aria-label="Resumo de valor">
           <span class="product-doc-final-signal">Sem recadastro do zero</span>
-          <span class="product-doc-final-signal">Prévia antes da aplicação</span>
-          <span class="product-doc-final-signal">Continuidade direta no módulo</span>
+          <span class="product-doc-final-signal">Sugestões antes da aplicação</span>
+          <span class="product-doc-final-signal">Continuidade direta no fluxo</span>
         </div>
       </div>
       <div class="product-doc-final-actions">
         <div class="product-doc-final-action-panel">
-          <strong>Entre pela planilha ou pelo módulo</strong>
-          <span class="product-doc-final-action-copy">Importação assistida quando houver base pronta, com liberdade para montar e ajustar direto no fluxo.</span>
+          <strong>Teste com a base da automação</strong>
+          <span class="product-doc-final-action-copy">Comece pela planilha pronta ou crie a estrutura direto na ferramenta, sem alongar o caminho.</span>
           <div class="product-doc-actions">
             {% if request.user.is_authenticated %}
               {% if entitlement.has_access %}
-                <a class="btn btn-primary" href="{{ entry_url }}">Abrir módulos</a>
+                <a class="btn btn-primary" href="{{ entry_url }}">Abrir ferramenta</a>
               {% elif access_state == "disponivel" %}
                 <a class="btn btn-primary" href="{{ activate_url }}">Testar</a>
               {% else %}

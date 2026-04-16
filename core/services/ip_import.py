@@ -761,7 +761,7 @@ def build_import_proposal(original_filename, normalized_rows):
     for list_index, (list_token, group_rows) in enumerate(grouped.items(), start=1):
         deduped_rows, duplicate_count = _dedupe_ip_items(group_rows)
         if duplicate_count:
-            warnings.append(f"Lista {list_index}: {duplicate_count} IP(s) duplicado(s) foram consolidados na preview.")
+            warnings.append(f"Lista {list_index}: {duplicate_count} IP(s) duplicado(s) foram consolidados nas sugestoes.")
 
         sorted_rows = sorted(deduped_rows, key=lambda item: ipaddress.ip_address(item["ip"]))
         ip_values = [item["ip"] for item in sorted_rows]
@@ -1467,9 +1467,9 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
         progress_callback,
         stage="preview",
         percent=90,
-        title="Montando a previa para revisao",
+        title="Montando sugestoes para revisao",
         message="As listas sugeridas estao sendo organizadas para abrir a revisao final.",
-        progress_label="Montando a previa",
+        progress_label="Montando sugestoes",
         sheets_total=total_sheets,
         sheets_processed=processed_count,
         snapshots=_build_progress_list_snapshots_from_rows(normalized_rows),
@@ -1482,9 +1482,9 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
         progress_callback,
         stage="preview",
         percent=100,
-        title="Preview pronta",
+        title="Sugestoes prontas",
         message="A estrutura sugerida foi consolidada e esta pronta para revisao.",
-        progress_label="Preview pronta",
+        progress_label="Sugestoes prontas",
         sheets_total=total_sheets,
         sheets_processed=processed_count,
         snapshots=final_snapshots,
@@ -1511,9 +1511,9 @@ def reprocess_import_job(job, settings_obj=None, progress_callback=None):
         "progress_payload": {
             "stage": "preview",
             "percent": 100,
-            "title": "Preview pronta",
+            "title": "Sugestoes prontas",
             "message": "A estrutura sugerida foi consolidada e esta pronta para revisao.",
-            "progress_label": "Preview pronta",
+            "progress_label": "Sugestoes prontas",
             "sheets_total": total_sheets,
             "sheets_processed": processed_count,
             "snapshots": final_snapshots,
@@ -1594,7 +1594,7 @@ def apply_import_job(job, user, selected_list_keys=None):
             job.applied_lista = lista
 
         if not applied:
-            raise IPImportError("Nenhuma lista foi aplicada. Revise a selecao da preview.")
+            raise IPImportError("Nenhuma lista foi aplicada. Revise a selecao das sugestoes.")
 
         all_keys = {str(payload.get("list_key") or "") for payload in list_payloads if payload.get("list_key")}
         applied_now = set(applied_list_keys.keys())

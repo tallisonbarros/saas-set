@@ -16,12 +16,7 @@
 {% block content %}
   <section class="ios-ops-shell">
     <div class="ios-ops-topbar">
-      <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Menu do modulo">
-        <a class="hud-menu-pill" href="{% url 'listas_ip_list' %}">Minhas listas</a>
-        {% if can_manage %}
-          <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ip-list-edit-open>Editar lista</button>
-        {% endif %}
-      </div>
+      {% include "core/partials/ip_hud_menu.html" with active="detail" lista=lista show_edit_list=can_manage %}
     </div>
 
     <section class="card ip-network-hub">

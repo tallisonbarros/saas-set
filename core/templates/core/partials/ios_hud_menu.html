@@ -1,0 +1,29 @@
+<div class="hud-menu hud-menu-flat ios-hud-menu module-hud-menu module-hud-menu-ios" aria-label="{{ aria_label|default:'Menu do modulo de IOs' }}">
+  <a class="hud-menu-pill{% if active == 'racks' %} is-active{% endif %}" href="{% url 'ios_list' %}" {% if active == 'racks' %}aria-current="page"{% endif %}>Meus Racks</a>
+  <a class="hud-menu-pill{% if active == 'search' %} is-active{% endif %}" href="{% url 'ios_search' %}" {% if active == 'search' %}aria-current="page"{% endif %}>Pesquisa de I/Os</a>
+  <a class="hud-menu-pill{% if active == 'models' %} is-active{% endif %}" href="{% url 'ios_modulos' %}" {% if active == 'models' %}aria-current="page"{% endif %}>Modelos de modulos</a>
+
+  {% if rack %}
+    <a class="hud-menu-pill{% if active == 'rack' %} is-active{% endif %}" href="{% url 'ios_rack_detail' rack.id %}" {% if active == 'rack' %}aria-current="page"{% endif %}>Rack</a>
+  {% endif %}
+
+  {% if show_rack_io_list and rack %}
+    <a class="hud-menu-pill{% if active == 'rack_io_list' %} is-active{% endif %}" href="{% url 'ios_rack_io_list' rack.id %}" {% if active == 'rack_io_list' %}aria-current="page"{% endif %}>Lista completa</a>
+  {% endif %}
+
+  {% if show_pdf and rack %}
+    <a class="hud-menu-pill" href="{% url 'ios_rack_io_list' rack.id %}?format=pdf">Exportar PDF</a>
+  {% endif %}
+
+  {% if show_import %}
+    <button class="hud-menu-pill" type="button" data-io-import-open>Importar planilha</button>
+  {% endif %}
+
+  {% if show_new_rack %}
+    <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ios-rack-open>Novo rack</button>
+  {% endif %}
+
+  {% if show_edit_rack %}
+    <a class="hud-menu-pill ios-hud-menu-primary" href="#" data-rack-edit-open>Editar rack</a>
+  {% endif %}
+</div>

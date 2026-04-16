@@ -1,0 +1,23 @@
+<div class="hud-menu hud-menu-flat ios-hud-menu module-hud-menu module-hud-menu-ip" aria-label="{{ aria_label|default:'Menu do modulo de IPs' }}">
+  <a class="hud-menu-pill{% if active == 'lists' %} is-active{% endif %}" href="{% url 'listas_ip_list' %}" {% if active == 'lists' %}aria-current="page"{% endif %}>Minhas listas</a>
+
+  {% if lista %}
+    <a class="hud-menu-pill{% if active == 'detail' %} is-active{% endif %}" href="{% url 'lista_ip_detail' lista.id %}" {% if active == 'detail' %}aria-current="page"{% endif %}>Lista</a>
+  {% endif %}
+
+  {% if show_admin %}
+    <a class="hud-menu-pill{% if active == 'admin' %} is-active{% endif %}" href="{% url 'listas_ip_import_admin' %}" {% if active == 'admin' %}aria-current="page"{% endif %}>Modulo administrativo</a>
+  {% endif %}
+
+  {% if show_import %}
+    <button class="hud-menu-pill" type="button" data-ip-import-open>Importar planilha</button>
+  {% endif %}
+
+  {% if show_new_list %}
+    <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ip-list-create-open>Nova lista</button>
+  {% endif %}
+
+  {% if show_edit_list %}
+    <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ip-list-edit-open>Editar lista</button>
+  {% endif %}
+</div>

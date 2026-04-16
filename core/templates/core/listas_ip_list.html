@@ -14,19 +14,7 @@
 {% block content %}
   <section class="ios-ops-shell">
     <div class="ios-ops-topbar">
-      {% if can_manage or ip_import_can_upload or ip_import_is_admin %}
-        <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Acoes de lista">
-          {% if ip_import_is_admin %}
-            <a class="hud-menu-pill" href="{% url 'listas_ip_import_admin' %}">Modulo administrativo</a>
-          {% endif %}
-          {% if ip_import_can_upload %}
-            <button class="hud-menu-pill" type="button" data-ip-import-open>Importar planilha</button>
-          {% endif %}
-          {% if can_manage %}
-            <button class="hud-menu-pill ios-hud-menu-primary" type="button" data-ip-list-create-open>Nova lista</button>
-          {% endif %}
-        </div>
-      {% endif %}
+      {% include "core/partials/ip_hud_menu.html" with active="lists" show_admin=ip_import_is_admin show_import=ip_import_can_upload show_new_list=can_manage %}
     </div>
 
     {% include "core/partials/commercial_plan_badge.html" with status=commercial_status plans_url=commercial_plans_url %}

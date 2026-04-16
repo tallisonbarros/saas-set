@@ -14,14 +14,16 @@
 {% endblock %}
 
 {% block content %}
+  <section class="ios-ops-shell">
+    <div class="ios-ops-topbar">
+      {% include "core/partials/ios_hud_menu.html" with active="models" %}
+    </div>
+
   <section class="card">
     <div class="page-hud">
       <div class="hud-top">
         <div class="hud-title">Modelos de modulos</div>
         <div class="hud-pill">Modelos</div>
-        <div class="hud-menu" aria-label="Menu do modulo">
-          <a class="hud-menu-pill" href="{% url 'ios_list' %}">Meus Racks</a>
-        </div>
       </div>
       <div class="page-hud-head">
         <div>
@@ -110,4 +112,5 @@
     </section>
 
   </div>
+  </section>
 {% endblock %}

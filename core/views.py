@@ -1019,14 +1019,15 @@ def _ios_search_payload(search_results):
                 "tipo": channel.tipo.nome,
                 "local": channel.modulo.rack.local.nome if channel.modulo.rack.local_id else "-",
                 "grupo": channel.modulo.rack.grupo.nome if channel.modulo.rack.grupo_id else "-",
-                "url": _ios_module_panel_url(channel.modulo.rack_id, channel.modulo.id),
+                "url": _ios_module_panel_url(channel.modulo.rack_id, channel.modulo.id, channel.id),
             }
         )
     return payload
 
 
-def _ios_module_panel_url(rack_id, module_id):
-    return f"{reverse('ios_rack_detail', kwargs={'pk': rack_id})}?module={module_id}#rack-module-panel"
+def _ios_module_panel_url(rack_id, module_id, channel_id=None):
+    channel_param = f"&channel={channel_id}" if channel_id else ""
+    return f"{reverse('ios_rack_detail', kwargs={'pk': rack_id})}?module={module_id}{channel_param}#rack-module-panel"
 
 
 def _ios_build_module_editor_data(slots, channel_types):
@@ -1378,7 +1379,7 @@ def _build_ip_import_preview_lists(proposal, applied_list_key_map=None):
             {
                 "key": list_key,
                 "name": list_payload.get("name") or f"Lista {list_index}",
-                "description": list_payload.get("description") or "Preview da importacao com os enderecos sugeridos pela analise.",
+                "description": list_payload.get("description") or "Sugestao da importacao com os enderecos sugeridos pela analise.",
                 "id_listaip": list_payload.get("id_listaip") or "",
                 "faixa_inicio": list_payload.get("faixa_inicio") or "-",
                 "faixa_fim": list_payload.get("faixa_fim") or "-",
@@ -1477,7 +1478,7 @@ def _build_io_import_preview_racks(proposal, applied_rack_key_map=None):
             {
                 "key": rack_key,
                 "name": rack_payload.get("name") or f"Rack {rack_index}",
-                "descricao": f"Preview da importacao com {len(modules)} modulo(s) proposto(s).",
+                "descricao": f"Sugestao da importacao com {len(modules)} modulo(s) proposto(s).",
                 "slots_total": slots_total,
                 "ocupados": ocupados,
                 "slots_livres": max(slots_total - ocupados, 0),

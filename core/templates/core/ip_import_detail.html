@@ -1,6 +1,6 @@
 {% extends "core/base.html" %}
 
-{% block title %}Preview da Importacao de IPs{% endblock %}
+{% block title %}Sugestoes da Importacao de IPs{% endblock %}
 
 {% block breadcrumbs %}
   <nav class="page-crumbs" aria-label="Breadcrumb">
@@ -219,16 +219,15 @@
 
     <section class="io-card" style="padding: 18px 22px 16px;">
       <div class="ios-ops-topbar" style="margin: 0 0 10px;">
-        <div class="hud-menu hud-menu-flat ios-hud-menu" aria-label="Navegacao da importacao">
-          <a class="hud-menu-pill" href="{% url 'listas_ip_list' %}">Listas de IP</a>
-          {% if request.user.is_staff or request.user.is_superuser or ip_import_is_dev %}
-            <a class="hud-menu-pill" href="{% url 'listas_ip_import_admin' %}">Modulo administrativo</a>
-          {% endif %}
-        </div>
+        {% if request.user.is_staff or request.user.is_superuser or ip_import_is_dev %}
+          {% include "core/partials/ip_hud_menu.html" with active="import" show_admin=True %}
+        {% else %}
+          {% include "core/partials/ip_hud_menu.html" with active="import" %}
+        {% endif %}
       </div>
       <div class="page-hud" style="padding: 0; background: transparent; border: 0; box-shadow: none;">
         <div class="hud-top">
-          <div class="hud-title">Preview da Importacao de IPs</div>
+          <div class="hud-title">Sugestoes da Importacao de IPs</div>
           <div class="hud-pill">{{ job.get_status_display }}</div>
         </div>
         <div class="page-hud-head">
@@ -258,7 +257,7 @@
           <div class="ip-import-processing-kicker">Analise de IA</div>
           <div class="ip-import-processing-orb" aria-hidden="true"></div>
           <h2 class="ip-import-processing-title" data-ip-import-page-title>{{ progress.title|default:"Processando em segundo plano" }}</h2>
-          <p class="ip-import-processing-copy" data-ip-import-page-copy>{{ progress.message|default:"A planilha esta sendo interpretada para gerar a previa das listas." }}</p>
+          <p class="ip-import-processing-copy" data-ip-import-page-copy>{{ progress.message|default:"A planilha esta sendo interpretada para gerar sugestoes de listas." }}</p>
 
           <div class="ip-import-progress" aria-hidden="true">
             <div class="ip-import-progress-bar" data-ip-import-page-progress-bar style="width: {{ progress.percent|default:0 }}%;"></div>
@@ -306,7 +305,7 @@
             </article>
             <article class="ip-import-step{% if progress.steps.preview == 'active' %} is-active{% elif progress.steps.preview == 'done' %} is-done{% endif %}" data-ip-import-page-step="preview">
               <span class="ip-import-step-dot" aria-hidden="true"></span>
-              <div>Montando a previa para revisao</div>
+              <div>Montando sugestoes para revisao</div>
               <div data-ip-import-page-step-status="preview">{% if progress.steps.preview == 'done' %}Concluido{% elif progress.steps.preview == 'active' %}Em processamento{% else %}Aguardando{% endif %}</div>
             </article>
           </div>
@@ -401,7 +400,7 @@
       <section class="io-card ios-empty-state io-center">
         <div class="ios-empty-icon">!</div>
         <h2 class="ios-empty-title">Nenhuma lista sugerida</h2>
-        <p class="muted">A importacao ainda nao conseguiu montar uma preview visual das listas.</p>
+        <p class="muted">A importacao ainda nao conseguiu montar sugestoes visuais para as listas.</p>
       </section>
     {% endif %}
 
