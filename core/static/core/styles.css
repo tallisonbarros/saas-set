@@ -9375,6 +9375,102 @@ select:focus {
   background: rgba(255, 255, 255, 0.04);
   color: #f5f7f9;
   font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.product-doc-price-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.product-doc-price-option-form {
+  align-self: start;
+  min-width: 0;
+  margin: 0;
+}
+
+.product-doc-price-option {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 0;
+  padding: 13px 14px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(91, 103, 116, 0.18);
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.product-doc-price-option-button {
+  width: 100%;
+  min-width: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  appearance: none;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.product-doc-price-option-button:hover,
+.product-doc-price-option-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 122, 26, 0.32);
+  background: rgba(255, 122, 26, 0.06);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.13);
+  outline: none;
+}
+
+.product-doc-price-option span {
+  color: #96a2ad;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.product-doc-price-option strong {
+  color: #eef3f7;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.product-doc-price-option em {
+  color: #f2b077;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.2;
+}
+
+.product-doc-price-option b {
+  align-self: end;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(91, 103, 116, 0.16);
+  color: #f2f5f7;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.product-doc-price-option.is-highlight {
+  border-color: rgba(255, 122, 26, 0.24);
+  background: rgba(255, 122, 26, 0.075);
+}
+
+.product-doc-price-option.is-highlight b {
+  color: #ffd0a7;
+  border-top-color: rgba(255, 122, 26, 0.18);
 }
 
 .product-doc-plan-foot {
@@ -9384,17 +9480,44 @@ select:focus {
 }
 
 .product-doc-plan-foot form {
+  display: grid;
+  gap: 6px;
   margin: 0;
 }
 
 .product-doc-plan-foot-split {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: center;
+  align-items: start;
+  gap: 12px;
+}
+
+.product-doc-plan-foot-split .btn {
+  width: 100%;
+  min-height: 42px;
+  justify-content: center;
+  padding-inline: 12px;
+  font-size: 12px;
 }
 
 .product-doc-plan-note {
   color: #95a0ab;
   font-size: 12px;
+}
+
+.product-doc-plan-note.is-saving {
+  color: #efb27a;
+  font-size: 10.5px;
+  line-height: 1.2;
+  padding-left: 2px;
+  text-align: left;
+}
+
+.product-doc-billing-footnote {
+  margin: -2px 0 0;
+  color: #96a2ad;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .product-doc-chip.is-accent {
