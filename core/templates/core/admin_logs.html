@@ -29,6 +29,34 @@
     </div>
 
     <div class="card compact-card">
+      <div class="panel-title">Landing de documentacao tecnica</div>
+      <div class="muted" style="margin-bottom: 12px;">Acessos registrados mesmo sem usuario logado.</div>
+      <div class="admin-metric-grid">
+        <article class="admin-metric-card">
+          <span class="admin-metric-label">Total retido</span>
+          <strong class="admin-metric-value">{{ landing_metrics.total }}</strong>
+        </article>
+        <article class="admin-metric-card">
+          <span class="admin-metric-label">Hoje</span>
+          <strong class="admin-metric-value">{{ landing_metrics.today }}</strong>
+        </article>
+        <article class="admin-metric-card">
+          <span class="admin-metric-label">Ultimos 7 dias</span>
+          <strong class="admin-metric-value">{{ landing_metrics.last_7_days }}</strong>
+        </article>
+        <article class="admin-metric-card">
+          <span class="admin-metric-label">Anonimos</span>
+          <strong class="admin-metric-value">{{ landing_metrics.anonymous }}</strong>
+        </article>
+        <article class="admin-metric-card">
+          <span class="admin-metric-label">Logados</span>
+          <strong class="admin-metric-value">{{ landing_metrics.authenticated }}</strong>
+        </article>
+      </div>
+      <div class="muted" style="margin-top: 12px;">Modulo de auditoria: {{ landing_metrics.module }}</div>
+    </div>
+
+    <div class="card compact-card">
       <div class="panel-title">Registros recentes</div>
       <div class="muted" style="margin-bottom: 12px;">Mostrando os ultimos 500 acessos.</div>
       <form method="get" class="stack" style="margin-bottom: 12px;">

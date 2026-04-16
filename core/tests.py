@@ -16,6 +16,7 @@ from core.apps.app_rotas.views import _global_point_visual_flags, _route_point_v
 from core.access_control import has_tipo_code, normalize_access_code
 from core.models import (
     AcessoProdutoUsuario,
+    AdminAccessLog,
     App,
     AssinaturaUsuario,
     ConsumoImportacaoDiaria,
@@ -80,6 +81,7 @@ from core.services.ip_import import (
     reprocess_import_job as reprocess_ip_import_job,
 )
 from core.views import (
+    DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE,
     _build_proposta_pdf_context,
     _build_radar_relatorio_pdf_context,
     _reprocess_ip_import_job,
@@ -401,6 +403,29 @@ class DevAdminPrivilegesTests(TestCase):
         self.client_http.force_login(self.dev_user)
         response = self.client_http.get("/admin-logs/")
         self.assertEqual(response.status_code, 200)
+
+    def test_documentacao_landing_records_anonymous_access(self):
+        response = self.client_http.get("/produtos/documentacao-tecnica/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            AdminAccessLog.objects.filter(
+                user__isnull=True,
+                module=DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE,
+            ).exists()
+        )
+
+    def test_admin_logs_exposes_documentacao_landing_metrics(self):
+        AdminAccessLog.objects.create(user=None, module=DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE)
+        AdminAccessLog.objects.create(user=self.user, module=DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE)
+
+        self.client_http.force_login(self.dev_user)
+        response = self.client_http.get("/admin-logs/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Landing de documentacao tecnica")
+        self.assertEqual(response.context["landing_metrics"]["total"], 2)
+        self.assertEqual(response.context["landing_metrics"]["anonymous"], 1)
+        self.assertEqual(response.context["landing_metrics"]["authenticated"], 1)
 
     def test_dev_is_promoted_to_staff_by_middleware(self):
         self.assertFalse(User.objects.get(pk=self.dev_user.pk).is_staff)

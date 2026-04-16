@@ -136,6 +136,22 @@ from .access_control import (
 
 logger = logging.getLogger(__name__)
 ADMIN_PRIVILEGED_TIPOS = {"MASTER", "DEV"}
+DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE = "landing:documentacao_tecnica"
+
+
+def _record_documentacao_tecnica_landing_access(request):
+    try:
+        if request.method not in {"GET", "HEAD"}:
+            return
+        user = request.user if getattr(request, "user", None) and request.user.is_authenticated else None
+        AdminAccessLog.objects.create(
+            user=user,
+            module=DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE,
+        )
+        cutoff = timezone.now() - timedelta(days=90)
+        AdminAccessLog.objects.filter(created_at__lt=cutoff).delete()
+    except Exception:
+        pass
 
 
 def _build_module_signal_badges(user, cliente):
@@ -3028,6 +3044,7 @@ def register(request):
 
 
 def produto_documentacao_tecnica(request):
+    _record_documentacao_tecnica_landing_access(request)
     produto = _documentacao_tecnica_product()
     state = (request.GET.get("state") or "").strip().lower()
     requested_next = _get_safe_next_url(request, fallback="ios_list")
@@ -10444,6 +10461,17 @@ def admin_logs(request):
         return HttpResponseForbidden("Sem permissao.")
     user_q = request.GET.get("user", "").strip()
     module_q = request.GET.get("module", "").strip()
+    now = timezone.now()
+    today_start = timezone.localtime(now).replace(hour=0, minute=0, second=0, microsecond=0)
+    landing_logs_qs = AdminAccessLog.objects.filter(module=DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE)
+    landing_metrics = {
+        "module": DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE,
+        "total": landing_logs_qs.count(),
+        "today": landing_logs_qs.filter(created_at__gte=today_start).count(),
+        "last_7_days": landing_logs_qs.filter(created_at__gte=now - timedelta(days=7)).count(),
+        "anonymous": landing_logs_qs.filter(user__isnull=True).count(),
+        "authenticated": landing_logs_qs.filter(user__isnull=False).count(),
+    }
     logs_qs = AdminAccessLog.objects.select_related("user").all()
     if user_q:
         logs_qs = logs_qs.filter(user__username__icontains=user_q)
@@ -10457,6 +10485,7 @@ def admin_logs(request):
             "logs": logs,
             "user_q": user_q,
             "module_q": module_q,
+            "landing_metrics": landing_metrics,
         },
     )
 
