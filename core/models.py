@@ -557,6 +557,7 @@ class Compra(models.Model):
     data = models.DateField(null=True, blank=True)
     categoria = models.ForeignKey(CategoriaCompra, on_delete=models.PROTECT, null=True, blank=True)
     centro_custo = models.ForeignKey(CentroCusto, on_delete=models.PROTECT, null=True, blank=True)
+    anexo_foto = models.ImageField(upload_to="financeiro/compras/", blank=True, null=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -36,9 +36,10 @@
       <p class="notice notice-{{ message_level|default:'info' }}">{{ message }}</p>
     {% endif %}
 
-    <form method="post" class="finance-grid">
+    <form method="post" enctype="multipart/form-data" class="finance-grid">
       {% csrf_token %}
       <input type="hidden" name="action" value="create_compra">
+      <input type="hidden" name="from_compra" value="{{ from_compra_id }}">
       <div class="finance-card">
         <div class="panel-title">Dados</div>
         <div class="stack">
@@ -104,6 +105,13 @@
                 {% endfor %}
               </select>
             </div>
+          </div>
+          <div class="field">
+            <label>Foto da compra</label>
+            <input type="file" name="anexo_foto" accept="image/*">
+            {% if initial.tem_anexo_foto %}
+              <p class="muted">A compra de origem ja possui foto anexada. Se nao enviar outra, a foto sera copiada.</p>
+            {% endif %}
           </div>
         </div>
         <div class="panel-title">Itens</div>

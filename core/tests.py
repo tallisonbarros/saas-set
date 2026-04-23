@@ -33,6 +33,8 @@ from core.models import (
     PlanoComercial,
     IngestRecord,
     CanalRackIO,
+    Caderno,
+    Compra,
     LocalRackIO,
     ModuloAcesso,
     ModuloIO,
@@ -3819,3 +3821,107 @@ class IPImportPipelineTests(TestCase):
         self.assertTrue(resumo["skipped"])
         self.assertEqual(result["proposal"]["summary"]["lists"], 2)
         self.assertEqual(sorted(item["name"] for item in result["proposal"]["lists"]), ["PLC PRINCIPAL", "REMOTA"])
+
+
+class FinanceiroCompraAnexoFotoTests(TestCase):
+    def setUp(self):
+        self.tipo_financeiro = TipoPerfil.objects.get(codigo="FINANCEIRO")
+        self.financeiro_modulo = ModuloAcesso.objects.get(codigo="FINANCEIRO")
+        self.financeiro_modulo.tipos.set([self.tipo_financeiro])
+
+        self.user = User.objects.create_user(
+            username="financeiro-anexo@set.local",
+            email="financeiro-anexo@set.local",
+            password="123456",
+        )
+        self.perfil = PerfilUsuario.objects.create(
+            nome="Financeiro Anexo",
+            email="financeiro-anexo@set.local",
+            usuario=self.user,
+        )
+        self.perfil.tipos.add(self.tipo_financeiro)
+        self.caderno = Caderno.objects.create(nome="Caderno Teste", criador=self.perfil, ativo=True)
+        self.client.force_login(self.user)
+
+    def _build_image_upload(self, name="comprovante.gif"):
+        return SimpleUploadedFile(
+            name,
+            (
+                b"GIF89a\x01\x00\x01\x00\x80\x00\x00"
+                b"\x00\x00\x00\xff\xff\xff!\xf9\x04\x01"
+                b"\x00\x00\x00\x00,\x00\x00\x00\x00\x01"
+                b"\x00\x01\x00\x00\x02\x02D\x01\x00;"
+            ),
+            content_type="image/gif",
+        )
+
+    def test_financeiro_nova_cria_compra_com_foto_anexada(self):
+        with patch(
+            "django.core.files.storage.FileSystemStorage._save",
+            side_effect=lambda *args, **kwargs: args[0],
+        ):
+            response = self.client.post(
+                "/financeiro/nova/",
+                {
+                    "action": "create_compra",
+                    "caderno": str(self.caderno.id),
+                    "nome": "Compra com foto",
+                    "descricao": "Compra teste com comprovante",
+                    "data": "2026-04-23",
+                    "anexo_foto": self._build_image_upload(),
+                    "total_items": "1",
+                    "item_nome_0": "",
+                    "item_quantidade_0": "",
+                    "item_valor_0": "",
+                    "item_parcela_0": "",
+                    "item_tipo_0": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        compra = Compra.objects.get(nome="Compra com foto")
+        self.assertTrue(bool(compra.anexo_foto))
+        self.assertIn("financeiro/compras/", compra.anexo_foto.name)
+
+    def test_financeiro_compra_detail_permite_adicionar_e_remover_foto(self):
+        compra = Compra.objects.create(caderno=self.caderno, nome="Compra editavel")
+
+        with patch(
+            "django.core.files.storage.FileSystemStorage._save",
+            side_effect=lambda *args, **kwargs: args[0],
+        ):
+            response = self.client.post(
+                f"/financeiro/compras/{compra.pk}/",
+                {
+                    "action": "update_compra",
+                    "nome": compra.nome,
+                    "descricao": "",
+                    "data": "",
+                    "caderno": str(self.caderno.id),
+                    "categoria": "",
+                    "centro_custo": "",
+                    "anexo_foto": self._build_image_upload("nota.gif"),
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+
+        compra.refresh_from_db()
+        self.assertTrue(bool(compra.anexo_foto))
+
+        response = self.client.post(
+            f"/financeiro/compras/{compra.pk}/",
+            {
+                "action": "update_compra",
+                "nome": compra.nome,
+                "descricao": "",
+                "data": "",
+                "caderno": str(self.caderno.id),
+                "categoria": "",
+                "centro_custo": "",
+                "remove_anexo_foto": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        compra.refresh_from_db()
+        self.assertFalse(bool(compra.anexo_foto))

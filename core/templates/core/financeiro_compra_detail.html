@@ -53,7 +53,24 @@
         <div><strong>Caderno:</strong> {% if compra.caderno %}{{ compra.caderno.nome }}{% else %}-{% endif %}</div>
         <div><strong>Categoria:</strong> {% if compra.categoria %}{{ compra.categoria.nome }}{% else %}-{% endif %}</div>
         <div><strong>Centro:</strong> {% if compra.centro_custo %}{{ compra.centro_custo.nome }}{% else %}-{% endif %}</div>
+        <div><strong>Anexo:</strong> {% if compra.anexo_foto %}Foto enviada{% else %}-{% endif %}</div>
       </div>
+    </div>
+
+    <div class="finance-card">
+      <div class="panel-title">Anexo da compra</div>
+      {% if compra.anexo_foto %}
+        <div class="stack">
+          <a class="btn btn-outline btn-compact" href="{{ compra.anexo_foto.url }}" target="_blank" rel="noreferrer">Abrir foto</a>
+          <img
+            src="{{ compra.anexo_foto.url }}"
+            alt="Foto anexada da compra"
+            style="max-width: 100%; max-height: 320px; border-radius: 16px; object-fit: cover;"
+          >
+        </div>
+      {% else %}
+        <p class="muted">Nenhuma foto anexada.</p>
+      {% endif %}
     </div>
 
     <div class="finance-card">
@@ -198,7 +215,7 @@
         <span class="muted">Ajuste dados basicos.</span>
       </summary>
       <div class="io-discrete-body">
-        <form method="post" class="stack">
+        <form method="post" enctype="multipart/form-data" class="stack">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_compra">
           <label>Nome</label>
@@ -248,6 +265,14 @@
               <option value="{{ c.id }}" {% if compra.centro_custo and compra.centro_custo.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
             {% endfor %}
           </select>
+          <label>Foto da compra</label>
+          <input type="file" name="anexo_foto" accept="image/*">
+          {% if compra.anexo_foto %}
+            <label class="checkbox-item">
+              <input type="checkbox" name="remove_anexo_foto">
+              Remover foto atual
+            </label>
+          {% endif %}
           <button class="btn btn-ghost" type="submit">Salvar</button>
         </form>
       </div>

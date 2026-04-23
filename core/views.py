@@ -9234,18 +9234,28 @@ def financeiro_nova(request):
             return redirect(f"{reverse('financeiro_nova')}?{urlencode(params)}")
         if action == "create_compra":
             caderno_id = request.POST.get("caderno")
+            source_compra_id = request.POST.get("from_compra") or from_compra_id
             nome = request.POST.get("nome", "").strip()
             descricao = request.POST.get("descricao", "").strip()
             data_raw = request.POST.get("data", "").strip()
             categoria_id = request.POST.get("categoria")
             centro_id = request.POST.get("centro_custo")
+            anexo_foto = request.FILES.get("anexo_foto")
             itens_payload = []
+            source_compra = None
             total_items_raw = request.POST.get("total_items", "1").strip()
             try:
                 total_items = int(total_items_raw)
             except ValueError:
                 total_items = 1
             total_items = max(1, min(total_items, 200))
+            if source_compra_id:
+                source_compra_qs = Compra.objects.filter(pk=source_compra_id)
+                if not _is_admin_user(request.user):
+                    source_compra_qs = source_compra_qs.filter(
+                        Q(caderno__criador=cliente) | Q(caderno__id_financeiro__in=cliente.financeiros.all())
+                    )
+                source_compra = source_compra_qs.first()
             for idx in range(total_items):
                 item_nome = request.POST.get(f"item_nome_{idx}", "").strip()
                 item_valor = request.POST.get(f"item_valor_{idx}", "").replace(",", ".").strip()
@@ -9285,6 +9295,7 @@ def financeiro_nova(request):
                     data is not None,
                     categoria_id,
                     centro_id,
+                    anexo_foto,
                     itens_payload,
                 ]
             )
@@ -9298,6 +9309,11 @@ def financeiro_nova(request):
                     data=data,
                     categoria_id=categoria_id or None,
                     centro_custo_id=centro_id or None,
+                    anexo_foto=anexo_foto or (
+                        source_compra.anexo_foto.name
+                        if source_compra and source_compra.anexo_foto
+                        else None
+                    ),
                 )
                 for item in itens_payload:
                     valor_raw = item["valor"]
@@ -9336,6 +9352,7 @@ def financeiro_nova(request):
         "categoria_id": "",
         "centro_id": "",
         "itens": [],
+        "tem_anexo_foto": False,
     }
     if from_compra_id:
         compra_qs = Compra.objects.filter(pk=from_compra_id)
@@ -9357,6 +9374,7 @@ def financeiro_nova(request):
             initial["categoria_id"] = str(compra_ref.categoria_id or "")
             initial["centro_id"] = str(compra_ref.centro_custo_id or "")
             initial["itens"] = list(compra_ref.itens.all())
+            initial["tem_anexo_foto"] = bool(compra_ref.anexo_foto)
 
     return render(
         request,
@@ -9372,6 +9390,7 @@ def financeiro_nova(request):
             "message": message,
             "message_level": message_level,
             "open_cadastro": open_cadastro,
+            "from_compra_id": str(from_compra_id or ""),
         },
     )
 
@@ -9923,6 +9942,8 @@ def financeiro_compra_detail(request, pk):
             centro_id = request.POST.get("centro_custo")
             caderno_id = request.POST.get("caderno")
             data_raw = request.POST.get("data", "").strip()
+            anexo_foto = request.FILES.get("anexo_foto")
+            remove_anexo_foto = request.POST.get("remove_anexo_foto") == "on"
             allowed_cadernos = _financeiro_allowed_cadernos_qs(request.user, cliente)
             if caderno_id and not allowed_cadernos.filter(id=caderno_id).exists():
                 return redirect("financeiro_compra_detail", pk=compra.pk)
@@ -9940,7 +9961,14 @@ def financeiro_compra_detail(request, pk):
             compra.data = data
             if caderno_id:
                 compra.caderno_id = caderno_id
-            compra.save(update_fields=["nome", "descricao", "categoria", "centro_custo", "caderno", "data"])
+            update_fields = ["nome", "descricao", "categoria", "centro_custo", "caderno", "data"]
+            if remove_anexo_foto:
+                compra.anexo_foto = None
+                update_fields.append("anexo_foto")
+            elif anexo_foto:
+                compra.anexo_foto = anexo_foto
+                update_fields.append("anexo_foto")
+            compra.save(update_fields=update_fields)
             return redirect("financeiro_compra_detail", pk=compra.pk)
         if action == "copy_next_months":
             meses_raw = request.POST.get("meses", "").strip()
@@ -9998,6 +10026,7 @@ def financeiro_compra_detail(request, pk):
                     existing.categoria_id = compra.categoria_id
                     existing.centro_custo_id = compra.centro_custo_id
                     existing.data = target_date
+                    existing.anexo_foto = compra.anexo_foto.name if compra.anexo_foto else None
                     existing.save(
                         update_fields=[
                             "descricao",
@@ -10006,6 +10035,7 @@ def financeiro_compra_detail(request, pk):
                             "categoria",
                             "centro_custo",
                             "data",
+                            "anexo_foto",
                         ]
                     )
                     existing.itens.all().delete()
@@ -10019,6 +10049,7 @@ def financeiro_compra_detail(request, pk):
                         data=target_date,
                         categoria_id=compra.categoria_id,
                         centro_custo_id=compra.centro_custo_id,
+                        anexo_foto=compra.anexo_foto.name if compra.anexo_foto else None,
                     )
                 itens_novos = [
                     CompraItem(
