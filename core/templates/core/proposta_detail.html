@@ -135,7 +135,7 @@
             <div><strong>Codigo:</strong> {{ proposta.codigo }}</div>
             <div><strong>Status:</strong> {{ status_label }}</div>
             <div><strong>Aprovacao:</strong> {% if proposta.aprovada == True %}Sim{% elif proposta.aprovada == False %}Nao{% else %}Pendente{% endif %}</div>
-            <div><strong>Valor:</strong> {% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</div>
+            <div><strong>Valor:</strong> {% include "core/propostas/_valor.html" with proposta=proposta %}</div>
             <div><strong>Para:</strong> {{ proposta.cliente.nome }} ({{ proposta.cliente.email }})</div>
             {% if proposta.criada_por %}
               <div><strong>De:</strong> {{ proposta.criada_por.username }}</div>
@@ -233,6 +233,8 @@
                 <input type="hidden" name="action" value="update_value">
                 <label>Valor</label>
                 <input type="text" name="valor" value="{{ proposta.valor|default_if_none:'' }}">
+                <label>Valor com desconto</label>
+                <input type="text" name="valor_com_desconto" value="{{ proposta.valor_com_desconto|default_if_none:'' }}">
                 <button class="btn btn-primary" type="submit">Atualizar valor</button>
               </form>
             {% endif %}

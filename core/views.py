@@ -4304,6 +4304,29 @@ def _format_brl_currency(value):
     return f"R$ {number}"
 
 
+def _parse_optional_decimal_input(raw_value):
+    normalized = (raw_value or "").replace(",", ".").strip()
+    if not normalized:
+        return None, normalized, False
+    try:
+        return Decimal(normalized), normalized, True
+    except (InvalidOperation, ValueError):
+        return None, normalized, False
+
+
+def _proposta_valor_context(proposta):
+    has_discount = proposta.tem_valor_com_desconto
+    original_value = proposta.valor
+    current_value = proposta.valor_final
+    return {
+        "has_discount": has_discount,
+        "original_value": original_value,
+        "current_value": current_value,
+        "original_display": _format_brl_currency(original_value),
+        "current_display": _format_brl_currency(current_value),
+    }
+
+
 def _format_ptbr_datetime(value):
     if not value:
         return ""
@@ -4637,6 +4660,22 @@ def _build_proposta_pdf_context(
         de_contato = proposta.criada_por.email or proposta.criada_por.username
     _append_pdf_row(identificacao_direita, "De", de_contato, mono=True)
     _append_pdf_row(identificacao_direita, "Status", status_label)
+    valor_ctx = _proposta_valor_context(proposta)
+    if valor_ctx["has_discount"]:
+        _append_pdf_row(identificacao_direita, "Valor original", valor_ctx["original_display"])
+        _append_pdf_row(
+            identificacao_direita,
+            "Valor com desconto",
+            valor_ctx["current_display"],
+            highlight=True,
+        )
+    else:
+        _append_pdf_row(
+            identificacao_direita,
+            "Valor",
+            valor_ctx["current_display"],
+            highlight=valor_ctx["current_value"] is not None,
+        )
     if proposta.aprovado_por:
         _append_pdf_row(identificacao_direita, "Decidida por", proposta.aprovado_por.username)
 
@@ -4649,7 +4688,8 @@ def _build_proposta_pdf_context(
         "status_label": status_label,
         "status_badge_class": _status_badge_class(status_label),
         "codigo": proposta.codigo or f"ID {proposta.id}",
-        "valor_display": _format_brl_currency(proposta.valor),
+        "valor_display": valor_ctx["current_display"],
+        "valor_context": valor_ctx,
         "criada_em_display": _format_ptbr_date(proposta.criado_em),
         "de_display": proposta.criada_por.username if proposta.criada_por else "Sistema",
         "para_nome": proposta.cliente.nome if proposta.cliente else "-",
@@ -8348,18 +8388,24 @@ def proposta_detail(request, pk):
             if proposta.aprovada is not None:
                 message = "Nao e possivel alterar o valor apos aprovacao."
             else:
-                valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
-                valor = None
-                if valor_raw:
-                    try:
-                        valor = Decimal(valor_raw)
-                    except (InvalidOperation, ValueError):
-                        valor = None
-                if valor_raw and valor is None:
+                valor, valor_raw, valor_ok = _parse_optional_decimal_input(request.POST.get("valor"))
+                valor_com_desconto, valor_com_desconto_raw, valor_com_desconto_ok = _parse_optional_decimal_input(
+                    request.POST.get("valor_com_desconto")
+                )
+                if valor_raw and not valor_ok:
                     message = "Informe um valor valido."
+                elif valor_com_desconto_raw and not valor_com_desconto_ok:
+                    message = "Informe um valor com desconto valido."
+                elif valor_com_desconto is not None and valor is None:
+                    message = "Informe o valor original antes do valor com desconto."
+                elif valor_com_desconto is not None and valor_com_desconto < 0:
+                    message = "Valor com desconto nao pode ser negativo."
+                elif valor is not None and valor_com_desconto is not None and valor_com_desconto > valor:
+                    message = "Valor com desconto nao pode ser maior que o valor original."
                 else:
                     proposta.valor = valor
-                    proposta.save(update_fields=["valor"])
+                    proposta.valor_com_desconto = valor_com_desconto
+                    proposta.save(update_fields=["valor", "valor_com_desconto"])
                     return redirect("proposta_detail", pk=proposta.pk)
         if action == "update_details":
             if proposta.criada_por_id != request.user.id:
@@ -8504,6 +8550,7 @@ def proposta_nova_vendedor(request):
         "nome": "",
         "descricao": "",
         "valor": "",
+        "valor_com_desconto": "",
         "prioridade": "50",
         "codigo": "",
         "observacao": "",
@@ -8514,7 +8561,10 @@ def proposta_nova_vendedor(request):
         email = request.POST.get("email", "").strip().lower()
         nome = request.POST.get("nome", "").strip()
         descricao = _sanitize_proposta_descricao(request.POST.get("descricao", "").strip())
-        valor_raw = request.POST.get("valor", "").replace(",", ".").strip()
+        valor, valor_raw, valor_ok = _parse_optional_decimal_input(request.POST.get("valor"))
+        valor_com_desconto, valor_com_desconto_raw, valor_com_desconto_ok = _parse_optional_decimal_input(
+            request.POST.get("valor_com_desconto")
+        )
         prioridade_raw = request.POST.get("prioridade", "").strip()
         codigo = request.POST.get("codigo", "").strip()
         observacao = request.POST.get("observacao", "").strip()
@@ -8526,6 +8576,7 @@ def proposta_nova_vendedor(request):
             "nome": nome,
             "descricao": descricao,
             "valor": valor_raw,
+            "valor_com_desconto": valor_com_desconto_raw,
             "prioridade": prioridade_raw or "50",
             "codigo": codigo,
             "observacao": observacao,
@@ -8546,12 +8597,6 @@ def proposta_nova_vendedor(request):
         if not message and not destinatario:
             message = "Usuario nao encontrado para este email."
         elif not message:
-            valor = None
-            if valor_raw:
-                try:
-                    valor = Decimal(valor_raw)
-                except (InvalidOperation, ValueError):
-                    valor = None
             try:
                 prioridade = int(prioridade_raw) if prioridade_raw else 50
             except ValueError:
@@ -8559,8 +8604,16 @@ def proposta_nova_vendedor(request):
             prioridade = max(1, min(99, prioridade))
             if not nome or not descricao:
                 message = "Preencha nome e descricao."
-            elif valor_raw and valor is None:
+            elif valor_raw and not valor_ok:
                 message = "Informe um valor valido ou deixe em branco para levantamento."
+            elif valor_com_desconto_raw and not valor_com_desconto_ok:
+                message = "Informe um valor com desconto valido ou deixe em branco."
+            elif valor_com_desconto is not None and valor is None:
+                message = "Informe o valor original antes do valor com desconto."
+            elif valor_com_desconto is not None and valor_com_desconto < 0:
+                message = "Valor com desconto nao pode ser negativo."
+            elif valor is not None and valor_com_desconto is not None and valor_com_desconto > valor:
+                message = "Valor com desconto nao pode ser maior que o valor original."
             else:
                 proposta = Proposta.objects.create(
                     cliente=destinatario,
@@ -8568,6 +8621,7 @@ def proposta_nova_vendedor(request):
                     nome=nome,
                     descricao=descricao,
                     valor=valor,
+                    valor_com_desconto=valor_com_desconto,
                     prioridade=prioridade,
                     codigo=codigo,
                     observacao_cliente=observacao,
@@ -8609,6 +8663,7 @@ def proposta_nova_de_trabalho(request, trabalho_pk):
         "nome": trabalho.nome,
         "descricao": "",
         "valor": "",
+        "valor_com_desconto": "",
         "prioridade": "50",
         "codigo": "",
         "observacao": f"Origem: Radar {trabalho.radar.nome} / Trabalho {trabalho.nome}",

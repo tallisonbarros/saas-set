@@ -696,6 +696,11 @@ class PropostaTrabalhoVinculoTests(TestCase):
     def setUp(self):
         self.client_http = Client()
         self.vendedor = User.objects.create_user(username="vend", email="vend@set.local", password="123456")
+        self.tipo_cliente = TipoPerfil.objects.get(codigo="CLIENTE")
+        self.modulo_propostas = ModuloAcesso.objects.get(codigo="PROPOSTAS")
+        self.modulo_radar = ModuloAcesso.objects.get(codigo="RADAR")
+        self.modulo_propostas.tipos.add(self.tipo_cliente)
+        self.modulo_radar.tipos.add(self.tipo_cliente)
         self.destinatario_user = User.objects.create_user(
             username="cliente",
             email="cliente@set.local",
@@ -706,6 +711,18 @@ class PropostaTrabalhoVinculoTests(TestCase):
             email="cliente@set.local",
             usuario=self.destinatario_user,
         )
+        self.destinatario.tipos.add(self.tipo_cliente)
+        self.destinatario_alvo_user = User.objects.create_user(
+            username="cliente-alvo",
+            email="cliente-alvo@set.local",
+            password="123456",
+        )
+        self.destinatario_alvo = PerfilUsuario.objects.create(
+            nome="Cliente Alvo",
+            email="cliente-alvo@set.local",
+            usuario=self.destinatario_alvo_user,
+        )
+        self.destinatario_alvo.tipos.add(self.tipo_cliente)
         self.radar = Radar.objects.create(cliente=self.destinatario, nome="Radar Norte")
         self.classificacao = RadarClassificacao.objects.create(nome="Critica")
         self.contrato = RadarContrato.objects.create(nome="Contrato A")
@@ -730,6 +747,41 @@ class PropostaTrabalhoVinculoTests(TestCase):
             descricao="Escopo comercial.",
             trabalho=self.trabalho,
         )
+
+    def test_cria_proposta_com_valor_com_desconto(self):
+        self.client_http.force_login(self.destinatario_user)
+        response = self.client_http.post(
+            "/propostas/nova/",
+            {
+                "email": self.destinatario_alvo.email,
+                "nome": "Proposta com desconto",
+                "descricao": "Escopo comercial com desconto.",
+                "valor": "1500.00",
+                "valor_com_desconto": "1250.00",
+                "trabalho_id": str(self.trabalho.id),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        proposta = Proposta.objects.get(nome="Proposta com desconto")
+        self.assertEqual(proposta.valor, Decimal("1500.00"))
+        self.assertEqual(proposta.valor_com_desconto, Decimal("1250.00"))
+        self.assertEqual(proposta.valor_final, Decimal("1250.00"))
+        self.assertEqual(proposta.trabalho_id, self.trabalho.id)
+
+    def test_valor_com_desconto_exige_valor_original(self):
+        self.client_http.force_login(self.destinatario_user)
+        response = self.client_http.post(
+            "/propostas/nova/",
+            {
+                "email": self.destinatario_alvo.email,
+                "nome": "Proposta desconto invalido",
+                "descricao": "Escopo comercial.",
+                "valor_com_desconto": "900.00",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Informe o valor original antes do valor com desconto.")
+        self.assertFalse(Proposta.objects.filter(nome="Proposta desconto invalido").exists())
 
     def test_proposta_vinculada_reflete_alteracoes_do_trabalho(self):
         self.trabalho.descricao = "Descricao tecnica atualizada"
@@ -775,6 +827,19 @@ class PropostaTrabalhoVinculoTests(TestCase):
         self.assertEqual(labels.get("Colaboradores"), "Ana, Bruno")
         self.assertEqual(context["atividades"][0]["nome"], "Inspecao")
 
+    def test_pdf_context_destaca_valor_com_desconto(self):
+        self.proposta.valor = Decimal("2000.00")
+        self.proposta.valor_com_desconto = Decimal("1750.00")
+        self.proposta.save(update_fields=["valor", "valor_com_desconto"])
+        proposta = Proposta.objects.select_related("trabalho", "trabalho__radar").prefetch_related(
+            "trabalho__atividades",
+            "anexos",
+        ).get(pk=self.proposta.pk)
+        context = _build_proposta_pdf_context(proposta, "Pendente", include_origem=True, trabalho=proposta.trabalho)
+        self.assertTrue(context["valor_context"]["has_discount"])
+        self.assertEqual(context["valor_context"]["original_display"], "R$ 2.000,00")
+        self.assertEqual(context["valor_context"]["current_display"], "R$ 1.750,00")
+
     def test_proposta_sem_vinculo_permanece_funcional(self):
         proposta = Proposta.objects.create(
             cliente=self.destinatario,
@@ -789,11 +854,13 @@ class PropostaTrabalhoVinculoTests(TestCase):
 
     def test_nao_autorizado_nao_cria_vinculo(self):
         outro = User.objects.create_user(username="outro", email="outro@set.local", password="123456")
+        outro_perfil = PerfilUsuario.objects.create(nome="Outro", email="outro@set.local", usuario=outro)
+        outro_perfil.tipos.add(self.tipo_cliente)
         self.client_http.force_login(outro)
         response = self.client_http.post(
             "/propostas/nova/",
             {
-                "email": self.destinatario.email,
+                "email": self.destinatario_alvo.email,
                 "nome": "Proposta sem permissao",
                 "descricao": "Comercial",
                 "trabalho_id": str(self.trabalho.id),
@@ -807,10 +874,17 @@ class PropostaTrabalhoVinculoTests(TestCase):
 class RadarCreatorPermissionTests(TestCase):
     def setUp(self):
         self.client_http = Client()
+        self.tipo_cliente = TipoPerfil.objects.get(codigo="CLIENTE")
+        self.modulo_radar = ModuloAcesso.objects.get(codigo="RADAR")
+        self.modulo_propostas = ModuloAcesso.objects.get(codigo="PROPOSTAS")
+        self.modulo_radar.tipos.add(self.tipo_cliente)
+        self.modulo_propostas.tipos.add(self.tipo_cliente)
         self.owner_user = User.objects.create_user(username="owner", email="owner@set.local", password="123456")
         self.viewer_user = User.objects.create_user(username="viewer", email="viewer@set.local", password="123456")
         self.owner = PerfilUsuario.objects.create(nome="Owner", email="owner@set.local", usuario=self.owner_user)
         self.viewer = PerfilUsuario.objects.create(nome="Viewer", email="viewer@set.local", usuario=self.viewer_user)
+        self.owner.tipos.add(self.tipo_cliente)
+        self.viewer.tipos.add(self.tipo_cliente)
         self.radar_id = RadarID.objects.create(codigo="R-001")
         self.viewer.radares.add(self.radar_id)
         self.radar = Radar.objects.create(
@@ -846,6 +920,17 @@ class RadarCreatorPermissionTests(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(RadarTrabalho.objects.filter(radar=self.radar, nome="Pode criar").exists())
+
+    def test_detalhe_trabalho_exibe_botao_gerar_proposta_apenas_para_criador(self):
+        self.client_http.force_login(self.owner_user)
+        owner_response = self.client_http.get(f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/")
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertContains(owner_response, f"/propostas/nova/de-trabalho/{self.trabalho.id}/")
+
+        self.client_http.force_login(self.viewer_user)
+        viewer_response = self.client_http.get(f"/radar-atividades/{self.radar.id}/trabalhos/{self.trabalho.id}/")
+        self.assertEqual(viewer_response.status_code, 200)
+        self.assertNotContains(viewer_response, f"/propostas/nova/de-trabalho/{self.trabalho.id}/")
 
     def test_create_trabalho_ajax_persiste_colaboradores(self):
         self.client_http.force_login(self.owner_user)

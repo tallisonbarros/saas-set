@@ -77,6 +77,13 @@
             <div class="field-help">Sem valor definido, a proposta fica em levantamento.</div>
           </div>
           <div>
+            <label for="id_valor_com_desconto">Valor com desconto</label>
+            <input id="id_valor_com_desconto" type="text" name="valor_com_desconto" value="{{ form_data.valor_com_desconto }}" placeholder="Opcional">
+            <div class="field-help">Se informado, o valor original sera exibido tachado e o desconto em destaque.</div>
+          </div>
+        </div>
+        <div class="proposal-form-grid">
+          <div>
             <label for="id_prioridade">Prioridade</label>
             <input id="id_prioridade" type="number" name="prioridade" min="1" max="99" value="{{ form_data.prioridade }}">
           </div>

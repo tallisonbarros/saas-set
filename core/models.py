@@ -603,6 +603,7 @@ class Proposta(models.Model):
     codigo = models.CharField(max_length=40, blank=True)
     descricao = models.TextField()
     valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    valor_com_desconto = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     prioridade = models.PositiveSmallIntegerField(
         default=50,
         validators=[MinValueValidator(1), MaxValueValidator(99)],
@@ -659,6 +660,16 @@ class Proposta(models.Model):
         if not self.codigo:
             self.codigo = self._proximo_codigo()
         super().save(*args, **kwargs)
+
+    @property
+    def tem_valor_com_desconto(self):
+        return self.valor is not None and self.valor_com_desconto is not None
+
+    @property
+    def valor_final(self):
+        if self.tem_valor_com_desconto:
+            return self.valor_com_desconto
+        return self.valor
 
     @property
     def origem_trabalho(self):

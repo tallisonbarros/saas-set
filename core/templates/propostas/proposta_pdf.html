@@ -187,6 +187,9 @@
 
     <section class="content-card section payment-summary-card avoid-break">
       <h2 class="section-title">Valor e Condicoes de Pagamento</h2>
+      {% if valor_context.has_discount %}
+        <div class="payment-summary-original">{{ valor_context.original_display }}</div>
+      {% endif %}
       <div class="payment-summary-value">{{ valor_display }}</div>
       {% for bloco in condicoes_comerciais %}
         {% if bloco.titulo == "F) Tributacao" or bloco.titulo == "G) Validade e Pagamento" %}

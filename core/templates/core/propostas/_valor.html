@@ -1,0 +1,10 @@
+{% if proposta.tem_valor_com_desconto %}
+  <span class="proposal-price-stack">
+    <span class="proposal-price-original">R$ {{ proposta.valor }}</span>
+    <span class="proposal-price-current proposal-price-current-discount">R$ {{ proposta.valor_com_desconto }}</span>
+  </span>
+{% elif proposta.valor is not None %}
+  <span class="proposal-price-current">R$ {{ proposta.valor }}</span>
+{% else %}
+  <span class="proposal-price-empty">A definir</span>
+{% endif %}

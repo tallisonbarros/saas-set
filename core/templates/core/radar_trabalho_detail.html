@@ -28,6 +28,9 @@
           <div class="radar-mode-badge radar-mode-badge-creator">Criador</div>
         {% endif %}
         <div class="hud-menu hud-menu-flat" aria-label="Menu do modulo">
+          {% if can_create_proposta_from_trabalho %}
+            <a class="hud-menu-pill" href="{% url 'proposta_nova_de_trabalho' trabalho.id %}" target="_blank" rel="noopener noreferrer">Gerar proposta</a>
+          {% endif %}
           <a class="hud-menu-pill" href="{% url 'radar_detail' radar.id %}">Voltar para o radar</a>
         </div>
       </div>

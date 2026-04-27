@@ -69,7 +69,7 @@
               </div>
               <div class="proposal-card-meta">
                 <div class="proposal-meta-item">
-                  <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
+                  {% include "core/propostas/_valor.html" with proposta=proposta %}
                 </div>
                 <div class="proposal-meta-item">
                   <span class="meta-value">{{ proposta.cliente.nome|default:"Sistema" }}</span>
@@ -116,7 +116,7 @@
               </div>
               <div class="proposal-card-meta">
                 <div class="proposal-meta-item">
-                  <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
+                  {% include "core/propostas/_valor.html" with proposta=proposta %}
                 </div>
                 <div class="proposal-meta-item">
                   <span class="meta-value">{{ proposta.criada_por.username|default:"Sistema" }}</span>
@@ -324,7 +324,7 @@
                     <div class="proposal-card-meta">
                       <div class="proposal-meta-item">
                         {% if tipo_ativo != "enviadas" %}<span class="meta-label">Valor</span>{% endif %}
-                        <span class="meta-value">{% if proposta.valor is not None %}R$ {{ proposta.valor }}{% else %}A definir{% endif %}</span>
+                        {% include "core/propostas/_valor.html" with proposta=proposta %}
                       </div>
                       <div class="proposal-meta-item">
                         {% if tipo_ativo != "enviadas" %}<span class="meta-label">De</span>{% endif %}
