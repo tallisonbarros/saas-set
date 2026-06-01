@@ -778,6 +778,79 @@ def _create_grupo_payload(request, cliente):
     }
 
 
+def _create_local_payload(request, cliente):
+    if not cliente:
+        return {
+            "ok": False,
+            "created": False,
+            "id": None,
+            "nome": None,
+            "message": "Sem cadastro de cliente.",
+            "level": "error",
+        }
+    nome = request.POST.get("local_nome", "").strip()
+    if not nome:
+        return {
+            "ok": False,
+            "created": False,
+            "id": None,
+            "nome": None,
+            "message": "Informe um nome de local.",
+            "level": "error",
+        }
+    local, created = LocalRackIO.objects.get_or_create(nome=nome, cliente=cliente)
+    return {
+        "ok": True,
+        "created": created,
+        "id": local.id,
+        "nome": local.nome,
+        "message": "Local criado." if created else "Local ja existe.",
+        "level": "success" if created else "warning",
+    }
+
+
+def _delete_local_payload(request, cliente):
+    if not cliente:
+        return {"ok": False, "message": "Sem cadastro de cliente.", "level": "error"}
+    local_id = request.POST.get("local")
+    try:
+        local = LocalRackIO.objects.filter(pk=local_id, cliente=cliente).first()
+    except (TypeError, ValueError):
+        local = None
+    if not local:
+        return {"ok": False, "message": "Local nao encontrado.", "level": "error"}
+    nome = local.nome
+    deleted_id = local.id
+    local.delete()
+    return {
+        "ok": True,
+        "id": deleted_id,
+        "message": f"Local {nome} excluido.",
+        "level": "success",
+    }
+
+
+def _delete_grupo_payload(request, cliente):
+    if not cliente:
+        return {"ok": False, "message": "Sem cadastro de cliente.", "level": "error"}
+    grupo_id = request.POST.get("grupo")
+    try:
+        grupo = GrupoRackIO.objects.filter(pk=grupo_id, cliente=cliente).first()
+    except (TypeError, ValueError):
+        grupo = None
+    if not grupo:
+        return {"ok": False, "message": "Grupo nao encontrado.", "level": "error"}
+    nome = grupo.nome
+    deleted_id = grupo.id
+    grupo.delete()
+    return {
+        "ok": True,
+        "id": deleted_id,
+        "message": f"Grupo {nome} excluido.",
+        "level": "success",
+    }
+
+
 def _ensure_default_cadernos(cliente):
     if not cliente:
         return
@@ -924,17 +997,6 @@ def _ios_racks_queryset(user, cliente):
 def _ios_build_rack_groups(racks, locais=None):
     rack_groups = []
     grouped = {}
-    for local in locais or []:
-        local_name = (local.nome or "").strip()
-        local_key = local_name.lower() if local_name else "__sem_local__"
-        grouped.setdefault(
-            local_key,
-            {
-                "local": local,
-                "groups": {},
-                "racks_sem_grupo": [],
-            },
-        )
     for rack in racks.order_by("local__nome", "grupo__nome", "inventario__nome", "nome"):
         rack.all_canais_comissionados = bool(rack.canais_total) and rack.canais_total == rack.canais_comissionados
         local_name = (rack.local.nome if rack.local_id and rack.local else "").strip()
@@ -3425,35 +3487,22 @@ def ios_list(request):
             elif not message:
                 return redirect("ios_list")
         if action == "create_local":
-            if not cliente:
-                return HttpResponseForbidden("Sem cadastro de cliente.")
-            nome = request.POST.get("local_nome", "").strip()
-            if not nome:
-                msg = "Informe um nome de local."
-                level = "error"
-                created = False
-            else:
-                local, created = LocalRackIO.objects.get_or_create(nome=nome, cliente=cliente)
-                if created:
-                    msg = "Local criado."
-                    level = "success"
-                else:
-                    msg = "Local ja existe."
-                    level = "warning"
+            payload = _create_local_payload(request, cliente)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "ok": bool(nome),
-                        "created": created,
-                        "id": local.id if nome and "local" in locals() else None,
-                        "nome": local.nome if nome and "local" in locals() else None,
-                        "message": msg,
-                        "level": level,
-                    }
-                )
+                return JsonResponse(payload)
+            return redirect("ios_list")
+        if action == "delete_local":
+            payload = _delete_local_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
             return redirect("ios_list")
         if action == "create_grupo":
             payload = _create_grupo_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
+            return redirect("ios_list")
+        if action == "delete_grupo":
+            payload = _delete_grupo_payload(request, cliente)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(payload)
             return redirect("ios_list")
@@ -3551,35 +3600,22 @@ def ios_search(request):
             elif not message:
                 return redirect("ios_search")
         if action == "create_local":
-            if not cliente:
-                return HttpResponseForbidden("Sem cadastro de cliente.")
-            nome = request.POST.get("local_nome", "").strip()
-            if not nome:
-                msg = "Informe um nome de local."
-                level = "error"
-                created = False
-            else:
-                local, created = LocalRackIO.objects.get_or_create(nome=nome, cliente=cliente)
-                if created:
-                    msg = "Local criado."
-                    level = "success"
-                else:
-                    msg = "Local ja existe."
-                    level = "warning"
+            payload = _create_local_payload(request, cliente)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "ok": bool(nome),
-                        "created": created,
-                        "id": local.id if nome and "local" in locals() else None,
-                        "nome": local.nome if nome and "local" in locals() else None,
-                        "message": msg,
-                        "level": level,
-                    }
-                )
+                return JsonResponse(payload)
+            return redirect("ios_search")
+        if action == "delete_local":
+            payload = _delete_local_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
             return redirect("ios_search")
         if action == "create_grupo":
             payload = _create_grupo_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
+            return redirect("ios_search")
+        if action == "delete_grupo":
+            payload = _delete_grupo_payload(request, cliente)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(payload)
             return redirect("ios_search")
@@ -3693,35 +3729,22 @@ def ios_rack_new(request):
                     RackSlotIO.objects.bulk_create(slots)
                     return redirect("ios_rack_detail", pk=rack.pk)
         if action == "create_local":
-            if not cliente:
-                return HttpResponseForbidden("Sem cadastro de cliente.")
-            nome = request.POST.get("local_nome", "").strip()
-            if not nome:
-                msg = "Informe um nome de local."
-                level = "error"
-                created = False
-            else:
-                local, created = LocalRackIO.objects.get_or_create(nome=nome, cliente=cliente)
-                if created:
-                    msg = "Local criado."
-                    level = "success"
-                else:
-                    msg = "Local ja existe."
-                    level = "warning"
+            payload = _create_local_payload(request, cliente)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse(
-                    {
-                        "ok": bool(nome),
-                        "created": created,
-                        "id": local.id if nome and "local" in locals() else None,
-                        "nome": local.nome if nome and "local" in locals() else None,
-                        "message": msg,
-                        "level": level,
-                    }
-                )
+                return JsonResponse(payload)
+            return redirect("ios_rack_new")
+        if action == "delete_local":
+            payload = _delete_local_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
             return redirect("ios_rack_new")
         if action == "create_grupo":
             payload = _create_grupo_payload(request, cliente)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(payload)
+            return redirect("ios_rack_new")
+        if action == "delete_grupo":
+            payload = _delete_grupo_payload(request, cliente)
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse(payload)
             return redirect("ios_rack_new")

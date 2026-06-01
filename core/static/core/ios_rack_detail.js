@@ -580,11 +580,11 @@
         "</div>" +
         info.channels.map(function (channel) {
           return "<div class=\"channel-row\" data-channel-id=\"" + escapeHtml(channel.id) + "\">" +
-            "<div class=\"channel-index\">Canal " + escapeHtml(channel.indice) + "</div>" +
+            "<div class=\"channel-index\">C" + escapeHtml(channel.indice) + "</div>" +
             "<label class=\"field channel-field channel-field-tag\"><span>Tag</span><input type=\"text\" class=\"channel-tag-input\" value=\"" + escapeHtml(channel.tag) + "\" placeholder=\"TAG\"" + (canManage ? "" : " disabled") + "></label>" +
             "<label class=\"field channel-field channel-field-desc\"><span>Descricao</span><input type=\"text\" class=\"channel-desc-input\" value=\"" + escapeHtml(channel.descricao) + "\"" + (canManage ? "" : " disabled") + "></label>" +
             "<label class=\"field channel-field channel-field-type\"><span>Tipo</span><select class=\"channel-type-select\"" + (canManage ? "" : " disabled") + ">" + buildTypeOptions(channel.tipo_id) + "</select></label>" +
-            "<button class=\"channel-status-btn channel-field-status " + (channel.comissionado ? "is-tested" : "is-pending") + "\" type=\"button\" data-state=\"" + (channel.comissionado ? "tested" : "pending") + "\"" + (canManage ? "" : " disabled") + ">Comissionado</button>" +
+            "<button class=\"channel-status-btn channel-field-status " + (channel.comissionado ? "is-tested" : "is-pending") + "\" type=\"button\" data-state=\"" + (channel.comissionado ? "tested" : "pending") + "\"" + (canManage ? "" : " disabled") + ">" + (channel.comissionado ? "OK" : "Pendente") + "</button>" +
           "</div>";
         }).join("") +
         (canManage

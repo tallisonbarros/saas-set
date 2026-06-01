@@ -51,12 +51,24 @@
                     </div>
                   </details>
                 </div>
-                <select name="local" id="local-select" data-select-base="Sem local" data-select-examples="Fabrica Alpha|Fabrica Beta|Industria Norte|Industria Sul">
-                  <option value="">Sem local</option>
-                  {% for local in locais %}
-                    <option value="{{ local.id }}">{{ local.nome }}</option>
-                  {% endfor %}
-                </select>
+                <div class="select-action-row custom-choice" data-choice-field="local">
+                  <input type="hidden" name="local" id="local-select" value="">
+                  <button class="custom-choice-trigger" type="button" data-choice-trigger aria-haspopup="listbox" aria-expanded="false">
+                    <span data-choice-label>Sem local</span>
+                  </button>
+                  <div class="custom-choice-menu" data-choice-menu role="listbox" hidden>
+                    <button class="custom-choice-row" type="button" data-choice-option data-choice-value="" data-choice-name="Sem local" role="option">
+                      <span class="custom-choice-delete-spacer"></span>
+                      <span>Sem local</span>
+                    </button>
+                    {% for local in locais %}
+                      <div class="custom-choice-row" data-choice-row data-choice-value="{{ local.id }}" data-choice-name="{{ local.nome }}" role="option">
+                        <button class="custom-choice-delete" type="button" data-delete-choice="local" data-choice-value="{{ local.id }}" aria-label="Excluir local {{ local.nome }}">x</button>
+                        <button class="custom-choice-option" type="button" data-choice-option data-choice-value="{{ local.id }}" data-choice-name="{{ local.nome }}">{{ local.nome }}</button>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
               </label>
               <label class="field">
                 <div class="field-row">
@@ -70,12 +82,24 @@
                     </div>
                   </details>
                 </div>
-                <select name="grupo" id="grupo-select" data-select-base="Sem grupo" data-select-examples="Recebimento|Secagem|Utilidades|Expedicao">
-                  <option value="">Sem grupo</option>
-                  {% for grupo in grupos %}
-                    <option value="{{ grupo.id }}">{{ grupo.nome }}</option>
-                  {% endfor %}
-                </select>
+                <div class="select-action-row custom-choice" data-choice-field="grupo">
+                  <input type="hidden" name="grupo" id="grupo-select" value="">
+                  <button class="custom-choice-trigger" type="button" data-choice-trigger aria-haspopup="listbox" aria-expanded="false">
+                    <span data-choice-label>Sem grupo</span>
+                  </button>
+                  <div class="custom-choice-menu" data-choice-menu role="listbox" hidden>
+                    <button class="custom-choice-row" type="button" data-choice-option data-choice-value="" data-choice-name="Sem grupo" role="option">
+                      <span class="custom-choice-delete-spacer"></span>
+                      <span>Sem grupo</span>
+                    </button>
+                    {% for grupo in grupos %}
+                      <div class="custom-choice-row" data-choice-row data-choice-value="{{ grupo.id }}" data-choice-name="{{ grupo.nome }}" role="option">
+                        <button class="custom-choice-delete" type="button" data-delete-choice="grupo" data-choice-value="{{ grupo.id }}" aria-label="Excluir grupo {{ grupo.nome }}">x</button>
+                        <button class="custom-choice-option" type="button" data-choice-option data-choice-value="{{ grupo.id }}" data-choice-name="{{ grupo.nome }}">{{ grupo.nome }}</button>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
               </label>
               <label class="field">
                 <span>ID_PLANTA</span>
@@ -128,6 +152,153 @@
         box.textContent = message;
         box.className = "notice notice-" + (level || "info");
         box.style.display = "block";
+      }
+      function postAction(action, fieldName, fieldValue) {
+        var data = new FormData();
+        data.set("action", action);
+        if (fieldName) {
+          data.set(fieldName, fieldValue);
+        }
+        return fetch(window.location.pathname + window.location.search, {
+          method: "POST",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCookie("csrftoken"),
+          },
+          body: data,
+        }).then(function (resp) { return resp.json(); });
+      }
+      function getChoice(field) {
+        var root = document.querySelector("[data-choice-field='" + field + "']");
+        if (!root) {
+          return null;
+        }
+        return {
+          root: root,
+          input: root.querySelector("input[type='hidden']"),
+          label: root.querySelector("[data-choice-label]"),
+          trigger: root.querySelector("[data-choice-trigger]"),
+          menu: root.querySelector("[data-choice-menu]"),
+        };
+      }
+      function findChoiceName(choice, value) {
+        var option = choice.root.querySelector("[data-choice-option][data-choice-value='" + value + "']");
+        return option ? option.getAttribute("data-choice-name") : "";
+      }
+      function setChoiceValue(field, value, name) {
+        var choice = getChoice(field);
+        if (!choice || !choice.input || !choice.label) {
+          return;
+        }
+        var resolvedName = name || findChoiceName(choice, value) || (field === "grupo" ? "Sem grupo" : "Sem local");
+        choice.input.value = value || "";
+        choice.label.textContent = resolvedName;
+        choice.input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      function closeChoiceMenus(exceptRoot) {
+        Array.from(document.querySelectorAll("[data-choice-field]")).forEach(function (root) {
+          if (exceptRoot && root === exceptRoot) {
+            return;
+          }
+          var menu = root.querySelector("[data-choice-menu]");
+          var trigger = root.querySelector("[data-choice-trigger]");
+          if (menu) {
+            menu.hidden = true;
+          }
+          if (trigger) {
+            trigger.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+      function bindChoiceRow(row, field) {
+        if (!row || row.dataset.choiceBound === "1") {
+          return;
+        }
+        row.dataset.choiceBound = "1";
+        var option = row.matches("[data-choice-option]") ? row : row.querySelector("[data-choice-option]");
+        var deleteButton = row.querySelector("[data-delete-choice]");
+        if (option) {
+          option.addEventListener("click", function () {
+            setChoiceValue(field, option.getAttribute("data-choice-value"), option.getAttribute("data-choice-name"));
+            closeChoiceMenus();
+          });
+        }
+        if (deleteButton) {
+          deleteButton.addEventListener("click", function (event) {
+            event.stopPropagation();
+            var value = deleteButton.getAttribute("data-choice-value");
+            var name = row.getAttribute("data-choice-name") || "";
+            if (!window.confirm("Excluir " + field + " " + name + "? Racks vinculados ficarao sem " + field + ".")) {
+              return;
+            }
+            deleteButton.disabled = true;
+            postAction("delete_" + field, field, value)
+              .then(function (payload) {
+                if (payload && payload.ok) {
+                  var choice = getChoice(field);
+                  if (choice && choice.input && choice.input.value === value) {
+                    setChoiceValue(field, "");
+                  }
+                  row.remove();
+                }
+                if (payload && payload.message) {
+                  setMessage(field + "-message", payload.message, payload.level);
+                }
+              })
+              .catch(function () {
+                setMessage(field + "-message", "Nao foi possivel excluir agora.", "error");
+              })
+              .finally(function () {
+                deleteButton.disabled = false;
+              });
+          });
+        }
+      }
+      function addChoiceOption(field, value, name) {
+        var choice = getChoice(field);
+        if (!choice || !choice.menu || choice.root.querySelector("[data-choice-row][data-choice-value='" + value + "']")) {
+          return;
+        }
+        var row = document.createElement("div");
+        row.className = "custom-choice-row";
+        row.setAttribute("data-choice-row", "");
+        row.setAttribute("data-choice-value", value);
+        row.setAttribute("data-choice-name", name);
+        row.setAttribute("role", "option");
+        row.innerHTML = '<button class="custom-choice-delete" type="button" data-delete-choice="' + field + '" data-choice-value="' + value + '" aria-label="Excluir ' + field + '"></button><button class="custom-choice-option" type="button" data-choice-option data-choice-value="' + value + '"></button>';
+        row.querySelector(".custom-choice-delete").textContent = "x";
+        var option = row.querySelector(".custom-choice-option");
+        option.textContent = name;
+        option.setAttribute("data-choice-name", name);
+        choice.menu.appendChild(row);
+        bindChoiceRow(row, field);
+      }
+      function bindCustomChoices() {
+        Array.from(document.querySelectorAll("[data-choice-field]")).forEach(function (root) {
+          if (root.dataset.choiceRootBound === "1") {
+            return;
+          }
+          root.dataset.choiceRootBound = "1";
+          var field = root.getAttribute("data-choice-field");
+          var trigger = root.querySelector("[data-choice-trigger]");
+          var menu = root.querySelector("[data-choice-menu]");
+          if (trigger && menu) {
+            trigger.addEventListener("click", function () {
+              var willOpen = menu.hidden;
+              closeChoiceMenus(root);
+              menu.hidden = !willOpen;
+              trigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
+            });
+          }
+          Array.from(root.querySelectorAll("[data-choice-row], [data-choice-option]")).forEach(function (row) {
+            bindChoiceRow(row, field);
+          });
+        });
+        document.addEventListener("click", function (event) {
+          if (!event.target.closest("[data-choice-field]")) {
+            closeChoiceMenus();
+          }
+        });
       }
       function splitExamples(raw) {
         return (raw || "")
@@ -333,16 +504,8 @@
             .then(function (resp) { return resp.json(); })
             .then(function (payload) {
               if (payload && payload.id && payload.nome) {
-                var exists = Array.from(select.options).some(function (opt) {
-                  return opt.value === String(payload.id);
-                });
-                if (!exists) {
-                  var option = document.createElement("option");
-                  option.value = payload.id;
-                  option.textContent = payload.nome;
-                  select.appendChild(option);
-                }
-                select.value = String(payload.id);
+                addChoiceOption("local", String(payload.id), payload.nome);
+                setChoiceValue("local", String(payload.id), payload.nome);
               }
               if (payload && payload.message) {
                 setMessage("local-message", payload.message, payload.level);
@@ -389,16 +552,8 @@
             .then(function (resp) { return resp.json(); })
             .then(function (payload) {
               if (payload && payload.id && payload.nome) {
-                var exists = Array.from(select.options).some(function (opt) {
-                  return opt.value === String(payload.id);
-                });
-                if (!exists) {
-                  var option = document.createElement("option");
-                  option.value = payload.id;
-                  option.textContent = payload.nome;
-                  select.appendChild(option);
-                }
-                select.value = String(payload.id);
+                addChoiceOption("grupo", String(payload.id), payload.nome);
+                setChoiceValue("grupo", String(payload.id), payload.nome);
               }
               if (payload && payload.message) {
                 setMessage("grupo-message", payload.message, payload.level);
@@ -416,10 +571,14 @@
             });
         });
       }
+      function bindDeleteChoice(type) {
+        return type;
+      }
       window.requestAnimationFrame(bindRackFieldExamples);
       window.setTimeout(bindRackFieldExamples, 120);
       bindCadastro();
       bindGrupo();
+      bindCustomChoices();
     })();
   </script>
 {% endblock %}

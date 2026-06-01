@@ -8,7 +8,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, SimpleTestCase, TestCase
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 from django.utils import timezone
 from openpyxl import Workbook
 
@@ -86,6 +86,10 @@ from core.views import (
     DOCUMENTACAO_TECNICA_LANDING_AUDIT_MODULE,
     _build_proposta_pdf_context,
     _build_radar_relatorio_pdf_context,
+    _delete_grupo_payload,
+    _delete_local_payload,
+    _ios_build_rack_groups,
+    _ios_racks_queryset,
     _reprocess_ip_import_job,
     _sanitize_proposta_descricao,
     _user_role,
@@ -1473,6 +1477,73 @@ class RadarCreatorPermissionTests(TestCase):
         self.assertEqual(len(trabalho_ctx["observacoes_resumo"]), 2)
         self.assertEqual(trabalho_ctx["observacoes_resumo"][0]["texto"], "Observacao mais recente")
         self.assertEqual(trabalho_ctx["observacoes_resumo"][1]["texto"], "Observacao antiga")
+
+
+class IORackGroupingTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="io-racks@set.local",
+            email="io-racks@set.local",
+            password="123456",
+        )
+        self.perfil = PerfilUsuario.objects.create(
+            nome="IO Racks",
+            email="io-racks@set.local",
+            usuario=self.user,
+        )
+        self.factory = RequestFactory()
+
+    def test_rack_groups_ignore_registered_locals_without_racks(self):
+        LocalRackIO.objects.create(cliente=self.perfil, nome="Sem rack")
+        local_com_rack = LocalRackIO.objects.create(cliente=self.perfil, nome="Com rack")
+        RackIO.objects.create(
+            cliente=self.perfil,
+            nome="Rack 01",
+            local=local_com_rack,
+            slots_total=1,
+        )
+
+        groups = _ios_build_rack_groups(
+            _ios_racks_queryset(self.user, self.perfil),
+            locais=LocalRackIO.objects.filter(cliente=self.perfil),
+        )
+
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["local"], local_com_rack)
+
+    def test_delete_local_clears_rack_reference_and_removes_local(self):
+        local = LocalRackIO.objects.create(cliente=self.perfil, nome="Temporario")
+        rack = RackIO.objects.create(
+            cliente=self.perfil,
+            nome="Rack 01",
+            local=local,
+            slots_total=1,
+        )
+        request = self.factory.post("/ios/", {"local": str(local.id)})
+
+        payload = _delete_local_payload(request, self.perfil)
+        rack.refresh_from_db()
+
+        self.assertTrue(payload["ok"])
+        self.assertIsNone(rack.local)
+        self.assertFalse(LocalRackIO.objects.filter(pk=local.pk).exists())
+
+    def test_delete_grupo_clears_rack_reference_and_removes_group(self):
+        grupo = GrupoRackIO.objects.create(cliente=self.perfil, nome="Temporario")
+        rack = RackIO.objects.create(
+            cliente=self.perfil,
+            nome="Rack 01",
+            grupo=grupo,
+            slots_total=1,
+        )
+        request = self.factory.post("/ios/", {"grupo": str(grupo.id)})
+
+        payload = _delete_grupo_payload(request, self.perfil)
+        rack.refresh_from_db()
+
+        self.assertTrue(payload["ok"])
+        self.assertIsNone(rack.grupo)
+        self.assertFalse(GrupoRackIO.objects.filter(pk=grupo.pk).exists())
 
 
 class IOImportPipelineTests(TestCase):
